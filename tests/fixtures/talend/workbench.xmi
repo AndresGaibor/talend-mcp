@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="ASCII"?>
+<application:Application selectedElement="window">
+  <children selectedElement="stack">
+    <sharedElements selectedElement="part-open">
+      <children>
+        <children xmi:id="part-open" label="Job lab04_olist_orders_to_staging 0.1">
+          <persistedState key="memento" value="&lt;editor id=&quot;org.talend.designer.core.ui.MultiPageTalendEditor&quot; name=&quot;lab04_olist_orders_to_staging&quot; partName=&quot;Job lab04_olist_orders_to_staging 0.1&quot;&gt;&lt;input path=&quot;/PRJ_GENIUS_LAB/temp/tmpPROCESS_DzivYFL-EfGooKJ9qOgNNQ&quot;/&gt;&lt;/editor&gt;"/>
+          <tags>Editor</tags>
+        </children>
+      </children>
+    </sharedElements>
+  </children>
+</application:Application>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<talendfile:ProcessType defaultContext="Default" jobType="Standard">
+  <context name="Default">
+    <contextParameter name="DB_HOST" type="id_String" value="209.50.254.159"/>
+    <contextParameter name="FILE_OLIST_ORDERS" type="id_String" value="/Users/andresgaibor/geniuslab/Fuentes/orders.csv"/>
+  </context>
+  <node componentName="tFileInputDelimited" posX="80" posY="160">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tFileInputDelimited_1"/>
+    <elementParameter field="FILE" name="FILENAME" value="context.FILE_OLIST_ORDERS"/>
+    <elementParameter field="TEXT" name="LABEL" value="orders"/>
+    <metadata connector="FLOW" label="metadata" name="tFileInputDelimited_1">
+      <column key="true" length="40" name="order_id" nullable="true" type="id_String"/>
+      <column key="false" length="40" name="customer_id" nullable="true" type="id_String"/>
+    </metadata>
+  </node>
+  <node componentName="tMap">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMap_1"/>
+    <metadata connector="FLOW" name="out1">
+      <column key="true" length="40" name="order_id" nullable="true" type="id_String"/>
+      <column key="false" length="60" name="load_source" nullable="false" type="id_String"/>
+    </metadata>
+    <nodeData>
+      <outputTables name="out1">
+        <mapperTableEntries name="order_id" expression="row1.order_id " type="id_String" nullable="true"/>
+        <mapperTableEntries name="load_source" expression="&quot;lab04_olist_orders_to_staging&quot; " type="id_String"/>
+      </outputTables>
+    </nodeData>
+  </node>
+  <node componentName="tMysqlOutput">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBOutput_1"/>
+    <elementParameter field="TEXT" name="HOST" value="context.DB_HOST"/>
+    <elementParameter field="DBTABLE" name="TABLE" value="&quot;stg_olist_orders_ag&quot;"/>
+    <elementParameter field="CLOSED_LIST" name="TABLE_ACTION" value="TRUNCATE"/>
+    <elementParameter field="CLOSED_LIST" name="DATA_ACTION" value="INSERT"/>
+    <metadata connector="FLOW" name="tDBOutput_1">
+      <column key="true" length="40" name="order_id" nullable="true" sourceType="VARCHAR" type="id_String"/>
+      <column key="false" length="60" name="load_source" nullable="false" sourceType="VARCHAR" type="id_String"/>
+    </metadata>
+  </node>
+  <connection connectorName="FLOW" label="row1" metaname="tFileInputDelimited_1" source="tFileInputDelimited_1" target="tMap_1">
+    <elementParameter name="UNIQUE_NAME" value="row1"/>
+  </connection>
+  <connection connectorName="FLOW" label="out1" metaname="out1" source="tMap_1" target="tDBOutput_1">
+    <elementParameter name="UNIQUE_NAME" value="out1"/>
+  </connection>
+</talendfile:ProcessType>

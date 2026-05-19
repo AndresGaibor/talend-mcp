@@ -1,0 +1,6 @@
+!ENTRY org.talend.platform.logging 4 0 2026-05-18 17:08:46.022
+!MESSAGE 2026-05-18 17:08:46,021 ERROR org.talend.commons.exception.CommonExceptionHandler  - The Job "lab04_olist_orders_to_staging" has wrong configuration. Fix it and try again.
+Error Line: 2322
+Detail Message: stg_olist_orders_ag cannot be resolved to a variable
+!ENTRY org.talend.platform.logging 1 0 2026-05-19 11:09:32.848
+!MESSAGE 2026-05-19 11:09:32,847 INFO  org.talend.designer.core.runprocess.Processor  - Command line: /path/java prj_genius_lab.lab04_olist_orders_to_staging_0_1.lab04_olist_orders_to_staging --context=Default --stat_port=3440
