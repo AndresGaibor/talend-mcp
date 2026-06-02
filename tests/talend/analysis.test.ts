@@ -27,6 +27,7 @@ describe("Talend analysis", () => {
         {
           uniqueName: "tBad_1",
           componentName: "tMap",
+          nodeAttributes: {},
           parameters: {},
           schemas: [{ name: "out1", columns: [{ name: "" }, { name: "null" }] }],
         },

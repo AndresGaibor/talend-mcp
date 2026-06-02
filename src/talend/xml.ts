@@ -1,4 +1,4 @@
-import { XMLParser } from "fast-xml-parser";
+import { XMLBuilder, XMLParser } from "fast-xml-parser";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -8,8 +8,20 @@ const parser = new XMLParser({
   trimValues: false,
 });
 
+const builder = new XMLBuilder({
+  ignoreAttributes: false,
+  attributeNamePrefix: "@_",
+  format: true,
+  suppressEmptyNode: false,
+  suppressBooleanAttributes: false,
+});
+
 export function parseXml(xml: string): unknown {
   return parser.parse(xml);
+}
+
+export function buildXml(data: unknown): string {
+  return builder.build(data);
 }
 
 export function asArray<T>(valor: T | T[] | undefined | null): T[] {

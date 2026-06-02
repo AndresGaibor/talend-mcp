@@ -6,4 +6,11 @@ describe("MCP server", () => {
     const server = createTalendMcpServer();
     expect(server).toBeDefined();
   });
+
+  test("registra tools de inspeccion", () => {
+    const server = createTalendMcpServer();
+    const toolNames = Object.keys((server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools);
+    expect(toolNames).toContain("talend_inspect_component");
+    expect(toolNames).toContain("talend_inspect_job");
+  });
 });

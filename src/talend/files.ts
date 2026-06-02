@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 
 export function normalizePath(ruta: string): string {
-  return normalize(ruta);
+  return normalize(ruta).replace(/\\/g, "/");
 }
 
 export function isPathInside(rutaObjetivo: string, rutaBase: string): boolean {
@@ -18,6 +18,18 @@ export async function readTextFile(rutaArchivo: string, rutaBasePermitida?: stri
   }
 
   return await Bun.file(rutaArchivo).text();
+}
+
+export async function writeTextFile(
+  rutaArchivo: string,
+  contenido: string,
+  rutaBasePermitida?: string,
+): Promise<void> {
+  if (rutaBasePermitida && !isPathInside(rutaArchivo, rutaBasePermitida)) {
+    throw new Error(`Ruta fuera del workspace permitido: ${rutaArchivo}`);
+  }
+
+  await Bun.write(rutaArchivo, contenido);
 }
 
 export async function listFilesRecursive(

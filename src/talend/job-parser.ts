@@ -16,6 +16,16 @@ function attr(nodo: XmlRecord | undefined, nombre: string): string | undefined {
   return typeof valor === "string" ? valor : undefined;
 }
 
+function nodeAttributes(node: XmlRecord): Record<string, string> {
+  const atributos: Record<string, string> = {};
+  for (const [clave, valor] of Object.entries(node)) {
+    if (clave.startsWith("@_") && typeof valor === "string") {
+      atributos[clave.slice(2)] = valor;
+    }
+  }
+  return atributos;
+}
+
 function boolAttr(nodo: XmlRecord, nombre: string): boolean | undefined {
   const valor = attr(nodo, nombre);
   if (valor === undefined) return undefined;
@@ -110,6 +120,7 @@ export function parseJobItem(xml: string, itemPath: string): ParsedJob {
       uniqueName: parameters.UNIQUE_NAME ?? "",
       componentName: attr(node, "componentName") ?? "",
       label: parameters.LABEL,
+      nodeAttributes: nodeAttributes(node),
       parameters,
       schemas: parseSchemas(node),
     };

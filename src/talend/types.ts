@@ -46,6 +46,7 @@ export type TalendComponent = {
   uniqueName: string;
   componentName: string;
   label?: string;
+  nodeAttributes: Record<string, string>;
   parameters: Record<string, string>;
   schemas: TalendSchema[];
 };
@@ -80,6 +81,33 @@ export type ParsedJob = {
   connections: TalendConnection[];
   contexts: TalendContextParameter[];
   mapperEntries: MapperEntry[];
+};
+
+export type TalendComponentLink = TalendConnection;
+
+export type TalendComponentInspection = {
+  component: TalendComponent;
+  incomingConnections: TalendComponentLink[];
+  outgoingConnections: TalendComponentLink[];
+  raw?: {
+    nodeAttributes: Record<string, string>;
+  };
+};
+
+export type TalendJobInspection = {
+  job: ParsedJob;
+  components: TalendComponentInspection[];
+  connections: TalendConnection[];
+  contexts: TalendContextParameter[];
+  mapperEntries: MapperEntry[];
+  schemaIssues: SchemaIssue[];
+  stats: {
+    componentCount: number;
+    connectionCount: number;
+    contextCount: number;
+    mapperEntryCount: number;
+    schemaIssueCount: number;
+  };
 };
 
 export type TalendJobResource = {

@@ -16,7 +16,7 @@ proc.stderr.on("data", (d) => {
   console.error("STDERR:", d.toString());
 });
 
-const send = (obj) => {
+const send = (obj: unknown) => {
   const line = JSON.stringify(obj) + "\n";
   proc.stdin.write(line);
 };
