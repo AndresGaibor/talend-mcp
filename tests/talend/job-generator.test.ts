@@ -5,7 +5,7 @@ import { parseJobProperties } from "../../src/talend/repository";
 
 describe("Talend job generator", () => {
   test("buildJobItemXml genera XML válido con componentes y conexiones", () => {
-    const xml = buildJobItemXml({
+    const { xml } = buildJobItemXml({
       jobName: "test_job",
       version: "0.1",
       defaultContext: "Default",
@@ -48,7 +48,7 @@ describe("Talend job generator", () => {
   });
 
   test("buildJobItemXml genera XML con contexto por defecto", () => {
-    const xml = buildJobItemXml({
+    const { xml } = buildJobItemXml({
       jobName: "simple_job",
       version: "0.1",
       defaultContext: "Production",
@@ -62,14 +62,16 @@ describe("Talend job generator", () => {
   });
 
   test("buildJobPropertiesXml genera properties válido", () => {
-    const xml = buildJobPropertiesXml({
+    const spec = {
       jobName: "my_job",
       version: "0.1",
       label: "My Custom Job",
       description: "Este job hace algo",
       purpose: "etl",
       components: [],
-    });
+    };
+    const { rootId } = buildJobItemXml(spec);
+    const xml = buildJobPropertiesXml(spec, rootId);
 
     expect(xml).toContain("TalendProperties:Property");
     expect(xml).toContain('label="My Custom Job"');
@@ -101,7 +103,7 @@ describe("Talend job generator", () => {
 
     const result = validateJobSpec(spec);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes("jobName"))).toBe(true);
+    expect(result.errors.some((e: string) => e.includes("jobName"))).toBe(true);
   });
 
   test("validateJobSpec rechaza uniqueNames duplicados", () => {
@@ -115,7 +117,7 @@ describe("Talend job generator", () => {
 
     const result = validateJobSpec(spec);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes("Duplicate"))).toBe(true);
+    expect(result.errors.some((e: string) => e.includes("Duplicate"))).toBe(true);
   });
 
   test("validateJobSpec rechaza spec sin components", () => {
@@ -125,7 +127,7 @@ describe("Talend job generator", () => {
 
     const result = validateJobSpec(spec);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes("components"))).toBe(true);
+    expect(result.errors.some((e: string) => e.includes("components"))).toBe(true);
   });
 
   test("XML generado es parseable por parseJobItem", () => {
@@ -138,7 +140,7 @@ describe("Talend job generator", () => {
       ],
     };
 
-    const xml = buildJobItemXml(spec);
+    const { xml } = buildJobItemXml(spec);
     const job = parseJobItem(xml, "test.item");
 
     expect(job.components.length).toBeGreaterThan(0);

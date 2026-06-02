@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { analyzeTdbOutputs, findSchemaIssues } from "./talend/analysis";
 import { listDQAnalyses, parseDQAnalysis, formatDQAnalysis, formatDQAnalysesList } from "./talend/dq-analysis";
 import { updateDQAnalysisFiles, duplicateDQAnalysisFiles } from "./talend/dq-crud";
+import { formatProjectContexts, listProjectContexts } from "./talend/project-contexts";
 import { parseJobItem } from "./talend/job-parser";
 import { parseJobProperties, listJobs } from "./talend/repository";
 import { parseOpenJobsFromWorkbench } from "./talend/open-job";
@@ -22,7 +23,7 @@ import { readTextFile, writeTextFile, listFilesRecursive, isPathInside } from ".
 import { resolveWorkspaceFromProject, getConfiguredProjectPath, setActiveRepo, clearActiveRepo, isRepoMode } from "./talend/workspace";
 import { cloneRepo, pullRepo, getRepoInfo, discoverTalendProject, getCachedRepos, parseSource, loadState, saveState, getCacheDir } from "./talend/repo";
 import { runJob, getJobExecutionInfo } from "./talend/executor";
-import { createTalendJob, renameTalendJob, deleteTalendJob, duplicateTalendJob } from "./talend/job-crud";
+import { createTalendFolder, createTalendJob, findTalendJob, renameTalendJob, deleteTalendJob, duplicateTalendJob, moveTalendJobToFolder } from "./talend/job-crud";
 import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec } from "./talend/job-generator";
 import {
   buildTalendComponentEditPreview,
@@ -43,6 +44,18 @@ import {
   buildTalendComponentDeletePreview,
   buildTalendConnectionDeletePreview,
 } from "./talend/editor";
+
+import {
+  formatRepositoryContext,
+  formatRepositoryContextList,
+  listRepositoryContexts,
+  readRepositoryContext,
+  createRepositoryContext,
+  updateRepositoryContextParameter,
+  upsertRepositoryContextParameter,
+  deleteRepositoryContextParameter,
+  deleteRepositoryContext,
+} from "./talend/repository-contexts";
 
 import { wrapHandler } from "./tools/live-logger";
 import { resolvePublicUrl } from "./tailscale/resolve-public-url";
@@ -117,15 +130,25 @@ async function listAllJobs() {
   return ok(JSON.stringify(jobs, null, 2), { jobs });
 }
 
-async function readJob({ jobName }: { jobName?: string }) {
+async function readJob({ jobName, folderPath }: { jobName?: string; folderPath?: string }) {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return err("No se detectó TALEND_PROJECT.");
-  const jobs = await listJobs(projectPath);
-  const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
+  const target = jobName ? await findTalendJob(projectPath, jobName, folderPath) : (await listJobs(projectPath))[0];
   if (!target) return err("Job no encontrado.");
   const xml = await readTextFile(target.itemPath, projectPath);
   const job = parseJobItem(xml, target.itemPath);
   return ok(JSON.stringify({ ...target, ...job }, null, 2), { ...target, ...job });
+}
+
+async function createFolderHandler({ folderPath }: { folderPath: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = createTalendFolder(projectPath, folderPath);
+    return ok(JSON.stringify(result, null, 2), result);
+  } catch (e) {
+    return err(`Error creando carpeta: ${e}`);
+  }
 }
 
 async function listComponents({ jobName }: { jobName?: string }) {
@@ -160,6 +183,102 @@ async function readContexts({ jobName }: { jobName?: string }) {
   const xml = await readTextFile(target.itemPath, projectPath);
   const job = parseJobItem(xml, target.itemPath);
   return okArray(JSON.stringify(job.contexts, null, 2), job.contexts);
+}
+
+async function listProjectContextsHandler() {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const contexts = await listProjectContexts(projectPath);
+  return ok(formatProjectContexts(contexts), contexts);
+}
+
+async function listRepositoryContextsHandler() {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const contexts = await listRepositoryContexts(projectPath);
+  return ok(formatRepositoryContextList(contexts), contexts);
+}
+
+async function readRepositoryContextHandler({ contextName }: { contextName: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const context = await readRepositoryContext(projectPath, contextName);
+  if (!context) return err(`Contexto de repositorio no encontrado: ${contextName}`);
+  return ok(formatRepositoryContext(context), context);
+}
+
+async function createRepositoryContextHandler({
+  contextName,
+  version,
+  purpose,
+  description,
+}: {
+  contextName: string;
+  version?: string;
+  purpose?: string;
+  description?: string;
+}) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = await createRepositoryContext(projectPath, { name: contextName, version, purpose, description });
+    return ok(`Contexto de repositorio creado: ${contextName}`, result);
+  } catch (e) {
+    return err(`Error creando contexto: ${e}`);
+  }
+}
+
+async function upsertRepositoryContextParameterHandler({
+  contextName,
+  parameterName,
+  value,
+  type,
+  prompt,
+}: {
+  contextName: string;
+  parameterName: string;
+  value: string;
+  type?: string;
+  prompt?: string;
+}) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    await upsertRepositoryContextParameter(projectPath, contextName, parameterName, value, "Default", type, prompt);
+    return ok(`Parámetro '${parameterName}' creado/actualizado en contexto '${contextName}'.`);
+  } catch (e) {
+    return err(`Error actualizando parámetro: ${e}`);
+  }
+}
+
+async function deleteRepositoryContextHandler({ contextName }: { contextName: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = await deleteRepositoryContext(projectPath, contextName);
+    return ok(`Contexto de repositorio '${contextName}' eliminado.`);
+  } catch (e) {
+    return err(`Error eliminando contexto: ${e}`);
+  }
+}
+
+async function deleteRepositoryContextParameterHandler({
+  contextName,
+  parameterName,
+  context,
+}: {
+  contextName: string;
+  parameterName: string;
+  context?: string;
+}) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    await deleteRepositoryContextParameter(projectPath, contextName, parameterName, context ?? "Default");
+    return ok(`Parámetro '${parameterName}' eliminado del contexto de repositorio '${contextName}'.`);
+  } catch (e) {
+    return err(`Error eliminando parámetro: ${e}`);
+  }
 }
 
 async function listAnalyses() {
@@ -512,11 +631,11 @@ async function previewDeleteContext({ jobName, contextName, parameterName }: { j
   return ok(JSON.stringify(preview, null, 2), preview);
 }
 
-async function updateJobMetadata({ propertiesJobName, label, description, purpose }: { propertiesJobName?: string; label?: string; description?: string; purpose?: string }) {
+async function updateJobMetadata({ propertiesJobName, folderPath, label, description, purpose }: { propertiesJobName?: string; folderPath?: string; label?: string; description?: string; purpose?: string }) {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return err("No se detectó TALEND_PROJECT.");
   const jobs = await listJobs(projectPath);
-  const target = propertiesJobName ? jobs.find((j) => j.label === propertiesJobName) : jobs[0];
+  const target = propertiesJobName ? await findTalendJob(projectPath, propertiesJobName, folderPath) : jobs[0];
   if (!target) return err("Job no encontrado.");
 
   const xml = await readTextFile(target.propertiesPath, projectPath);
@@ -613,47 +732,58 @@ async function moveComponentHandler({ jobName, uniqueName, posX, posY }: { jobNa
 
 // ──────────────────── Job CRUD handlers ────────────────────
 
-async function createJobHandler({ jobName, version, defaultContext, label }: { jobName: string; version?: string; defaultContext?: string; label?: string }) {
+async function createJobHandler({ jobName, version, defaultContext, label, folderPath, description, purpose }: { jobName: string; version?: string; defaultContext?: string; label?: string; folderPath?: string; description?: string; purpose?: string }) {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return err("No se detectó TALEND_PROJECT.");
   try {
-    const result = await createTalendJob(projectPath, { jobName, version: version ?? "0.1", defaultContext, label });
+    const result = await createTalendJob(projectPath, { jobName, version: version ?? "0.1", defaultContext, label, folderPath, description, purpose });
     return ok(JSON.stringify(result, null, 2), result);
   } catch (e) {
     return err(`Error creando job: ${e}`);
   }
 }
 
-async function renameJobHandler({ oldJobName, newJobName }: { oldJobName: string; newJobName: string }) {
+async function renameJobHandler({ oldJobName, newJobName, folderPath }: { oldJobName: string; newJobName: string; folderPath?: string }) {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return err("No se detectó TALEND_PROJECT.");
   try {
-    const result = await renameTalendJob(projectPath, { oldJobName, newJobName });
+    const result = await renameTalendJob(projectPath, { oldJobName, newJobName, folderPath });
     return ok(JSON.stringify(result, null, 2), result);
   } catch (e) {
     return err(`Error renombrando job: ${e}`);
   }
 }
 
-async function deleteJobHandler({ jobName }: { jobName: string }) {
+async function deleteJobHandler({ jobName, folderPath }: { jobName: string; folderPath?: string }) {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return err("No se detectó TALEND_PROJECT.");
   try {
-    const result = await deleteTalendJob(projectPath, { jobName });
+    const result = await deleteTalendJob(projectPath, { jobName, folderPath });
     return ok(JSON.stringify(result, null, 2), result);
   } catch (e) {
     return err(`Error eliminando job: ${e}`);
   }
 }
 
-async function duplicateJobHandler({ sourceJobName, targetJobName, targetVersion }: { sourceJobName: string; targetJobName: string; targetVersion?: string }) {
+async function duplicateJobHandler({ sourceJobName, sourceFolderPath, targetJobName, targetVersion, targetFolderPath }: { sourceJobName: string; sourceFolderPath?: string; targetJobName: string; targetVersion?: string; targetFolderPath?: string }) {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return err("No se detectó TALEND_PROJECT.");
   try {
-    const result = await duplicateTalendJob(projectPath, { sourceJobName, targetJobName, targetVersion });
+    const result = await duplicateTalendJob(projectPath, { sourceJobName, sourceFolderPath, targetJobName, targetVersion, targetFolderPath });
     return ok(JSON.stringify(result, null, 2), result);
   } catch (e) {
     return err(`Error duplicando job: ${e}`);
+  }
+}
+
+async function moveJobToFolderHandler({ jobName, folderPath }: { jobName: string; folderPath: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = await moveTalendJobToFolder(projectPath, { jobName, folderPath });
+    return ok(JSON.stringify(result, null, 2), result);
+  } catch (e) {
+    return err(`Error moviendo job: ${e}`);
   }
 }
 
@@ -667,20 +797,36 @@ async function generateJobHandler({ spec }: { spec: unknown }) {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return err("No se detectó TALEND_PROJECT.");
 
-  const itemXml = buildJobItemXml(s);
-  const propertiesXml = buildJobPropertiesXml(s);
+  const { xml: itemXml, rootId } = buildJobItemXml(s);
+  const propertiesXml = buildJobPropertiesXml(s, rootId);
 
   const version = s.version ?? "0.1";
   const itemFileName = `${s.jobName}_${version}.item`;
   const propertiesFileName = `${s.jobName}_${version}.properties`;
 
-  const itemPath = join(projectPath, "process", itemFileName);
-  const propertiesPath = join(projectPath, "process", propertiesFileName);
+  // Resolver carpeta
+  const processDir = join(projectPath, "process");
+  let targetDir = processDir;
+  if (s.folderPath) {
+    targetDir = join(processDir, ...s.folderPath.split("/"));
+    if (!require("node:fs").existsSync(targetDir)) {
+      require("node:fs").mkdirSync(targetDir, { recursive: true });
+    }
+  }
+
+  const itemPath = join(targetDir, itemFileName);
+  const propertiesPath = join(targetDir, propertiesFileName);
 
   await writeTextFile(itemPath, itemXml, projectPath);
   await writeTextFile(propertiesPath, propertiesXml, projectPath);
 
-  return ok(JSON.stringify({ itemPath, propertiesPath, jobName: s.jobName, version }, null, 2), { itemPath, propertiesPath, jobName: s.jobName, version });
+  return ok(JSON.stringify({ itemPath, propertiesPath, jobName: s.jobName, version, folderPath: s.folderPath }, null, 2), { 
+    itemPath, 
+    propertiesPath, 
+    jobName: s.jobName, 
+    version,
+    folderPath: s.folderPath 
+  });
 }
 
 // ──────────────────── Execution handlers ────────────────────
@@ -861,7 +1007,7 @@ const toolDefs: ToolDef[] = [
   {
     name: "talend_read_job",
     description: "Devuelve resumen de un job.",
-    inputSchema: z.object({ jobName: z.string().optional() }),
+    inputSchema: z.object({ jobName: z.string().optional(), folderPath: z.string().optional() }),
     handler: readJob,
   },
   {
@@ -881,6 +1027,12 @@ const toolDefs: ToolDef[] = [
     description: "Lee variables de contexto del job.",
     inputSchema: z.object({ jobName: z.string().optional() }),
     handler: readContexts,
+  },
+  {
+    name: "talend_list_project_contexts",
+    description: "Lista todos los contextos de todos los jobs del proyecto abierto.",
+    inputSchema: z.object({}),
+    handler: listProjectContextsHandler,
   },
   {
     name: "talend_list_analyses",
@@ -1144,6 +1296,7 @@ const toolDefs: ToolDef[] = [
     description: "Actualiza nombre, descripcion o proposito del job.",
     inputSchema: z.object({
       propertiesJobName: z.string().optional(),
+      folderPath: z.string().optional(),
       label: z.string().optional(),
       description: z.string().optional(),
       purpose: z.string().optional(),
@@ -1160,6 +1313,62 @@ const toolDefs: ToolDef[] = [
       purpose: z.string().optional(),
     }),
     handler: previewJobMetadata,
+  },
+  // ─── Repository Context tools ───
+  {
+    name: "talend_list_repository_contexts",
+    description: "Lista todos los contextos de repositorio del proyecto.",
+    inputSchema: z.object({}),
+    handler: listRepositoryContextsHandler,
+  },
+  {
+    name: "talend_read_repository_context",
+    description: "Lee un contexto de repositorio completo con todas sus variables.",
+    inputSchema: z.object({
+      contextName: z.string().describe("Nombre del contexto de repositorio (ej: olist_context)"),
+    }),
+    handler: readRepositoryContextHandler,
+  },
+  {
+    name: "talend_create_repository_context",
+    description: "Crea un nuevo contexto de repositorio en la carpeta context/.",
+    inputSchema: z.object({
+      contextName: z.string().describe("Nombre del contexto"),
+      version: z.string().optional().describe("Versión (default: 0.1)"),
+      purpose: z.string().optional().describe("Propósito del contexto"),
+      description: z.string().optional().describe("Descripción del contexto"),
+    }),
+    handler: createRepositoryContextHandler,
+  },
+  {
+    name: "talend_upsert_repository_context_parameter",
+    description: "Crea o actualiza un parámetro dentro de un contexto de repositorio.",
+    inputSchema: z.object({
+      contextName: z.string().describe("Nombre del contexto de repositorio"),
+      parameterName: z.string().describe("Nombre del parámetro"),
+      value: z.string().describe("Valor del parámetro"),
+      type: z.string().optional().describe("Tipo (ej: id_String, id_Password)"),
+      prompt: z.string().optional().describe("Prompt mostrado al usuario"),
+    }),
+    handler: upsertRepositoryContextParameterHandler,
+  },
+  {
+    name: "talend_delete_repository_context",
+    description: "Elimina un contexto de repositorio completo (archivos .item y .properties).",
+    inputSchema: z.object({
+      contextName: z.string().describe("Nombre del contexto a eliminar"),
+    }),
+    handler: deleteRepositoryContextHandler,
+  },
+  {
+    name: "talend_delete_repository_context_parameter",
+    description: "Elimina un parámetro específico de un contexto de repositorio.",
+    inputSchema: z.object({
+      contextName: z.string().describe("Nombre del contexto de repositorio"),
+      parameterName: z.string().describe("Nombre del parámetro a borrar"),
+      context: z.string().optional().describe("Nombre del bloque de contexto (default: Default)"),
+    }),
+    handler: deleteRepositoryContextParameterHandler,
   },
   // ─── Repo tools ───
   {
@@ -1226,8 +1435,19 @@ const toolDefs: ToolDef[] = [
       version: z.string().optional().describe("Versión (default: 0.1)"),
       defaultContext: z.string().optional().describe("Contexto por defecto (default: Default)"),
       label: z.string().optional().describe("Etiqueta visible"),
+      description: z.string().optional().describe("Descripción inicial"),
+      purpose: z.string().optional().describe("Propósito inicial"),
+      folderPath: z.string().optional().describe("Carpeta destino dentro de process"),
     }),
     handler: createJobHandler,
+  },
+  {
+    name: "talend_create_folder",
+    description: "Crea una carpeta dentro de process para organizar jobs.",
+    inputSchema: z.object({
+      folderPath: z.string().describe("Ruta de carpeta dentro de process, por ejemplo carpeta_a/subcarpeta_b"),
+    }),
+    handler: createFolderHandler,
   },
   {
     name: "talend_rename_job",
@@ -1235,6 +1455,7 @@ const toolDefs: ToolDef[] = [
     inputSchema: z.object({
       oldJobName: z.string().describe("Nombre actual del job"),
       newJobName: z.string().describe("Nuevo nombre del job"),
+      folderPath: z.string().optional().describe("Carpeta del job origen"),
     }),
     handler: renameJobHandler,
   },
@@ -1243,6 +1464,7 @@ const toolDefs: ToolDef[] = [
     description: "Elimina un job existente (item + properties).",
     inputSchema: z.object({
       jobName: z.string().describe("Nombre del job a eliminar"),
+      folderPath: z.string().optional().describe("Carpeta del job"),
     }),
     handler: deleteJobHandler,
   },
@@ -1251,10 +1473,21 @@ const toolDefs: ToolDef[] = [
     description: "Duplica un job existente con un nombre nuevo.",
     inputSchema: z.object({
       sourceJobName: z.string().describe("Nombre del job origen"),
+      sourceFolderPath: z.string().optional().describe("Carpeta del job origen"),
       targetJobName: z.string().describe("Nombre del job duplicado"),
       targetVersion: z.string().optional().describe("Versión del duplicado (default: misma que origen)"),
+      targetFolderPath: z.string().optional().describe("Carpeta destino del duplicado"),
     }),
     handler: duplicateJobHandler,
+  },
+  {
+    name: "talend_move_job_to_folder",
+    description: "Mueve un job existente a otra carpeta dentro de process.",
+    inputSchema: z.object({
+      jobName: z.string().describe("Nombre del job a mover"),
+      folderPath: z.string().describe("Carpeta destino dentro de process"),
+    }),
+    handler: moveJobToFolderHandler,
   },
   // ─── Flow editing tools ───
   {
@@ -1316,6 +1549,7 @@ const toolDefs: ToolDef[] = [
         label: z.string().optional().describe("Etiqueta visible"),
         description: z.string().optional().describe("Descripción del job"),
         purpose: z.string().optional().describe("Propósito del job"),
+        folderPath: z.string().optional().describe("Carpeta donde se guardará el job"),
         components: z.array(z.object({
           uniqueName: z.string().describe("UNIQUE_NAME del componente"),
           componentName: z.string().describe("Nombre del componente (ej: tFileInputDelimited, tMap, tMysqlOutput)"),
@@ -1382,9 +1616,15 @@ export function createTalendMcpServer(options?: CreateServerOptions): McpServer 
     "talend_delete_connection",
     "talend_move_component",
     "talend_create_job",
+    "talend_create_folder",
     "talend_rename_job",
     "talend_delete_job",
     "talend_duplicate_job",
+    "talend_move_job_to_folder",
+    "talend_create_repository_context",
+    "talend_upsert_repository_context_parameter",
+    "talend_delete_repository_context",
+    "talend_delete_repository_context_parameter",
   ]);
 
   const workspaceTools = new Set([

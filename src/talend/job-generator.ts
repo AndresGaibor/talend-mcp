@@ -1,5 +1,6 @@
 import { buildXml, parseXml } from "./xml";
 import { createEmptyJobItemXml } from "./job-crud";
+import { generateTalendId } from "./utils";
 
 export interface ComponentSpec {
   uniqueName: string;
@@ -40,6 +41,7 @@ export interface JobSpec {
   label?: string;
   description?: string;
   purpose?: string;
+  folderPath?: string;
   components: ComponentSpec[];
   connections?: ConnectionSpec[];
 }
@@ -72,6 +74,7 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
   }
 
   const node: Record<string, unknown> = {
+    "@_xmi:id": generateTalendId(),
     "@_componentName": spec.componentName,
     elementParameter: parameters.length === 1 ? parameters[0] : parameters,
   };
@@ -82,7 +85,9 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
   if (spec.schema && spec.schema.columns && Array.isArray(spec.schema.columns)) {
     const metadata: Record<string, unknown> = {
       "@_connector": spec.schema.connector ?? "FLOW",
-      "@_name": spec.schema.name,
+      "@_label": spec.schema.name ?? spec.uniqueName,
+      "@_name": spec.schema.name ?? spec.uniqueName,
+      "@_xmi:id": generateTalendId(),
       column: spec.schema.columns.map((c) => buildColumn(c)),
     };
     node.metadata = metadata;
@@ -93,6 +98,7 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
 
 function buildConnectionNode(spec: ConnectionSpec): Record<string, unknown> {
   const node: Record<string, unknown> = {
+    "@_xmi:id": generateTalendId(),
     "@_source": spec.source,
     "@_target": spec.target,
     "@_label": spec.label,
@@ -103,20 +109,23 @@ function buildConnectionNode(spec: ConnectionSpec): Record<string, unknown> {
   return node;
 }
 
-export function buildJobItemXml(spec: JobSpec): string {
+export function buildJobItemXml(spec: JobSpec): { xml: string; rootId: string } {
   const version = spec.version ?? "0.1";
   const defaultContext = spec.defaultContext ?? "Default";
+  const rootId = generateTalendId();
 
   if (spec.components.length === 0) {
-    return createEmptyJobItemXml({ jobName: spec.jobName, version, defaultContext });
+    return { xml: createEmptyJobItemXml({ jobName: spec.jobName, version, defaultContext }), rootId };
   }
 
   const contextParam = spec.components.some((c) => c.componentName === "tFileInputDelimited" || c.componentName === "tDBInput")
-    ? [{ "@_name": "DEFAULT", "@_type": "id_String", "@_value": "" }]
+    ? [{ "@_xmi:id": generateTalendId(), "@_name": "DEFAULT", "@_type": "id_String", "@_value": "" }]
     : [];
 
   const contextSection = {
     context: {
+      "@_confirmationNeeded": "false",
+      "@_hide": "false",
       "@_name": defaultContext,
       contextParameter: contextParam.length === 1 ? contextParam[0] : contextParam,
     },
@@ -132,6 +141,10 @@ export function buildJobItemXml(spec: JobSpec): string {
   }
 
   const root: Record<string, unknown> = {
+    "@_xmi:version": "2.0",
+    "@_xmlns:xmi": "http://www.omg.org/XMI",
+    "@_xmlns:talendfile": "platform:/resource/org.talend.model/model/TalendFile.xsd",
+    "@_xmi:id": rootId,
     "@_defaultContext": defaultContext,
     "@_jobType": "Standard",
   };
@@ -146,27 +159,40 @@ export function buildJobItemXml(spec: JobSpec): string {
     "talendfile:ProcessType": root,
   };
 
-  return buildXml(doc);
+  return { xml: buildXml(doc), rootId };
 }
 
-export function buildJobPropertiesXml(spec: JobSpec): string {
+export function buildJobPropertiesXml(spec: JobSpec, rootItemId: string): string {
   const version = spec.version ?? "0.1";
   const itemFileName = `${spec.jobName}_${version}.item`;
+  const propId = generateTalendId();
+  const itemId = generateTalendId();
+  const stateId = generateTalendId();
 
   const doc = {
     "xmi:XMI": {
+      "@_xmi:version": "2.0",
+      "@_xmlns:xmi": "http://www.omg.org/XMI",
+      "@_xmlns:TalendProperties": "http://www.talend.org/properties",
       "TalendProperties:Property": {
+        "@_xmi:id": generateTalendId(),
+        "@_id": propId,
         "@_label": spec.label ?? spec.jobName,
         "@_version": version,
         "@_displayName": spec.label ?? spec.jobName,
         "@_purpose": spec.purpose ?? "",
         "@_description": spec.description ?? "",
+        "@_item": itemId,
       },
       "TalendProperties:ItemState": {
-        "@_path": spec.jobName,
+        "@_xmi:id": stateId,
+        "@_path": spec.folderPath ?? "",
       },
       "TalendProperties:ProcessItem": {
-        process: { "@_href": `${itemFileName}#/` },
+        "@_xmi:id": itemId,
+        "@_property": propId,
+        "@_state": stateId,
+        process: { "@_href": `${itemFileName}#${rootItemId}` },
       },
     },
   };

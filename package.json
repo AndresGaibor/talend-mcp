@@ -13,6 +13,8 @@
     "start": "bun run index.ts",
     "detect:talend-project": "bun run scripts/detect-talend-project.ts",
     "dq:analyses": "bun run scripts/list-dq-analyses.ts",
+    "jobs": "bun run scripts/jobs.ts",
+    "contexts": "bun run scripts/contexts.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

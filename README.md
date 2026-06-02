@@ -55,6 +55,16 @@ Talend MCP server running:
 - `talend_detect_open_job` - detecta el job abierto en Talend Studio
 - `talend_list_jobs` - lista los jobs del proyecto
 - `talend_read_job` - devuelve resumen de un job
+- `talend_read_contexts` - lee los contextos de un job
+- `talend_list_project_contexts` - lista todos los contextos de todos los jobs del proyecto
+- `talend_list_repository_contexts` - lista todos los contextos de repositorio del proyecto
+- `talend_read_repository_context` - lee un contexto de repositorio completo con todas sus variables
+- `talend_create_job` - crea un job nuevo, opcionalmente dentro de una carpeta
+- `talend_create_folder` - crea una carpeta dentro de `process`
+- `talend_rename_job` - renombra un job existente
+- `talend_delete_job` - elimina un job existente
+- `talend_duplicate_job` - duplica un job, con soporte para `sourceFolderPath` y `targetFolderPath`
+- `talend_move_job_to_folder` - mueve un job completo a otra carpeta
 - `talend_list_components` - lista componentes de un job
 - `talend_show_flow` - muestra el flujo entre componentes
 - `talend_read_contexts` - lee variables de contexto
@@ -77,6 +87,16 @@ Talend MCP server running:
 - `talend_upsert_context` - crea o actualiza parametro
 - `talend_delete_context` - elimina parametro de contexto
 - `talend_update_job_metadata` - actualiza nombre/descripcion/purpose
+- `talend_create_repository_context` - crea un contexto de repositorio en `context/`
+- `talend_upsert_repository_context_parameter` - crea o actualiza un parametro en un contexto de repositorio
+- `talend_delete_repository_context` - elimina un contexto de repositorio completo
+
+### Jobs y carpetas
+
+- `talend_create_job` acepta `folderPath` para crear archivos dentro de `process/<carpeta>/`
+- `talend_read_job`, `talend_update_job_metadata`, `talend_rename_job` y `talend_delete_job` aceptan `folderPath` para desambiguar jobs repetidos
+- `talend_duplicate_job` acepta `sourceFolderPath` y `targetFolderPath`
+- `talend_move_job_to_folder` mueve `*.item` y `*.properties` y actualiza `TalendProperties:ItemState path`
 
 ### Gestion de repositorios git
 
@@ -191,6 +211,18 @@ Si usas la app de escritorio de ChatGPT, puedes conectar directo sin tunnel:
     }
   }
 }
+```
+
+### CLI local
+
+```bash
+bun run jobs list
+bun run jobs read mi_job --folder-path carpeta_a
+bun run jobs create mi_job --folder-path carpeta_nueva
+bun run jobs duplicate mi_job mi_job_copia --source-folder-path carpeta_a --folder-path carpeta_b
+bun run jobs move mi_job carpeta_destino/subcarpeta
+bun run jobs create-folder carpeta_nueva/subcarpeta
+bun run contexts list
 ```
 
 ## Ejemplo rapido (local)
