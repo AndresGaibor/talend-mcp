@@ -8,7 +8,7 @@ Sirve para inspeccionar jobs, componentes, contextos, flujos y logs sin modifica
 
 - Bun instalado
 - Talend Studio con un workspace accesible desde esta maquina
-- Una ruta valida del proyecto Talend
+- Una ruta valida al workspace de Talend
 
 ## Instalacion
 
@@ -32,12 +32,12 @@ TALEND_MCP_MODE=http bun run start
 
 ## Configuracion
 
-La variable mas importante es `TALEND_PROJECT`.
+La variable mas importante es `TALEND_WORKSPACE`.
 
 Ejemplo:
 
 ```bash
-export TALEND_PROJECT="/ruta/a/tu/proyecto-talend"
+export TALEND_WORKSPACE="/ruta/a/tu/workspace-talend"
 ```
 
 Opciones disponibles:
@@ -47,7 +47,8 @@ Opciones disponibles:
 - `TALEND_MCP_HOST` - host del servidor HTTP, por defecto `127.0.0.1`
 - `TALEND_MCP_FUNNEL` - desactiva el tunnel publico con `false`
 - `TALEND_MCP_LIVE` - desactiva el modo live con `false`
-- `TALEND_PROJECT` - ruta absoluta al proyecto Talend
+- `TALEND_WORKSPACE` - ruta absoluta al workspace de Talend
+- `TALEND_PROJECT` - ruta absoluta al proyecto Talend, si quieres forzar uno en particular
 
 ## Integracion MCP
 
@@ -60,7 +61,7 @@ Ejemplo de configuracion para un cliente MCP:
       "command": "bun",
       "args": ["run", "/ruta/al/repositorio/talend-mcp/index.ts"],
       "env": {
-        "TALEND_PROJECT": "/ruta/a/tu/proyecto-talend"
+        "TALEND_WORKSPACE": "/ruta/a/tu/workspace-talend"
       }
     }
   }
@@ -68,6 +69,8 @@ Ejemplo de configuracion para un cliente MCP:
 ```
 
 Si usas HTTP, inicia el servidor con `TALEND_MCP_MODE=http` y conecta el cliente a la URL `/mcp`.
+
+El servidor detecta automaticamente el proyecto abierto a partir del workspace y sus archivos `.metadata`.
 
 ## Que hace
 
@@ -94,12 +97,12 @@ El servidor es de solo lectura.
 ## Ejemplo rapido
 
 1. Instala dependencias con `bun install`
-2. Define `TALEND_PROJECT` con la ruta real de tu proyecto
+2. Define `TALEND_WORKSPACE` con la ruta real de tu workspace de Talend
 3. Ejecuta `bun run start`
 4. Conecta tu cliente MCP a este servidor
 
 ## Solucion de problemas
 
-- Si no detecta el proyecto, revisa que `TALEND_PROJECT` apunte a una ruta existente
+- Si no detecta el proyecto, revisa que `TALEND_WORKSPACE` apunte a una ruta existente
 - Si el job abierto no aparece, asegurate de tener Talend Studio abierto con un editor activo
 - Si ejecutas por HTTP y no responde, revisa `TALEND_MCP_PORT` y `TALEND_MCP_HOST`
