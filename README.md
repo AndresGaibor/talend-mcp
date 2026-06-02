@@ -8,7 +8,7 @@ Sirve para inspeccionar jobs, componentes, contextos, flujos y logs sin modifica
 
 - Bun instalado
 - Talend Studio con un workspace accesible desde esta maquina
-- Una ruta valida al workspace de Talend
+- Un workspace de Talend accesible localmente
 
 ## Instalacion
 
@@ -32,12 +32,12 @@ TALEND_MCP_MODE=http bun run start
 
 ## Configuracion
 
-La variable mas importante es `TALEND_WORKSPACE`.
+La deteccion automatica usa `TALEND_WORKSPACE` para encontrar el proyecto abierto.
 
 Ejemplo:
 
 ```bash
-export TALEND_WORKSPACE="/ruta/a/tu/workspace-talend"
+export TALEND_WORKSPACE="<ruta-al-workspace-de-talend>"
 ```
 
 Opciones disponibles:
@@ -47,8 +47,8 @@ Opciones disponibles:
 - `TALEND_MCP_HOST` - host del servidor HTTP, por defecto `127.0.0.1`
 - `TALEND_MCP_FUNNEL` - desactiva el tunnel publico con `false`
 - `TALEND_MCP_LIVE` - desactiva el modo live con `false`
-- `TALEND_WORKSPACE` - ruta absoluta al workspace de Talend
-- `TALEND_PROJECT` - ruta absoluta al proyecto Talend, si quieres forzar uno en particular
+- `TALEND_WORKSPACE` - ruta al workspace de Talend donde esta el proyecto abierto
+- `TALEND_PROJECT` - ruta al proyecto Talend, solo si quieres forzar uno en particular
 
 ## Integracion MCP
 
@@ -59,9 +59,9 @@ Ejemplo de configuracion para un cliente MCP:
   "mcpServers": {
     "talend-mcp": {
       "command": "bun",
-      "args": ["run", "/ruta/al/repositorio/talend-mcp/index.ts"],
+      "args": ["run", "index.ts"],
       "env": {
-        "TALEND_WORKSPACE": "/ruta/a/tu/workspace-talend"
+        "TALEND_WORKSPACE": "<ruta-al-workspace-de-talend>"
       }
     }
   }
@@ -70,7 +70,7 @@ Ejemplo de configuracion para un cliente MCP:
 
 Si usas HTTP, inicia el servidor con `TALEND_MCP_MODE=http` y conecta el cliente a la URL `/mcp`.
 
-El servidor detecta automaticamente el proyecto abierto a partir del workspace y sus archivos `.metadata`.
+El servidor detecta automaticamente el proyecto abierto a partir del workspace y sus archivos `.metadata`, sin usar una ruta fija al proyecto.
 
 ## Que hace
 
@@ -97,7 +97,7 @@ El servidor es de solo lectura.
 ## Ejemplo rapido
 
 1. Instala dependencias con `bun install`
-2. Define `TALEND_WORKSPACE` con la ruta real de tu workspace de Talend
+2. Define `TALEND_WORKSPACE` con la ruta de tu workspace de Talend
 3. Ejecuta `bun run start`
 4. Conecta tu cliente MCP a este servidor
 
