@@ -113,6 +113,7 @@ export type TalendJobInspection = {
 export type TalendJobResource = {
   label: string;
   version: string;
+  folderPath?: string;
   purpose?: string;
   description?: string;
   itemPath: string;

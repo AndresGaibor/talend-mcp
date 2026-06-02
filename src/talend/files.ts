@@ -1,5 +1,6 @@
+import { mkdirSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 
 export function normalizePath(ruta: string): string {
   return normalize(ruta).replace(/\\/g, "/");
@@ -29,6 +30,7 @@ export async function writeTextFile(
     throw new Error(`Ruta fuera del workspace permitido: ${rutaArchivo}`);
   }
 
+  mkdirSync(dirname(rutaArchivo), { recursive: true });
   await Bun.write(rutaArchivo, contenido);
 }
 

@@ -1,4 +1,5 @@
 import { basename, dirname, join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import type { TalendWorkspace } from "./types";
 import { parseLaunchConfig } from "./open-job";
@@ -38,6 +39,72 @@ export function resolveWorkspaceFromProject(rawPath: string): TalendWorkspace {
     projectName,
     metadataPath: join(workspacePath, ".metadata"),
   };
+}
+
+export function extractWorkspacePathFromLsofOutput(output: string): string | undefined {
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.match(/(\/[^\s]+\/studio\/workspace\/[^\/\s]+)/);
+    if (match?.[1]) return match[1];
+  }
+
+  return undefined;
+}
+
+export function extractProjectPathFromLsofOutput(output: string): string | undefined {
+  const paths = output
+    .split(/\r?\n/)
+    .map((line) => line.match(/(\/[^\s]+)$/)?.[1])
+    .filter((ruta): ruta is string => Boolean(ruta));
+
+  for (const path of paths) {
+    let current = dirname(path);
+
+    while (true) {
+      if (existsSync(join(current, "talend.project"))) return current;
+
+      try {
+        const children = readdirSync(current, { withFileTypes: true });
+        for (const child of children) {
+          if (!child.isDirectory()) continue;
+          const childPath = join(current, child.name);
+          if (existsSync(join(childPath, "talend.project"))) return childPath;
+        }
+      } catch {
+        // Ignorar carpetas inaccesibles y seguir con los padres.
+      }
+
+      const parent = dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  }
+
+  return undefined;
+}
+
+function runProcess(command: string, args: string[]): string {
+  const result = spawnSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return typeof result.stdout === "string" ? result.stdout : typeof result.stderr === "string" ? result.stderr : "";
+}
+
+function detectProjectFromRunningStudio(): string | undefined {
+  if (process.platform === "win32") return undefined;
+
+  const psOutput = runProcess("ps", ["-axo", "pid,command"]);
+  const candidates = psOutput
+    .split(/\r?\n/)
+    .filter((line) => line.includes("Talend-Studio") || line.includes("TalendStudio"));
+
+  for (const line of candidates) {
+    const pid = line.trim().split(/\s+/)[0];
+    if (!pid || !/^[0-9]+$/.test(pid)) continue;
+
+    const lsofOutput = runProcess("lsof", ["-p", pid]);
+    const projectPath = extractProjectPathFromLsofOutput(lsofOutput);
+    if (projectPath) return projectPath;
+  }
+
+  return undefined;
 }
 
 function collectProjectCandidates(rutaDirectorio: string, candidatos: string[]): void {
@@ -99,7 +166,15 @@ export function getConfiguredProjectPath(
   if (env.TALEND_PROJECT) return env.TALEND_PROJECT;
 
   const workspacePath = env.TALEND_WORKSPACE;
-  if (!workspacePath) return undefined;
+  if (workspacePath) {
+    const detectedFromWorkspace = discoverProjectPathFromWorkspace(workspacePath);
+    if (detectedFromWorkspace) return detectedFromWorkspace;
+  }
 
-  return discoverProjectPathFromWorkspace(workspacePath);
+  if (env.TALEND_DISABLE_AUTODETECT === "1") return undefined;
+
+  const detectedProject = detectProjectFromRunningStudio();
+  if (detectedProject) return detectedProject;
+
+  return undefined;
 }

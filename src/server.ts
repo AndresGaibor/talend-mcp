@@ -9,14 +9,21 @@ import * as z from "zod/v4";
 import { join } from "node:path";
 
 import { analyzeTdbOutputs, findSchemaIssues } from "./talend/analysis";
+import { listDQAnalyses, parseDQAnalysis, formatDQAnalysis, formatDQAnalysesList } from "./talend/dq-analysis";
+import { updateDQAnalysisFiles, duplicateDQAnalysisFiles } from "./talend/dq-crud";
 import { parseJobItem } from "./talend/job-parser";
 import { parseJobProperties, listJobs } from "./talend/repository";
 import { parseOpenJobsFromWorkbench } from "./talend/open-job";
 import { parseLatestRunLog } from "./talend/run-logs";
+import { analyzeJobLogs, readLogContent, findJobLogFile, formatLogLines, type LogFileInfo } from "./talend/log-viewer";
+import { analyzeJob, formatAnalysis, type FullJobAnalysis } from "./talend/talend-analysis";
 import { inspectTalendComponent, inspectTalendJob } from "./talend/inspection";
 import { readTextFile, writeTextFile, listFilesRecursive, isPathInside } from "./talend/files";
 import { resolveWorkspaceFromProject, getConfiguredProjectPath, setActiveRepo, clearActiveRepo, isRepoMode } from "./talend/workspace";
 import { cloneRepo, pullRepo, getRepoInfo, discoverTalendProject, getCachedRepos, parseSource, loadState, saveState, getCacheDir } from "./talend/repo";
+import { runJob, getJobExecutionInfo } from "./talend/executor";
+import { createTalendJob, renameTalendJob, deleteTalendJob, duplicateTalendJob } from "./talend/job-crud";
+import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec } from "./talend/job-generator";
 import {
   buildTalendComponentEditPreview,
   buildTalendContextEditPreview,
@@ -30,6 +37,11 @@ import {
   updateTalendJobPropertiesXml,
   updateTalendComponentParameterXml,
   updateTalendSchemaColumnXml,
+  deleteTalendComponentXml,
+  deleteTalendConnectionXml,
+  moveTalendComponentXml,
+  buildTalendComponentDeletePreview,
+  buildTalendConnectionDeletePreview,
 } from "./talend/editor";
 
 import { wrapHandler } from "./tools/live-logger";
@@ -148,6 +160,95 @@ async function readContexts({ jobName }: { jobName?: string }) {
   const xml = await readTextFile(target.itemPath, projectPath);
   const job = parseJobItem(xml, target.itemPath);
   return okArray(JSON.stringify(job.contexts, null, 2), job.contexts);
+}
+
+async function listAnalyses() {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const analyses = listDQAnalyses(projectPath);
+  return okArray(formatDQAnalysesList(analyses), analyses);
+}
+
+async function readAnalysis({ analysisName }: { analysisName?: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+
+  const analyses = listDQAnalyses(projectPath);
+  const target = analysisName
+    ? analyses.find((a) => a.name === analysisName || a.filePath.endsWith(`${analysisName}.ana`))
+    : analyses[0];
+
+  if (!target) return err("Análisis no encontrado.");
+
+  const parsed = parseDQAnalysis(target.filePath);
+  if (!parsed) return err("No se pudo leer el análisis.");
+
+  return ok(formatDQAnalysis(parsed), parsed);
+}
+
+async function updateAnalysisHandler({
+  analysisName,
+  name,
+  status,
+  purpose,
+  description,
+  version,
+  author,
+  defaultContext,
+}: {
+  analysisName: string;
+  name?: string;
+  status?: string;
+  purpose?: string;
+  description?: string;
+  version?: string;
+  author?: string;
+  defaultContext?: string;
+}) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = updateDQAnalysisFiles(projectPath, analysisName, { name, status, purpose, description, version, author, defaultContext });
+    return ok(JSON.stringify(result, null, 2), result);
+  } catch (e) {
+    return err(`Error actualizando analysis: ${e}`);
+  }
+}
+
+async function duplicateAnalysisHandler({
+  sourceAnalysisName,
+  targetAnalysisName,
+  version,
+  status,
+  purpose,
+  description,
+  author,
+  defaultContext,
+}: {
+  sourceAnalysisName: string;
+  targetAnalysisName: string;
+  version?: string;
+  status?: string;
+  purpose?: string;
+  description?: string;
+  author?: string;
+  defaultContext?: string;
+}) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = duplicateDQAnalysisFiles(projectPath, sourceAnalysisName, targetAnalysisName, {
+      version,
+      status,
+      purpose,
+      description,
+      author,
+      defaultContext,
+    });
+    return ok(JSON.stringify(result, null, 2), result);
+  } catch (e) {
+    return err(`Error duplicando analysis: ${e}`);
+  }
 }
 
 async function analyzeTdb({ jobName }: { jobName?: string }) {
@@ -452,6 +553,215 @@ async function previewJobMetadata({ propertiesJobName, label, description, purpo
   return ok(JSON.stringify(preview, null, 2), preview);
 }
 
+async function deleteComponentHandler({ jobName, uniqueName }: { jobName?: string; uniqueName: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const jobs = await listJobs(projectPath);
+  const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
+  if (!target) return err("Job no encontrado.");
+  const xml = await readTextFile(target.itemPath, projectPath);
+  const updatedXml = deleteTalendComponentXml(xml, { uniqueName });
+  await writeTextFile(target.itemPath, updatedXml, projectPath);
+  return ok(JSON.stringify({ itemPath: target.itemPath, uniqueName }, null, 2), { itemPath: target.itemPath, uniqueName });
+}
+
+async function previewDeleteComponentHandler({ jobName, uniqueName }: { jobName?: string; uniqueName: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const jobs = await listJobs(projectPath);
+  const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
+  if (!target) return err("Job no encontrado.");
+  const xml = await readTextFile(target.itemPath, projectPath);
+  const preview = buildTalendComponentDeletePreview(xml, { uniqueName });
+  return ok(JSON.stringify(preview, null, 2), preview);
+}
+
+async function deleteConnectionHandler({ jobName, uniqueName }: { jobName?: string; uniqueName: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const jobs = await listJobs(projectPath);
+  const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
+  if (!target) return err("Job no encontrado.");
+  const xml = await readTextFile(target.itemPath, projectPath);
+  const updatedXml = deleteTalendConnectionXml(xml, { uniqueName });
+  await writeTextFile(target.itemPath, updatedXml, projectPath);
+  return ok(JSON.stringify({ itemPath: target.itemPath, uniqueName }, null, 2), { itemPath: target.itemPath, uniqueName });
+}
+
+async function previewDeleteConnectionHandler({ jobName, uniqueName }: { jobName?: string; uniqueName: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const jobs = await listJobs(projectPath);
+  const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
+  if (!target) return err("Job no encontrado.");
+  const xml = await readTextFile(target.itemPath, projectPath);
+  const preview = buildTalendConnectionDeletePreview(xml, { uniqueName });
+  return ok(JSON.stringify(preview, null, 2), preview);
+}
+
+async function moveComponentHandler({ jobName, uniqueName, posX, posY }: { jobName?: string; uniqueName: string; posX: number; posY: number }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const jobs = await listJobs(projectPath);
+  const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
+  if (!target) return err("Job no encontrado.");
+  const xml = await readTextFile(target.itemPath, projectPath);
+  const updatedXml = moveTalendComponentXml(xml, { uniqueName, posX, posY });
+  await writeTextFile(target.itemPath, updatedXml, projectPath);
+  return ok(JSON.stringify({ itemPath: target.itemPath, uniqueName, posX, posY }, null, 2), { itemPath: target.itemPath, uniqueName, posX, posY });
+}
+
+// ──────────────────── Job CRUD handlers ────────────────────
+
+async function createJobHandler({ jobName, version, defaultContext, label }: { jobName: string; version?: string; defaultContext?: string; label?: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = await createTalendJob(projectPath, { jobName, version: version ?? "0.1", defaultContext, label });
+    return ok(JSON.stringify(result, null, 2), result);
+  } catch (e) {
+    return err(`Error creando job: ${e}`);
+  }
+}
+
+async function renameJobHandler({ oldJobName, newJobName }: { oldJobName: string; newJobName: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = await renameTalendJob(projectPath, { oldJobName, newJobName });
+    return ok(JSON.stringify(result, null, 2), result);
+  } catch (e) {
+    return err(`Error renombrando job: ${e}`);
+  }
+}
+
+async function deleteJobHandler({ jobName }: { jobName: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = await deleteTalendJob(projectPath, { jobName });
+    return ok(JSON.stringify(result, null, 2), result);
+  } catch (e) {
+    return err(`Error eliminando job: ${e}`);
+  }
+}
+
+async function duplicateJobHandler({ sourceJobName, targetJobName, targetVersion }: { sourceJobName: string; targetJobName: string; targetVersion?: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  try {
+    const result = await duplicateTalendJob(projectPath, { sourceJobName, targetJobName, targetVersion });
+    return ok(JSON.stringify(result, null, 2), result);
+  } catch (e) {
+    return err(`Error duplicando job: ${e}`);
+  }
+}
+
+async function generateJobHandler({ spec }: { spec: unknown }) {
+  const validation = validateJobSpec(spec);
+  if (!validation.valid) {
+    return err(`Spec inválido:\n${validation.errors.join("\n")}`);
+  }
+
+  const s = spec as JobSpec;
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+
+  const itemXml = buildJobItemXml(s);
+  const propertiesXml = buildJobPropertiesXml(s);
+
+  const version = s.version ?? "0.1";
+  const itemFileName = `${s.jobName}_${version}.item`;
+  const propertiesFileName = `${s.jobName}_${version}.properties`;
+
+  const itemPath = join(projectPath, "process", itemFileName);
+  const propertiesPath = join(projectPath, "process", propertiesFileName);
+
+  await writeTextFile(itemPath, itemXml, projectPath);
+  await writeTextFile(propertiesPath, propertiesXml, projectPath);
+
+  return ok(JSON.stringify({ itemPath, propertiesPath, jobName: s.jobName, version }, null, 2), { itemPath, propertiesPath, jobName: s.jobName, version });
+}
+
+// ──────────────────── Execution handlers ────────────────────
+
+async function runJobHandler({ jobName, contextName, timeoutMs }: { jobName?: string; contextName?: string; timeoutMs?: number }) {
+  const result = await runJob({ jobName, contextName, timeoutMs });
+  if (!result.ok) return err(result.error ?? "Job falló");
+  return ok(
+    `Job completado en ${result.durationMs}ms (exit ${result.exitCode})\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    { exitCode: result.exitCode, durationMs: result.durationMs, stdout: result.stdout, stderr: result.stderr },
+  );
+}
+
+async function jobInfoHandler({ jobName }: { jobName?: string }) {
+  const info = await getJobExecutionInfo(jobName);
+  if (!info) return err("No se encontró información del job.");
+  return ok(JSON.stringify(info, null, 2), info);
+}
+
+async function viewLogsHandler({ jobName, maxLines, filter, fromLine }: { jobName?: string; maxLines?: number; filter?: string; fromLine?: number }) {
+  const name = jobName ?? (await listJobs(getConfiguredProjectPath() ?? ""))[0]?.label ?? "";
+  if (!name) return err("No se detectó job.");
+
+  const result = readLogContent(findJobLogFile(name)?.path ?? "", { maxLines, filter, fromLine });
+  if (!result.lines.length) return err("No se encontró archivo de log.");
+
+  const formatted = formatLogLines(result.lines, true);
+  const truncatedNote = result.truncated ? `\n\n[ truncado: mostrando últimas ${result.lines.length} de ${result.totalLines} líneas ]` : "";
+  return ok(`${formatted}${truncatedNote}`, { totalLines: result.totalLines, returnedLines: result.lines.length, truncated: result.truncated });
+}
+
+async function analyzeLogsHandler({ jobName }: { jobName?: string }) {
+  const name = jobName ?? (await listJobs(getConfiguredProjectPath() ?? ""))[0]?.label ?? "";
+  if (!name) return err("No se detectó job.");
+
+  const analysis = analyzeJobLogs(name);
+  if (!analysis.logFile) return err(`No se encontró archivo de log para "${name}".\n\nSugerencias:\n${analysis.suggestions.join("\n")}`);
+
+  const status = analysis.analysis?.status ?? "unknown";
+  const statusEmoji = status === "error" ? " ERROR " : status === "success" ? " OK " : " ? ";
+  const statusColor = status === "error" ? "❌" : status === "success" ? "✅" : "❓";
+
+  let output = `${statusColor} Job: ${name} | Status: ${status}\n`;
+  output += `Log: ${analysis.logFile.path}\n`;
+  output += `Tamaño: ${(analysis.logFile.size / 1024).toFixed(1)} KB\n`;
+  output += `Modificado: ${analysis.logFile.modified.toISOString()}\n`;
+  output += `Errores encontrados: ${analysis.analysis?.errors?.length ?? 0}\n\n`;
+
+  if (analysis.analysis?.errors?.length) {
+    output += `=== ERRORES ===\n`;
+    for (const err of analysis.analysis.errors) {
+      output += `Línea ${err.line}: ${err.message.split("\n")[0]}\n`;
+    }
+    output += "\n";
+  }
+
+  if (analysis.suggestions.length) {
+    output += `=== SUGERENCIAS ===\n${analysis.suggestions.join("\n")}\n\n`;
+  }
+
+  if (analysis.rawSnippet.length) {
+    output += `=== CONTEXTO RECIENTE ===\n${formatLogLines(analysis.rawSnippet, true)}`;
+  }
+
+  return ok(output, analysis);
+}
+
+async function fullAnalysisHandler({ jobName }: { jobName?: string }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const jobs = await listJobs(projectPath);
+  const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
+  if (!target) return err("Job no encontrado.");
+
+  const xml = await readTextFile(target.itemPath, projectPath);
+  const job = parseJobItem(xml, target.itemPath);
+  const analysis = analyzeJob(job);
+  const formatted = formatAnalysis(analysis);
+  return ok(formatted, analysis);
+}
+
 // ──────────────────── Repo tool handlers ────────────────────
 
 async function repoSources() {
@@ -573,6 +883,48 @@ const toolDefs: ToolDef[] = [
     handler: readContexts,
   },
   {
+    name: "talend_list_analyses",
+    description: "Lista los análisis de Data Profiling del proyecto abierto.",
+    inputSchema: z.object({}),
+    handler: listAnalyses,
+  },
+  {
+    name: "talend_read_analysis",
+    description: "Lee el contenido de un análisis de Data Profiling.",
+    inputSchema: z.object({ analysisName: z.string().optional().describe("Nombre del análisis") }),
+    handler: readAnalysis,
+  },
+  {
+    name: "talend_update_analysis",
+    description: "Actualiza metadata de un análisis de Data Profiling.",
+    inputSchema: z.object({
+      analysisName: z.string().describe("Nombre del análisis a actualizar"),
+      name: z.string().optional().describe("Nuevo nombre interno"),
+      status: z.string().optional().describe("Nuevo status"),
+      purpose: z.string().optional().describe("Nuevo propósito"),
+      description: z.string().optional().describe("Nueva descripción"),
+      version: z.string().optional().describe("Nueva versión"),
+      author: z.string().optional().describe("Nuevo autor"),
+      defaultContext: z.string().optional().describe("Nuevo contexto por defecto"),
+    }),
+    handler: updateAnalysisHandler,
+  },
+  {
+    name: "talend_duplicate_analysis",
+    description: "Duplica un análisis de Data Profiling con nuevo nombre.",
+    inputSchema: z.object({
+      sourceAnalysisName: z.string().describe("Nombre del análisis origen"),
+      targetAnalysisName: z.string().describe("Nombre del análisis duplicado"),
+      version: z.string().optional().describe("Versión del duplicado (default: misma que origen)"),
+      status: z.string().optional().describe("Status a aplicar"),
+      purpose: z.string().optional().describe("Propósito a aplicar"),
+      description: z.string().optional().describe("Descripción a aplicar"),
+      author: z.string().optional().describe("Autor a aplicar"),
+      defaultContext: z.string().optional().describe("Contexto por defecto a aplicar"),
+    }),
+    handler: duplicateAnalysisHandler,
+  },
+  {
     name: "talend_analyze_tdboutput",
     description: "Analiza componentes tMysqlOutput/tDBOutput.",
     inputSchema: z.object({ jobName: z.string().optional() }),
@@ -589,6 +941,33 @@ const toolDefs: ToolDef[] = [
     description: "Busca errores históricos en .metadata/.log.",
     inputSchema: z.object({ jobName: z.string().optional() }),
     handler: readJobErrors,
+  },
+  {
+    name: "talend_view_logs",
+    description: "Muestra líneas de log de un job con números de línea y marcadores de error. Soporta filtrado y paginación.",
+    inputSchema: z.object({
+      jobName: z.string().optional().describe("Nombre del job (default: primero encontrado)"),
+      maxLines: z.number().optional().describe("Máximo de líneas a devolver (default: 100)"),
+      filter: z.string().optional().describe("Filtro de texto a buscar en las líneas"),
+      fromLine: z.number().optional().describe("Inicio de lectura (default: 1)"),
+    }),
+    handler: viewLogsHandler,
+  },
+  {
+    name: "talend_analyze_logs",
+    description: "Analiza logs de un job: detecta status, errores, sugiere acciones y muestra snippet de contexto.",
+    inputSchema: z.object({
+      jobName: z.string().optional().describe("Nombre del job (default: primero encontrado)"),
+    }),
+    handler: analyzeLogsHandler,
+  },
+  {
+    name: "talend_full_analysis",
+    description: "Análisis completo de un job: componentes, conexiones, contexts, tDBOutput, schema issues y warnings. Formato legible.",
+    inputSchema: z.object({
+      jobName: z.string().optional().describe("Nombre del job (default: primero encontrado)"),
+    }),
+    handler: fullAnalysisHandler,
   },
   {
     name: "talend_summarize_open_job",
@@ -819,6 +1198,158 @@ const toolDefs: ToolDef[] = [
     }),
     handler: repoSwitch,
   },
+  // ─── Execution tools ───
+  {
+    name: "talend_run_job",
+    description: "Ejecuta un job de Talend Studio y devuelve stdout, stderr, exitCode y duración.",
+    inputSchema: z.object({
+      jobName: z.string().optional().describe("Nombre del job a ejecutar (default: primero encontrado)"),
+      contextName: z.string().optional().describe("Nombre del contexto (default: Default)"),
+      timeoutMs: z.number().optional().describe("Timeout en milisegundos (default: 300000)"),
+    }),
+    handler: runJobHandler,
+  },
+  {
+    name: "talend_job_info",
+    description: "Devuelve información del script de ejecución de un job: itemPath, propertiesPath y scriptPath.",
+    inputSchema: z.object({
+      jobName: z.string().optional().describe("Nombre del job (default: primero encontrado)"),
+    }),
+    handler: jobInfoHandler,
+  },
+  // ─── Job CRUD tools ───
+  {
+    name: "talend_create_job",
+    description: "Crea un job nuevo vacío en el proyecto.",
+    inputSchema: z.object({
+      jobName: z.string().describe("Nombre del job"),
+      version: z.string().optional().describe("Versión (default: 0.1)"),
+      defaultContext: z.string().optional().describe("Contexto por defecto (default: Default)"),
+      label: z.string().optional().describe("Etiqueta visible"),
+    }),
+    handler: createJobHandler,
+  },
+  {
+    name: "talend_rename_job",
+    description: "Renombra un job existente.",
+    inputSchema: z.object({
+      oldJobName: z.string().describe("Nombre actual del job"),
+      newJobName: z.string().describe("Nuevo nombre del job"),
+    }),
+    handler: renameJobHandler,
+  },
+  {
+    name: "talend_delete_job",
+    description: "Elimina un job existente (item + properties).",
+    inputSchema: z.object({
+      jobName: z.string().describe("Nombre del job a eliminar"),
+    }),
+    handler: deleteJobHandler,
+  },
+  {
+    name: "talend_duplicate_job",
+    description: "Duplica un job existente con un nombre nuevo.",
+    inputSchema: z.object({
+      sourceJobName: z.string().describe("Nombre del job origen"),
+      targetJobName: z.string().describe("Nombre del job duplicado"),
+      targetVersion: z.string().optional().describe("Versión del duplicado (default: misma que origen)"),
+    }),
+    handler: duplicateJobHandler,
+  },
+  // ─── Flow editing tools ───
+  {
+    name: "talend_delete_component",
+    description: "Elimina un componente del job y sus conexiones.",
+    inputSchema: z.object({
+      jobName: z.string().optional(),
+      uniqueName: z.string().describe("UNIQUE_NAME del componente"),
+    }),
+    handler: deleteComponentHandler,
+  },
+  {
+    name: "talend_preview_delete_component",
+    description: "Muestra preview y diff al eliminar un componente.",
+    inputSchema: z.object({
+      jobName: z.string().optional(),
+      uniqueName: z.string().describe("UNIQUE_NAME del componente"),
+    }),
+    handler: previewDeleteComponentHandler,
+  },
+  {
+    name: "talend_delete_connection",
+    description: "Elimina una conexión del job.",
+    inputSchema: z.object({
+      jobName: z.string().optional(),
+      uniqueName: z.string().describe("UNIQUE_NAME de la conexión"),
+    }),
+    handler: deleteConnectionHandler,
+  },
+  {
+    name: "talend_preview_delete_connection",
+    description: "Muestra preview y diff al eliminar una conexión.",
+    inputSchema: z.object({
+      jobName: z.string().optional(),
+      uniqueName: z.string().describe("UNIQUE_NAME de la conexión"),
+    }),
+    handler: previewDeleteConnectionHandler,
+  },
+  {
+    name: "talend_move_component",
+    description: "Mueve un componente a una nueva posición (posX, posY).",
+    inputSchema: z.object({
+      jobName: z.string().optional(),
+      uniqueName: z.string().describe("UNIQUE_NAME del componente"),
+      posX: z.number().describe("Nueva posición X"),
+      posY: z.number().describe("Nueva posición Y"),
+    }),
+    handler: moveComponentHandler,
+  },
+  // ─── Job generation tool ───
+  {
+    name: "talend_generate_job",
+    description: "Genera un job completo desde una especificación declarativa (JobSpec). Valida el spec, construye el .item y el .properties, y los escribe en el proyecto.",
+    inputSchema: z.object({
+      spec: z.object({
+        jobName: z.string().describe("Nombre del job"),
+        version: z.string().optional().describe("Versión (default: 0.1)"),
+        defaultContext: z.string().optional().describe("Contexto por defecto (default: Default)"),
+        label: z.string().optional().describe("Etiqueta visible"),
+        description: z.string().optional().describe("Descripción del job"),
+        purpose: z.string().optional().describe("Propósito del job"),
+        components: z.array(z.object({
+          uniqueName: z.string().describe("UNIQUE_NAME del componente"),
+          componentName: z.string().describe("Nombre del componente (ej: tFileInputDelimited, tMap, tMysqlOutput)"),
+          posX: z.number().optional().describe("Posición X"),
+          posY: z.number().optional().describe("Posición Y"),
+          label: z.string().optional().describe("Etiqueta del componente"),
+          parameters: z.record(z.string(), z.string()).optional().describe("Parámetros adicionales"),
+          schema: z.object({
+            name: z.string().describe("Nombre del schema"),
+            connector: z.string().optional().describe("Connector (default: FLOW)"),
+            columns: z.array(z.object({
+              name: z.string().describe("Nombre de la columna"),
+              type: z.string().optional().describe("Tipo (default: id_String)"),
+              length: z.number().optional().describe("Longitud"),
+              precision: z.number().optional().describe("Precisión"),
+              nullable: z.boolean().optional().describe("Nullable"),
+              key: z.boolean().optional().describe("Es clave"),
+              sourceType: z.string().optional().describe("Tipo en fuente"),
+              pattern: z.string().optional().describe("Patrón"),
+            })).optional().describe("Columnas del schema"),
+          }).optional().describe("Schema del componente"),
+        })).describe("Componentes del job"),
+        connections: z.array(z.object({
+          source: z.string().describe("UNIQUE_NAME del componente fuente"),
+          target: z.string().describe("UNIQUE_NAME del componente destino"),
+          label: z.string().describe("Etiqueta de la conexión"),
+          connectorName: z.string().optional().describe("Tipo de connector (default: FLOW)"),
+          metaname: z.string().optional().describe("Nombre del meta"),
+          uniqueName: z.string().optional().describe("UNIQUE_NAME de la conexión"),
+        })).optional().describe("Conexiones entre componentes"),
+      }),
+    }),
+    handler: generateJobHandler,
+  },
 ];
 
 // ──────────────────── Creación del servidor ────────────────────
@@ -845,6 +1376,15 @@ export function createTalendMcpServer(options?: CreateServerOptions): McpServer 
     "talend_update_context",
     "talend_upsert_context",
     "talend_update_job_metadata",
+    "talend_update_analysis",
+    "talend_duplicate_analysis",
+    "talend_delete_component",
+    "talend_delete_connection",
+    "talend_move_component",
+    "talend_create_job",
+    "talend_rename_job",
+    "talend_delete_job",
+    "talend_duplicate_job",
   ]);
 
   const workspaceTools = new Set([
@@ -852,6 +1392,8 @@ export function createTalendMcpServer(options?: CreateServerOptions): McpServer 
     "talend_read_latest_run_log",
     "talend_read_job_errors",
     "talend_summarize_open_job",
+    "talend_view_logs",
+    "talend_analyze_logs",
   ]);
 
   function wrapGuard(name: string, handler: (input: any) => Promise<CallToolResult>): (input: any) => Promise<CallToolResult> {

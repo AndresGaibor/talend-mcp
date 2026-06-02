@@ -14,6 +14,11 @@ import {
   updateTalendJobPropertiesXml,
   updateTalendComponentParameterXml,
   updateTalendSchemaColumnXml,
+  deleteTalendComponentXml,
+  deleteTalendConnectionXml,
+  moveTalendComponentXml,
+  buildTalendComponentDeletePreview,
+  buildTalendConnectionDeletePreview,
 } from "../../src/talend/editor";
 
 describe("Talend editor", () => {
@@ -210,5 +215,53 @@ describe("Talend editor", () => {
 
     expect(preview.changed).toBe(true);
     expect(preview.diff).toContain("DB_HOST");
+  });
+
+  test("elimina un componente y sus conexiones asociadas", async () => {
+    const xml = await readTextFile("tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.item");
+
+    const updatedXml = deleteTalendComponentXml(xml, { uniqueName: "tMap_1" });
+    const job = parseJobItem(updatedXml, "tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.item");
+
+    expect(job.components.find((c) => c.uniqueName === "tMap_1")).toBeUndefined();
+    expect(job.connections.some((c) => c.source === "tMap_1" || c.target === "tMap_1")).toBe(false);
+  });
+
+  test("elimina una conexión por uniqueName", async () => {
+    const xml = await readTextFile("tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.item");
+
+    const updatedXml = deleteTalendConnectionXml(xml, { uniqueName: "row1" });
+    const job = parseJobItem(updatedXml, "tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.item");
+
+    expect(job.connections.find((c) => c.uniqueName === "row1")).toBeUndefined();
+  });
+
+  test("mueve un componente a nueva posición", async () => {
+    const xml = await readTextFile("tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.item");
+
+    const updatedXml = moveTalendComponentXml(xml, { uniqueName: "tFileInputDelimited_1", posX: 300, posY: 200 });
+    const job = parseJobItem(updatedXml, "tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.item");
+    const component = job.components.find((c) => c.uniqueName === "tFileInputDelimited_1");
+
+    expect(component?.nodeAttributes.posX).toBe("300");
+    expect(component?.nodeAttributes.posY).toBe("200");
+  });
+
+  test("buildTalendComponentDeletePreview genera diff", async () => {
+    const xml = await readTextFile("tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.item");
+
+    const preview = buildTalendComponentDeletePreview(xml, { uniqueName: "tMap_1" });
+
+    expect(preview.changed).toBe(true);
+    expect(preview.diff).toContain("tMap_1");
+  });
+
+  test("buildTalendConnectionDeletePreview genera diff", async () => {
+    const xml = await readTextFile("tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.item");
+
+    const preview = buildTalendConnectionDeletePreview(xml, { uniqueName: "row1" });
+
+    expect(preview.changed).toBe(true);
+    expect(preview.diff).toContain("row1");
   });
 });

@@ -11,6 +11,8 @@
   },
   "scripts": {
     "start": "bun run index.ts",
+    "detect:talend-project": "bun run scripts/detect-talend-project.ts",
+    "dq:analyses": "bun run scripts/list-dq-analyses.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readTextFile } from "../../src/talend/files";
-import { analyzeTdbOutputs, findSchemaIssues } from "../../src/talend/analysis";
+import { analyzeTdbOutputs, findSchemaIssues, analyzeColumns, summarizeColumnIssues } from "../../src/talend/analysis";
 import { parseJobItem } from "../../src/talend/job-parser";
 
 describe("Talend analysis", () => {
@@ -35,5 +35,114 @@ describe("Talend analysis", () => {
     });
 
     expect(issues.map((issue) => issue.issue)).toEqual(["empty-column-name", "null-column-name"]);
+  });
+
+  test("analyzeColumns detecta reserved keywords", () => {
+    const job = {
+      itemPath: "fixture.item",
+      contexts: [],
+      connections: [],
+      mapperEntries: [],
+      components: [
+        {
+          uniqueName: "tMap_1",
+          componentName: "tMap",
+          nodeAttributes: {},
+          parameters: {},
+          schemas: [{
+            name: "out1",
+            columns: [
+              { name: "select" },
+              { name: "index" },
+              { name: "order" },
+            ],
+          }],
+        },
+      ],
+    };
+
+    const results = analyzeColumns(job);
+    const summary = summarizeColumnIssues(results);
+    expect(summary.warnings).toBeGreaterThan(0);
+    expect(summary.byType["reserved-keyword"]).toBe(3);
+  });
+
+  test("analyzeColumns detecta columnas sin tipo", () => {
+    const job = {
+      itemPath: "fixture.item",
+      contexts: [],
+      connections: [],
+      mapperEntries: [],
+      components: [
+        {
+          uniqueName: "tMap_1",
+          componentName: "tMap",
+          nodeAttributes: {},
+          parameters: {},
+          schemas: [{
+            name: "out1",
+            columns: [
+              { name: "campo_sin_tipo", type: "" },
+              { name: "campo_ok", type: "id_String" },
+            ],
+          }],
+        },
+      ],
+    };
+
+    const results = analyzeColumns(job);
+    const noType = results.filter((r) => r.issues.some((i) => i.type === "missing-type"));
+    expect(noType.length).toBeGreaterThan(0);
+  });
+
+  test("analyzeColumns detecta nombres excesivamente largos", () => {
+    const longName = "a".repeat(80);
+    const job = {
+      itemPath: "fixture.item",
+      contexts: [],
+      connections: [],
+      mapperEntries: [],
+      components: [
+        {
+          uniqueName: "tMap_1",
+          componentName: "tMap",
+          nodeAttributes: {},
+          parameters: {},
+          schemas: [{
+            name: "out1",
+            columns: [{ name: longName }],
+          }],
+        },
+      ],
+    };
+
+    const results = analyzeColumns(job);
+    const longIssues = results.filter((r) => r.issues.some((i) => i.type === "excessive-length"));
+    expect(longIssues.length).toBeGreaterThan(0);
+  });
+
+  test("analyzeColumns detecta columnas con espacios", () => {
+    const job = {
+      itemPath: "fixture.item",
+      contexts: [],
+      connections: [],
+      mapperEntries: [],
+      components: [
+        {
+          uniqueName: "tMap_1",
+          componentName: "tMap",
+          nodeAttributes: {},
+          parameters: {},
+          schemas: [{
+            name: "out1",
+            columns: [{ name: "nombre con espacios" }],
+          }],
+        },
+      ],
+    };
+
+    const results = analyzeColumns(job);
+    const withSpaces = results.filter((r) => r.issues.some((i) => i.type === "name-with-spaces"));
+    expect(withSpaces.length).toBe(1);
   });
 });

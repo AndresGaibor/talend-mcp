@@ -371,6 +371,94 @@ export function buildTalendJobPropertiesEditPreview(xml: string, options: JobPro
   };
 }
 
+type DeleteComponentOptions = {
+  uniqueName: string;
+};
+
+type DeleteConnectionOptions = {
+  uniqueName: string;
+};
+
+type MoveComponentOptions = {
+  uniqueName: string;
+  posX: number;
+  posY: number;
+};
+
+export function deleteTalendComponentXml(xml: string, options: DeleteComponentOptions): string {
+  const document = getParsedDocument(xml);
+  const root = document["talendfile:ProcessType"] ?? document.ProcessType;
+  if (!root) throw new Error("XML de job Talend inválido: falta talendfile:ProcessType");
+
+  const nodes = ensureArrayNode(root.node as XmlRecord | XmlRecord[] | undefined);
+  const filtered = nodes.filter((node) => {
+    const parameters = asArray(node.elementParameter as XmlRecord | XmlRecord[] | undefined);
+    return !parameters.some((p) => attr(p, "name") === "UNIQUE_NAME" && attr(p, "value") === options.uniqueName);
+  });
+
+  if (filtered.length === nodes.length) throw new Error(`Componente no encontrado: ${options.uniqueName}`);
+
+  const connections = ensureArrayNode(root.connection as XmlRecord | XmlRecord[] | undefined);
+  const filteredConnections = connections.filter((conn) => {
+    const source = attr(conn, "source");
+    const target = attr(conn, "target");
+    return source !== options.uniqueName && target !== options.uniqueName;
+  });
+
+  root.node = filtered.length === 1 ? filtered[0] : filtered;
+  root.connection = filteredConnections.length === 1 ? filteredConnections[0] : filteredConnections;
+
+  return buildXml(document);
+}
+
+export function deleteTalendConnectionXml(xml: string, options: DeleteConnectionOptions): string {
+  const document = getParsedDocument(xml);
+  const root = document["talendfile:ProcessType"] ?? document.ProcessType;
+  if (!root) throw new Error("XML de job Talend inválido: falta talendfile:ProcessType");
+
+  const connections = ensureArrayNode(root.connection as XmlRecord | XmlRecord[] | undefined);
+  const filtered = connections.filter((conn) => {
+    const parameters = asArray(conn.elementParameter as XmlRecord | XmlRecord[] | undefined);
+    return !parameters.some((p) => attr(p, "name") === "UNIQUE_NAME" && attr(p, "value") === options.uniqueName);
+  });
+
+  if (filtered.length === connections.length) throw new Error(`Conexión no encontrada: ${options.uniqueName}`);
+
+  root.connection = filtered.length === 1 ? filtered[0] : filtered;
+  return buildXml(document);
+}
+
+export function moveTalendComponentXml(xml: string, options: MoveComponentOptions): string {
+  const document = getParsedDocument(xml);
+  const root = document["talendfile:ProcessType"] ?? document.ProcessType;
+  if (!root) throw new Error("XML de job Talend inválido: falta talendfile:ProcessType");
+
+  const nodes = ensureArrayNode(root.node as XmlRecord | XmlRecord[] | undefined);
+  const target = nodes.find((node) => {
+    const parameters = asArray(node.elementParameter as XmlRecord | XmlRecord[] | undefined);
+    return parameters.some((p) => attr(p, "name") === "UNIQUE_NAME" && attr(p, "value") === options.uniqueName);
+  });
+
+  if (!target) throw new Error(`Componente no encontrado: ${options.uniqueName}`);
+
+  setAttr(target, "posX", options.posX);
+  setAttr(target, "posY", options.posY);
+  root.node = nodes;
+  return buildXml(document);
+}
+
+export function buildTalendComponentDeletePreview(xml: string, options: DeleteComponentOptions): EditResult {
+  const before = xml;
+  const after = deleteTalendComponentXml(xml, options);
+  return { xml: after, changed: before !== after, diff: diffText(before, after) };
+}
+
+export function buildTalendConnectionDeletePreview(xml: string, options: DeleteConnectionOptions): EditResult {
+  const before = xml;
+  const after = deleteTalendConnectionXml(xml, options);
+  return { xml: after, changed: before !== after, diff: diffText(before, after) };
+}
+
 export function buildTalendComponentEditPreview(
   xml: string,
   options:

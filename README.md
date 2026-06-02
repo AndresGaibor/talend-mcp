@@ -1,58 +1,183 @@
 # talend-mcp
 
-Servidor MCP local en modo solo lectura para analizar proyectos de Qlik Talend Studio.
+Servidor MCP para analizar y editar proyectos de Qlik Talend Studio.
 
-Sirve para inspeccionar jobs, componentes, contextos, flujos y logs sin modificar el workspace ni ejecutar procesos.
+Sirve para inspeccionar jobs, componentes, contextos, flujos, logs y ejecutar modificaciones
+sobre archivos `.item` y `.properties` de Talend.
 
 ## Requisitos
 
-- Bun instalado
+- [Bun](https://bun.sh) instalado
 - Talend Studio con un workspace accesible desde esta maquina
-- Un workspace de Talend accesible localmente
 
 ## Instalacion
 
 ```bash
+git clone <repo-url> talend-mcp
+cd talend-mcp
 bun install
 ```
 
 ## Ejecucion
 
-Modo por defecto: `stdio`
+Por defecto el servidor se levanta en modo **HTTP** en `http://127.0.0.1:3927`.
 
 ```bash
 bun run start
 ```
 
-Si quieres levantarlo por HTTP:
+Salida esperada:
 
-```bash
-TALEND_MCP_MODE=http bun run start
+```
+Talend MCP server running:
+  Local:  http://127.0.0.1:3927/mcp
+  Health: http://127.0.0.1:3927/healthz
 ```
 
-## Configuracion
+> Si prefieres modo stdio: `TALEND_MCP_MODE=stdio bun run start`
 
-La deteccion automatica usa `TALEND_WORKSPACE` para encontrar el proyecto abierto.
+## Variables de entorno
 
-Ejemplo:
+| Variable | Default | Descripcion |
+|---|---|---|
+| `TALEND_MCP_MODE` | `http` | `http` o `stdio` |
+| `TALEND_MCP_PORT` | `3927` | Puerto del servidor HTTP |
+| `TALEND_MCP_HOST` | `127.0.0.1` | Host del servidor HTTP |
+| `TALEND_MCP_FUNNEL` | `true` | Activa/desactiva Tailscale Funnel |
+| `TALEND_MCP_LIVE` | `true` | Modo live (logs en stderr) |
+| `TALEND_WORKSPACE` | - | Ruta al workspace de Talend Studio |
+| `TALEND_PROJECT` | - | Ruta directa al proyecto (opcional) |
+
+## Herramientas disponibles
+
+### Lectura e inspeccion
+
+- `talend_detect_open_job` - detecta el job abierto en Talend Studio
+- `talend_list_jobs` - lista los jobs del proyecto
+- `talend_read_job` - devuelve resumen de un job
+- `talend_list_components` - lista componentes de un job
+- `talend_show_flow` - muestra el flujo entre componentes
+- `talend_read_contexts` - lee variables de contexto
+- `talend_analyze_tdboutput` - analiza componentes tMysqlOutput/tDBOutput
+- `talend_read_latest_run_log` - obtiene la ultima ejecucion
+- `talend_read_job_errors` - errores historicos en `.metadata/.log`
+- `talend_summarize_open_job` - resumen completo del job abierto
+- `talend_inspect_component` - inspeccion detallada de un componente
+- `talend_inspect_job` - inspeccion completa del job
+
+### Edicion (solo en modo workspace local, no repo)
+
+- `talend_update_component_parameter` - actualiza parametro de componente
+- `talend_preview_component_parameter` - preview del cambio
+- `talend_update_schema_column` - actualiza columna de schema
+- `talend_preview_schema_column` - preview del cambio
+- `talend_duplicate_component` - duplica un componente
+- `talend_add_connection` - agrega conexion entre componentes
+- `talend_update_context` - actualiza parametro de contexto
+- `talend_upsert_context` - crea o actualiza parametro
+- `talend_delete_context` - elimina parametro de contexto
+- `talend_update_job_metadata` - actualiza nombre/descripcion/purpose
+
+### Gestion de repositorios git
+
+- `talend_repo_setup` - clona y activa un repo como proyecto
+- `talend_repo_status` - estado del repo activo
+- `talend_repo_pull` - pull del repo activo
+- `talend_repo_switch` - cambia de repo activo
+- `talend_repo_sources` - lista repos en cache
+
+### Ejecucion
+
+- `talend_run_job` - ejecuta un job de Talend Studio
+- `talend_job_info` - informacion del script de ejecucion
+
+---
+
+## Uso con ChatGPT Web (OpenAI Secure MCP Tunnel)
+
+Para conectar este servidor a ChatGPT via web necesitas el **Secure MCP Tunnel** de OpenAI,
+que crea un enlace HTTPS saliente sin exponer el servidor al internet publico.
+
+### macOS
 
 ```bash
-export TALEND_WORKSPACE="<ruta-al-workspace-de-talend>"
+# 1. Descarga tunnel-client (o descargalo manualmente desde GitHub)
+curl -LO https://github.com/openai/tunnel-client/releases/latest/download/tunnel-client-darwin-amd64
+chmod +x tunnel-client-darwin-amd64
+sudo mv tunnel-client-darwin-amd64 /usr/local/bin/tunnel-client
+
+# 2. Crea un API key en https://platform.openai.com/settings/organization/api-keys
+export CONTROL_PLANE_API_KEY="sk-..."
+
+# 3. Crea un tunnel en https://platform.openai.com/settings/organization/tunnels
+#    y copia el tunnel ID (ej: tunnel_6a1f1012a92c8191931616ac46216eed)
+
+# 4. Inicia talend-mcp (en otra terminal)
+cd talend-mcp
+TALEND_MCP_FUNNEL=false bun run start
+
+# 5. Inicializa el perfil del tunnel
+tunnel-client init \
+  --sample sample_mcp_remote_no_auth \
+  --profile talend \
+  --tunnel-id tunnel_<tu-id> \
+  --mcp-server-url http://127.0.0.1:3927/mcp
+
+# 6. Valida la configuracion
+tunnel-client doctor --profile talend --explain
+
+# 7. Inicia el tunnel (debe quedar corriendo)
+tunnel-client run --profile talend
 ```
 
-Opciones disponibles:
+### Windows (PowerShell)
 
-- `TALEND_MCP_MODE` - `stdio` (por defecto) o `http`
-- `TALEND_MCP_PORT` - puerto del servidor HTTP, por defecto `3927`
-- `TALEND_MCP_HOST` - host del servidor HTTP, por defecto `127.0.0.1`
-- `TALEND_MCP_FUNNEL` - desactiva el tunnel publico con `false`
-- `TALEND_MCP_LIVE` - desactiva el modo live con `false`
-- `TALEND_WORKSPACE` - ruta al workspace de Talend donde esta el proyecto abierto
-- `TALEND_PROJECT` - ruta al proyecto Talend, solo si quieres forzar uno en particular
+```powershell
+# 1. Descarga tunnel-client
+Invoke-WebRequest -Uri "https://github.com/openai/tunnel-client/releases/latest/download/tunnel-client-windows-amd64.exe" -OutFile "$env:USERPROFILE\Downloads\tunnel-client.exe"
 
-## Integracion MCP
+# 2. Mueve el binario a una ruta en el PATH
+Move-Item "$env:USERPROFILE\Downloads\tunnel-client.exe" "$env:USERPROFILE\AppData\Local\Microsoft\WindowsApps\tunnel-client.exe"
 
-Ejemplo de configuracion para un cliente MCP:
+# 3. Define las variables de entorno
+$env:CONTROL_PLANE_API_KEY="sk-..."
+
+# 4. Inicia talend-mcp (en otra terminal)
+#    Navega a la carpeta del proyecto y ejecuta:
+#    $env:TALEND_MCP_FUNNEL="false"
+#    bun run start
+
+# 5. Inicializa el perfil del tunnel
+tunnel-client init `
+  --sample sample_mcp_remote_no_auth `
+  --profile talend `
+  --tunnel-id tunnel_<tu-id> `
+  --mcp-server-url http://127.0.0.1:3927/mcp
+
+# 6. Valida la configuracion
+tunnel-client doctor --profile talend --explain
+
+# 7. Inicia el tunnel
+tunnel-client run --profile talend
+```
+
+### Conectar en ChatGPT
+
+1. Manten `talend-mcp` y `tunnel-client run` corriendo
+2. Ve a https://chatgpt.com/#settings/Connectors
+3. Presiona **+** y selecciona **Tunnel**
+4. Elige el tunnel ID que creaste
+5. ¡Listo! ChatGPT ya puede usar las herramientas de Talend
+
+## Uso con ChatGPT Desktop (sin tunnel)
+
+Si usas la app de escritorio de ChatGPT, puedes conectar directo sin tunnel:
+
+1. Inicia el servidor: `TALEND_MCP_FUNNEL=false bun run start`
+2. En ChatGPT Desktop: Settings > Connectors > + > URL
+3. Ingresa: `http://127.0.0.1:3927/mcp`
+
+## Uso con otros clientes MCP (stdio)
 
 ```json
 {
@@ -68,41 +193,21 @@ Ejemplo de configuracion para un cliente MCP:
 }
 ```
 
-Si usas HTTP, inicia el servidor con `TALEND_MCP_MODE=http` y conecta el cliente a la URL `/mcp`.
+## Ejemplo rapido (local)
 
-El servidor detecta automaticamente el proyecto abierto a partir del workspace y sus archivos `.metadata`, sin usar una ruta fija al proyecto.
-
-## Que hace
-
-El servidor es de solo lectura.
-
-- No modifica `.item`, `.properties`, `.metadata` ni `.launch`
-- No ejecuta jobs
-- No escribe archivos
-- No toca la UI de Talend Studio
-
-## Herramientas disponibles
-
-- `talend_detect_open_job` - detecta el job abierto en Talend Studio
-- `talend_list_jobs` - lista los jobs del proyecto
-- `talend_read_job` - devuelve un resumen de un job
-- `talend_list_components` - lista los componentes del job
-- `talend_show_flow` - muestra el flujo entre componentes
-- `talend_read_contexts` - lee variables de contexto
-- `talend_analyze_tdboutput` - analiza salidas a base de datos
-- `talend_read_latest_run_log` - obtiene la ultima ejecucion y su estado
-- `talend_read_job_errors` - resume errores historicos en `.metadata` y `.log`
-- `talend_summarize_open_job` - genera un resumen completo del job abierto
-
-## Ejemplo rapido
-
-1. Instala dependencias con `bun install`
-2. Define `TALEND_WORKSPACE` con la ruta de tu workspace de Talend
-3. Ejecuta `bun run start`
-4. Conecta tu cliente MCP a este servidor
+1. `bun install`
+2. `export TALEND_WORKSPACE="/ruta/al/workspace"`
+3. `TALEND_MCP_FUNNEL=false bun run start`
+4. Abre `http://127.0.0.1:3927/healthz` para verificar
 
 ## Solucion de problemas
 
-- Si no detecta el proyecto, revisa que `TALEND_WORKSPACE` apunte a una ruta existente
-- Si el job abierto no aparece, asegurate de tener Talend Studio abierto con un editor activo
-- Si ejecutas por HTTP y no responde, revisa `TALEND_MCP_PORT` y `TALEND_MCP_HOST`
+- **No se ve la URL**: el modo por defecto ahora es `http`; si ves `$ bun run index.ts` sin mas,
+  el servidor esta vivo pero en modo stdio. Verifica que `TALEND_MCP_MODE` sea `http`.
+- **Tailscale Funnel falla**: usa `TALEND_MCP_FUNNEL=false` para desactivarlo.
+- **No detecta el proyecto**: verifica que `TALEND_WORKSPACE` apunte a una ruta existente.
+- **Job abierto no aparece**: asegurate de tener Talend Studio abierto con un editor activo.
+- **Tunnel no aparece en ChatGPT**: verifica que `tunnel-client run` este corriendo y que el
+  tunnel ID en ChatGPT coincida con el del perfil. Revisa `http://127.0.0.1:8080/ui`.
+- **doctor falla**: asegurate que `CONTROL_PLANE_API_KEY` este definida y tenga permisos
+  Tunnels **Read** + **Use** en platform.openai.com.

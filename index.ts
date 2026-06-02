@@ -1,6 +1,6 @@
 import { runStdioServer, runHttpServer } from "./src/server";
 
-const mode = process.env.TALEND_MCP_MODE ?? "stdio";
+const mode = process.env.TALEND_MCP_MODE ?? "http";
 
 if (mode === "http") {
   const port = Number(process.env.TALEND_MCP_PORT) || 3927;

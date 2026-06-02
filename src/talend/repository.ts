@@ -8,13 +8,16 @@ export function parseJobProperties(xml: string, propertiesPath: string): TalendJ
   const root = parsed["xmi:XMI"] as Record<string, unknown> | undefined;
   const property = root?.["TalendProperties:Property"] as Record<string, string> | undefined;
   const processItem = root?.["TalendProperties:ProcessItem"] as Record<string, unknown> | undefined;
+  const itemState = root?.["TalendProperties:ItemState"] as Record<string, string> | undefined;
   const process = processItem?.process as Record<string, string> | undefined;
   const href = process?.["@_href"] ?? "";
   const itemFile = href.split("#")[0] ?? "";
+  const folderPath = itemState?.["@_path"] ?? "";
 
   return {
     label: property?.["@_label"] ?? "",
     version: property?.["@_version"] ?? "",
+    folderPath: folderPath || undefined,
     purpose: property?.["@_purpose"],
     description: property?.["@_description"],
     itemPath: join(dirname(propertiesPath), itemFile),
