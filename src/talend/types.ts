@@ -49,6 +49,7 @@ export type TalendComponent = {
   nodeAttributes: Record<string, string>;
   parameters: Record<string, string>;
   schemas: TalendSchema[];
+  rawNodeData?: any;
 };
 
 export type TalendConnection = {

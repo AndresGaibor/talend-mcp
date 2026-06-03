@@ -25,6 +25,7 @@ import { cloneRepo, pullRepo, getRepoInfo, discoverTalendProject, getCachedRepos
 import { runJob, getJobExecutionInfo } from "./talend/executor";
 import { createTalendFolder, createTalendJob, findTalendJob, renameTalendJob, deleteTalendJob, duplicateTalendJob, moveTalendJobToFolder } from "./talend/job-crud";
 import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec } from "./talend/job-generator";
+import { COMPONENT_REGISTRY, getComponentSnippet } from "./talend/component-registry";
 import {
   buildTalendComponentEditPreview,
   buildTalendContextEditPreview,
@@ -37,6 +38,7 @@ import {
   deleteTalendContextParameterXml,
   updateTalendJobPropertiesXml,
   updateTalendComponentParameterXml,
+  patchTalendComponentXml,
   updateTalendSchemaColumnXml,
   deleteTalendComponentXml,
   deleteTalendConnectionXml,
@@ -56,7 +58,10 @@ import {
   deleteRepositoryContextParameter,
   deleteRepositoryContext,
 } from "./talend/repository-contexts";
+import { createStudioBridgeTools } from "./talend/studio/bridge-tools";
+import { studioToolDefs } from "./tools/new-tools";
 
+import { parseXml, buildXml, asArray } from "./talend/xml";
 import { wrapHandler } from "./tools/live-logger";
 import { resolvePublicUrl } from "./tailscale/resolve-public-url";
 
@@ -459,23 +464,28 @@ async function inspectJob({ jobName }: { jobName?: string }) {
   return ok(JSON.stringify(inspectTalendJob(job), null, 2), inspectTalendJob(job));
 }
 
-async function updateComponentParameter({ jobName, uniqueName, parameterName, value }: { jobName?: string; uniqueName: string; parameterName: string; value: string }) {
+async function updateComponentParameter({ jobName, uniqueName, parameterName, value }: { jobName?: string, uniqueName: string, parameterName: string, value: string }) {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return err("No se detectó TALEND_PROJECT.");
   const jobs = await listJobs(projectPath);
-  const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
+  const target = jobName ? jobs.find(j => j.label === jobName) : jobs[0];
   if (!target) return err("Job no encontrado.");
-
   const xml = await readTextFile(target.itemPath, projectPath);
   const updatedXml = updateTalendComponentParameterXml(xml, { uniqueName, parameterName, value });
   await writeTextFile(target.itemPath, updatedXml, projectPath);
+  return ok(`Propiedad '${parameterName}' actualizada a '${value}' en el componente '${uniqueName}'.`);
+}
 
-  return ok(JSON.stringify({ itemPath: target.itemPath, uniqueName, parameterName, value }, null, 2), {
-    itemPath: target.itemPath,
-    uniqueName,
-    parameterName,
-    value,
-  });
+async function patchComponent({ jobName, uniqueName, patch }: { jobName?: string, uniqueName: string, patch: Record<string, string> }) {
+  const projectPath = getConfiguredProjectPath();
+  if (!projectPath) return err("No se detectó TALEND_PROJECT.");
+  const jobs = await listJobs(projectPath);
+  const target = jobName ? jobs.find(j => j.label === jobName) : jobs[0];
+  if (!target) return err("Job no encontrado.");
+  const xml = await readTextFile(target.itemPath, projectPath);
+  const updatedXml = patchTalendComponentXml(xml, uniqueName, patch);
+  await writeTextFile(target.itemPath, updatedXml, projectPath);
+  return ok(`Componente '${uniqueName}' actualizado con ${Object.keys(patch).length} cambios.`);
 }
 
 async function previewComponentParameter({ jobName, uniqueName, parameterName, value }: { jobName?: string; uniqueName: string; parameterName: string; value: string }) {
@@ -829,6 +839,59 @@ async function generateJobHandler({ spec }: { spec: unknown }) {
   });
 }
 
+async function listComponentCatalogHandler() {
+  const catalog = Object.values(COMPONENT_REGISTRY).map(c => ({
+    name: c.name,
+    category: c.category,
+    description: c.description
+  }));
+  return ok(JSON.stringify(catalog, null, 2), catalog);
+}
+
+async function getComponentSnippetHandler({ componentName }: { componentName: string }) {
+  const snippet = getComponentSnippet(componentName);
+  if (!snippet) return err(`Componente '${componentName}' no encontrado en el catálogo.`);
+  return ok(JSON.stringify(snippet, null, 2), snippet);
+}
+
+async function discoverComponentsHandler({ pattern }: { pattern?: string }) {
+  const pluginsDir = "/Applications/TalendStudio-8.0.1/studio/plugins";
+  const { execSync } = require("node:child_process");
+  
+  try {
+    // Buscar la carpeta exacta del localprovider (puede cambiar con la versión)
+    const providerDir = execSync(`find "${pluginsDir}" -name "org.talend.designer.components.localprovider_*" -type d`).toString().trim();
+    const componentsDir = `${providerDir}/components`;
+    
+    let command = `ls "${componentsDir}"`;
+    if (pattern) {
+      command += ` | grep -i "${pattern}"`;
+    }
+    
+    const output = execSync(command).toString().trim();
+    const components = output.split("\n").filter((c: string) => c && !c.includes("."));
+    
+    return ok(`Se encontraron ${components.length} componentes que coinciden con '${pattern || "todo"}'.`, components);
+  } catch (e) {
+    return err(`Error escaneando componentes: ${e}`);
+  }
+}
+
+async function inspectComponentDefinitionHandler({ componentName }: { componentName: string }) {
+  const pluginsDir = "/Applications/TalendStudio-8.0.1/studio/plugins";
+  const { execSync } = require("node:child_process");
+  
+  try {
+    const providerDir = execSync(`find "${pluginsDir}" -name "org.talend.designer.components.localprovider_*" -type d`).toString().trim();
+    const xmlPath = `${providerDir}/components/${componentName}/${componentName}_java.xml`;
+    const xmlContent = execSync(`cat "${xmlPath}"`).toString();
+    
+    return ok(`Estructura XML de '${componentName}' extraída directamente del Studio.`, { xml: xmlContent });
+  } catch (e) {
+    return err(`No se pudo encontrar la definición de '${componentName}'.`);
+  }
+}
+
 // ──────────────────── Execution handlers ────────────────────
 
 async function runJobHandler({ jobName, contextName, timeoutMs }: { jobName?: string; contextName?: string; timeoutMs?: number }) {
@@ -1153,6 +1216,16 @@ const toolDefs: ToolDef[] = [
       value: z.string(),
     }),
     handler: updateComponentParameter,
+  },
+  {
+    name: "talend_patch_component",
+    description: "Actualiza múltiples propiedades de un componente de un solo golpe (patch).",
+    inputSchema: z.object({
+      jobName: z.string().optional().describe("Nombre del job"),
+      uniqueName: z.string().describe("UNIQUE_NAME del componente (ej: tMysqlOutput_1)"),
+      patch: z.record(z.string(), z.string()).describe("Mapa de propiedades y nuevos valores"),
+    }),
+    handler: patchComponent,
   },
   {
     name: "talend_preview_component_parameter",
@@ -1584,6 +1657,36 @@ const toolDefs: ToolDef[] = [
     }),
     handler: generateJobHandler,
   },
+  {
+    name: "talend_list_component_catalog",
+    description: "Muestra el catálogo de componentes de Talend soportados con sus descripciones y categorías.",
+    inputSchema: z.object({}),
+    handler: listComponentCatalogHandler,
+  },
+  {
+    name: "talend_get_component_snippet",
+    description: "Devuelve un fragmento de JSON (JobSpec snippet) para un componente específico, incluyendo sus parámetros por defecto.",
+    inputSchema: z.object({
+      componentName: z.string().describe("Nombre del componente (ej: tMysqlOutput, tMap)"),
+    }),
+    handler: getComponentSnippetHandler,
+  },
+  {
+    name: "talend_discover_components",
+    description: "Escanea dinámicamente los plugins de Talend Studio para descubrir nuevos componentes por nombre o patrón.",
+    inputSchema: z.object({
+      pattern: z.string().optional().describe("Patrón de búsqueda (ej: 'S3', 'Google', 'BigData')"),
+    }),
+    handler: discoverComponentsHandler,
+  },
+  {
+    name: "talend_inspect_component_definition",
+    description: "Lee el XML original de un componente desde los plugins de Talend para conocer sus parámetros técnicos reales.",
+    inputSchema: z.object({
+      componentName: z.string().describe("Nombre del componente (ej: tSystem, tSSH)"),
+    }),
+    handler: inspectComponentDefinitionHandler,
+  },
 ];
 
 // ──────────────────── Creación del servidor ────────────────────
@@ -1604,6 +1707,7 @@ export function createTalendMcpServer(options?: CreateServerOptions): McpServer 
 
   const writeTools = new Set([
     "talend_update_component_parameter",
+    "talend_patch_component",
     "talend_update_schema_column",
     "talend_duplicate_component",
     "talend_add_connection",
@@ -1646,7 +1750,9 @@ export function createTalendMcpServer(options?: CreateServerOptions): McpServer 
     };
   }
 
-  for (const tool of toolDefs) {
+  const allToolDefs = [...toolDefs, ...createStudioBridgeTools(), ...studioToolDefs];
+
+  for (const tool of allToolDefs) {
     let handler = wrapGuard(tool.name, tool.handler);
 
     if (liveWriter) {
