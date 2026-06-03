@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <?artifactRepository version='1.1.0'?>
 <artifacts size='1'>
-  <artifact classifier='osgi.bundle' id='com.andres.talend.bridge' version='0.1.0.202606030558'>
+  <artifact classifier='osgi.bundle' id='com.andres.talend.bridge' version='0.1.0.202606031734'>
     <properties size='9'>
-      <property name='artifact.size' value='47218'/>
-      <property name='download.size' value='47218'/>
-      <property name='download.checksum.sha-512' value='d0c4d5800c48310dd3ef70f49c0172796ca87fc8f1501b739172cbecbd9d9e9637d44d2782213bffce986c67c1bb9298e0cd83bdb4476a7c2a72b205bb39b382'/>
-      <property name='download.checksum.sha-1' value='0f93f6a8017970bbb611605753678de31734743e'/>
-      <property name='download.checksum.sha-256' value='e82716d4fe6f4823782cbf62716022dc007706b85023a059236fa1f6b1e9664e'/>
+      <property name='artifact.size' value='60483'/>
+      <property name='download.size' value='60483'/>
+      <property name='download.checksum.sha-512' value='4fc7ffa065942e14aff1726595c213813e07d4dc9cf02c687657f15daa24c3d6197f6655726346c6e467c45f5cc82ad2c519c2a0beb5a1ed3ad6bad13cb6f724'/>
+      <property name='download.checksum.sha-1' value='ed35887baae489d73a97ac42c2f0a9ff4c792b5e'/>
+      <property name='download.checksum.sha-256' value='4da54efedec94c3e4efd598ac2cafcfea932fe46ba35384ea8d21de6a17f1066'/>
       <property name='maven-groupId' value='com.andres.talend'/>
       <property name='maven-artifactId' value='com.andres.talend.bridge'/>
       <property name='maven-version' value='0.1.0-SNAPSHOT'/>

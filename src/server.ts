@@ -1718,6 +1718,50 @@ export function createTalendMcpServer(options?: CreateServerOptions): McpServer 
 
   // ── Guards para modo repo ──
 
+  function getToolAnnotations(name: string) {
+    const writeTools = new Set([
+      "talend_update_component_parameter",
+      "talend_patch_component",
+      "talend_update_schema_column",
+      "talend_duplicate_component",
+      "talend_add_connection",
+      "talend_update_context",
+      "talend_upsert_context",
+      "talend_delete_context",
+      "talend_update_job_metadata",
+      "talend_update_analysis",
+      "talend_duplicate_analysis",
+      "talend_delete_component",
+      "talend_delete_connection",
+      "talend_move_component",
+      "talend_create_job",
+      "talend_create_folder",
+      "talend_rename_job",
+      "talend_delete_job",
+      "talend_duplicate_job",
+      "talend_move_job_to_folder",
+      "talend_run_exported_job",
+      "talend_bridge_execute_command",
+      "talend_bridge_run_launch_config",
+      "talend_bridge_open_resource",
+      "talend_bridge_save_active_editor",
+      "talend_bridge_save_all",
+      "talend_bridge_refresh_workspace",
+      "talend_auto_run_active_job",
+      "talend_safe_edit_component_parameter",
+      "talend_safe_patch_component",
+      "talend_safe_add_connection",
+      "talend_create_repository_context",
+      "talend_upsert_repository_context_parameter",
+      "talend_delete_repository_context",
+      "talend_delete_repository_context_parameter",
+    ]);
+    return {
+      readOnlyHint: !writeTools.has(name),
+      idempotentHint: !writeTools.has(name),
+    };
+  }
+
   const writeTools = new Set([
     "talend_update_component_parameter",
     "talend_patch_component",
@@ -1775,7 +1819,7 @@ export function createTalendMcpServer(options?: CreateServerOptions): McpServer 
     server.registerTool(tool.name, {
       description: tool.description,
       inputSchema: tool.inputSchema,
-      annotations: { readOnlyHint: true, idempotentHint: true },
+      annotations: getToolAnnotations(tool.name),
     }, handler);
   }
 

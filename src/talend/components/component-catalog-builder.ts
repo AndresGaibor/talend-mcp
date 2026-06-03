@@ -1,6 +1,6 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
-import { join, basename } from "node:path";
-import { inflateSync } from "node:zlib";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { scanInstalledPlugins, entriesToCatalogFormat, type ComponentJarEntry } from "./component-jar-scanner";
 
 export type ComponentCatalogEntry = {
   componentName: string;
@@ -38,58 +38,78 @@ export type CatalogStatus = {
   errors: string[];
 };
 
-type ComponentXml = {
-  NAME?: string;
-  VERSION?: string;
-  FAMILY?: string;
-  PARAMETERS?: Array<{ NAME?: string; VALUE?: string; REQUIRED?: string; SHOW?: string; FIELD?: string; REPOSITORY_VALUE?: string }>;
-};
+const CATALOG_DIR = ".talend-mcp";
+const CATALOG_FILE = "component-catalog.json";
+
+function ensureCatalogDir(): string {
+  const dir = join(process.cwd(), CATALOG_DIR);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
+function jarToCatalogEntry(jar: ComponentJarEntry): ComponentCatalogEntry {
+  return {
+    componentName: jar.componentName,
+    family: jar.family,
+    version: jar.version,
+    pluginJar: jar.sourcePlugin,
+    definitionFiles: jar.definitionFiles,
+    parameters: jar.parameters.map((p) => ({
+      name: p.name,
+      field: p.field,
+      required: p.required,
+      defaultValue: p.defaultValue ?? "",
+      show: p.show,
+      repositoryValue: p.repositoryValue,
+    })),
+    schemas: jar.schemas,
+    connectors: jar.connectors.map((c) => c.name),
+    dependencies: [],
+    limitations: jar.limitations,
+  };
+}
 
 export async function buildComponentCatalog(talendStudioPath?: string): Promise<CatalogStatus> {
-  const errors: string[] = [];
-  const scannedPlugins: string[] = [];
-  const entries: ComponentCatalogEntry[] = [];
+  const pluginsDir = talendStudioPath
+    ? join(talendStudioPath, "plugins")
+    : undefined;
 
-  if (!talendStudioPath) {
-    talendStudioPath = process.env.TALEND_STUDIO_PATH ?? "/Applications/TalendStudio-8.0.1/studio";
-  }
+  const scanResult = await scanInstalledPlugins({ pluginsDir });
 
-  const pluginsDir = join(talendStudioPath, "plugins");
-  if (!existsSync(pluginsDir)) {
-    return {
-      ok: false,
-      catalogPath: null,
-      entryCount: 0,
-      lastUpdated: null,
-      scannedPlugins: [],
-      errors: [`Plugins directory not found: ${pluginsDir}`],
-    };
-  }
+  const catalog = scanResult.entries.map(jarToCatalogEntry);
+
+  const talendStudioHome = talendStudioPath ?? process.env.TALEND_STUDIO_PATH ?? "/Applications/TalendStudio-8.0.1/studio";
+  const catalogData = entriesToCatalogFormat(
+    scanResult.entries,
+    scanResult.scannedPlugins,
+    scanResult.errors,
+    talendStudioHome,
+  );
+
+  const catalogDir = ensureCatalogDir();
+  const catalogPath = join(catalogDir, CATALOG_FILE);
+  const writeErrors: string[] = [];
 
   try {
-    const pluginDirs = readdirSync(pluginsDir).filter((d) => d.startsWith("org.talend.designer.") || d.startsWith("org.talend.l"));
-    for (const pluginDir of pluginDirs) {
-      scannedPlugins.push(pluginDir);
-    }
+    writeFileSync(catalogPath, JSON.stringify(catalogData, null, 2), "utf8");
   } catch (e) {
-    errors.push(`Cannot read plugins directory: ${e}`);
+    writeErrors.push("Failed to write catalog: " + (e instanceof Error ? e.message : String(e)));
   }
 
-  const catalogPath = join(process.cwd(), ".talend-mcp", "component-catalog.json");
-  const lastUpdated = Date.now();
-
   return {
-    ok: errors.length === 0,
+    ok: writeErrors.length === 0,
     catalogPath,
-    entryCount: entries.length,
-    lastUpdated,
-    scannedPlugins,
-    errors,
+    entryCount: catalog.length,
+    lastUpdated: catalogData.generatedAt,
+    scannedPlugins: scanResult.scannedPlugins,
+    errors: [...scanResult.errors, ...writeErrors],
   };
 }
 
 export async function getCatalogStatus(): Promise<CatalogStatus> {
-  const catalogPath = join(process.cwd(), ".talend-mcp", "component-catalog.json");
+  const catalogPath = join(process.cwd(), CATALOG_DIR, CATALOG_FILE);
 
   if (!existsSync(catalogPath)) {
     return {
@@ -109,9 +129,9 @@ export async function getCatalogStatus(): Promise<CatalogStatus> {
       ok: true,
       catalogPath,
       entryCount: data.entries?.length ?? 0,
-      lastUpdated: data.lastUpdated ?? null,
+      lastUpdated: data.generatedAt ?? null,
       scannedPlugins: data.scannedPlugins ?? [],
-      errors: [],
+      errors: data.errors ?? [],
     };
   } catch (e) {
     return {
@@ -120,13 +140,13 @@ export async function getCatalogStatus(): Promise<CatalogStatus> {
       entryCount: 0,
       lastUpdated: null,
       scannedPlugins: [],
-      errors: [`Failed to read catalog: ${e}`],
+      errors: ["Failed to read catalog: " + (e instanceof Error ? e.message : String(e))],
     };
   }
 }
 
 export async function searchComponents(query: string, maxResults = 20): Promise<ComponentCatalogEntry[]> {
-  const catalogPath = join(process.cwd(), ".talend-mcp", "component-catalog.json");
+  const catalogPath = join(process.cwd(), CATALOG_DIR, CATALOG_FILE);
 
   if (!existsSync(catalogPath)) {
     return [];
@@ -143,7 +163,7 @@ export async function searchComponents(query: string, maxResults = 20): Promise<
         (e: ComponentCatalogEntry) =>
           e.componentName.toLowerCase().includes(lowerQuery) ||
           e.family.toLowerCase().includes(lowerQuery) ||
-          e.connectors.some((c) => c.toLowerCase().includes(lowerQuery))
+          e.connectors.some((c) => c.toLowerCase().includes(lowerQuery)),
       )
       .slice(0, maxResults);
   } catch {
@@ -152,7 +172,7 @@ export async function searchComponents(query: string, maxResults = 20): Promise<
 }
 
 export async function inspectComponent(componentName: string): Promise<ComponentCatalogEntry | null> {
-  const catalogPath = join(process.cwd(), ".talend-mcp", "component-catalog.json");
+  const catalogPath = join(process.cwd(), CATALOG_DIR, CATALOG_FILE);
 
   if (!existsSync(catalogPath)) {
     return null;
@@ -181,12 +201,12 @@ export async function getComponentConnectors(componentName: string): Promise<str
 export async function generateComponentTemplate(componentName: string): Promise<{ ok: boolean; template?: string; error?: string }> {
   const entry = await inspectComponent(componentName);
   if (!entry) {
-    return { ok: false, error: `Component not found: ${componentName}` };
+    return { ok: false, error: "Component not found: " + componentName };
   }
 
   const requiredParams = entry.parameters.filter((p) => p.required);
   const template = {
-    componentName: entry.componentName,
+    componentName: entry.componentName ?? componentName,
     family: entry.family,
     requiredParameters: requiredParams.map((p) => ({
       name: p.name,
@@ -208,11 +228,11 @@ export async function generateComponentTemplate(componentName: string): Promise<
 
 export async function validateComponentUsage(
   componentName: string,
-  parameters: Record<string, string>
+  parameters: Record<string, string>,
 ): Promise<{ ok: boolean; valid: boolean; errors: string[]; warnings: string[] }> {
   const entry = await inspectComponent(componentName);
   if (!entry) {
-    return { ok: false, valid: false, errors: [`Component not found: ${componentName}`], warnings: [] };
+    return { ok: false, valid: false, errors: ["Component not found: " + componentName], warnings: [] };
   }
 
   const errors: string[] = [];
@@ -222,19 +242,14 @@ export async function validateComponentUsage(
   for (const req of requiredParams) {
     const value = parameters[req.name];
     if (!value || value.trim() === "") {
-      errors.push(`Parámetro requerido faltante: ${req.name}`);
+      errors.push("Parámetro requerido faltante: " + req.name);
     }
   }
 
   const unknownParams = Object.keys(parameters).filter((k) => !entry.parameters.find((p) => p.name === k));
   if (unknownParams.length > 0) {
-    warnings.push(`Parámetros desconocidos: ${unknownParams.join(", ")}`);
+    warnings.push("Parámetros desconocidos: " + unknownParams.join(", "));
   }
 
-  return {
-    ok: true,
-    valid: errors.length === 0,
-    errors,
-    warnings,
-  };
+  return { ok: true, valid: errors.length === 0, errors, warnings };
 }

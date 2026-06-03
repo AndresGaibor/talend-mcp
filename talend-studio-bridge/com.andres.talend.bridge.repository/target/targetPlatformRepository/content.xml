@@ -342,31 +342,6 @@
         </instructions>
       </touchpointData>
     </unit>
-    <unit id='com.andres.talend.bridge.feature.feature.group' version='0.1.0.202606030558' singleton='false'>
-      <update id='com.andres.talend.bridge.feature.feature.group' range='[0.0.0,0.1.0.202606030558)' severity='0'/>
-      <properties size='8'>
-        <property name='org.eclipse.equinox.p2.name' value='Talend Studio Bridge'/>
-        <property name='org.eclipse.equinox.p2.description' value='Bridge local para auditar Talend Studio desde MCP.'/>
-        <property name='org.eclipse.equinox.p2.provider' value='Andres'/>
-        <property name='org.eclipse.equinox.p2.type.group' value='true'/>
-        <property name='maven-groupId' value='com.andres.talend'/>
-        <property name='maven-artifactId' value='com.andres.talend.bridge.feature'/>
-        <property name='maven-version' value='0.1.0-SNAPSHOT'/>
-        <property name='maven-type' value='eclipse-feature'/>
-      </properties>
-      <provides size='1'>
-        <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.feature.feature.group' version='0.1.0.202606030558'/>
-      </provides>
-      <requires size='2'>
-        <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge' range='[0.1.0.202606030558,0.1.0.202606030558]'/>
-        <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.feature.feature.jar' range='[0.1.0.202606030558,0.1.0.202606030558]'>
-          <filter>
-            (org.eclipse.update.install.features=true)
-          </filter>
-        </required>
-      </requires>
-      <touchpoint id='null' version='0.0.0'/>
-    </unit>
     <unit id='jakarta.inject.jakarta.inject-api.source' version='2.0.1' singleton='false'>
       <update id='jakarta.inject.jakarta.inject-api.source' range='[0.0.0,2.0.1)' severity='0'/>
       <properties size='7'>
@@ -562,59 +537,6 @@
         <instructions size='1'>
           <instruction key='manifest'>
             Bundle-SymbolicName: org.eclipse.e4.ui.workbench.swt;singleton:=true&#xA;Bundle-Version: 0.17.400.v20240425-0840
-          </instruction>
-        </instructions>
-      </touchpointData>
-    </unit>
-    <unit id='com.andres.talend.bridge' version='0.1.0.202606030558' generation='2'>
-      <update id='com.andres.talend.bridge' range='[0.0.0,0.1.0.202606030558)' severity='0'/>
-      <properties size='5'>
-        <property name='org.eclipse.equinox.p2.name' value='Talend Studio Bridge'/>
-        <property name='maven-groupId' value='com.andres.talend'/>
-        <property name='maven-artifactId' value='com.andres.talend.bridge'/>
-        <property name='maven-version' value='0.1.0-SNAPSHOT'/>
-        <property name='maven-type' value='eclipse-plugin'/>
-      </properties>
-      <provides size='4'>
-        <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge' version='0.1.0.202606030558'/>
-        <provided namespace='osgi.bundle' name='com.andres.talend.bridge' version='0.1.0.202606030558'/>
-        <provided namespace='osgi.identity' name='com.andres.talend.bridge' version='0.1.0.202606030558'>
-          <properties size='1'>
-            <property name='type' value='osgi.bundle'/>
-          </properties>
-        </provided>
-        <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='bundle' version='1.0.0'/>
-      </provides>
-      <requires size='12'>
-        <required namespace='osgi.bundle' name='org.eclipse.core.runtime' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.ui' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.jface' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.swt' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.core.resources' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.debug.core' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.debug.ui' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.ui.ide' range='0.0.0'/>
-        <required namespace='osgi.bundle' name='org.eclipse.equinox.common' range='0.0.0'/>
-        <required namespace='java.package' name='com.sun.net.httpserver' range='0.0.0'/>
-        <requiredProperties namespace='osgi.ee' match='(&amp;(osgi.ee=JavaSE)(version=1.8))'>
-          <description>
-            com.andres.talend.bridge
-          </description>
-        </requiredProperties>
-        <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.source' range='[0.1.0.202606030558,0.1.0.202606030558]' optional='true'>
-          <filter>
-            (org.eclipse.update.install.sources=true)
-          </filter>
-        </required>
-      </requires>
-      <artifacts size='1'>
-        <artifact classifier='osgi.bundle' id='com.andres.talend.bridge' version='0.1.0.202606030558'/>
-      </artifacts>
-      <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
-      <touchpointData size='1'>
-        <instructions size='1'>
-          <instruction key='manifest'>
-            Bundle-SymbolicName: com.andres.talend.bridge;singleton:=true&#xA;Bundle-Version: 0.1.0.202606030558
           </instruction>
         </instructions>
       </touchpointData>
@@ -4643,36 +4565,6 @@
         </instructions>
       </touchpointData>
     </unit>
-    <unit id='com.andres.talend.bridge.feature.feature.jar' version='0.1.0.202606030558'>
-      <properties size='7'>
-        <property name='org.eclipse.equinox.p2.name' value='Talend Studio Bridge'/>
-        <property name='org.eclipse.equinox.p2.description' value='Bridge local para auditar Talend Studio desde MCP.'/>
-        <property name='org.eclipse.equinox.p2.provider' value='Andres'/>
-        <property name='maven-groupId' value='com.andres.talend'/>
-        <property name='maven-artifactId' value='com.andres.talend.bridge.feature'/>
-        <property name='maven-version' value='0.1.0-SNAPSHOT'/>
-        <property name='maven-type' value='eclipse-feature'/>
-      </properties>
-      <provides size='3'>
-        <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.feature.feature.jar' version='0.1.0.202606030558'/>
-        <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='feature' version='1.0.0'/>
-        <provided namespace='org.eclipse.update.feature' name='com.andres.talend.bridge.feature' version='0.1.0.202606030558'/>
-      </provides>
-      <filter>
-        (org.eclipse.update.install.features=true)
-      </filter>
-      <artifacts size='1'>
-        <artifact classifier='org.eclipse.update.feature' id='com.andres.talend.bridge.feature' version='0.1.0.202606030558'/>
-      </artifacts>
-      <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
-      <touchpointData size='1'>
-        <instructions size='1'>
-          <instruction key='zipped'>
-            true
-          </instruction>
-        </instructions>
-      </touchpointData>
-    </unit>
     <unit id='org.eclipse.equinox.common' version='3.19.100.v20240524-2011' generation='2'>
       <update id='org.eclipse.equinox.common' range='[0.0.0,3.19.100.v20240524-2011)' severity='0'/>
       <properties size='9'>
@@ -4866,6 +4758,31 @@
           </instruction>
         </instructions>
       </touchpointData>
+    </unit>
+    <unit id='com.andres.talend.bridge.feature.feature.group' version='0.1.0.202606031734' singleton='false'>
+      <update id='com.andres.talend.bridge.feature.feature.group' range='[0.0.0,0.1.0.202606031734)' severity='0'/>
+      <properties size='8'>
+        <property name='org.eclipse.equinox.p2.name' value='Talend Studio Bridge'/>
+        <property name='org.eclipse.equinox.p2.description' value='Bridge local para auditar Talend Studio desde MCP.'/>
+        <property name='org.eclipse.equinox.p2.provider' value='Andres'/>
+        <property name='org.eclipse.equinox.p2.type.group' value='true'/>
+        <property name='maven-groupId' value='com.andres.talend'/>
+        <property name='maven-artifactId' value='com.andres.talend.bridge.feature'/>
+        <property name='maven-version' value='0.1.0-SNAPSHOT'/>
+        <property name='maven-type' value='eclipse-feature'/>
+      </properties>
+      <provides size='1'>
+        <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.feature.feature.group' version='0.1.0.202606031734'/>
+      </provides>
+      <requires size='2'>
+        <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge' range='[0.1.0.202606031734,0.1.0.202606031734]'/>
+        <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.feature.feature.jar' range='[0.1.0.202606031734,0.1.0.202606031734]'>
+          <filter>
+            (org.eclipse.update.install.features=true)
+          </filter>
+        </required>
+      </requires>
+      <touchpoint id='null' version='0.0.0'/>
     </unit>
     <unit id='org.apache.batik.css.source' version='1.17.0.v20231215-1130' singleton='false'>
       <update id='org.apache.batik.css.source' range='[0.0.0,1.17.0.v20231215-1130)' severity='0'/>
@@ -6201,23 +6118,23 @@
         <provided namespace='java.package' name='com.sun.net.httpserver' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.jdi.connect' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.events' version='0.0.0'/>
-        <provided namespace='java.package' name='java.lang.foreign' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.datatransfer' version='0.0.0'/>
+        <provided namespace='java.package' name='java.lang.foreign' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.text.html' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.jdi.event' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.dynalink' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf.metal' version='0.0.0'/>
         <provided namespace='java.package' name='java.net.spi' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing.colorchooser' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.logging' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing.colorchooser' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.dynalink.support' version='0.0.0'/>
         <provided namespace='java.package' name='javax.security.auth.x500' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.stream' version='0.0.0'/>
+        <provided namespace='java.package' name='jdk.jshell.spi' version='0.0.0'/>
         <provided namespace='java.package' name='java.lang.classfile' version='0.0.0'/>
         <provided namespace='java.package' name='javax.lang.model' version='0.0.0'/>
-        <provided namespace='java.package' name='jdk.jshell.spi' version='0.0.0'/>
         <provided namespace='java.package' name='java.lang.annotation' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.jfr' version='0.0.0'/>
         <provided namespace='java.package' name='javax.imageio.spi' version='0.0.0'/>
@@ -6227,8 +6144,8 @@
         <provided namespace='java.package' name='javax.security.auth' version='0.0.0'/>
         <provided namespace='java.package' name='java.math' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom' version='0.0.0'/>
-        <provided namespace='java.package' name='java.awt.geom' version='0.0.0'/>
         <provided namespace='java.package' name='javax.transaction.xa' version='0.0.0'/>
+        <provided namespace='java.package' name='java.awt.geom' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.transform.stax' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.traversal' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.swing.interop' version='0.0.0'/>
@@ -6247,8 +6164,8 @@
         <provided namespace='java.package' name='java.beans' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sql' version='0.0.0'/>
         <provided namespace='java.package' name='javax.print.event' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.imageio.metadata' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.prefs' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.imageio.metadata' version='0.0.0'/>
         <provided namespace='java.package' name='java.net' version='0.0.0'/>
         <provided namespace='java.package' name='javax.naming.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javax.imageio.plugins.bmp' version='0.0.0'/>
@@ -6256,8 +6173,8 @@
         <provided namespace='java.package' name='java.time.format' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.concurrent' version='0.0.0'/>
         <provided namespace='java.package' name='javax.security.auth.spi' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.sound.sampled' version='0.0.0'/>
         <provided namespace='java.package' name='java.rmi.server' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.sound.sampled' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sql.rowset.serial' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.parsers' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf.synth' version='0.0.0'/>
@@ -6291,16 +6208,16 @@
         <provided namespace='java.package' name='java.awt.color' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.text.rtf' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.javadoc.doclet' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.xml.crypto' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.print' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.xml.crypto' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf.multi' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.channels.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javax.imageio.event' version='0.0.0'/>
         <provided namespace='java.package' name='javax.net.ssl' version='0.0.0'/>
         <provided namespace='java.package' name='java.rmi.registry' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.stream.events' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.print.attribute' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.java.accessibility.util' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.print.attribute' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.file.attribute' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.management.jfr' version='0.0.0'/>
@@ -6328,12 +6245,12 @@
         <provided namespace='java.package' name='jdk.security.jarsigner' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.security.auth' version='0.0.0'/>
         <provided namespace='java.package' name='javax.security.auth.kerberos' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.crypto' version='0.0.0'/>
         <provided namespace='java.package' name='java.sql' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.crypto' version='0.0.0'/>
         <provided namespace='java.package' name='java.util' version='0.0.0'/>
         <provided namespace='java.package' name='java.lang.classfile.constantpool' version='0.0.0'/>
-        <provided namespace='java.package' name='java.nio.channels' version='0.0.0'/>
         <provided namespace='java.package' name='java.time.temporal' version='0.0.0'/>
+        <provided namespace='java.package' name='java.nio.channels' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.stylesheets' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.charset' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sound.midi' version='0.0.0'/>
@@ -6352,17 +6269,17 @@
         <provided namespace='java.package' name='javax.xml.crypto.dsig' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.tools.javac' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.jdi' version='0.0.0'/>
-        <provided namespace='java.package' name='java.nio.charset.spi' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.security.jgss' version='0.0.0'/>
-        <provided namespace='java.package' name='java.util.spi' version='0.0.0'/>
+        <provided namespace='java.package' name='java.nio.charset.spi' version='0.0.0'/>
         <provided namespace='java.package' name='java.text.spi' version='0.0.0'/>
+        <provided namespace='java.package' name='java.util.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javax.management.timer' version='0.0.0'/>
         <provided namespace='java.package' name='java.security.spec' version='0.0.0'/>
         <provided namespace='java.package' name='java.nio.file.spi' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.crypto.dsig.keyinfo' version='0.0.0'/>
         <provided namespace='java.package' name='javax.accessibility' version='0.0.0'/>
-        <provided namespace='java.package' name='com.sun.source.tree' version='0.0.0'/>
         <provided namespace='java.package' name='javax.xml.namespace' version='0.0.0'/>
+        <provided namespace='java.package' name='com.sun.source.tree' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.font' version='0.0.0'/>
         <provided namespace='java.package' name='java.security.interfaces' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.tools.attach.spi' version='0.0.0'/>
@@ -6376,8 +6293,8 @@
         <provided namespace='java.package' name='jdk.nio.mapmode' version='0.0.0'/>
         <provided namespace='java.package' name='javax.swing.plaf.nimbus' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.event' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.swing.border' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sql.rowset.spi' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.swing.border' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.jfr.consumer' version='0.0.0'/>
         <provided namespace='java.package' name='javax.management.remote' version='0.0.0'/>
         <provided namespace='java.package' name='javax.imageio.plugins.tiff' version='0.0.0'/>
@@ -6389,8 +6306,8 @@
         <provided namespace='java.package' name='java.lang.runtime' version='0.0.0'/>
         <provided namespace='java.package' name='javax.security.sasl' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.security.auth.module' version='0.0.0'/>
-        <provided namespace='java.package' name='javax.xml.crypto.dom' version='0.0.0'/>
         <provided namespace='java.package' name='javax.naming.ldap' version='0.0.0'/>
+        <provided namespace='java.package' name='javax.xml.crypto.dom' version='0.0.0'/>
         <provided namespace='java.package' name='java.time.zone' version='0.0.0'/>
         <provided namespace='java.package' name='java.awt.im.spi' version='0.0.0'/>
         <provided namespace='java.package' name='java.beans.beancontext' version='0.0.0'/>
@@ -6401,8 +6318,8 @@
         <provided namespace='java.package' name='java.lang.module' version='0.0.0'/>
         <provided namespace='java.package' name='com.sun.source.util' version='0.0.0'/>
         <provided namespace='java.package' name='jdk.management' version='0.0.0'/>
-        <provided namespace='java.package' name='java.io' version='0.0.0'/>
         <provided namespace='java.package' name='javax.sql.rowset' version='0.0.0'/>
+        <provided namespace='java.package' name='java.io' version='0.0.0'/>
         <provided namespace='java.package' name='java.util.jar' version='0.0.0'/>
         <provided namespace='java.package' name='javax.crypto.interfaces' version='0.0.0'/>
         <provided namespace='java.package' name='org.w3c.dom.ranges' version='0.0.0'/>
@@ -8361,6 +8278,36 @@
         </instructions>
       </touchpointData>
     </unit>
+    <unit id='com.andres.talend.bridge.feature.feature.jar' version='0.1.0.202606031734'>
+      <properties size='7'>
+        <property name='org.eclipse.equinox.p2.name' value='Talend Studio Bridge'/>
+        <property name='org.eclipse.equinox.p2.description' value='Bridge local para auditar Talend Studio desde MCP.'/>
+        <property name='org.eclipse.equinox.p2.provider' value='Andres'/>
+        <property name='maven-groupId' value='com.andres.talend'/>
+        <property name='maven-artifactId' value='com.andres.talend.bridge.feature'/>
+        <property name='maven-version' value='0.1.0-SNAPSHOT'/>
+        <property name='maven-type' value='eclipse-feature'/>
+      </properties>
+      <provides size='3'>
+        <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.feature.feature.jar' version='0.1.0.202606031734'/>
+        <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='feature' version='1.0.0'/>
+        <provided namespace='org.eclipse.update.feature' name='com.andres.talend.bridge.feature' version='0.1.0.202606031734'/>
+      </provides>
+      <filter>
+        (org.eclipse.update.install.features=true)
+      </filter>
+      <artifacts size='1'>
+        <artifact classifier='org.eclipse.update.feature' id='com.andres.talend.bridge.feature' version='0.1.0.202606031734'/>
+      </artifacts>
+      <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
+      <touchpointData size='1'>
+        <instructions size='1'>
+          <instruction key='zipped'>
+            true
+          </instruction>
+        </instructions>
+      </touchpointData>
+    </unit>
     <unit id='org.eclipse.debug.ui' version='3.18.400.v20240516-0857' generation='2'>
       <update id='org.eclipse.debug.ui' range='[0.0.0,3.18.400.v20240516-0857)' severity='0'/>
       <properties size='9'>
@@ -9600,6 +9547,59 @@
         <instructions size='1'>
           <instruction key='manifest'>
             Bundle-SymbolicName: org.eclipse.jface.databinding&#xA;Bundle-Version: 1.15.300.v20240424-0444
+          </instruction>
+        </instructions>
+      </touchpointData>
+    </unit>
+    <unit id='com.andres.talend.bridge' version='0.1.0.202606031734' generation='2'>
+      <update id='com.andres.talend.bridge' range='[0.0.0,0.1.0.202606031734)' severity='0'/>
+      <properties size='5'>
+        <property name='org.eclipse.equinox.p2.name' value='Talend Studio Bridge'/>
+        <property name='maven-groupId' value='com.andres.talend'/>
+        <property name='maven-artifactId' value='com.andres.talend.bridge'/>
+        <property name='maven-version' value='0.1.0-SNAPSHOT'/>
+        <property name='maven-type' value='eclipse-plugin'/>
+      </properties>
+      <provides size='4'>
+        <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge' version='0.1.0.202606031734'/>
+        <provided namespace='osgi.bundle' name='com.andres.talend.bridge' version='0.1.0.202606031734'/>
+        <provided namespace='osgi.identity' name='com.andres.talend.bridge' version='0.1.0.202606031734'>
+          <properties size='1'>
+            <property name='type' value='osgi.bundle'/>
+          </properties>
+        </provided>
+        <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='bundle' version='1.0.0'/>
+      </provides>
+      <requires size='12'>
+        <required namespace='osgi.bundle' name='org.eclipse.core.runtime' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.ui' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.jface' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.swt' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.core.resources' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.debug.core' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.debug.ui' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.ui.ide' range='0.0.0'/>
+        <required namespace='osgi.bundle' name='org.eclipse.equinox.common' range='0.0.0'/>
+        <required namespace='java.package' name='com.sun.net.httpserver' range='0.0.0'/>
+        <requiredProperties namespace='osgi.ee' match='(&amp;(osgi.ee=JavaSE)(version=1.8))'>
+          <description>
+            com.andres.talend.bridge
+          </description>
+        </requiredProperties>
+        <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.source' range='[0.1.0.202606031734,0.1.0.202606031734]' optional='true'>
+          <filter>
+            (org.eclipse.update.install.sources=true)
+          </filter>
+        </required>
+      </requires>
+      <artifacts size='1'>
+        <artifact classifier='osgi.bundle' id='com.andres.talend.bridge' version='0.1.0.202606031734'/>
+      </artifacts>
+      <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
+      <touchpointData size='1'>
+        <instructions size='1'>
+          <instruction key='manifest'>
+            Bundle-SymbolicName: com.andres.talend.bridge;singleton:=true&#xA;Bundle-Version: 0.1.0.202606031734
           </instruction>
         </instructions>
       </touchpointData>

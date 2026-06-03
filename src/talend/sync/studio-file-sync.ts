@@ -283,6 +283,12 @@ export async function safeEditComponentParameter(
     };
   }
 
+  const writeStart = Date.now();
+  if (editResult.editedXml) {
+    writeFileSync(itemPath, editResult.editedXml, "utf8");
+  }
+  steps.push({ name: "write_item_file", ok: true, durationMs: Date.now() - writeStart });
+
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);
 
   return {
@@ -335,6 +341,12 @@ export async function safePatchComponent(
     };
   }
 
+  const writeStart = Date.now();
+  if (patchResult.patchedXml) {
+    writeFileSync(itemPath, patchResult.patchedXml, "utf8");
+  }
+  steps.push({ name: "write_item_file", ok: true, durationMs: Date.now() - writeStart });
+
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);
 
   return {
@@ -386,6 +398,12 @@ export async function safeAddConnection(
       snapshotPath: beforeResult.snapshotPath,
     };
   }
+
+  const writeStart = Date.now();
+  if (connResult.modifiedXml) {
+    writeFileSync(itemPath, connResult.modifiedXml, "utf8");
+  }
+  steps.push({ name: "write_item_file", ok: true, durationMs: Date.now() - writeStart });
 
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);
 

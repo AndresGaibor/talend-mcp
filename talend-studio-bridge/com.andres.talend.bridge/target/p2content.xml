@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <units size='1'>
-  <unit id='com.andres.talend.bridge' version='0.1.0.202606030558' generation='2'>
-    <update id='com.andres.talend.bridge' range='[0.0.0,0.1.0.202606030558)' severity='0'/>
+  <unit id='com.andres.talend.bridge' version='0.1.0.202606031734' generation='2'>
+    <update id='com.andres.talend.bridge' range='[0.0.0,0.1.0.202606031734)' severity='0'/>
     <properties size='5'>
       <property name='org.eclipse.equinox.p2.name' value='Talend Studio Bridge'/>
       <property name='maven-groupId' value='com.andres.talend'/>
@@ -10,9 +10,9 @@
       <property name='maven-type' value='eclipse-plugin'/>
     </properties>
     <provides size='4'>
-      <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge' version='0.1.0.202606030558'/>
-      <provided namespace='osgi.bundle' name='com.andres.talend.bridge' version='0.1.0.202606030558'/>
-      <provided namespace='osgi.identity' name='com.andres.talend.bridge' version='0.1.0.202606030558'>
+      <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge' version='0.1.0.202606031734'/>
+      <provided namespace='osgi.bundle' name='com.andres.talend.bridge' version='0.1.0.202606031734'/>
+      <provided namespace='osgi.identity' name='com.andres.talend.bridge' version='0.1.0.202606031734'>
         <properties size='1'>
           <property name='type' value='osgi.bundle'/>
         </properties>
@@ -35,20 +35,20 @@
           com.andres.talend.bridge
         </description>
       </requiredProperties>
-      <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.source' range='[0.1.0.202606030558,0.1.0.202606030558]' optional='true'>
+      <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.source' range='[0.1.0.202606031734,0.1.0.202606031734]' optional='true'>
         <filter>
           (org.eclipse.update.install.sources=true)
         </filter>
       </required>
     </requires>
     <artifacts size='1'>
-      <artifact classifier='osgi.bundle' id='com.andres.talend.bridge' version='0.1.0.202606030558'/>
+      <artifact classifier='osgi.bundle' id='com.andres.talend.bridge' version='0.1.0.202606031734'/>
     </artifacts>
     <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
     <touchpointData size='1'>
       <instructions size='1'>
         <instruction key='manifest'>
-          Bundle-SymbolicName: com.andres.talend.bridge;singleton:=true&#xA;Bundle-Version: 0.1.0.202606030558&#xA;
+          Bundle-SymbolicName: com.andres.talend.bridge;singleton:=true&#xA;Bundle-Version: 0.1.0.202606031734&#xA;
         </instruction>
       </instructions>
     </touchpointData>

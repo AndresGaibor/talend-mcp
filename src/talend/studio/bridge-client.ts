@@ -9,6 +9,7 @@ export type BridgeConfig = {
   port: number;
   readOnly: boolean;
   unsafeActions: boolean;
+  allowAllCommands: boolean;
   allowCommands: string[];
   timeoutMs: number;
 };
@@ -93,6 +94,7 @@ const DEFAULT_CONFIG: BridgeConfig = {
   port: 3930,
   readOnly: true,
   unsafeActions: false,
+  allowAllCommands: false,
   allowCommands: ["org.eclipse.ui.file.save", "org.eclipse.ui.file.saveAll"],
   timeoutMs: 2_500,
 };
@@ -131,6 +133,7 @@ export async function readTalendStudioBridgeConfig(): Promise<BridgeConfig> {
     ...DEFAULT_CONFIG,
     ...parsed,
     allowCommands: parsed?.allowCommands?.length ? parsed.allowCommands : DEFAULT_CONFIG.allowCommands,
+    allowAllCommands: parsed?.allowAllCommands ?? DEFAULT_CONFIG.allowAllCommands,
   };
 }
 

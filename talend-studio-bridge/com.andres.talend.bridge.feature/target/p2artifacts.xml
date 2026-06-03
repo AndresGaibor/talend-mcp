@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <?artifactRepository version='1.1.0'?>
 <artifacts size='1'>
-  <artifact classifier='org.eclipse.update.feature' id='com.andres.talend.bridge.feature' version='0.1.0.202606030558'>
+  <artifact classifier='org.eclipse.update.feature' id='com.andres.talend.bridge.feature' version='0.1.0.202606031734'>
     <properties size='10'>
-      <property name='artifact.size' value='657'/>
-      <property name='download.size' value='657'/>
-      <property name='download.checksum.sha-512' value='bfd4f1d6d326204caf3d2c505b6d1fe4201bdd6e7109278ef7eb4e49c5f9da2ad7287625b205ba37b9151e26da1fe458d0ea6ab70161087bdc0823730b3d8acb'/>
-      <property name='download.checksum.sha-1' value='92a3caf99d0bdff50bf7223332a67fef80c87ae0'/>
-      <property name='download.checksum.sha-256' value='69c084267d34aafacf4e80ef4d8a250593743a45e87f4aa1dbf02a62efc85dc6'/>
+      <property name='artifact.size' value='658'/>
+      <property name='download.size' value='658'/>
+      <property name='download.checksum.sha-512' value='71bfbdabf6d144fea1067a806a091933215ee6c9df00535f5b1d34e1c914f32b5d966edc8ce0610179038ae9e6697d9ec8c90be05ebfd646e81ea0ad303b47ff'/>
+      <property name='download.checksum.sha-1' value='43366baf4f1d9393800e61a26a076026271d4137'/>
+      <property name='download.checksum.sha-256' value='c4f61a5163c844c6ed3d4f1d3ab9927f9c600afd2e2019116b5f5175a14b8919'/>
       <property name='maven-groupId' value='com.andres.talend'/>
       <property name='maven-artifactId' value='com.andres.talend.bridge.feature'/>
       <property name='maven-version' value='0.1.0-SNAPSHOT'/>

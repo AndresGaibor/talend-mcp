@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -204,7 +204,8 @@ export async function getAllMastery(): Promise<ComponentMastery[]> {
   const entries = [];
 
   try {
-    const files = (await Bun.file(masteryDir).text()).split("\n").filter((f) => f.endsWith(".json"));
+    const files = readdirSync(masteryDir).filter((f) => f.endsWith(".json"));
+
     for (const file of files) {
       try {
         const content = readFileSync(join(masteryDir, file), "utf8");
