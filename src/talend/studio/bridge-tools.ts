@@ -603,5 +603,202 @@ export function createStudioBridgeTools(): BridgeToolDef[] {
         return bridgeFail(result);
       },
     },
+    {
+      name: "talend_sync_status",
+      description: "Devuelve el estado de sincronización entre archivos y Studio activo.",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const bridge = await loadBridge();
+        const { getSyncStatus } = await import("../sync/studio-file-sync");
+        const projectPath = getConfiguredProjectPath();
+        if (!projectPath) {
+          return bridgeFail({
+            ok: false,
+            source: "unavailable",
+            confidence: "low",
+            endpoint: "/sync/status",
+            error: { code: "NO_PROJECT", message: "No se detectó TALEND_PROJECT" },
+          });
+        }
+        const status = await getSyncStatus(projectPath, bridge);
+        return bridgeOk({
+          ok: true,
+          source: status.source,
+          confidence: status.confidence,
+          endpoint: "/sync/status",
+          data: status,
+        });
+      },
+    },
+    {
+      name: "talend_sync_before_file_edit",
+      description: "Antes de editar archivos .item/.properties: detecta si hay job abierto, guarda si está dirty, crea snapshot.",
+      inputSchema: z.object({
+        itemPath: z.string().describe("Ruta al archivo .item"),
+        propertiesPath: z.string().describe("Ruta al archivo .properties"),
+      }),
+      handler: async ({ itemPath, propertiesPath }) => {
+        const bridge = await loadBridge();
+        const { beforeFileEdit } = await import("../sync/studio-file-sync");
+        const projectPath = getConfiguredProjectPath();
+        if (!projectPath) {
+          return bridgeFail({
+            ok: false,
+            source: "unavailable",
+            confidence: "low",
+            endpoint: "/sync/before-edit",
+            error: { code: "NO_PROJECT", message: "No se detectó TALEND_PROJECT" },
+          });
+        }
+        const result = await beforeFileEdit(projectPath, itemPath, propertiesPath, bridge);
+        return bridgeOk({
+          ok: result.ok,
+          source: "mcp+studio-bridge",
+          confidence: result.ok ? "high" : "low",
+          endpoint: "/sync/before-edit",
+          data: {
+            blocked: result.blocked,
+            reason: result.reason,
+            snapshotCreated: result.snapshotCreated,
+            snapshotPath: result.snapshotPath,
+          },
+        });
+      },
+    },
+    {
+      name: "talend_safe_edit_component_parameter",
+      description: "Edita un parámetro de componente en XML de forma segura: snapshot, edit, refresh, validación.",
+      inputSchema: z.object({
+        itemPath: z.string().describe("Ruta al archivo .item del job"),
+        propertiesPath: z.string().describe("Ruta al archivo .properties del job"),
+        uniqueName: z.string().describe("UNIQUE_NAME del componente a editar"),
+        parameterName: z.string().describe("Nombre del parámetro a modificar"),
+        value: z.string().describe("Nuevo valor para el parámetro"),
+      }),
+      handler: async ({ itemPath, propertiesPath, uniqueName, parameterName, value }) => {
+        const bridge = await loadBridge();
+        const projectPath = getConfiguredProjectPath();
+        if (!projectPath) {
+          return bridgeFail({
+            ok: false,
+            source: "unavailable",
+            confidence: "low",
+            endpoint: "/sync/edit-parameter",
+            error: { code: "NO_PROJECT", message: "No se detectó TALEND_PROJECT" },
+          });
+        }
+        const { safeEditComponentParameter } = await import("../sync/studio-file-sync");
+        const { updateTalendComponentParameterXml } = await import("../editor");
+        const xml = await readTextFile(itemPath, projectPath);
+        const editFn = () => {
+          try {
+            const updatedXml = updateTalendComponentParameterXml(xml, { uniqueName, parameterName, value });
+            return { ok: true, editedXml: updatedXml };
+          } catch (e) {
+            return { ok: false };
+          }
+        };
+        const result = await safeEditComponentParameter(projectPath, itemPath, propertiesPath, bridge, editFn);
+        return bridgeOk({
+          ok: result.ok,
+          source: result.source,
+          confidence: result.confidence,
+          endpoint: "/sync/edit-parameter",
+          data: result,
+        });
+      },
+    },
+    {
+      name: "talend_safe_patch_component",
+      description: "Aplica un patch multi-parámetro a un componente de forma segura.",
+      inputSchema: z.object({
+        itemPath: z.string().describe("Ruta al archivo .item del job"),
+        propertiesPath: z.string().describe("Ruta al archivo .properties del job"),
+        uniqueName: z.string().describe("UNIQUE_NAME del componente a patchear"),
+        patch: z.record(z.string(), z.string()).describe("Mapa de parámetros a actualizar"),
+      }),
+      handler: async ({ itemPath, propertiesPath, uniqueName, patch }) => {
+        const bridge = await loadBridge();
+        const projectPath = getConfiguredProjectPath();
+        if (!projectPath) {
+          return bridgeFail({
+            ok: false,
+            source: "unavailable",
+            confidence: "low",
+            endpoint: "/sync/patch-component",
+            error: { code: "NO_PROJECT", message: "No se detectó TALEND_PROJECT" },
+          });
+        }
+        const { safePatchComponent } = await import("../sync/studio-file-sync");
+        const { patchTalendComponentXml } = await import("../editor");
+        const xml = await readTextFile(itemPath, projectPath);
+        const patchFn = () => {
+          try {
+            const updatedXml = patchTalendComponentXml(xml, uniqueName, patch);
+            return { ok: true, patchedXml: updatedXml };
+          } catch (e) {
+            return { ok: false };
+          }
+        };
+        const result = await safePatchComponent(projectPath, itemPath, propertiesPath, bridge, patchFn);
+        return bridgeOk({
+          ok: result.ok,
+          source: result.source,
+          confidence: result.confidence,
+          endpoint: "/sync/patch-component",
+          data: result,
+        });
+      },
+    },
+    {
+      name: "talend_safe_add_connection",
+      description: "Añade una conexión entre dos componentes de forma segura.",
+      inputSchema: z.object({
+        itemPath: z.string().describe("Ruta al archivo .item del job"),
+        propertiesPath: z.string().describe("Ruta al archivo .properties del job"),
+        sourceUniqueName: z.string().describe("UNIQUE_NAME del componente origen"),
+        targetUniqueName: z.string().describe("UNIQUE_NAME del componente destino"),
+        connectionType: z.string().describe("Tipo de conexión (FLOW, MAIN, etc)"),
+      }),
+      handler: async ({ itemPath, propertiesPath, sourceUniqueName, targetUniqueName, connectionType }) => {
+        const bridge = await loadBridge();
+        const projectPath = getConfiguredProjectPath();
+        if (!projectPath) {
+          return bridgeFail({
+            ok: false,
+            source: "unavailable",
+            confidence: "low",
+            endpoint: "/sync/add-connection",
+            error: { code: "NO_PROJECT", message: "No se detectó TALEND_PROJECT" },
+          });
+        }
+        const { safeAddConnection } = await import("../sync/studio-file-sync");
+        const { addTalendConnectionXml } = await import("../editor");
+        const xml = await readTextFile(itemPath, projectPath);
+        const connFn = () => {
+          try {
+            const updatedXml = addTalendConnectionXml(xml, {
+              sourceUniqueName,
+              targetUniqueName,
+              connectorName: connectionType,
+              label: `${sourceUniqueName}_to_${targetUniqueName}`,
+              metaname: "",
+              uniqueName: `connection_${sourceUniqueName}_${targetUniqueName}_${Date.now()}`,
+            });
+            return { ok: true, modifiedXml: updatedXml };
+          } catch (e) {
+            return { ok: false };
+          }
+        };
+        const result = await safeAddConnection(projectPath, itemPath, propertiesPath, bridge, connFn);
+        return bridgeOk({
+          ok: result.ok,
+          source: result.source,
+          confidence: result.confidence,
+          endpoint: "/sync/add-connection",
+          data: result,
+        });
+      },
+    },
   ];
 }
