@@ -962,5 +962,82 @@ export function createStudioBridgeTools(): BridgeToolDef[] {
         });
       },
     },
+    {
+      name: "talend_mastery_component",
+      description: "Descubre y evalúa el nivel de dominio de un componente específico (0-10).",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+      }),
+      handler: async ({ componentName }) => {
+        const { masteryComponent } = await import("../mastery/component-mastery-runner");
+        const result = await masteryComponent(componentName);
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "medium",
+          endpoint: "/mastery/component",
+          data: result,
+        });
+      },
+    },
+    {
+      name: "talend_mastery_all_components",
+      description: "Ejecuta mastery en todos los componentes del catálogo y genera reporte.",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const { masteryAllComponents } = await import("../mastery/component-mastery-runner");
+        const report = await masteryAllComponents();
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "medium",
+          endpoint: "/mastery/all",
+          data: report,
+        });
+      },
+    },
+    {
+      name: "talend_mastery_report",
+      description: "Devuelve el reporte de mastery con distribución de niveles y score promedio.",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const { generateMasteryReport } = await import("../mastery/component-mastery-runner");
+        const report = await generateMasteryReport();
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/mastery/report",
+          data: report,
+        });
+      },
+    },
+    {
+      name: "talend_mastery_generate_fixture",
+      description: "Genera un fixture XML mínimo válido con el componente para testing.",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+      }),
+      handler: async ({ componentName }) => {
+        const { masteryGenerateFixture } = await import("../mastery/component-mastery-runner");
+        const result = await masteryGenerateFixture(componentName);
+        if (!result.ok) {
+          return bridgeFail({
+            ok: false,
+            source: "unavailable",
+            confidence: "low",
+            endpoint: "/mastery/fixture",
+            error: { code: "FIXTURE_FAILED", message: result.error ?? "Unknown error" },
+          });
+        }
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "medium",
+          endpoint: "/mastery/fixture",
+          data: { componentName, fixture: result.fixture },
+        });
+      },
+    },
   ];
 }
