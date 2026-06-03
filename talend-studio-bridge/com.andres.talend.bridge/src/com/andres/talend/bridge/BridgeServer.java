@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 import com.andres.talend.bridge.audit.CapabilityAuditService;
 import com.andres.talend.bridge.audit.CommandAuditService;
 import com.andres.talend.bridge.audit.PluginAuditService;
+import com.andres.talend.bridge.events.EventsService;
 import com.andres.talend.bridge.launch.LaunchConfigService;
 import com.andres.talend.bridge.problems.ProblemMarkerService;
 import com.andres.talend.bridge.resources.WorkspaceService;
@@ -53,7 +54,10 @@ final class BridgeServer {
       server.createContext("/workbench/selection", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::selection))));
       server.createContext("/workbench/views", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::views))));
       server.createContext("/workbench/open-resource", exchange -> guarded(exchange, () -> handleOpenResource(exchange)));
+      server.createContext("/workbench/save-active", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::saveActiveEditor))));
+      server.createContext("/workbench/save-all", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::saveAllEditors))));
       server.createContext("/workspace/state", exchange -> guarded(exchange, () -> respond(exchange, 200, WorkspaceService.state())));
+      server.createContext("/workspace/refresh", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkspaceService::refresh))));
       server.createContext("/problems/markers", exchange -> guarded(exchange, () -> respond(exchange, 200, ProblemMarkerService.markers())));
       server.createContext("/talend/probe/classes", exchange -> guarded(exchange, () -> respond(exchange, 200, TalendClassProbeService.probe(bundleContext))));
       server.createContext("/talend/active-editor/introspect", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeEditorIntrospect))));
@@ -62,15 +66,9 @@ final class BridgeServer {
       server.createContext("/commands/execute", exchange -> guarded(exchange, () -> handleExecuteCommand(exchange)));
       server.createContext("/launch/configs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchConfigService.listConfigs())));
       server.createContext("/launch/run", exchange -> guarded(exchange, () -> handleLaunchRun(exchange)));
-      server.createContext("/events/recent", exchange -> guarded(exchange, () -> {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("ok", true);
-        payload.put("source", "studio-bridge");
-        payload.put("confidence", "low");
-        payload.put("endpoint", "/events/recent");
-        payload.put("events", new java.util.ArrayList<Object>());
-        respond(exchange, 200, payload);
-      }));
+      server.createContext("/events/recent", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.recent())));
+      server.createContext("/events/clear", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.clear())));
+      server.createContext("/automation/run-active-job", exchange -> guarded(exchange, () -> handleAutomationRunActiveJob(exchange)));
       server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
       server.start();
     } catch (IOException e) {
@@ -94,6 +92,7 @@ final class BridgeServer {
     payload.put("plugin", Activator.PLUGIN_ID);
     payload.put("version", "0.1.0");
     payload.put("mode", config.readOnly ? "readOnly" : "readWrite");
+    payload.put("unsafeActions", config.unsafeActions);
     return payload;
   }
 
@@ -125,13 +124,22 @@ final class BridgeServer {
     String name = asString(body.get("name"));
     String mode = asString(body.get("mode"));
     boolean dryRun = asBoolean(body.get("dryRun"), true);
-    respond(exchange, 200, LaunchConfigService.runLaunchConfig(name, mode, dryRun, BridgeConfig.load()));
+    respond(exchange, 200, LaunchConfigService.runLaunchConfig(name, mode, dryRun, config));
   }
 
   private void handleOpenResource(HttpExchange exchange) throws IOException {
     Map<String, Object> body = readJsonBody(exchange);
     String path = asString(body.get("path"));
     respond(exchange, 200, UiThread.sync(() -> WorkbenchService.openResource(path)));
+  }
+
+  private void handleAutomationRunActiveJob(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    boolean dryRun = asBoolean(body.get("dryRun"), true);
+    boolean saveBefore = asBoolean(body.get("saveBefore"), true);
+    boolean waitForTermination = asBoolean(body.get("waitForTermination"), true);
+    int timeoutMs = asInt(body.get("timeoutMs"), 120000);
+    respond(exchange, 200, UiThread.sync(() -> AutomationService.runActiveJob(saveBefore, waitForTermination, timeoutMs, dryRun, config)));
   }
 
   private Map<String, Object> readJsonBody(HttpExchange exchange) throws IOException {
@@ -157,6 +165,14 @@ final class BridgeServer {
       if (path != null) payload.put("path", path);
       if (body.contains("\"dryRun\":true")) payload.put("dryRun", Boolean.TRUE);
       if (body.contains("\"dryRun\":false")) payload.put("dryRun", Boolean.FALSE);
+      if (body.contains("\"saveBefore\":true")) payload.put("saveBefore", Boolean.TRUE);
+      if (body.contains("\"saveBefore\":false")) payload.put("saveBefore", Boolean.FALSE);
+      if (body.contains("\"waitForTermination\":true")) payload.put("waitForTermination", Boolean.TRUE);
+      if (body.contains("\"waitForTermination\":false")) payload.put("waitForTermination", Boolean.FALSE);
+      String timeoutMsStr = extractString(body, "timeoutMs");
+      if (timeoutMsStr != null) {
+        try { payload.put("timeoutMs", Integer.parseInt(timeoutMsStr)); } catch (NumberFormatException ignored) {}
+      }
       return payload;
     }
   }
@@ -193,5 +209,19 @@ final class BridgeServer {
 
   private boolean asBoolean(Object value, boolean fallback) {
     return value instanceof Boolean ? (Boolean) value : fallback;
+  }
+
+  private int asInt(Object value, int fallback) {
+    if (value instanceof Number) {
+      return ((Number) value).intValue();
+    }
+    if (value instanceof String) {
+      try {
+        return Integer.parseInt((String) value);
+      } catch (NumberFormatException ignored) {
+        return fallback;
+      }
+    }
+    return fallback;
   }
 }

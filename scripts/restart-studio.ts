@@ -14,8 +14,10 @@ async function main() {
     for (const line of lines) {
       if (line.includes("Talend-Studio-macosx-cocoa") && !line.includes("grep")) {
         const parts = line.trim().split(/\s+/);
-        pid = parts[1];
-        break;
+        if (parts.length > 1 && parts[1]) {
+          pid = parts[1];
+          break;
+        }
       }
     }
   } catch (err) {

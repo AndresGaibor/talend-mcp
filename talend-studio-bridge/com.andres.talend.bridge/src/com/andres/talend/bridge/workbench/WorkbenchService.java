@@ -96,11 +96,133 @@ public final class WorkbenchService {
     return payload;
   }
 
-  public static Map<String, Object> openResource(String absolutePath) {
+  public static Map<String, Object> saveActiveEditor() {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ok", true);
     payload.put("source", "studio-bridge");
     payload.put("confidence", "medium");
+    payload.put("endpoint", "/workbench/save-active");
+
+    IWorkbenchPage page = activePage();
+    if (page == null || page.getActiveEditor() == null) {
+      payload.put("ok", false);
+      payload.put("saved", false);
+      payload.put("error", error("NO_ACTIVE_EDITOR", "No hay editor activo"));
+      return payload;
+    }
+
+    IEditorPart editor = page.getActiveEditor();
+    if (!editor.isDirty()) {
+      payload.put("saved", false);
+      payload.put("message", "Editor no está dirty, no se necesita guardar");
+      return payload;
+    }
+
+    try {
+      editor.doSave(new org.eclipse.core.runtime.NullProgressMonitor());
+      payload.put("saved", true);
+      payload.put("editorTitle", editor.getTitle());
+    } catch (Exception e) {
+      payload.put("ok", false);
+      payload.put("saved", false);
+      payload.put("error", error("SAVE_FAILED", e.getMessage()));
+    }
+    return payload;
+  }
+
+  public static Map<String, Object> saveAllEditors() {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/workbench/save-all");
+
+    IWorkbenchPage page = activePage();
+    if (page == null) {
+      payload.put("ok", false);
+      payload.put("saved", 0);
+      payload.put("error", error("NO_ACTIVE_PAGE", "No hay página activa"));
+      return payload;
+    }
+
+    int savedCount = 0;
+    for (IEditorPart editor : page.getDirtyEditors()) {
+      try {
+        editor.doSave(new org.eclipse.core.runtime.NullProgressMonitor());
+        savedCount++;
+      } catch (Exception ignored) {
+      }
+    }
+
+    payload.put("saved", savedCount);
+    return payload;
+  }
+
+  public static Map<String, Object> closeActiveEditor() {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/workbench/close-editor");
+
+    IWorkbenchPage page = activePage();
+    if (page == null || page.getActiveEditor() == null) {
+      payload.put("ok", false);
+      payload.put("closed", false);
+      payload.put("error", error("NO_ACTIVE_EDITOR", "No hay editor activo"));
+      return payload;
+    }
+
+    IEditorPart editor = page.getActiveEditor();
+    try {
+      page.closeEditor(editor, true);
+      payload.put("closed", true);
+      payload.put("editorTitle", editor.getTitle());
+    } catch (Exception e) {
+      payload.put("ok", false);
+      payload.put("closed", false);
+      payload.put("error", error("CLOSE_FAILED", e.getMessage()));
+    }
+    return payload;
+  }
+
+  public static Map<String, Object> activateEditor(String title) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/workbench/activate-editor");
+
+    IWorkbenchPage page = activePage();
+    if (page == null) {
+      payload.put("ok", false);
+      payload.put("error", error("NO_ACTIVE_PAGE", "No hay página activa"));
+      return payload;
+    }
+
+    for (IEditorReference ref : page.getEditorReferences()) {
+      if (title.equals(ref.getTitle())) {
+        try {
+          page.activate(ref.getPart(true));
+          payload.put("activated", true);
+          payload.put("editorTitle", title);
+          return payload;
+        } catch (Exception e) {
+          payload.put("ok", false);
+          payload.put("error", error("ACTIVATE_FAILED", e.getMessage()));
+          return payload;
+        }
+      }
+    }
+
+    payload.put("ok", false);
+    payload.put("error", error("EDITOR_NOT_FOUND", "No se encontró editor con título: " + title));
+    return payload;
+  }
+
+  public static Map<String, Object> openResource(String absolutePath) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("source", "studio-bridge");
     payload.put("endpoint", "/workbench/open-resource");
     payload.put("path", absolutePath);
 
@@ -123,7 +245,6 @@ public final class WorkbenchService {
     try {
       file.getParent().refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ONE, null);
     } catch (Exception e) {
-      // Ignorar errores de refresco
     }
 
     try {

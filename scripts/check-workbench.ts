@@ -11,7 +11,7 @@ async function main() {
   for (let i = 1; i <= 20; i++) {
     const res = await client.workbenchState();
     if (res.ok && res.data?.windows && res.data.windows.length > 0) {
-      const activePage = res.data.windows[0].activePage;
+      const activePage = res.data.windows[0]?.activePage;
       if (activePage) {
         console.log("SUCCESS: Workbench is fully initialized and active!");
         console.log(JSON.stringify(res.data, null, 2));

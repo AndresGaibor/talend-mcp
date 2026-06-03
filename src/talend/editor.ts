@@ -189,6 +189,17 @@ function diffText(before: string, after: string): string {
   return lineas.join("\n");
 }
 
+export function patchTalendComponentXml(xml: string, uniqueName: string, patch: Record<string, string>): string {
+  const document = getParsedDocument(xml);
+  const root = document["talendfile:ProcessType"] ?? document.ProcessType;
+  if (!root) throw new Error("XML de job Talend inválido: falta talendfile:ProcessType");
+  const target = findNodeByUniqueName(root, uniqueName);
+  for (const [parameterName, value] of Object.entries(patch)) {
+    updateElementParameters(target, parameterName, value);
+  }
+  return buildXml(document);
+}
+
 export function updateTalendComponentParameterXml(xml: string, options: ParameterEditOptions): string {
   const document = getParsedDocument(xml);
   const root = document["talendfile:ProcessType"] ?? document.ProcessType;

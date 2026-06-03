@@ -854,8 +854,21 @@ async function getComponentSnippetHandler({ componentName }: { componentName: st
   return ok(JSON.stringify(snippet, null, 2), snippet);
 }
 
+import { existsSync } from "node:fs";
+
+function getTalendStudioPath(): string {
+  return process.env.TALEND_STUDIO_PATH ?? (() => {
+    const macDefault = "/Applications/TalendStudio-8.0.1/studio/plugins";
+    if (existsSync(macDefault)) return macDefault;
+    const home = process.env.HOME ?? "";
+    const homeDefault = `${home}/TalendStudio/plugins`;
+    if (existsSync(homeDefault)) return homeDefault;
+    return macDefault;
+  })();
+}
+
 async function discoverComponentsHandler({ pattern }: { pattern?: string }) {
-  const pluginsDir = "/Applications/TalendStudio-8.0.1/studio/plugins";
+  const pluginsDir = getTalendStudioPath();
   const { execSync } = require("node:child_process");
   
   try {
@@ -878,7 +891,7 @@ async function discoverComponentsHandler({ pattern }: { pattern?: string }) {
 }
 
 async function inspectComponentDefinitionHandler({ componentName }: { componentName: string }) {
-  const pluginsDir = "/Applications/TalendStudio-8.0.1/studio/plugins";
+  const pluginsDir = getTalendStudioPath();
   const { execSync } = require("node:child_process");
   
   try {

@@ -11,6 +11,7 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchManager;
 
 public final class LaunchConfigService {
@@ -21,11 +22,7 @@ public final class LaunchConfigService {
     try {
       ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
       for (ILaunchConfiguration config : manager.getLaunchConfigurations()) {
-        Map<String, Object> item = new LinkedHashMap<>();
-        item.put("name", config.getName());
-        item.put("type", config.getType() != null ? config.getType().getName() : null);
-        item.put("path", null);
-        configs.add(item);
+        configs.add(configInfo(config));
       }
     } catch (Exception ignored) {
     }
@@ -37,6 +34,56 @@ public final class LaunchConfigService {
     payload.put("endpoint", "/launch/configs");
     payload.put("configs", configs);
     return payload;
+  }
+
+  private static Map<String, Object> configInfo(ILaunchConfiguration config) {
+    Map<String, Object> item = new LinkedHashMap<>();
+    item.put("name", config.getName());
+
+    try {
+      ILaunchConfigurationType type = config.getType();
+      if (type != null) {
+        item.put("typeId", type.getIdentifier());
+        item.put("typeName", type.getName());
+
+        // Available modes for this type
+        java.util.Set<String> modeSet = type.getSupportedModes();
+        List<String> modeList = new ArrayList<>();
+        for (String mode : modeSet) {
+          if (mode.equals(ILaunchManager.RUN_MODE) || mode.equals(ILaunchManager.DEBUG_MODE) || mode.equals(ILaunchManager.PROFILE_MODE)) {
+            modeList.add(mode);
+          }
+        }
+        item.put("modes", modeList);
+      }
+    } catch (Exception ignored) {
+      item.put("typeId", null);
+      item.put("typeName", null);
+      item.put("modes", new ArrayList<>());
+    }
+
+    // Attributes
+    Map<String, Object> attributes = new LinkedHashMap<>();
+    try {
+      Map<String, Object> attrs = config.getAttributes();
+      for (Map.Entry<String, Object> entry : attrs.entrySet()) {
+        if (entry.getValue() != null) {
+          attributes.put(entry.getKey(), String.valueOf(entry.getValue()));
+        }
+      }
+    } catch (CoreException ignored) {
+    }
+    item.put("attributes", attributes);
+
+    // Resource path if available
+    try {
+      if (config.getMappedResources() != null && config.getMappedResources().length > 0) {
+        item.put("resource", config.getMappedResources()[0].getFullPath().toString());
+      }
+    } catch (Exception ignored) {
+    }
+
+    return item;
   }
 
   public static Map<String, Object> runLaunchConfig(String name, String mode, boolean dryRun, BridgeConfig config) {
@@ -62,8 +109,19 @@ public final class LaunchConfigService {
       return payload;
     }
 
+    // Check readOnly mode - block real execution
+    if (config.readOnly) {
+      payload.put("executed", false);
+      payload.put("blocked", true);
+      payload.put("reason", "Bridge is in readOnly mode. Set unsafeActions=true in config to enable real execution.");
+      return payload;
+    }
+
+    // Check unsafeActions flag
     if (dryRun || !config.unsafeActions) {
       payload.put("executed", false);
+      payload.put("blocked", true);
+      payload.put("reason", "unsafeActions=false or dryRun=true. Set unsafeActions=true to execute.");
       return payload;
     }
 

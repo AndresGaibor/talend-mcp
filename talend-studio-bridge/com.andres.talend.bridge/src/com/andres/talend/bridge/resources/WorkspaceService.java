@@ -32,4 +32,23 @@ public final class WorkspaceService {
     payload.put("projects", projects);
     return payload;
   }
+
+  public static Map<String, Object> refresh() {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/workspace/refresh");
+
+    try {
+      ResourcesPlugin.getWorkspace().save(true, null);
+      payload.put("refreshed", true);
+      payload.put("message", "Workspace refreshed successfully");
+    } catch (Exception e) {
+      payload.put("ok", false);
+      payload.put("refreshed", false);
+      payload.put("error", "REFRESH_FAILED: " + e.getMessage());
+    }
+    return payload;
+  }
 }

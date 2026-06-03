@@ -1,5 +1,7 @@
 package com.andres.talend.bridge;
 
+import com.andres.talend.bridge.events.EventsService;
+
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
 
@@ -10,14 +12,11 @@ public final class Activator extends AbstractUIPlugin {
 
   private BridgeServer bridgeServer;
 
-  public static Activator getDefault() {
-    return instance;
-  }
-
   @Override
   public void start(BundleContext context) throws Exception {
     super.start(context);
     instance = this;
+    EventsService.start();
     bridgeServer = new BridgeServer(context);
     bridgeServer.start();
   }
@@ -28,6 +27,7 @@ public final class Activator extends AbstractUIPlugin {
       bridgeServer.stop();
       bridgeServer = null;
     }
+    EventsService.stop();
     instance = null;
     super.stop(context);
   }

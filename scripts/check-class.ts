@@ -31,7 +31,7 @@ async function main() {
 
   console.log("Checking active editor...");
   const state = await client.workbenchState();
-  if (state.ok && state.data?.windows) {
+  if (state.ok && state.data?.windows?.[0]) {
     console.log("Active Editor:", JSON.stringify(state.data.windows[0].activeEditor));
   }
 }

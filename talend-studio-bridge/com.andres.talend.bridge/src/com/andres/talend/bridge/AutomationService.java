@@ -1,0 +1,187 @@
+package com.andres.talend.bridge;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import com.andres.talend.bridge.events.EventsService;
+import com.andres.talend.bridge.launch.LaunchConfigService;
+import com.andres.talend.bridge.problems.ProblemMarkerService;
+import com.andres.talend.bridge.workbench.WorkbenchService;
+
+import org.eclipse.debug.core.DebugEvent;
+import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.IDebugEventSetListener;
+import org.eclipse.debug.core.ILaunch;
+import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.PlatformUI;
+
+public final class AutomationService {
+
+  private AutomationService() {}
+
+  public static Map<String, Object> runActiveJob(boolean saveBefore, boolean waitForTermination, int timeoutMs, boolean dryRun, BridgeConfig config) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/automation/run-active-job");
+    payload.put("dryRun", dryRun);
+
+    if (dryRun) {
+      payload.put("mode", "dryRun");
+      payload.put("step", "would-execute-active-job");
+      return payload;
+    }
+
+    // Step 1: Detect active editor
+    IEditorPart activeEditor = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().getActiveEditor();
+    if (activeEditor == null) {
+      payload.put("ok", false);
+      payload.put("error", error("NO_ACTIVE_EDITOR", "No hay editor activo"));
+      return payload;
+    }
+
+    String editorTitle = activeEditor.getTitle();
+
+    // Step 2: Save if dirty
+    if (saveBefore && activeEditor.isDirty()) {
+      Map<String, Object> saveResult = WorkbenchService.saveActiveEditor();
+      if (!Boolean.TRUE.equals(saveResult.get("saved"))) {
+        payload.put("warning", "Editor dirty but save failed");
+      }
+    }
+
+    // Step 3: Find launch config matching editor title
+    String jobName = extractJobName(editorTitle);
+    if (jobName == null) {
+      payload.put("ok", false);
+      payload.put("error", error("CANNOT_EXTRACT_JOB_NAME", "No se pudo extraer nombre de job de: " + editorTitle));
+      return payload;
+    }
+
+    payload.put("jobName", jobName);
+    payload.put("step", "launch-config-search");
+
+    // Step 4: Find matching launch config
+    ILaunchConfiguration launchConfig = findLaunchConfig(jobName);
+    if (launchConfig == null) {
+      payload.put("ok", false);
+      payload.put("error", error("LAUNCH_CONFIG_NOT_FOUND", "No se encontró launch config para: " + jobName));
+      return payload;
+    }
+
+    String launchName = launchConfig.getName();
+    payload.put("launchConfig", launchName);
+    payload.put("step", "launching");
+
+    // Step 5: Launch
+    final AtomicReference<ILaunch> launchedLaunch = new AtomicReference<>();
+    DebugEventListener debugListener = new DebugEventListener(launchedLaunch);
+    DebugPlugin.getDefault().addDebugEventListener(debugListener);
+
+    try {
+      Map<String, Object> launchResult = LaunchConfigService.runLaunchConfig(launchName, "run", false, config);
+      if (!Boolean.TRUE.equals(launchResult.get("ok"))) {
+        payload.put("ok", false);
+        payload.put("launchResult", launchResult);
+        return payload;
+      }
+      payload.put("launched", true);
+      payload.put("step", waitForTermination ? "waiting-termination" : "completed");
+
+      // Step 6: Wait for termination if requested
+      if (waitForTermination) {
+        ILaunch launched = launchedLaunch.get();
+        if (launched != null) {
+          long deadline = System.currentTimeMillis() + timeoutMs;
+          while (!launched.isTerminated()) {
+            if (System.currentTimeMillis() > deadline) {
+              payload.put("timeout", true);
+              payload.put("step", "timeout");
+              break;
+            }
+            try {
+              Thread.sleep(500);
+            } catch (InterruptedException ignored) {
+              break;
+            }
+          }
+          payload.put("durationMs", System.currentTimeMillis() - ((Number) launchResult.getOrDefault("startedAt", System.currentTimeMillis())).longValue());
+          payload.put("terminated", launched.isTerminated());
+          payload.put("exitCode", launched.isTerminated() ? 0 : -1);
+        }
+      }
+
+      // Step 7: Read problems
+      payload.put("step", "reading-problems");
+      Map<String, Object> problems = ProblemMarkerService.markers();
+      payload.put("problems", problems.get("markers"));
+      payload.put("problemCount", ((java.util.List<?>) problems.get("markers")).size());
+
+      payload.put("step", "completed");
+      return payload;
+
+    } finally {
+      DebugPlugin.getDefault().removeDebugEventListener(debugListener);
+    }
+  }
+
+  private static String extractJobName(String editorTitle) {
+    if (editorTitle == null) return null;
+    // Format: "Job jobName version" or "jobName_version"
+    if (editorTitle.startsWith("Job ")) {
+      String rest = editorTitle.substring(4);
+      int spaceIdx = rest.lastIndexOf(' ');
+      if (spaceIdx > 0) {
+        return rest.substring(0, spaceIdx);
+      }
+      return rest;
+    }
+    int lastUnderscore = editorTitle.lastIndexOf('_');
+    if (lastUnderscore > 0) {
+      return editorTitle.substring(0, lastUnderscore);
+    }
+    return editorTitle;
+  }
+
+  private static ILaunchConfiguration findLaunchConfig(String jobName) {
+    try {
+      for (ILaunchConfiguration config : DebugPlugin.getDefault().getLaunchManager().getLaunchConfigurations()) {
+        if (config.getName().startsWith(jobName)) {
+          return config;
+        }
+      }
+    } catch (Exception ignored) {
+    }
+    return null;
+  }
+
+  private static Map<String, Object> error(String code, String message) {
+    Map<String, Object> err = new LinkedHashMap<>();
+    err.put("code", code);
+    err.put("message", message);
+    return err;
+  }
+
+  private static final class DebugEventListener implements IDebugEventSetListener {
+    private final AtomicReference<ILaunch> launched;
+
+    DebugEventListener(AtomicReference<ILaunch> launched) {
+      this.launched = launched;
+    }
+
+    @Override
+    public void handleDebugEvents(DebugEvent[] events) {
+      for (DebugEvent event : events) {
+        Object source = event.getSource();
+        if (source instanceof ILaunch && event.getKind() == DebugEvent.CREATE) {
+          launched.set((ILaunch) source);
+        }
+      }
+    }
+  }
+}

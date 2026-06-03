@@ -1,13 +1,35 @@
-import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
 
-const targetJar = "talend-studio-bridge/com.andres.talend.bridge.repository/target/repository/plugins/com.andres.talend.bridge_0.1.0.202606030558.jar";
-const pluginsDir = "/Applications/TalendStudio-8.0.1/studio/plugins";
-const bundlesInfoPath = "/Applications/TalendStudio-8.0.1/studio/configuration/org.eclipse.equinox.simpleconfigurator/bundles.info";
+function getStudioPath(): string {
+  const envPath = process.env.TALEND_STUDIO_PATH;
+  if (envPath && existsSync(envPath)) return envPath;
+
+  const candidates = [
+    "/Applications/TalendStudio-8.0.1/studio",
+    `${process.env.HOME ?? ""}/TalendStudio/studio`.trim(),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && existsSync(candidate)) return candidate;
+  }
+
+  return "/Applications/TalendStudio-8.0.1/studio";
+}
+
+function getBundlesInfoPath(): string {
+  const envPath = process.env.TALEND_BUNDLES_INFO_PATH;
+  if (envPath && existsSync(envPath)) return envPath;
+  return join(getStudioPath(), "configuration", "org.eclipse.equinox.simpleconfigurator", "bundles.info");
+}
+
+const targetJar = "talend-studio-bridge/com.andres.talend.bridge.repository/target/repository/plugins/com.andres.talend.bridge_0.1.0.202606031624.jar";
+const pluginsDir = join(getStudioPath(), "plugins");
+const bundlesInfoPath = getBundlesInfoPath();
 
 async function main() {
   console.log(`Copying ${targetJar} to ${pluginsDir}...`);
-  const destJarName = "com.andres.talend.bridge_0.1.0.202606030558.jar";
+  const destJarName = "com.andres.talend.bridge_0.1.0.202606031624.jar";
   const destPath = join(pluginsDir, destJarName);
   copyFileSync(targetJar, destPath);
   console.log(`Copied successfully to ${destPath}`);
@@ -18,11 +40,12 @@ async function main() {
   // Search for the line containing com.andres.talend.bridge
   const lines = content.split("\n");
   let updated = false;
-  const newLine = "com.andres.talend.bridge,0.1.0.202606030558,plugins/com.andres.talend.bridge_0.1.0.202606030558.jar,4,true";
+  const newLine = "com.andres.talend.bridge,0.1.0.202606031624,plugins/com.andres.talend.bridge_0.1.0.202606031624.jar,4,true";
 
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes("com.andres.talend.bridge")) {
-      console.log(`Found old line: ${lines[i]}`);
+    const line = lines[i];
+    if (line && line.includes("com.andres.talend.bridge")) {
+      console.log(`Found old line: ${line}`);
       lines[i] = newLine;
       updated = true;
       break;

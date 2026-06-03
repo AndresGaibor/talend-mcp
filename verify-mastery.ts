@@ -53,7 +53,10 @@ console.log("- tMysqlOutput TABLE:", tOutput?.parameters.TABLE);
 
 console.log("- Conexiones encontradas:", parsed.connections.length);
 if (parsed.connections.length > 0) {
-    console.log("  - " + parsed.connections[0].source + " -> " + parsed.connections[0].target);
+    const first = parsed.connections[0];
+    if (first) {
+        console.log("  - " + first.source + " -> " + first.target);
+    }
 }
 
 if (tMap && tMap.rawNodeData && tOutput && parsed.connections.length > 0) {
