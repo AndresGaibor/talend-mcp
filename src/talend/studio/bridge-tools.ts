@@ -800,5 +800,167 @@ export function createStudioBridgeTools(): BridgeToolDef[] {
         });
       },
     },
+    {
+      name: "talend_components_scan_installed",
+      description: "Escanea los plugins de Talend Studio y construye un catálogo de componentes disponibles.",
+      inputSchema: z.object({
+        talendStudioPath: z.string().optional().describe("Ruta a Talend Studio (por defecto: variable TALEND_STUDIO_PATH)"),
+      }),
+      handler: async ({ talendStudioPath }) => {
+        const { buildComponentCatalog } = await import("../components/component-catalog-builder");
+        const result = await buildComponentCatalog(talendStudioPath);
+        return bridgeOk({
+          ok: result.ok,
+          source: "workspace-files",
+          confidence: result.ok ? "high" : "low",
+          endpoint: "/components/scan",
+          data: result,
+        });
+      },
+    },
+    {
+      name: "talend_components_catalog_status",
+      description: "Devuelve el estado del catálogo de componentes: cantidad de entradas, última actualización, plugins escaneados.",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const { getCatalogStatus } = await import("../components/component-catalog-builder");
+        const result = await getCatalogStatus();
+        return bridgeOk({
+          ok: result.ok,
+          source: result.ok ? "workspace-files" : "unavailable",
+          confidence: result.ok ? "high" : "low",
+          endpoint: "/components/status",
+          data: result,
+        });
+      },
+    },
+    {
+      name: "talend_components_search",
+      description: "Busca componentes por nombre, familia o conector en el catálogo local.",
+      inputSchema: z.object({
+        query: z.string().describe("Texto a buscar"),
+        maxResults: z.number().optional().default(20).describe("Máximo de resultados"),
+      }),
+      handler: async ({ query, maxResults }) => {
+        const { searchComponents } = await import("../components/component-catalog-builder");
+        const results = await searchComponents(query, maxResults);
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: results.length > 0 ? "high" : "low",
+          endpoint: "/components/search",
+          data: { results, count: results.length },
+        });
+      },
+    },
+    {
+      name: "talend_components_inspect",
+      description: "Inspecciona un componente específico y devuelve sus parámetros, conectores y schemas.",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente (ej: tFileInputDelimited)"),
+      }),
+      handler: async ({ componentName }) => {
+        const { inspectComponent } = await import("../components/component-catalog-builder");
+        const result = await inspectComponent(componentName);
+        if (!result) {
+          return bridgeFail({
+            ok: false,
+            source: "unavailable",
+            confidence: "low",
+            endpoint: "/components/inspect",
+            error: { code: "COMPONENT_NOT_FOUND", message: `Componente no encontrado: ${componentName}` },
+          });
+        }
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/components/inspect",
+          data: result,
+        });
+      },
+    },
+    {
+      name: "talend_components_parameters",
+      description: "Lista todos los parámetros de un componente (requeridos y opcionales).",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+      }),
+      handler: async ({ componentName }) => {
+        const { getComponentParameters } = await import("../components/component-catalog-builder");
+        const params = await getComponentParameters(componentName);
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: params.length > 0 ? "high" : "low",
+          endpoint: "/components/parameters",
+          data: { componentName, parameters: params },
+        });
+      },
+    },
+    {
+      name: "talend_components_connectors",
+      description: "Lista los conectores disponibles de un componente.",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+      }),
+      handler: async ({ componentName }) => {
+        const { getComponentConnectors } = await import("../components/component-catalog-builder");
+        const connectors = await getComponentConnectors(componentName);
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: connectors.length > 0 ? "high" : "low",
+          endpoint: "/components/connectors",
+          data: { componentName, connectors },
+        });
+      },
+    },
+    {
+      name: "talend_components_generate_template",
+      description: "Genera una plantilla JSON con los parámetros requeridos y opcionales de un componente.",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+      }),
+      handler: async ({ componentName }) => {
+        const { generateComponentTemplate } = await import("../components/component-catalog-builder");
+        const result = await generateComponentTemplate(componentName);
+        if (!result.ok) {
+          return bridgeFail({
+            ok: false,
+            source: "unavailable",
+            confidence: "low",
+            endpoint: "/components/template",
+            error: { code: "TEMPLATE_FAILED", message: result.error ?? "Unknown error" },
+          });
+        }
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/components/template",
+          data: { componentName, template: JSON.parse(result.template!) },
+        });
+      },
+    },
+    {
+      name: "talend_components_validate_usage",
+      description: "Valida que los parámetros proporcionados sean correctos para un componente (requeridos, desconocidos).",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+        parameters: z.record(z.string(), z.string()).describe("Parámetros a validar"),
+      }),
+      handler: async ({ componentName, parameters }) => {
+        const { validateComponentUsage } = await import("../components/component-catalog-builder");
+        const result = await validateComponentUsage(componentName, parameters);
+        return bridgeOk({
+          ok: result.ok,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/components/validate",
+          data: result,
+        });
+      },
+    },
   ];
 }
