@@ -83,20 +83,23 @@ export async function validateComponentRun(
     const realRunResult = await bridge.runLaunchConfig(configName, false, "run");
     result.realRunOk = realRunResult.ok;
 
-    const launchId = (realRunResult as any).data?.launchId;
+    const launchId = (realRunResult.data as any)?.launchId;
     if (launchId) {
       result.launchId = launchId;
       try {
-        const statusResult = await bridge.eventsRecent();
-        result.launchTerminated = statusResult.ok && (statusResult.data as any)?.terminated === true;
+        const waitResult = await bridge.launchWait(launchId, options?.timeoutMs ?? 60000);
+        result.launchTerminated = waitResult.ok && (waitResult.data as any)?.terminated === true;
       } catch {
         result.launchTerminated = false;
       }
     } else {
       result.launchTerminated = false;
+      if (result.realRunOk) {
+        result.error = "Launch ejecutado, pero el bridge no devolvió launchId";
+      }
     }
 
-    result.ok = result.realRunOk;
+    result.ok = result.realRunOk && result.launchTerminated;
     return result;
   } catch (e) {
     result.error = e instanceof Error ? e.message : String(e);

@@ -56,8 +56,12 @@ export function parseComponentXmlWithParser(xml: string): ParsedComponent {
   const COMPONENT = parsed.COMPONENT ?? parsed.component ?? {};
   const HEADER = COMPONENT.HEADER ?? COMPONENT.header ?? {};
   const IMPL = COMPONENT.IMPL ?? COMPONENT.impl ?? {};
-  const PARAMETERS = toArray(IMPL.PARAMETER ?? IMPL.parameter);
-  const CONNECTORS = toArray(IMPL.CONNECTOR ?? IMPL.connector ?? IMPL.CONNECTORS ?? IMPL.connectors);
+  
+  const PARAMETERS = toArray(IMPL.PARAMETER ?? IMPL.parameter)
+    .concat(toArray(COMPONENT.PARAMETERS?.PARAMETER ?? COMPONENT.parameters?.parameter));
+
+  const CONNECTORS = toArray(IMPL.CONNECTOR ?? IMPL.connector ?? IMPL.CONNECTORS ?? IMPL.connectors)
+    .concat(toArray(COMPONENT.CONNECTORS?.CONNECTOR ?? COMPONENT.connectors?.connector));
 
   const parameters: ParsedParameter[] = [];
   for (const p of PARAMETERS) {
@@ -104,9 +108,18 @@ export function parseComponentXmlWithParser(xml: string): ParsedComponent {
   }
 
   const schemas = {
-    hasInputSchema: COMPONENT.INPUT_SCHEMA === "true" || COMPONENT.inputSchema === "true",
-    hasOutputSchema: COMPONENT.OUTPUT_SCHEMA === "true" || COMPONENT.outputSchema === "true",
-    hasDynamicSchema: COMPONENT.DYNAMIC_SCHEMA === "true" || COMPONENT.dynamicSchema === "true",
+    hasInputSchema:
+      COMPONENT.INPUT_SCHEMA === "true" ||
+      COMPONENT.inputSchema === "true" ||
+      parameters.some((p) => String(p.field).includes("SCHEMA")),
+    hasOutputSchema:
+      COMPONENT.OUTPUT_SCHEMA === "true" ||
+      COMPONENT.outputSchema === "true" ||
+      connectors.some((c) => String(c.type).toUpperCase() === "FLOW"),
+    hasDynamicSchema:
+      COMPONENT.DYNAMIC_SCHEMA === "true" ||
+      COMPONENT.dynamicSchema === "true" ||
+      xml.includes("DYNAMIC"),
   };
 
   const STARTABLE = HEADER.STARTABLE ?? HEADER.startable ?? COMPONENT.STARTABLE ?? false;

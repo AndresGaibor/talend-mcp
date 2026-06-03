@@ -1,10 +1,16 @@
 package com.andres.talend.bridge.launch;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.andres.talend.bridge.JsonUtil;
 
 public final class LaunchTrackerService {
 
@@ -35,7 +41,60 @@ public final class LaunchTrackerService {
     info.status = "started";
     launches.put(launchId, info);
     launchNameToLatestId.put(launchConfigName, launchId);
+    persist(info);
     return launchId;
+  }
+
+  public static void markTerminated(String launchId, Integer exitCode, Map<String, Object> extra) {
+    LaunchRunInfo info = launches.get(launchId);
+    if (info != null) {
+      info.terminatedAt = System.currentTimeMillis();
+      info.durationMs = info.terminatedAt - info.startedAt;
+      info.exitCode = exitCode;
+      info.extra = extra;
+      if (exitCode == null) {
+        info.status = "terminated_without_exit_code";
+      } else if (exitCode == 0) {
+        info.status = "success";
+      } else {
+        info.status = "failed";
+      }
+      persist(info);
+    }
+  }
+
+  public static LaunchRunInfo waitForLaunch(String launchId, int timeoutMs) {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      LaunchRunInfo info = getLaunch(launchId);
+      if (info != null && info.terminatedAt != null) {
+        return info;
+      }
+      try {
+        Thread.sleep(500);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    return getLaunch(launchId);
+  }
+
+  private static void persist(LaunchRunInfo info) {
+    try {
+      File file = getStoreFile();
+      try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(file, true), StandardCharsets.UTF_8)) {
+        writer.write(JsonUtil.stringify(info) + "\n");
+      }
+    } catch (Exception e) {
+      System.err.println("Failed to persist launch run: " + e.getMessage());
+    }
+  }
+
+  private static File getStoreFile() {
+    File dir = new File(System.getProperty("user.home"), ".talend-bridge");
+    if (!dir.exists()) dir.mkdirs();
+    return new File(dir, "launch-runs.jsonl");
   }
 
   public static String findLatestLaunchIdByName(String launchConfigName) {

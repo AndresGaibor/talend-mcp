@@ -38,6 +38,46 @@ function computeOverall(areas: CoverageArea): number {
   return Math.round(total);
 }
 
+async function getWorkspaceScore(bridgeHealth: number): Promise<number> {
+  let score = 0;
+  if (process.env.TALEND_PROJECT && existsSync(process.env.TALEND_PROJECT)) score += 20;
+  if (existsSync(join(process.cwd(), ".metadata"))) score += 20;
+  if (existsSync(join(process.cwd(), "process"))) score += 20;
+  if (existsSync(join(process.cwd(), "context"))) score += 20;
+  if (bridgeHealth > 0) score += 20;
+  return score;
+}
+
+async function getJobsScore(): Promise<number> {
+  let score = 0;
+  // Si tenemos repository-contexts y job-parser, asumimos soporte básico
+  if (existsSync("src/talend/repository.ts")) score += 20;
+  if (existsSync("src/talend/job-parser.ts")) score += 20;
+  if (existsSync("src/talend/job-generator.ts")) score += 20;
+  if (existsSync("src/talend/sync/studio-file-sync.ts")) score += 20;
+  if (existsSync("src/talend/automation/job-automation.ts")) score += 20;
+  return score;
+}
+
+async function getContextsScore(): Promise<number> {
+  let score = 0;
+  if (existsSync("src/talend/project-contexts.ts")) score += 25;
+  if (existsSync("src/talend/repository-contexts.ts")) score += 25;
+  if (existsSync("src/talend/sync/studio-file-sync.ts")) score += 25;
+  // TODO: validar missing values logic
+  score += 10; 
+  return score;
+}
+
+async function getDqScore(): Promise<number> {
+  let score = 0;
+  if (existsSync("src/talend/dq-analysis.ts")) score += 25;
+  if (existsSync("src/talend/dq-crud.ts")) score += 25;
+  if (existsSync("src/talend/dq-editor.ts")) score += 25;
+  // TODO: run analysis logic
+  return score;
+}
+
 async function getMasteryScore(): Promise<number> {
   try {
     const masteryDir = join(process.cwd(), ".talend-mcp", "mastery");
@@ -131,17 +171,22 @@ export async function generateCoverageReport(options?: {
   const executionScore = launchTracks.hasTerminatedData
     ? Math.min(100, 50 + (launchTracks.count > 0 ? 25 : 0) + (launchTracks.hasTerminatedData ? 25 : 0))
     : launchTracks.count > 0 ? 55 : 40;
-  const studioBridgeScore = bridgeHealthScore;
+  
+  const workspaceScore = await getWorkspaceScore(bridgeHealthScore);
+  const jobsScore = await getJobsScore();
+  const contextsScore = await getContextsScore();
+  const dqScore = await getDqScore();
+  const uiAutomationScore = existsSync("src/talend/ui/ui-driver.ts") ? 20 : 0;
 
   const dynamicAreas: CoverageArea = {
-    workspace: 90,
-    jobs: 75,
+    workspace: workspaceScore,
+    jobs: jobsScore,
     components: componentsScore,
-    contexts: 60,
-    dq: 50,
+    contexts: contextsScore,
+    dq: dqScore,
     execution: executionScore,
-    studioBridge: studioBridgeScore,
-    uiAutomation: 15,
+    studioBridge: bridgeHealthScore,
+    uiAutomation: uiAutomationScore,
   };
 
   const areas = { ...dynamicAreas, ...options?.override };
@@ -149,7 +194,7 @@ export async function generateCoverageReport(options?: {
   const defaultMissing: string[] = [];
   if (componentsScore < 70) defaultMissing.push("Catalogo de componentes requiere mas datos de mastery");
   if (!launchTracks.hasTerminatedData) defaultMissing.push("No hay datos de ejecucion real (launch tracking)");
-  if (studioBridgeScore < 80) defaultMissing.push("Plugin bridge necesita mas endpoints");
+  if (bridgeHealthScore < 80) defaultMissing.push("Plugin bridge necesita mas endpoints");
   if (areas.uiAutomation < 30) defaultMissing.push("UI automation no disponible aun");
 
   return {

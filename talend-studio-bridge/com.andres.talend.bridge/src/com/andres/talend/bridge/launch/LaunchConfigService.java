@@ -133,6 +133,8 @@ public final class LaunchConfigService {
 
     try {
       String launchMode = mode != null && !mode.trim().isEmpty() ? mode : ILaunchManager.RUN_MODE;
+      String launchId = LaunchTrackerService.registerLaunch(launchConfiguration.getName(), launchMode);
+      payload.put("launchId", launchId);
       launchConfiguration.launch(launchMode, new NullProgressMonitor(), true);
       payload.put("executed", true);
       payload.put("launchMode", launchMode);
@@ -144,6 +146,12 @@ public final class LaunchConfigService {
       error.put("code", "LAUNCH_FAILED");
       error.put("message", e.getMessage() != null ? e.getMessage() : "La ejecución de la launch config falló");
       payload.put("error", error);
+      
+      // If we registered a launchId, mark it as failed
+      if (payload.containsKey("launchId")) {
+        LaunchTrackerService.markTerminated((String) payload.get("launchId"), -1, payload);
+      }
+      
       return payload;
     }
   }

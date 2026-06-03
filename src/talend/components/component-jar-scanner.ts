@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, mkdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { resolveTalendPluginsDir } from "./talend-paths";
 import { parseComponentXmlWithParser } from "./component-xml-parser";
@@ -81,135 +81,209 @@ function listComponentDirs(cd: string): string[] {
   } catch { return []; }
 }
 
-function extract(xml: string, pt: RegExp, fallback: string): string {
-  const m = pt.exec(xml);
-  if (!m) return fallback;
-  return (m[1] as string) ?? fallback;
+async function listJarEntries(jarPath: string): Promise<string[]> {
+  const proc = Bun.spawn(["jar", "tf", jarPath], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const out = await new Response(proc.stdout).text();
+  await proc.exited;
+
+  return out
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
-function extractOpt(xml: string, pt: RegExp): string | null {
-  const m = pt.exec(xml);
-  if (!m) return null;
-  return (m[1] as string) ?? null;
+function looksLikeComponentXml(entry: string): boolean {
+  return (
+    entry.includes("components/") &&
+    (
+      entry.endsWith("_java.xml") ||
+      entry.endsWith("component.xml") ||
+      entry.endsWith(".xml")
+    )
+  );
 }
 
-function extractBool(xml: string, pt: RegExp, fallback: boolean): boolean {
-  const m = pt.exec(xml);
-  if (!m) return fallback;
-  return (m[1] as string) === "true";
+async function extractJarEntry(
+  jarPath: string,
+  entry: string,
+  targetDir: string
+): Promise<string | null> {
+  mkdirSync(targetDir, { recursive: true });
+
+  const proc = Bun.spawn(["jar", "xf", jarPath, entry], {
+    cwd: targetDir,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  await proc.exited;
+
+  const extracted = join(targetDir, entry);
+  return existsSync(extracted) ? extracted : null;
 }
 
-function extractNum(xml: string, pt: RegExp): number | undefined {
-  const m = pt.exec(xml);
-  if (!m) return undefined;
-  const n = parseInt(m[1] as string, 10);
-  return isNaN(n) ? undefined : n;
-}
-
-export function parseComponentXml(xml: string): {
-  name: string; version: string; family: string;
-  parameters: JarParameter[]; connectors: JarConnector[];
-  schemas: JarSchemas; capabilities: JarCapabilities; limitations: string[];
-} {
-  const parameters: JarParameter[] = [];
-  const connectors: JarConnector[] = [];
-  const schemas: JarSchemas = { hasInputSchema: false, hasOutputSchema: false, hasDynamicSchema: false };
-  const capabilities: JarCapabilities = { canStartFlow: false, canReceiveFlow: false, canOutputFlow: false, canUseReject: false, canUseIterate: false };
-  const limitations: string[] = [];
-
-  const name = extract(xml, /<NAME>([^<]+)<\/NAME>/, "");
-  const version = extract(xml, /<VERSION>([^<]+)<\/VERSION>/, "1.0");
-  const family = extract(xml, /<FAMILY>([^<]+)<\/FAMILY>/, "Unknown");
-
-  for (const mx of xml.matchAll(/<PARAMETER[^>]*>([\s\S]*?)<\/PARAMETER>/g)) {
-    const px = mx[1] as string;
-    const pName = extractOpt(px, /<NAME>([^<]+)<\/NAME>/);
-    if (!pName) continue;
-    parameters.push({
-      name: pName,
-      field: extract(px, /<FIELD>([^<]+)<\/FIELD>/, "id_String"),
-      required: extractBool(px, /<REQUIRED>([^<]+)<\/REQUIRED>/, false),
-      defaultValue: extract(px, /<DEFAULT>([^<]*)<\/DEFAULT>/, "") || null,
-      show: extractBool(px, /<SHOW>([^<]+)<\/SHOW>/, true),
-      repositoryValue: extractOpt(px, /<REPOSITORY_VALUE>([^<]*)<\/REPOSITORY_VALUE>/),
-    });
+async function scanJarFile(jarPath: string, errors: string[]): Promise<ComponentJarEntry[]> {
+  const entries: ComponentJarEntry[] = [];
+  let jarEntries: string[];
+  try {
+    jarEntries = await listJarEntries(jarPath);
+  } catch (e) {
+    errors.push(`Error listing entries in ${jarPath}: ${e}`);
+    return [];
   }
 
-  for (const mx of xml.matchAll(/<CONNECTOR[^>]*>([\s\S]*?)<\/CONNECTOR>/g)) {
-    const cx = mx[1] as string;
-    const cName = extract(cx, /<NAME>([^<]+)<\/NAME>/, "FLOW");
-    const ct = extract(cx, /<TYPE>([^<]+)<\/TYPE>/, "FLOW").toUpperCase() as JarConnector["type"];
-    connectors.push({ name: cName, type: ct || "UNKNOWN", maxInput: extractNum(cx, /<MAX_INPUT>([^<]+)<\/MAX_INPUT>/), maxOutput: extractNum(cx, /<MAX_OUTPUT>([^<]+)<\/MAX_OUTPUT>/) });
-    if (ct === "FLOW") { capabilities.canReceiveFlow = true; capabilities.canOutputFlow = true; }
-    else if (ct === "ITERATE") { capabilities.canUseIterate = true; }
-    else if (ct === "REJECT") { capabilities.canUseReject = true; }
+  const xmlEntries = jarEntries.filter(looksLikeComponentXml);
+
+  const tmpDir = join(
+    process.cwd(),
+    ".talend-mcp",
+    "tmp",
+    "component-scan",
+    basename(jarPath).replace(/[^a-zA-Z0-9_.-]/g, "_")
+  );
+
+  for (const xmlEntry of xmlEntries) {
+    try {
+      const extracted = await extractJarEntry(jarPath, xmlEntry, tmpDir);
+      if (!extracted) continue;
+
+      const xml = readFileSync(extracted, "utf8");
+      const parsed = parseComponentXmlWithParser(xml);
+
+      if (!parsed.name) continue;
+
+      entries.push({
+        componentName: parsed.name,
+        family: parsed.family,
+        version: parsed.version,
+        sourcePlugin: basename(jarPath),
+        definitionFiles: [xmlEntry],
+        parameters: parsed.parameters,
+        connectors: parsed.connectors,
+        schemas: parsed.schemas,
+        capabilities: parsed.capabilities,
+        limitations: parsed.limitations,
+      });
+    } catch (e) {
+      errors.push(
+        `Error parsing ${jarPath}:${xmlEntry}: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
+    }
   }
 
-  if (extractBool(xml, /<STARTABLE>([^<]+)<\/STARTABLE>/, false)) capabilities.canStartFlow = true;
-  if (extractBool(xml, /<INPUT_SCHEMA>([^<]+)<\/INPUT_SCHEMA>/, false)) schemas.hasInputSchema = true;
-  if (extractBool(xml, /<OUTPUT_SCHEMA>([^<]+)<\/OUTPUT_SCHEMA>/, false)) schemas.hasOutputSchema = true;
-  if (extractBool(xml, /<DYNAMIC_SCHEMA>([^<]+)<\/DYNAMIC_SCHEMA>/, false)) schemas.hasDynamicSchema = true;
-
-  return { name, version, family, parameters, connectors, schemas, capabilities, limitations };
+  return entries;
 }
 
-function scanComponentDir(dirName: string, cd: string, src: string): ComponentJarEntry | null {
+function scanComponentDir(dirName: string, cd: string, src: string, errors: string[]): ComponentJarEntry | null {
   for (const xn of [dirName + "_java.xml", dirName + ".xml", "component.xml"]) {
     const xp = join(cd, dirName, xn);
     if (existsSync(xp)) {
       try {
         const xml = readFileSync(xp, "utf8");
-        const p = parseComponentXmlWithParser(xml);
-        const jarParams = p.parameters.map((par): JarParameter => ({
-          name: par.name,
-          field: par.field,
-          required: par.required,
-          defaultValue: par.defaultValue,
-          show: par.show,
-          repositoryValue: par.repositoryValue,
-        }));
-        const jarConns = p.connectors.map((con): JarConnector => ({
-          name: con.name,
-          type: con.type,
-          maxInput: con.maxInput,
-          maxOutput: con.maxOutput,
-        }));
-        const jarSchemas: JarSchemas = p.schemas;
-        const jarCaps: JarCapabilities = p.capabilities;
+        const parsed = parseComponentXmlWithParser(xml);
+        
+        if (!parsed.name) continue;
+
         return {
-          componentName: p.name || dirName,
-          family: p.family,
-          version: p.version,
+          componentName: parsed.name,
+          family: parsed.family,
+          version: parsed.version,
           sourcePlugin: src,
           definitionFiles: [xp],
-          parameters: jarParams,
-          connectors: jarConns,
-          schemas: jarSchemas,
-          capabilities: jarCaps,
-          limitations: p.limitations,
+          parameters: parsed.parameters,
+          connectors: parsed.connectors,
+          schemas: parsed.schemas,
+          capabilities: parsed.capabilities,
+          limitations: parsed.limitations,
         };
-      } catch { return null; }
+      } catch (e) {
+        errors.push(`Error parsing ${xp}: ${e}`);
+        return null;
+      }
     }
   }
   return null;
+}
+
+function dedupeEntries(entries: ComponentJarEntry[]): ComponentJarEntry[] {
+  const map = new Map<string, ComponentJarEntry>();
+
+  for (const entry of entries) {
+    const key = `${entry.componentName}@${entry.version}`;
+
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, entry);
+      continue;
+    }
+
+    map.set(key, {
+      ...existing,
+      definitionFiles: [...new Set([...existing.definitionFiles, ...entry.definitionFiles])],
+      limitations: [...new Set([...existing.limitations, ...entry.limitations])],
+    });
+  }
+
+  return [...map.values()];
 }
 
 export async function scanInstalledPlugins(options?: { pluginsDir?: string }): Promise<ScanPluginsResult> {
   const errors: string[] = [];
   const scannedPlugins: string[] = [];
   const entries: ComponentJarEntry[] = [];
+  
   const pluginsDir = options?.pluginsDir ?? getTalendStudioPluginsDir();
   if (!pluginsDir) {
     return { scannedPlugins: [], entries: [], errors: ["Cannot find Talend plugins dir"] };
   }
+
+  try {
+    const dirs = readdirSync(pluginsDir);
+    for (const d of dirs) {
+      if (d.startsWith("org.talend.designer.") || d.startsWith("org.talend.l")) {
+        scannedPlugins.push(d);
+      }
+    }
+  } catch (e) {
+    errors.push("Cannot read plugins directory: " + e);
+    return { scannedPlugins: [], entries: [], errors };
+  }
+
+  // 1. Local provider components (unzipped)
   const cd = findLocalComponentsDir(pluginsDir);
-  if (!cd) return { scannedPlugins: [], entries: [], errors: ["Cannot find Talend components dir at " + pluginsDir] };
-  try { for (const d of readdirSync(pluginsDir).filter((d) => d.startsWith("org.talend.designer.") || d.startsWith("org.talend.l"))) scannedPlugins.push(d); }
-  catch (e) { errors.push("Cannot read plugins: " + e); }
-  for (const dn of listComponentDirs(cd)) { const e = scanComponentDir(dn, cd, basename(cd)); if (e) entries.push(e); }
-  return { scannedPlugins, entries, errors };
+  if (cd) {
+    for (const dn of listComponentDirs(cd)) {
+      const e = scanComponentDir(dn, cd, basename(cd), errors);
+      if (e) entries.push(e);
+    }
+  } else {
+    errors.push("No localprovider components directory found, scanning JARs only");
+  }
+
+  // 2. Scan JAR files
+  for (const plugin of scannedPlugins) {
+    if (plugin.endsWith(".jar")) {
+      const jarPath = join(pluginsDir, plugin);
+      const jarEntries = await scanJarFile(jarPath, errors);
+      entries.push(...jarEntries);
+    }
+  }
+
+  return {
+    scannedPlugins,
+    entries: dedupeEntries(entries),
+    errors
+  };
 }
 
 export function entriesToCatalogFormat(entries: ComponentJarEntry[], scannedPlugins: string[], errors: string[], talendStudioHome: string): {
   generatedAt: number; talendStudioHome: string; entries: ComponentJarEntry[]; errors: string[]; scannedPlugins: string[];
-} { return { generatedAt: Date.now(), talendStudioHome, entries, errors, scannedPlugins }; }
+} {
+  return { generatedAt: Date.now(), talendStudioHome, entries, errors, scannedPlugins };
+}

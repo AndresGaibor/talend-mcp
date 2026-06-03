@@ -57,6 +57,10 @@ final class BridgeServer {
       server.createContext("/workbench/open-resource", exchange -> guarded(exchange, () -> handleOpenResource(exchange)));
       server.createContext("/workbench/save-active", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::saveActiveEditor))));
       server.createContext("/workbench/save-all", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::saveAllEditors))));
+      server.createContext("/workbench/close-editor", exchange -> guarded(exchange, () -> handleCloseEditor(exchange)));
+      server.createContext("/workbench/activate-editor", exchange -> guarded(exchange, () -> handleActivateEditor(exchange)));
+      server.createContext("/workbench/find-editor", exchange -> guarded(exchange, () -> handleFindEditor(exchange)));
+      server.createContext("/workbench/show-view", exchange -> guarded(exchange, () -> handleShowView(exchange)));
       server.createContext("/workspace/state", exchange -> guarded(exchange, () -> respond(exchange, 200, WorkspaceService.state())));
       server.createContext("/workspace/refresh", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkspaceService::refresh))));
       server.createContext("/problems/markers", exchange -> guarded(exchange, () -> respond(exchange, 200, ProblemMarkerService.markers())));
@@ -137,6 +141,35 @@ final class BridgeServer {
     respond(exchange, 200, UiThread.sync(() -> WorkbenchService.openResource(path)));
   }
 
+  private void handleCloseEditor(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    String title = asString(body.get("title"));
+    boolean save = asBoolean(body.get("save"), true);
+    respond(exchange, 200, UiThread.sync(() -> WorkbenchService.closeEditor(title, save)));
+  }
+
+  private void handleActivateEditor(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    String title = asString(body.get("title"));
+    respond(exchange, 200, UiThread.sync(() -> WorkbenchService.activateEditor(title)));
+  }
+
+  private void handleFindEditor(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    String titleContains = asString(body.get("titleContains"));
+    if (titleContains == null || titleContains.isEmpty()) {
+      titleContains = queryParam(exchange, "titleContains");
+    }
+    final String finalTitle = titleContains;
+    respond(exchange, 200, UiThread.sync(() -> WorkbenchService.findEditor(finalTitle)));
+  }
+
+  private void handleShowView(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    String viewId = asString(body.get("viewId"));
+    respond(exchange, 200, UiThread.sync(() -> WorkbenchService.showView(viewId)));
+  }
+
   private void handleAutomationRunActiveJob(HttpExchange exchange) throws IOException {
     Map<String, Object> body = readJsonBody(exchange);
     boolean dryRun = asBoolean(body.get("dryRun"), true);
@@ -149,26 +182,23 @@ final class BridgeServer {
   private void handleLaunchRunStatus(HttpExchange exchange) throws IOException {
     Map<String, Object> body = readJsonBody(exchange);
     String launchId = asString(body.get("launchId"));
+    if (launchId == null || launchId.trim().isEmpty()) {
+      launchId = queryParam(exchange, "launchId");
+    }
     respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
   }
 
   private void handleLaunchWait(HttpExchange exchange) throws IOException {
     Map<String, Object> body = readJsonBody(exchange);
     String launchId = asString(body.get("launchId"));
+    if (launchId == null || launchId.trim().isEmpty()) {
+      launchId = queryParam(exchange, "launchId");
+    }
     int timeoutMs = asInt(body.get("timeoutMs"), 60000);
-    long deadline = System.currentTimeMillis() + timeoutMs;
-    while (System.currentTimeMillis() < deadline) {
-      LaunchTrackerService.LaunchRunInfo info = LaunchTrackerService.getLaunch(launchId);
-      if (info != null && info.terminatedAt != null) {
-        respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
-        return;
-      }
-      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
-      }
+    LaunchTrackerService.LaunchRunInfo info = LaunchTrackerService.waitForLaunch(launchId, timeoutMs);
+    if (info != null && info.terminatedAt != null) {
+      respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
+      return;
     }
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ok", true);
@@ -178,6 +208,24 @@ final class BridgeServer {
     payload.put("timedOut", true);
     payload.put("launchId", launchId);
     respond(exchange, 200, payload);
+  }
+
+  private String queryParam(HttpExchange exchange, String key) {
+    String query = exchange.getRequestURI().getRawQuery();
+    if (query == null || query.isEmpty()) return null;
+
+    for (String part : query.split("&")) {
+      String[] kv = part.split("=", 2);
+      if (kv.length == 2 && kv[0].equals(key)) {
+        try {
+          return java.net.URLDecoder.decode(kv[1], StandardCharsets.UTF_8.name());
+        } catch (java.io.UnsupportedEncodingException e) {
+          return kv[1];
+        }
+      }
+    }
+
+    return null;
   }
 
   private Map<String, Object> readJsonBody(HttpExchange exchange) throws IOException {

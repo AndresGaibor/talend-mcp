@@ -275,6 +275,33 @@ export class TalendStudioBridgeClient {
     return await this.request<Record<string, unknown>>("/workbench/save-all");
   }
 
+  async findEditor(titleContains: string): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>(
+      "/workbench/find-editor?titleContains=" + encodeURIComponent(titleContains)
+    );
+  }
+
+  async activateEditor(title: string): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/activate-editor", {
+      method: "POST",
+      body: { title },
+    });
+  }
+
+  async closeEditor(title: string, save = true): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/close-editor", {
+      method: "POST",
+      body: { title, save },
+    });
+  }
+
+  async showView(viewId: string): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/show-view", {
+      method: "POST",
+      body: { viewId },
+    });
+  }
+
   async refreshWorkspace(): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/workspace/refresh");
   }

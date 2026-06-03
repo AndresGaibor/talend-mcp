@@ -99,4 +99,73 @@ export const automationTools = [
       });
     },
   },
+  {
+    name: "talend_commands_scan",
+    description: "Sincroniza el catálogo de comandos con los comandos disponibles en el bridge.",
+    inputSchema: z.object({}),
+    handler: async () => {
+      const bridge = await loadBridge();
+      const { commands: bridgeCommands } = (await bridge.commandsList()).data ?? {};
+      if (!bridgeCommands) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint: "/commands/scan",
+          error: { code: "BRIDGE_ERROR", message: "No se pudieron obtener comandos del bridge" },
+        });
+      }
+      const { classifyCommand, getCommandCatalog } = await import("../commands/command-catalog");
+      for (const cmd of bridgeCommands) {
+        classifyCommand(cmd.id, cmd.name ?? "", cmd.category ?? "General");
+      }
+      const catalog = getCommandCatalog();
+      return bridgeOk({
+        ok: true,
+        source: "mcp+studio-bridge",
+        confidence: "high",
+        endpoint: "/commands/scan",
+        data: { count: catalog.commands.length, catalog },
+      });
+    },
+  },
+  {
+    name: "talend_commands_execute_safe",
+    description: "Ejecuta un comando solo si está permitido y es seguro.",
+    inputSchema: z.object({
+      commandId: z.string().describe("ID del comando"),
+      dryRun: z.boolean().optional().default(false).describe("Si es dry run"),
+    }),
+    handler: async ({ commandId, dryRun }: { commandId: string; dryRun?: boolean }) => {
+      const { isCommandAllowed, getCommand } = await import("../commands/command-catalog");
+      const cmd = getCommand(commandId);
+      if (!cmd) {
+        return bridgeFail({
+          ok: false,
+          source: "mcp",
+          confidence: "low",
+          endpoint: "/commands/execute-safe",
+          error: { code: "NOT_FOUND", message: "Comando no encontrado en catálogo: " + commandId },
+        });
+      }
+      if (!isCommandAllowed(commandId)) {
+        return bridgeFail({
+          ok: false,
+          source: "mcp",
+          confidence: "high",
+          endpoint: "/commands/execute-safe",
+          error: { code: "BLOCKED", message: "Comando bloqueado por política de seguridad: " + commandId },
+        });
+      }
+      const bridge = await loadBridge();
+      const result = await bridge.executeCommand(commandId, dryRun ?? false);
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/commands/execute-safe",
+        data: result.data,
+      });
+    },
+  },
 ];

@@ -220,6 +220,95 @@ public final class WorkbenchService {
     return payload;
   }
 
+  public static Map<String, Object> closeEditor(String title, boolean save) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/workbench/close-editor");
+
+    IWorkbenchPage page = activePage();
+    if (page == null) {
+      payload.put("ok", false);
+      payload.put("error", error("NO_ACTIVE_PAGE", "No hay página activa"));
+      return payload;
+    }
+
+    for (IEditorReference ref : page.getEditorReferences()) {
+      if (title.equals(ref.getTitle()) || (title.contains("*") && ref.getTitle().contains(title.replace("*", "")))) {
+        try {
+          IEditorPart editor = ref.getEditor(true);
+          if (editor != null) {
+            page.closeEditor(editor, save);
+            payload.put("closed", true);
+            payload.put("editorTitle", ref.getTitle());
+            return payload;
+          }
+        } catch (Exception e) {
+          payload.put("ok", false);
+          payload.put("error", error("CLOSE_FAILED", e.getMessage()));
+          return payload;
+        }
+      }
+    }
+
+    payload.put("ok", false);
+    payload.put("error", error("EDITOR_NOT_FOUND", "No se encontró editor con título: " + title));
+    return payload;
+  }
+
+  public static Map<String, Object> findEditor(String titleContains) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/workbench/find-editor");
+
+    IWorkbenchPage page = activePage();
+    if (page == null) {
+      payload.put("ok", false);
+      payload.put("error", error("NO_ACTIVE_PAGE", "No hay página activa"));
+      return payload;
+    }
+
+    List<Map<String, Object>> found = new ArrayList<>();
+    for (IEditorReference ref : page.getEditorReferences()) {
+      if (ref.getTitle().contains(titleContains)) {
+        found.add(editorReference(ref));
+      }
+    }
+
+    payload.put("editors", found);
+    payload.put("count", found.size());
+    return payload;
+  }
+
+  public static Map<String, Object> showView(String viewId) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/workbench/show-view");
+
+    try {
+      IWorkbenchPage page = activePage();
+      if (page != null) {
+        page.showView(viewId);
+        payload.put("shown", true);
+        payload.put("viewId", viewId);
+        return payload;
+      }
+    } catch (Exception e) {
+      payload.put("ok", false);
+      payload.put("error", error("SHOW_VIEW_FAILED", e.getMessage()));
+      return payload;
+    }
+
+    payload.put("ok", false);
+    payload.put("error", error("NO_ACTIVE_PAGE", "No hay página activa"));
+    return payload;
+  }
+
   public static Map<String, Object> openResource(String absolutePath) {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("source", "studio-bridge");

@@ -2,22 +2,15 @@ package com.andres.talend.bridge;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
-import com.andres.talend.bridge.events.EventsService;
 import com.andres.talend.bridge.launch.LaunchConfigService;
 import com.andres.talend.bridge.launch.LaunchTrackerService;
 import com.andres.talend.bridge.problems.ProblemMarkerService;
 import com.andres.talend.bridge.workbench.WorkbenchService;
 
-import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugPlugin;
-import org.eclipse.debug.core.IDebugEventSetListener;
-import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.ui.IEditorPart;
-import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.PlatformUI;
 
 public final class AutomationService {
@@ -95,59 +88,40 @@ public final class AutomationService {
     payload.put("launchConfig", launchName);
     payload.put("step", "launching");
 
-    String launchId = LaunchTrackerService.registerLaunch(launchName, "run");
+    // Step 5: Launch via LaunchConfigService (which registers it in LaunchTracker)
+    Map<String, Object> launchResult = LaunchConfigService.runLaunchConfig(launchName, "run", false, config);
+    if (!Boolean.TRUE.equals(launchResult.get("ok"))) {
+      payload.put("ok", false);
+      payload.put("launchResult", launchResult);
+      return payload;
+    }
+    
+    String launchId = (String) launchResult.get("launchId");
     payload.put("launchId", launchId);
+    payload.put("launched", true);
+    payload.put("step", waitForTermination ? "waiting-termination" : "completed");
 
-    // Step 5: Launch
-    final AtomicReference<ILaunch> launchedLaunch = new AtomicReference<>();
-    DebugEventListener debugListener = new DebugEventListener(launchedLaunch);
-    DebugPlugin.getDefault().addDebugEventListener(debugListener);
-
-    try {
-      Map<String, Object> launchResult = LaunchConfigService.runLaunchConfig(launchName, "run", false, config);
-      if (!Boolean.TRUE.equals(launchResult.get("ok"))) {
-        payload.put("ok", false);
-        payload.put("launchResult", launchResult);
-        return payload;
-      }
-      payload.put("launched", true);
-      payload.put("step", waitForTermination ? "waiting-termination" : "completed");
-
-      // Step 6: Wait for termination if requested
-      if (waitForTermination) {
-        ILaunch launched = launchedLaunch.get();
-        if (launched != null) {
-          long deadline = System.currentTimeMillis() + timeoutMs;
-          while (!launched.isTerminated()) {
-            if (System.currentTimeMillis() > deadline) {
-              payload.put("timeout", true);
-              payload.put("step", "timeout");
-              break;
-            }
-            try {
-              Thread.sleep(500);
-            } catch (InterruptedException ignored) {
-              break;
-            }
-          }
-          payload.put("terminated", launched.isTerminated());
-          payload.put("exitCode", null);
-          LaunchTrackerService.markTerminated(launchId, null, payload);
+    // Step 6: Wait for termination if requested using LaunchTrackerService
+    if (waitForTermination && launchId != null) {
+      LaunchTrackerService.LaunchRunInfo info = LaunchTrackerService.waitForLaunch(launchId, timeoutMs);
+      if (info != null) {
+        payload.put("terminated", info.terminatedAt != null);
+        payload.put("status", info.status);
+        payload.put("exitCode", info.exitCode);
+        if (info.terminatedAt == null) {
+          payload.put("timeout", true);
         }
       }
-
-      // Step 7: Read problems
-      payload.put("step", "reading-problems");
-      Map<String, Object> problems = ProblemMarkerService.markers();
-      payload.put("problems", problems.get("markers"));
-      payload.put("problemCount", ((java.util.List<?>) problems.get("markers")).size());
-
-      payload.put("step", "completed");
-      return payload;
-
-    } finally {
-      DebugPlugin.getDefault().removeDebugEventListener(debugListener);
     }
+
+    // Step 7: Read problems
+    payload.put("step", "reading-problems");
+    Map<String, Object> problems = ProblemMarkerService.markers();
+    payload.put("problems", problems.get("markers"));
+    payload.put("problemCount", ((java.util.List<?>) problems.get("markers")).size());
+
+    payload.put("step", "completed");
+    return payload;
   }
 
   private static String extractJobName(String editorTitle) {
@@ -185,23 +159,5 @@ public final class AutomationService {
     err.put("code", code);
     err.put("message", message);
     return err;
-  }
-
-  private static final class DebugEventListener implements IDebugEventSetListener {
-    private final AtomicReference<ILaunch> launched;
-
-    DebugEventListener(AtomicReference<ILaunch> launched) {
-      this.launched = launched;
-    }
-
-    @Override
-    public void handleDebugEvents(DebugEvent[] events) {
-      for (DebugEvent event : events) {
-        Object source = event.getSource();
-        if (source instanceof ILaunch && event.getKind() == DebugEvent.CREATE) {
-          launched.set((ILaunch) source);
-        }
-      }
-    }
   }
 }

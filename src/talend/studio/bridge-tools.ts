@@ -5,6 +5,7 @@ import { masteryTools } from "./tools-mastery";
 import { snapshotTools } from "./tools-snapshot";
 import { errorTools } from "./tools-errors";
 import { automationTools } from "./tools-automation";
+import { coverageTools } from "./tools-coverage";
 import type { BridgeToolDef } from "./tools-base";
 
 export const allTools: BridgeToolDef[] = [
@@ -15,6 +16,7 @@ export const allTools: BridgeToolDef[] = [
   ...snapshotTools,
   ...errorTools,
   ...automationTools,
+  ...coverageTools,
 ];
 
 export function createStudioBridgeTools(): BridgeToolDef[] {
@@ -28,5 +30,6 @@ export { masteryTools } from "./tools-mastery";
 export { snapshotTools } from "./tools-snapshot";
 export { errorTools } from "./tools-errors";
 export { automationTools } from "./tools-automation";
+export { coverageTools } from "./tools-coverage";
 export type { BridgeToolDef, ToolEnvelope } from "./tools-base";
 export { bridgeOk, bridgeFail, loadBridge } from "./tools-base";
