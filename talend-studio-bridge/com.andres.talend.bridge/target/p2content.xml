@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<units size='1'>
+  <unit id='com.andres.talend.bridge' version='0.1.0.202606030558' generation='2'>
+    <update id='com.andres.talend.bridge' range='[0.0.0,0.1.0.202606030558)' severity='0'/>
+    <properties size='5'>
+      <property name='org.eclipse.equinox.p2.name' value='Talend Studio Bridge'/>
+      <property name='maven-groupId' value='com.andres.talend'/>
+      <property name='maven-artifactId' value='com.andres.talend.bridge'/>
+      <property name='maven-version' value='0.1.0-SNAPSHOT'/>
+      <property name='maven-type' value='eclipse-plugin'/>
+    </properties>
+    <provides size='4'>
+      <provided namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge' version='0.1.0.202606030558'/>
+      <provided namespace='osgi.bundle' name='com.andres.talend.bridge' version='0.1.0.202606030558'/>
+      <provided namespace='osgi.identity' name='com.andres.talend.bridge' version='0.1.0.202606030558'>
+        <properties size='1'>
+          <property name='type' value='osgi.bundle'/>
+        </properties>
+      </provided>
+      <provided namespace='org.eclipse.equinox.p2.eclipse.type' name='bundle' version='1.0.0'/>
+    </provides>
+    <requires size='12'>
+      <required namespace='osgi.bundle' name='org.eclipse.core.runtime' range='0.0.0'/>
+      <required namespace='osgi.bundle' name='org.eclipse.ui' range='0.0.0'/>
+      <required namespace='osgi.bundle' name='org.eclipse.jface' range='0.0.0'/>
+      <required namespace='osgi.bundle' name='org.eclipse.swt' range='0.0.0'/>
+      <required namespace='osgi.bundle' name='org.eclipse.core.resources' range='0.0.0'/>
+      <required namespace='osgi.bundle' name='org.eclipse.debug.core' range='0.0.0'/>
+      <required namespace='osgi.bundle' name='org.eclipse.debug.ui' range='0.0.0'/>
+      <required namespace='osgi.bundle' name='org.eclipse.ui.ide' range='0.0.0'/>
+      <required namespace='osgi.bundle' name='org.eclipse.equinox.common' range='0.0.0'/>
+      <required namespace='java.package' name='com.sun.net.httpserver' range='0.0.0'/>
+      <requiredProperties namespace='osgi.ee' match='(&amp;(osgi.ee=JavaSE)(version=1.8))'>
+        <description>
+          com.andres.talend.bridge
+        </description>
+      </requiredProperties>
+      <required namespace='org.eclipse.equinox.p2.iu' name='com.andres.talend.bridge.source' range='[0.1.0.202606030558,0.1.0.202606030558]' optional='true'>
+        <filter>
+          (org.eclipse.update.install.sources=true)
+        </filter>
+      </required>
+    </requires>
+    <artifacts size='1'>
+      <artifact classifier='osgi.bundle' id='com.andres.talend.bridge' version='0.1.0.202606030558'/>
+    </artifacts>
+    <touchpoint id='org.eclipse.equinox.p2.osgi' version='1.0.0'/>
+    <touchpointData size='1'>
+      <instructions size='1'>
+        <instruction key='manifest'>
+          Bundle-SymbolicName: com.andres.talend.bridge;singleton:=true&#xA;Bundle-Version: 0.1.0.202606030558&#xA;
+        </instruction>
+      </instructions>
+    </touchpointData>
+  </unit>
+</units>

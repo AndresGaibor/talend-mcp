@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="com.andres.talend.bridge.feature"
+      label="Talend Studio Bridge"
+      version="0.1.0.202606030558"
+      provider-name="Andres">
+   <description>
+      Bridge local para auditar Talend Studio desde MCP.
+   </description>
+   <plugin
+         id="com.andres.talend.bridge"
+         download-size="46"
+         install-size="93"
+         version="0.1.0.202606030558"
+         unpack="false"/>
+</feature>

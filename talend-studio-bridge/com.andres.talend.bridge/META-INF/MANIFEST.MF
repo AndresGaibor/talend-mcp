@@ -1,0 +1,17 @@
+Bundle-ManifestVersion: 2
+Bundle-Name: Talend Studio Bridge
+Bundle-SymbolicName: com.andres.talend.bridge;singleton:=true
+Bundle-Version: 0.1.0.qualifier
+Bundle-Activator: com.andres.talend.bridge.Activator
+Bundle-ActivationPolicy: lazy
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.ui,
+ org.eclipse.jface,
+ org.eclipse.swt,
+ org.eclipse.core.resources,
+ org.eclipse.debug.core,
+ org.eclipse.debug.ui,
+ org.eclipse.ui.ide,
+ org.eclipse.equinox.common
+Import-Package: com.sun.net.httpserver
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
