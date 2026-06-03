@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Talend Studio Bridge
 Bundle-SymbolicName: com.andres.talend.bridge;singleton:=true
-Bundle-Version: 0.1.0.202606031944
+Bundle-Version: 0.1.0.202606032010
 Bundle-Activator: com.andres.talend.bridge.Activator
 Bundle-ActivationPolicy: lazy
 Require-Bundle: org.eclipse.core.runtime,org.eclipse.ui,org.eclipse.jfac

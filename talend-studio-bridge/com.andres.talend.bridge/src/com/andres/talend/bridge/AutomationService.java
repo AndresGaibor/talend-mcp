@@ -48,7 +48,14 @@ public final class AutomationService {
     }
 
     // Step 1: Detect active editor
-    IEditorPart activeEditor = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().getActiveEditor();
+    IWorkbenchPage page = WorkbenchService.activePageOrNull();
+    if (page == null) {
+      payload.put("ok", false);
+      payload.put("error", error("NO_ACTIVE_PAGE", "No hay página activa en el workbench"));
+      return payload;
+    }
+
+    IEditorPart activeEditor = page.getActiveEditor();
     if (activeEditor == null) {
       payload.put("ok", false);
       payload.put("error", error("NO_ACTIVE_EDITOR", "No hay editor activo"));
@@ -144,7 +151,24 @@ public final class AutomationService {
 
   private static ILaunchConfiguration findLaunchConfig(String jobName) {
     try {
-      for (ILaunchConfiguration config : DebugPlugin.getDefault().getLaunchManager().getLaunchConfigurations()) {
+      ILaunchConfiguration[] configs = DebugPlugin.getDefault().getLaunchManager().getLaunchConfigurations();
+      
+      // 1. Exact match with version 0.1 (common Talend default)
+      for (ILaunchConfiguration config : configs) {
+        if (config.getName().equals(jobName + " 0.1")) {
+          return config;
+        }
+      }
+      
+      // 2. Starts with name + space
+      for (ILaunchConfiguration config : configs) {
+        if (config.getName().startsWith(jobName + " ")) {
+          return config;
+        }
+      }
+      
+      // 3. Fallback to startsWith
+      for (ILaunchConfiguration config : configs) {
         if (config.getName().startsWith(jobName)) {
           return config;
         }

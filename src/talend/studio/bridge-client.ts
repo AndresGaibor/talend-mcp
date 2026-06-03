@@ -224,9 +224,10 @@ export class TalendStudioBridgeClient {
   }
 
   async launchRunStatus(launchId: string): Promise<BridgeResult<Record<string, unknown>>> {
-    return await this.request<Record<string, unknown>>(
-      "/launch/run-status?launchId=" + encodeURIComponent(launchId)
-    );
+    return await this.request<Record<string, unknown>>("/launch/run-status", {
+      method: "POST",
+      body: { launchId },
+    });
   }
 
   async launchWait(launchId: string, timeoutMs = 60000): Promise<BridgeResult<Record<string, unknown>>> {

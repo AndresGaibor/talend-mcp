@@ -424,6 +424,10 @@ public final class WorkbenchService {
     return payload;
   }
 
+  public static IWorkbenchPage activePageOrNull() {
+    return activePage();
+  }
+
   private static IWorkbenchPage activePage() {
     IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
     if (window != null && window.getActivePage() != null) {

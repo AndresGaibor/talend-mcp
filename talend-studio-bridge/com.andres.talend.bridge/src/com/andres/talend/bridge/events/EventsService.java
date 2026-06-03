@@ -13,6 +13,7 @@ import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.model.IProcess;
 
 import org.eclipse.ui.ISelectionListener;
 import org.eclipse.ui.ISelectionService;
@@ -123,7 +124,8 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
           addEvent("launch.terminated", info);
           String launchId = com.andres.talend.bridge.launch.LaunchTrackerService.findLatestLaunchIdByName(name);
           if (launchId != null) {
-            com.andres.talend.bridge.launch.LaunchTrackerService.markTerminated(launchId, null, info);
+            Integer exitCode = info.get("exitCode") instanceof Integer ? (Integer) info.get("exitCode") : null;
+            com.andres.talend.bridge.launch.LaunchTrackerService.markTerminated(launchId, exitCode, info);
           }
         } else if (kind == DebugEvent.CHANGE) {
           addEvent("process.changed", launchInfo(launch));
@@ -266,6 +268,20 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
       info.put("mode", launch.getLaunchMode());
     }
     info.put("terminated", launch.isTerminated());
+    IProcess[] processes = launch.getProcesses();
+    if (processes.length > 0) {
+      IProcess proc = processes[0];
+      info.put("processLabel", proc.getLabel());
+      if (!proc.isTerminated()) {
+        info.put("exitCode", null);
+      } else {
+        try {
+          info.put("exitCode", proc.getExitValue());
+        } catch (DebugException e) {
+          info.put("exitCode", null);
+        }
+      }
+    }
     return info;
   }
 

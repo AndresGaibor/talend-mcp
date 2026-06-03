@@ -1,7 +1,10 @@
 package com.andres.talend.bridge.launch;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -30,6 +33,38 @@ public final class LaunchTrackerService {
   private static final Map<String, String> launchNameToLatestId = new ConcurrentHashMap<>();
 
   private LaunchTrackerService() {}
+
+  public static void loadPersistedRuns() {
+    File file = getStoreFile();
+    if (!file.exists()) return;
+
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (line.trim().isEmpty()) continue;
+        try {
+          LaunchRunInfo info = JsonUtil.parse(line, LaunchRunInfo.class);
+          if (info != null && info.launchId != null) {
+            // Último evento gana por launchId
+            launches.put(info.launchId, info);
+            
+            // Actualizar mapping de nombre a ID si es el más reciente
+            String currentLatest = launchNameToLatestId.get(info.launchConfigName);
+            if (currentLatest == null) {
+              launchNameToLatestId.put(info.launchConfigName, info.launchId);
+            } else {
+              LaunchRunInfo currentInfo = launches.get(currentLatest);
+              if (currentInfo == null || info.startedAt > currentInfo.startedAt) {
+                launchNameToLatestId.put(info.launchConfigName, info.launchId);
+              }
+            }
+          }
+        } catch (Exception ignored) {}
+      }
+    } catch (Exception e) {
+      System.err.println("Failed to load persisted runs: " + e.getMessage());
+    }
+  }
 
   public static String registerLaunch(String launchConfigName, String mode) {
     String launchId = "launch_" + System.currentTimeMillis() + "_" + launchConfigName.replaceAll("\\s+", "_");
@@ -101,24 +136,8 @@ public final class LaunchTrackerService {
     return launchNameToLatestId.get(launchConfigName);
   }
 
-  public static void markTerminated(String launchId, Integer exitCode, Map<String, Object> extra) {
-    LaunchRunInfo info = launches.get(launchId);
-    if (info != null) {
-      info.terminatedAt = System.currentTimeMillis();
-      info.durationMs = info.terminatedAt - info.startedAt;
-      info.exitCode = exitCode;
-      info.extra = extra;
-      if (exitCode == null) {
-        info.status = "terminated_without_exit_code";
-      } else if (exitCode == 0) {
-        info.status = "success";
-      } else {
-        info.status = "failed";
-      }
-    }
-  }
-
   public static LaunchRunInfo getLaunch(String launchId) {
+    if (launchId == null) return null;
     return launches.get(launchId);
   }
 
@@ -143,7 +162,7 @@ public final class LaunchTrackerService {
   }
 
   public static Map<String, Object> runStatus(String launchId) {
-    LaunchRunInfo info = launches.get(launchId);
+    LaunchRunInfo info = getLaunch(launchId);
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ok", true);
     payload.put("source", "studio-bridge");
