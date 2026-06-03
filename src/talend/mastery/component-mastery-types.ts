@@ -9,6 +9,15 @@ export type MasteryLevelInfo = {
   canExecute: boolean;
 };
 
+export type MasteryEvidence = {
+  capability: string;
+  ok: boolean;
+  source: "catalog" | "roundtrip" | "studio-bridge" | "launch" | "manual";
+  confidence: "high" | "medium" | "low";
+  checkedAt: number;
+  details?: unknown;
+};
+
 export type ComponentMastery = {
   componentName: string;
   score: number;
@@ -26,6 +35,7 @@ export type ComponentMastery = {
     safeEditingSupported: boolean;
     automationValidated: boolean;
   };
+  evidence: MasteryEvidence[];
   missing: string[];
   lastValidated: number | null;
 };
@@ -196,6 +206,7 @@ export function createDefaultMastery(componentName: string): ComponentMastery {
       safeEditingSupported: false,
       automationValidated: false,
     },
+    evidence: [],
     missing: ["Componente no descubierto aún"],
     lastValidated: null,
   };

@@ -14,14 +14,18 @@ import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.core.DebugPlugin;
 
-import org.eclipse.ui.IEditorPart;
-import org.eclipse.ui.IEditorReference;
-import org.eclipse.ui.IPartListener2;
+import org.eclipse.ui.ISelectionListener;
+import org.eclipse.ui.ISelectionService;
 import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.IWorkbenchPartReference;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.core.resources.IResourceChangeEvent;
+import org.eclipse.core.resources.IResourceChangeListener;
+import org.eclipse.core.resources.IResourceDelta;
+import org.eclipse.core.resources.ResourcesPlugin;
 
-public final class EventsService implements IDebugEventSetListener, IPartListener2 {
+public final class EventsService implements IDebugEventSetListener, IPartListener2, ISelectionListener, IResourceChangeListener {
 
   private static final int MAX_EVENTS = 100;
   private static final List<Map<String, Object>> recentEvents = new CopyOnWriteArrayList<>();
@@ -38,7 +42,14 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
       IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
       if (page != null) {
         page.addPartListener(instance);
+        ISelectionService ss = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getSelectionService();
+        ss.addSelectionListener(instance);
       }
+    } catch (Exception ignored) {
+    }
+
+    try {
+      ResourcesPlugin.getWorkspace().addResourceChangeListener(instance, IResourceChangeEvent.POST_CHANGE);
     } catch (Exception ignored) {
     }
   }
@@ -201,6 +212,44 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
 
   @Override
   public void partInputChanged(IWorkbenchPartReference partRef) {}
+
+  @Override
+  public void selectionChanged(IWorkbenchPart part, org.eclipse.jface.viewers.ISelection selection) {
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("partId", part.getSite().getId());
+    info.put("partTitle", part.getTitle());
+    info.put("selectionClass", selection.getClass().getName());
+    info.put("selectionText", selection.toString());
+    addEvent("selection.changed", info);
+  }
+
+  @Override
+  public void resourceChanged(IResourceChangeEvent event) {
+    IResourceDelta delta = event.getDelta();
+    if (delta == null) return;
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("kind", kindName(event.getKind()));
+    info.put("resource", delta.getFullPath().toString());
+    info.put("flags", delta.getFlags());
+    boolean isProblem = (delta.getFlags() & IResourceDelta.MARKERS) != 0;
+    if (isProblem) {
+      addEvent("problem.changed", info);
+    } else {
+      addEvent("resource.changed", info);
+    }
+  }
+
+  private static String kindName(int kind) {
+    switch (kind) {
+      case IResourceChangeEvent.PRE_DELETE: return "pre_delete";
+      case IResourceChangeEvent.PRE_BUILD: return "pre_build";
+      case IResourceChangeEvent.POST_BUILD: return "post_build";
+      case IResourceChangeEvent.POST_CHANGE: return "post_change";
+      case IResourceChangeEvent.PRE_REFRESH: return "pre_refresh";
+      case IResourceChangeEvent.POST_REFRESH: return "post_refresh";
+      default: return "unknown";
+    }
+  }
 
   private static Map<String, Object> launchInfo(ILaunch launch) {
     Map<String, Object> info = new LinkedHashMap<>();

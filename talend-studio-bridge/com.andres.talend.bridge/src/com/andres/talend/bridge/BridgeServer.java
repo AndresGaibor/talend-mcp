@@ -17,6 +17,7 @@ import com.andres.talend.bridge.audit.CommandAuditService;
 import com.andres.talend.bridge.audit.PluginAuditService;
 import com.andres.talend.bridge.events.EventsService;
 import com.andres.talend.bridge.launch.LaunchConfigService;
+import com.andres.talend.bridge.launch.LaunchTrackerService;
 import com.andres.talend.bridge.problems.ProblemMarkerService;
 import com.andres.talend.bridge.resources.WorkspaceService;
 import com.andres.talend.bridge.talend.TalendClassProbeService;
@@ -69,6 +70,8 @@ final class BridgeServer {
       server.createContext("/events/recent", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.recent())));
       server.createContext("/events/clear", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.clear())));
       server.createContext("/automation/run-active-job", exchange -> guarded(exchange, () -> handleAutomationRunActiveJob(exchange)));
+      server.createContext("/launch/runs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchTrackerService.runs())));
+      server.createContext("/launch/run-status", exchange -> guarded(exchange, () -> handleLaunchRunStatus(exchange)));
       server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
       server.start();
     } catch (IOException e) {
@@ -140,6 +143,12 @@ final class BridgeServer {
     boolean waitForTermination = asBoolean(body.get("waitForTermination"), true);
     int timeoutMs = asInt(body.get("timeoutMs"), 120000);
     respond(exchange, 200, UiThread.sync(() -> AutomationService.runActiveJob(saveBefore, waitForTermination, timeoutMs, dryRun, config)));
+  }
+
+  private void handleLaunchRunStatus(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    String launchId = asString(body.get("launchId"));
+    respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
   }
 
   private Map<String, Object> readJsonBody(HttpExchange exchange) throws IOException {

@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.andres.talend.bridge.events.EventsService;
 import com.andres.talend.bridge.launch.LaunchConfigService;
+import com.andres.talend.bridge.launch.LaunchTrackerService;
 import com.andres.talend.bridge.problems.ProblemMarkerService;
 import com.andres.talend.bridge.workbench.WorkbenchService;
 
@@ -94,6 +95,9 @@ public final class AutomationService {
     payload.put("launchConfig", launchName);
     payload.put("step", "launching");
 
+    String launchId = LaunchTrackerService.registerLaunch(launchName, "run");
+    payload.put("launchId", launchId);
+
     // Step 5: Launch
     final AtomicReference<ILaunch> launchedLaunch = new AtomicReference<>();
     DebugEventListener debugListener = new DebugEventListener(launchedLaunch);
@@ -126,9 +130,9 @@ public final class AutomationService {
               break;
             }
           }
-          payload.put("durationMs", System.currentTimeMillis() - ((Number) launchResult.getOrDefault("startedAt", System.currentTimeMillis())).longValue());
           payload.put("terminated", launched.isTerminated());
-          payload.put("exitCode", launched.isTerminated() ? 0 : -1);
+          payload.put("exitCode", null);
+          LaunchTrackerService.markTerminated(launchId, null, payload);
         }
       }
 

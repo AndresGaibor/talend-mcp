@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync, copyFileSync } from "node:fs";
-import { join, dirname, basename } from "node:path";
+import { existsSync, writeFileSync } from "node:fs";
+import { createSnapshot as snapshotManagerCreateSnapshot } from "./snapshot-manager";
 
 export type SyncStatus = {
   ok: boolean;
@@ -30,33 +30,17 @@ export type SyncResult = {
   editedFiles: string[];
   validatedWithStudio: boolean;
   snapshotPath: string | null;
+  warnings?: string[];
 };
-
-const SNAPSHOT_DIR = ".talend-mcp-snapshots";
-const SNAPSHOT_RETENTION = 10;
-
-function getSnapshotDir(projectPath: string): string {
-  return join(projectPath, SNAPSHOT_DIR);
-}
-
-function generateSnapshotId(): string {
-  return `snapshot_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-}
-
-function ensureSnapshotDir(projectPath: string): string {
-  const dir = getSnapshotDir(projectPath);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
 
 export async function getSyncStatus(
   projectPath: string,
   bridgeClient: { workbenchState: () => Promise<{ ok: boolean; data?: { windows?: Array<{ activeEditor?: { title?: string; dirty?: boolean } }> } }> } | null
 ): Promise<SyncStatus> {
-  const snapshotDir = getSnapshotDir(projectPath);
-  const hasSnapshot = existsSync(snapshotDir);
+  const { listSnapshots } = await import("./snapshot-manager");
+  const snapshots = await listSnapshots(projectPath);
+  const hasSnapshot = snapshots.length > 0;
+  const snapshotPath = hasSnapshot ? (snapshots[0]?.itemPath ?? null) : null;
 
   let bridgeAvailable = false;
   let jobOpen = false;
@@ -70,7 +54,14 @@ export async function getSyncStatus(
         bridgeAvailable = true;
         const activeEditor = state.data.windows[0].activeEditor;
         if (activeEditor) {
-          jobOpen = true;
+          const title = activeEditor.title ?? "";
+          const editorId = (activeEditor as any).editorId ?? (activeEditor as any).siteId ?? "";
+          const looksLikeTalendJob =
+            editorId.includes("ProcessTalendEditor") ||
+            title.startsWith("Job ") ||
+            title.includes("_0.") ||
+            title.includes(" 0.");
+          jobOpen = looksLikeTalendJob;
           editorDirty = activeEditor.dirty ?? false;
           editorTitle = activeEditor.title ?? null;
         }
@@ -90,48 +81,9 @@ export async function getSyncStatus(
     itemPath: null,
     propertiesPath: null,
     hasSnapshot,
-    snapshotPath: hasSnapshot ? snapshotDir : null,
+    snapshotPath: hasSnapshot ? snapshotPath : null,
     bridgeAvailable,
   };
-}
-
-export async function createSnapshot(
-  projectPath: string,
-  itemPath: string,
-  propertiesPath: string
-): Promise<{ ok: boolean; snapshotPath: string | null; error?: string }> {
-  const snapshotId = generateSnapshotId();
-  const snapshotDir = ensureSnapshotDir(projectPath);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-
-  try {
-    const itemBackup = join(snapshotDir, `${basename(itemPath)}.${timestamp}.backup`);
-    const propsBackup = join(snapshotDir, `${basename(propertiesPath)}.${timestamp}.backup`);
-
-    if (existsSync(itemPath)) {
-      copyFileSync(itemPath, itemBackup);
-    }
-
-    if (existsSync(propertiesPath)) {
-      copyFileSync(propertiesPath, propsBackup);
-    }
-
-    const manifest = {
-      snapshotId,
-      timestamp: Date.now(),
-      itemPath,
-      propertiesPath,
-      itemBackup,
-      propsBackup,
-    };
-
-    const manifestPath = join(snapshotDir, `${snapshotId}.json`);
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
-
-    return { ok: true, snapshotPath: manifestPath };
-  } catch (e) {
-    return { ok: false, snapshotPath: null, error: e instanceof Error ? e.message : String(e) };
-  }
 }
 
 export async function beforeFileEdit(
@@ -165,13 +117,18 @@ export async function beforeFileEdit(
     }
   }
 
-  const snapshotResult = await createSnapshot(projectPath, itemPath, propertiesPath);
+  const snapshotResult = await snapshotManagerCreateSnapshot(
+    projectPath,
+    itemPath,
+    propertiesPath,
+    "before_file_edit"
+  );
 
   return {
     ok: true,
     blocked: false,
     snapshotCreated: snapshotResult.ok,
-    snapshotPath: snapshotResult.snapshotPath,
+    snapshotPath: snapshotResult.manifestPath,
   };
 }
 
@@ -182,6 +139,7 @@ export async function afterFileEdit(
 ): Promise<SyncResult> {
   const steps: SyncStep[] = [];
   const startTime = Date.now();
+  const warnings: string[] = [];
 
   steps.push({ name: "file_edit_applied", ok: true, durationMs: Date.now() - startTime });
 
@@ -197,9 +155,11 @@ export async function afterFileEdit(
         error: e instanceof Error ? e.message : String(e),
         durationMs: Date.now() - refreshStart,
       });
+      warnings.push("No se pudo refrescar el workspace: " + (e instanceof Error ? e.message : String(e)));
     }
   } else {
     steps.push({ name: "workspace_refreshed", ok: false, error: "Bridge no disponible", durationMs: Date.now() - refreshStart });
+    warnings.push("Bridge no disponible; no se pudo refrescar workspace.");
   }
 
   let validateStart = Date.now();
@@ -210,6 +170,9 @@ export async function afterFileEdit(
       const model = await bridgeClient.activeJobModel();
       validatedWithStudio = model.ok && model.data !== undefined;
       steps.push({ name: "studio_model_validated", ok: validatedWithStudio, durationMs: Date.now() - validateStart });
+      if (!validatedWithStudio) {
+        warnings.push("No se pudo validar el modelo interno del job.");
+      }
     } catch (e) {
       steps.push({
         name: "studio_model_validated",
@@ -217,19 +180,27 @@ export async function afterFileEdit(
         error: e instanceof Error ? e.message : String(e),
         durationMs: Date.now() - validateStart,
       });
+      warnings.push("Validación del modelo falló: " + (e instanceof Error ? e.message : String(e)));
     }
   } else {
     steps.push({ name: "studio_model_validated", ok: false, error: "Bridge no disponible", durationMs: Date.now() - validateStart });
+    warnings.push("Bridge no disponible; no se pudo validar modelo interno.");
   }
 
+  const criticalSteps = steps.filter((s) =>
+    ["file_edit_applied", "write_item_file"].includes(s.name)
+  );
+  const ok = criticalSteps.every((s) => s.ok);
+
   return {
-    ok: steps.every((s) => s.ok),
+    ok,
     source: bridgeClient ? "mcp+studio-bridge" : "workspace-files",
     confidence: bridgeClient ? "high" : "medium",
     steps,
     editedFiles,
     validatedWithStudio,
     snapshotPath: null,
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }
 
@@ -284,9 +255,24 @@ export async function safeEditComponentParameter(
   }
 
   const writeStart = Date.now();
-  if (editResult.editedXml) {
-    writeFileSync(itemPath, editResult.editedXml, "utf8");
+  if (!editResult.editedXml) {
+    steps.push({
+      name: "write_item_file",
+      ok: false,
+      error: "editResult.editedXml no fue devuelto",
+      durationMs: Date.now() - writeStart,
+    });
+    return {
+      ok: false,
+      source: "workspace-files",
+      confidence: "low",
+      steps,
+      editedFiles: [],
+      validatedWithStudio: false,
+      snapshotPath: beforeResult.snapshotPath,
+    };
   }
+  writeFileSync(itemPath, editResult.editedXml, "utf8");
   steps.push({ name: "write_item_file", ok: true, durationMs: Date.now() - writeStart });
 
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);
@@ -342,9 +328,24 @@ export async function safePatchComponent(
   }
 
   const writeStart = Date.now();
-  if (patchResult.patchedXml) {
-    writeFileSync(itemPath, patchResult.patchedXml, "utf8");
+  if (!patchResult.patchedXml) {
+    steps.push({
+      name: "write_item_file",
+      ok: false,
+      error: "patchResult.patchedXml no fue devuelto",
+      durationMs: Date.now() - writeStart,
+    });
+    return {
+      ok: false,
+      source: "workspace-files",
+      confidence: "low",
+      steps,
+      editedFiles: [],
+      validatedWithStudio: false,
+      snapshotPath: beforeResult.snapshotPath,
+    };
   }
+  writeFileSync(itemPath, patchResult.patchedXml, "utf8");
   steps.push({ name: "write_item_file", ok: true, durationMs: Date.now() - writeStart });
 
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);
@@ -400,9 +401,24 @@ export async function safeAddConnection(
   }
 
   const writeStart = Date.now();
-  if (connResult.modifiedXml) {
-    writeFileSync(itemPath, connResult.modifiedXml, "utf8");
+  if (!connResult.modifiedXml) {
+    steps.push({
+      name: "write_item_file",
+      ok: false,
+      error: "connResult.modifiedXml no fue devuelto",
+      durationMs: Date.now() - writeStart,
+    });
+    return {
+      ok: false,
+      source: "workspace-files",
+      confidence: "low",
+      steps,
+      editedFiles: [],
+      validatedWithStudio: false,
+      snapshotPath: beforeResult.snapshotPath,
+    };
   }
+  writeFileSync(itemPath, connResult.modifiedXml, "utf8");
   steps.push({ name: "write_item_file", ok: true, durationMs: Date.now() - writeStart });
 
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);

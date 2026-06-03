@@ -1,5 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
+import { resolveTalendPluginsDir } from "./talend-paths";
+import { parseComponentXmlWithParser } from "./component-xml-parser";
 
 export type ComponentJarEntry = {
   componentName: string;
@@ -51,13 +53,8 @@ export type ScanPluginsResult = {
   errors: string[];
 };
 
-function getTalendStudioPath(): string {
-  const p1 = "/Applications/TalendStudio-8.0.1/studio/plugins";
-  if (existsSync(p1)) return p1;
-  const home = process.env.HOME ?? "";
-  const p2 = home + "/TalendStudio/plugins";
-  if (existsSync(p2)) return p2;
-  return process.env.TALEND_STUDIO_PATH ?? p1;
+function getTalendStudioPluginsDir(): string | null {
+  return resolveTalendPluginsDir();
 }
 
 function findProviderDir(pluginsDir: string): string | null {
@@ -160,8 +157,38 @@ function scanComponentDir(dirName: string, cd: string, src: string): ComponentJa
   for (const xn of [dirName + "_java.xml", dirName + ".xml", "component.xml"]) {
     const xp = join(cd, dirName, xn);
     if (existsSync(xp)) {
-      try { const p = parseComponentXml(readFileSync(xp, "utf8")); return { componentName: p.name || dirName, family: p.family, version: p.version, sourcePlugin: src, definitionFiles: [xp], parameters: p.parameters, connectors: p.connectors, schemas: p.schemas, capabilities: p.capabilities, limitations: p.limitations }; }
-      catch { return null; }
+      try {
+        const xml = readFileSync(xp, "utf8");
+        const p = parseComponentXmlWithParser(xml);
+        const jarParams = p.parameters.map((par): JarParameter => ({
+          name: par.name,
+          field: par.field,
+          required: par.required,
+          defaultValue: par.defaultValue,
+          show: par.show,
+          repositoryValue: par.repositoryValue,
+        }));
+        const jarConns = p.connectors.map((con): JarConnector => ({
+          name: con.name,
+          type: con.type,
+          maxInput: con.maxInput,
+          maxOutput: con.maxOutput,
+        }));
+        const jarSchemas: JarSchemas = p.schemas;
+        const jarCaps: JarCapabilities = p.capabilities;
+        return {
+          componentName: p.name || dirName,
+          family: p.family,
+          version: p.version,
+          sourcePlugin: src,
+          definitionFiles: [xp],
+          parameters: jarParams,
+          connectors: jarConns,
+          schemas: jarSchemas,
+          capabilities: jarCaps,
+          limitations: p.limitations,
+        };
+      } catch { return null; }
     }
   }
   return null;
@@ -171,7 +198,10 @@ export async function scanInstalledPlugins(options?: { pluginsDir?: string }): P
   const errors: string[] = [];
   const scannedPlugins: string[] = [];
   const entries: ComponentJarEntry[] = [];
-  const pluginsDir = options?.pluginsDir ?? getTalendStudioPath();
+  const pluginsDir = options?.pluginsDir ?? getTalendStudioPluginsDir();
+  if (!pluginsDir) {
+    return { scannedPlugins: [], entries: [], errors: ["Cannot find Talend plugins dir"] };
+  }
   const cd = findLocalComponentsDir(pluginsDir);
   if (!cd) return { scannedPlugins: [], entries: [], errors: ["Cannot find Talend components dir at " + pluginsDir] };
   try { for (const d of readdirSync(pluginsDir).filter((d) => d.startsWith("org.talend.designer.") || d.startsWith("org.talend.l"))) scannedPlugins.push(d); }

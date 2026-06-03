@@ -1,6 +1,7 @@
 import * as z from "zod/v4";
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 
 import { listFilesRecursive, readTextFile } from "../files";
 import { analyzeTdbOutputs } from "../analysis";
@@ -314,7 +315,7 @@ export function createStudioBridgeTools(): BridgeToolDef[] {
           warning: "Bridge no disponible. Datos inferidos desde workspace, no confirmados por Studio.",
           data: {
             windows,
-            note: "activePage, dirty, editorId, shellTitle, visibleViews NO可以在 bridge 不可用时确认。",
+            note: "activePage, dirty, editorId, shellTitle y visibleViews no se pueden confirmar cuando el bridge no está disponible.",
           },
         });
       },
@@ -1037,6 +1038,376 @@ export function createStudioBridgeTools(): BridgeToolDef[] {
           endpoint: "/mastery/fixture",
           data: { componentName, fixture: result.fixture },
         });
+      },
+    },
+    {
+      name: "talend_mastery_validate_roundtrip",
+      description: "Valida round-trip de un componente: genera fixture, parsea, reconstruye, verifica que el componente existe.",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+        itemPath: z.string().describe("Ruta al archivo .item existente con el componente"),
+      }),
+      handler: async ({ componentName, itemPath }) => {
+        const { validateComponentRoundtrip } = await import("../mastery/component-roundtrip-validator");
+        const result = await validateComponentRoundtrip(componentName, itemPath);
+        const { getComponentMastery, saveComponentMastery } = await import("../mastery/component-mastery-runner");
+        const { createDefaultMastery, calculateMasteryLevel, getMissingCapabilities } = await import("../mastery/component-mastery-types");
+        let mastery = await getComponentMastery(componentName);
+        if (!mastery) mastery = createDefaultMastery(componentName);
+        const levelBefore = mastery.level;
+        if (result.roundtripValid) {
+          mastery.levels.roundTripReadWrite = true;
+        }
+        const { level, score } = calculateMasteryLevel(mastery.levels);
+        mastery.level = level;
+        mastery.score = score;
+        mastery.missing = getMissingCapabilities(mastery.levels);
+        mastery.lastValidated = Date.now();
+        await saveComponentMastery(mastery);
+        return bridgeOk({
+          ok: result.ok,
+          source: "workspace-files",
+          confidence: "medium",
+          endpoint: "/mastery/validate-roundtrip",
+          data: { ...result, levelBefore, levelAfter: level },
+        });
+      },
+    },
+    {
+      name: "talend_mastery_validate_in_studio",
+      description: "Valida que un componente abre en Studio y no genera Problems críticos.",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+        itemPath: z.string().describe("Ruta al archivo .item"),
+      }),
+      handler: async ({ componentName, itemPath }) => {
+        const { validateComponentInStudio } = await import("../mastery/component-studio-validator");
+        const bridge = await loadBridge();
+        const result = await validateComponentInStudio(componentName, itemPath, bridge);
+        const { getComponentMastery, saveComponentMastery } = await import("../mastery/component-mastery-runner");
+        const { calculateMasteryLevel, getMissingCapabilities, createDefaultMastery } = await import("../mastery/component-mastery-types");
+        let mastery = await getComponentMastery(componentName);
+        if (!mastery) mastery = createDefaultMastery(componentName);
+        const levelBefore = mastery.level;
+        if (result.opensInStudio && result.problemsCount === 0) {
+          mastery.levels.opensInStudio = true;
+          mastery.levels.compilesWithoutProblems = true;
+        }
+        mastery.evidence.push({
+          capability: "opensInStudio",
+          ok: result.opensInStudio,
+          source: "studio-bridge",
+          confidence: "high",
+          checkedAt: Date.now(),
+          details: { problemsCount: result.problemsCount, modelValid: result.modelValid },
+        });
+        const { level, score } = calculateMasteryLevel(mastery.levels);
+        mastery.level = level;
+        mastery.score = score;
+        mastery.missing = getMissingCapabilities(mastery.levels);
+        mastery.lastValidated = Date.now();
+        await saveComponentMastery(mastery);
+        return bridgeOk({
+          ok: result.ok,
+          source: result.ok ? "studio-bridge" : "unavailable",
+          confidence: result.ok ? "high" : "low",
+          endpoint: "/mastery/validate-in-studio",
+          data: { ...result, levelBefore, levelAfter: level },
+        });
+      },
+    },
+    {
+      name: "talend_mastery_validate_run",
+      description: "Valida que un componente compila y ejecuta correctamente via launch config. Solo si unsafeActions=true.",
+      inputSchema: z.object({
+        componentName: z.string().describe("Nombre del componente"),
+        itemPath: z.string().describe("Ruta al archivo .item"),
+        unsafeActions: z.boolean().optional().default(false).describe("Si true, ejecuta realmente el job"),
+      }),
+      handler: async ({ componentName, itemPath, unsafeActions }) => {
+        const { validateComponentRun } = await import("../mastery/component-run-validator");
+        const bridge = await loadBridge();
+        const result = await validateComponentRun(componentName, itemPath, bridge, { unsafeActions });
+        const { getComponentMastery, saveComponentMastery } = await import("../mastery/component-mastery-runner");
+        const { calculateMasteryLevel, getMissingCapabilities, createDefaultMastery } = await import("../mastery/component-mastery-types");
+        let mastery = await getComponentMastery(componentName);
+        if (!mastery) mastery = createDefaultMastery(componentName);
+        const levelBefore = mastery.level;
+        if (result.dryRunOk) {
+          mastery.levels.runsInStudio = true;
+        }
+        mastery.evidence.push({
+          capability: "runsInStudio",
+          ok: result.dryRunOk,
+          source: "launch",
+          confidence: "high",
+          checkedAt: Date.now(),
+          details: { launchConfigFound: result.launchConfigFound, realRunOk: result.realRunOk },
+        });
+        const { level, score } = calculateMasteryLevel(mastery.levels);
+        mastery.level = level;
+        mastery.score = score;
+        mastery.missing = getMissingCapabilities(mastery.levels);
+        mastery.lastValidated = Date.now();
+        await saveComponentMastery(mastery);
+        return bridgeOk({
+          ok: result.ok,
+          source: result.ok ? "studio-bridge" : "unavailable",
+          confidence: result.ok ? "high" : "low",
+          endpoint: "/mastery/validate-run",
+          data: { ...result, levelBefore, levelAfter: level },
+        });
+      },
+    },
+    {
+      name: "talend_error_read_latest",
+      description: "Devuelve los errores conocidos más recientes.",
+      inputSchema: z.object({
+        limit: z.number().optional().default(20).describe("Cantidad de errores a devolver"),
+      }),
+      handler: async ({ limit }) => {
+        const { getLatestErrors } = await import("../diagnostics/error-knowledge-base");
+        const errors = await getLatestErrors(limit);
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/errors/latest",
+          data: { errors, count: errors.length },
+        });
+      },
+    },
+    {
+      name: "talend_error_explain",
+      description: "Analiza un mensaje de error y devuelve causa y sugerencia de fix.",
+      inputSchema: z.object({
+        errorMessage: z.string().describe("Mensaje de error completo o parcial"),
+      }),
+      handler: async ({ errorMessage }) => {
+        const { suggestFix, analyzeError } = await import("../diagnostics/error-knowledge-base");
+        const { error, advice } = suggestFix(errorMessage);
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: error ? "high" : "low",
+          endpoint: "/errors/explain",
+          data: { error, advice },
+        });
+      },
+    },
+    {
+      name: "talend_command_catalog",
+      description: "Devuelve el catálogo de comandos Eclipse/Talend con su clasificación de riesgo.",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const { getCommandCatalog } = await import("../commands/command-catalog");
+        const catalog = getCommandCatalog();
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/commands/catalog",
+          data: catalog,
+        });
+      },
+    },
+    {
+      name: "talend_command_search",
+      description: "Busca comandos por nombre, ID o categoría.",
+      inputSchema: z.object({
+        query: z.string().describe("Texto a buscar"),
+      }),
+      handler: async ({ query }) => {
+        const { searchCommands } = await import("../commands/command-catalog");
+        const results = searchCommands(query);
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/commands/search",
+          data: { results, count: results.length },
+        });
+      },
+    },
+    {
+      name: "talend_command_allow",
+      description: "Permite un comando que antes estaba bloqueado.",
+      inputSchema: z.object({
+        commandId: z.string().describe("ID del comando a permitir"),
+      }),
+      handler: async ({ commandId }) => {
+        const { allowCommand } = await import("../commands/command-catalog");
+        const ok = allowCommand(commandId);
+        return bridgeOk({
+          ok,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/commands/allow",
+          data: { commandId, allowed: ok },
+        });
+      },
+    },
+    {
+      name: "talend_command_block",
+      description: "Bloquea un comando peligroso.",
+      inputSchema: z.object({
+        commandId: z.string().describe("ID del comando a bloquear"),
+      }),
+      handler: async ({ commandId }) => {
+        const { blockCommand } = await import("../commands/command-catalog");
+        const ok = blockCommand(commandId);
+        return bridgeOk({
+          ok,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/commands/block",
+          data: { commandId, blocked: ok },
+        });
+      },
+    },
+    {
+      name: "talend_error_suggest_fix",
+      description: "Sugiere un fix automático para un error conocido y muestra preview.",
+      inputSchema: z.object({
+        errorId: z.string().describe("ID del error en la knowledge base"),
+        filePath: z.string().describe("Ruta al archivo .item con el problema"),
+        errorMessage: z.string().describe("Mensaje de error detectado"),
+      }),
+      handler: async ({ errorId, filePath, errorMessage }) => {
+        const { previewFix } = await import("../diagnostics/fix-planner");
+        const result = await previewFix(errorId, filePath, errorMessage);
+        if (!result) {
+          return bridgeFail({
+            ok: false,
+            source: "workspace-files",
+            confidence: "low",
+            endpoint: "/errors/suggest-fix",
+            error: { code: "NO_FIX_AVAILABLE", message: "No hay fix automático para este error o no se puede aplicar" },
+          });
+        }
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/errors/suggest-fix",
+          data: {
+            canApply: result.canApply,
+            risk: result.risk,
+            changes: result.changes,
+            changesCount: result.changes.length,
+          },
+        });
+      },
+    },
+    {
+      name: "talend_error_apply_fix",
+      description: "Aplica un fix automático a un archivo .item para corregir un error conocido.",
+      inputSchema: z.object({
+        errorId: z.string().describe("ID del error en la knowledge base"),
+        filePath: z.string().describe("Ruta al archivo .item"),
+        errorMessage: z.string().describe("Mensaje de error detectado"),
+      }),
+      handler: async ({ errorId, filePath, errorMessage }) => {
+        const { applyFix } = await import("../diagnostics/fix-planner");
+        const result = await applyFix(errorId, filePath, errorMessage);
+        return bridgeOk({
+          ok: result.ok,
+          source: "workspace-files",
+          confidence: result.ok ? "high" : "low",
+          endpoint: "/errors/apply-fix",
+          data: {
+            applied: result.applied,
+            backupPath: result.backupPath,
+            error: result.error,
+          },
+        });
+      },
+    },
+    {
+      name: "talend_error_preview_fix",
+      description: "Muestra el diff de un fix antes de applied.",
+      inputSchema: z.object({
+        errorId: z.string().describe("ID del error en la knowledge base"),
+        filePath: z.string().describe("Ruta al archivo .item"),
+        errorMessage: z.string().describe("Mensaje de error detectado"),
+      }),
+      handler: async ({ errorId, filePath, errorMessage }) => {
+        const { previewFix } = await import("../diagnostics/fix-planner");
+        const result = await previewFix(errorId, filePath, errorMessage);
+        if (!result) {
+          return bridgeFail({
+            ok: false,
+            source: "workspace-files",
+            confidence: "low",
+            endpoint: "/errors/preview-fix",
+            error: { code: "NO_FIX_AVAILABLE", message: "No hay fix disponible" },
+          });
+        }
+        return bridgeOk({
+          ok: true,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/errors/preview-fix",
+          data: {
+            originalContent: result.originalContent,
+            proposedContent: result.proposedContent,
+            changes: result.changes,
+            risk: result.risk,
+          },
+        });
+      },
+    },
+    {
+      name: "talend_error_map_to_component",
+      description: "Intenta asociar un error a un componente específico del job.",
+      inputSchema: z.object({
+        errorMessage: z.string().describe("Mensaje de error"),
+        itemPath: z.string().describe("Ruta al archivo .item del job"),
+      }),
+      handler: async ({ errorMessage, itemPath }) => {
+        const { readTextFile } = await import("../files");
+        const { getConfiguredProjectPath } = await import("../workspace");
+        const projectPath = getConfiguredProjectPath();
+        if (!projectPath || !existsSync(itemPath)) {
+          return bridgeOk({
+            ok: true,
+            source: "workspace-files",
+            confidence: "low",
+            endpoint: "/errors/map-to-component",
+            data: { mappedComponent: null, reason: "Archivo no encontrado" },
+          });
+        }
+        try {
+          const xml = await readTextFile(itemPath, projectPath);
+          const { analyzeTdbOutputs } = await import("../analysis");
+          const { parseJobItem } = await import("../job-parser");
+          const parsed = parseJobItem(xml, itemPath);
+          const components = analyzeTdbOutputs(parsed);
+          let mappedComponent = null;
+          const lowerError = errorMessage.toLowerCase();
+          for (const comp of components) {
+            const compName = comp.componentName.toLowerCase();
+            if (lowerError.includes(compName) || lowerError.includes(comp.uniqueName.toLowerCase())) {
+              mappedComponent = comp.uniqueName;
+              break;
+            }
+          }
+          return bridgeOk({
+            ok: true,
+            source: "workspace-files",
+            confidence: mappedComponent ? "high" : "low",
+            endpoint: "/errors/map-to-component",
+            data: { mappedComponent, reason: mappedComponent ? "Componente encontrado en mensaje de error" : "No se pudo asociar" },
+          });
+        } catch {
+          return bridgeOk({
+            ok: true,
+            source: "workspace-files",
+            confidence: "low",
+            endpoint: "/errors/map-to-component",
+            data: { mappedComponent: null, reason: "Error al parsear el job" },
+          });
+        }
       },
     },
   ];

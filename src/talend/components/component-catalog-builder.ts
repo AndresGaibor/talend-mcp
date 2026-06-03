@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scanInstalledPlugins, entriesToCatalogFormat, type ComponentJarEntry } from "./component-jar-scanner";
+import { resolveTalendPluginsDir, resolveTalendStudioHome } from "./talend-paths";
 
 export type ComponentCatalogEntry = {
   componentName: string;
@@ -72,15 +73,13 @@ function jarToCatalogEntry(jar: ComponentJarEntry): ComponentCatalogEntry {
 }
 
 export async function buildComponentCatalog(talendStudioPath?: string): Promise<CatalogStatus> {
-  const pluginsDir = talendStudioPath
-    ? join(talendStudioPath, "plugins")
-    : undefined;
+  const pluginsDir = resolveTalendPluginsDir({ talendStudioHome: talendStudioPath });
 
-  const scanResult = await scanInstalledPlugins({ pluginsDir });
+  const scanResult = await scanInstalledPlugins({ pluginsDir: pluginsDir ?? undefined });
 
   const catalog = scanResult.entries.map(jarToCatalogEntry);
 
-  const talendStudioHome = talendStudioPath ?? process.env.TALEND_STUDIO_PATH ?? "/Applications/TalendStudio-8.0.1/studio";
+  const talendStudioHome = resolveTalendStudioHome({ talendStudioHome: talendStudioPath }) ?? "/Applications/TalendStudio-8.0.1/studio";
   const catalogData = entriesToCatalogFormat(
     scanResult.entries,
     scanResult.scannedPlugins,
