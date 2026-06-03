@@ -31,9 +31,25 @@ public final class AutomationService {
     payload.put("endpoint", "/automation/run-active-job");
     payload.put("dryRun", dryRun);
 
+    if (config.readOnly && !dryRun) {
+      payload.put("ok", false);
+      payload.put("blocked", true);
+      payload.put("reason", "READ_ONLY");
+      payload.put("error", error("READ_ONLY", "Bridge está en modo readOnly"));
+      return payload;
+    }
+
     if (dryRun) {
       payload.put("mode", "dryRun");
       payload.put("step", "would-execute-active-job");
+      return payload;
+    }
+
+    if (!config.unsafeActions) {
+      payload.put("ok", false);
+      payload.put("blocked", true);
+      payload.put("reason", "UNSAFE_ACTIONS_DISABLED");
+      payload.put("error", error("UNSAFE_ACTIONS_DISABLED", "unsafeActions=false"));
       return payload;
     }
 

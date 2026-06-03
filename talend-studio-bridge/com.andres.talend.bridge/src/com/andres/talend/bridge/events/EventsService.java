@@ -15,6 +15,7 @@ import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.core.DebugPlugin;
 
 import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IEditorReference;
 import org.eclipse.ui.IPartListener2;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.IWorkbenchPartReference;
@@ -117,43 +118,67 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
     }
   }
 
+  private static boolean isEditorReference(IWorkbenchPartReference partRef) {
+    return partRef instanceof IEditorReference;
+  }
+
+  private static Map<String, Object> editorPartInfo(IEditorPart editor) {
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("title", editor.getTitle());
+    info.put("dirty", editor.isDirty());
+    if (editor.getSite() != null) {
+      info.put("siteId", editor.getSite().getId());
+    }
+    info.put("class", editor.getClass().getName());
+    return info;
+  }
+
+  private static Map<String, Object> partInfo(IWorkbenchPartReference partRef) {
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("id", partRef.getId());
+    info.put("title", partRef.getTitle());
+    info.put("class", partRef.getClass().getName());
+    try {
+      Object part = partRef.getPart(false);
+      if (part != null) {
+        info.put("partClass", part.getClass().getName());
+        if (part instanceof IEditorPart) {
+          info.put("isEditor", true);
+          info.put("editorInfo", editorPartInfo((IEditorPart) part));
+        } else {
+          info.put("isEditor", false);
+        }
+      } else {
+        info.put("partClass", null);
+        info.put("isEditor", false);
+      }
+    } catch (Throwable e) {
+      info.put("error", e.toString());
+    }
+    return info;
+  }
+
   @Override
   public void partActivated(IWorkbenchPartReference partRef) {
-    if (partRef instanceof org.eclipse.ui.IEditorPart) {
-      IEditorPart editor = (IEditorPart) partRef.getPart(true);
-      if (editor != null) {
-        Map<String, Object> info = new LinkedHashMap<>();
-        info.put("title", editor.getTitle());
-        info.put("id", editor.getSite().getId());
-        info.put("class", editor.getClass().getName());
-        addEvent("editor.activated", info);
-      }
+    if (isEditorReference(partRef)) {
+      Map<String, Object> info = partInfo(partRef);
+      addEvent("editor.activated", info);
     }
   }
 
   @Override
   public void partOpened(IWorkbenchPartReference partRef) {
-    if (partRef instanceof org.eclipse.ui.IEditorPart) {
-      IEditorPart editor = (IEditorPart) partRef.getPart(true);
-      if (editor != null) {
-        Map<String, Object> info = new LinkedHashMap<>();
-        info.put("title", editor.getTitle());
-        info.put("id", editor.getSite().getId());
-        addEvent("editor.opened", info);
-      }
+    if (isEditorReference(partRef)) {
+      Map<String, Object> info = partInfo(partRef);
+      addEvent("editor.opened", info);
     }
   }
 
   @Override
   public void partClosed(IWorkbenchPartReference partRef) {
-    if (partRef instanceof org.eclipse.ui.IEditorPart) {
-      IEditorPart editor = (IEditorPart) partRef.getPart(true);
-      if (editor != null) {
-        Map<String, Object> info = new LinkedHashMap<>();
-        info.put("title", editor.getTitle());
-        info.put("id", editor.getSite().getId());
-        addEvent("editor.closed", info);
-      }
+    if (isEditorReference(partRef)) {
+      Map<String, Object> info = partInfo(partRef);
+      addEvent("editor.closed", info);
     }
   }
 
@@ -165,13 +190,9 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
 
   @Override
   public void partDeactivated(IWorkbenchPartReference partRef) {
-    if (partRef instanceof org.eclipse.ui.IEditorPart) {
-      IEditorPart editor = (IEditorPart) partRef.getPart(true);
-      if (editor != null) {
-        Map<String, Object> info = new LinkedHashMap<>();
-        info.put("title", editor.getTitle());
-        addEvent("editor.deactivated", info);
-      }
+    if (isEditorReference(partRef)) {
+      Map<String, Object> info = partInfo(partRef);
+      addEvent("editor.deactivated", info);
     }
   }
 

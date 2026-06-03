@@ -64,16 +64,36 @@ public final class CommandAuditService {
       return payload;
     }
 
-    if (dryRun) {
-      payload.put("supported", config.allowCommands.contains(commandId));
+    if (config.readOnly && !dryRun) {
+      payload.put("ok", false);
+      payload.put("blocked", true);
+      payload.put("reason", "READ_ONLY");
       payload.put("executed", false);
+      payload.put("error", error("READ_ONLY", "Bridge está en modo readOnly"));
       return payload;
     }
 
-    if (!config.unsafeActions && !config.allowCommands.contains(commandId)) {
+    if (dryRun) {
+      payload.put("executed", false);
+      payload.put("allowed", config.allowAllCommands || config.allowCommands.contains(commandId));
+      return payload;
+    }
+
+    if (!config.unsafeActions) {
       payload.put("ok", false);
-      payload.put("confidence", "low");
-      payload.put("error", error("COMMAND_BLOCKED", "Comando bloqueado por política local"));
+      payload.put("blocked", true);
+      payload.put("reason", "UNSAFE_ACTIONS_DISABLED");
+      payload.put("executed", false);
+      payload.put("error", error("UNSAFE_ACTIONS_DISABLED", "unsafeActions=false"));
+      return payload;
+    }
+
+    if (!config.allowAllCommands && !config.allowCommands.contains(commandId)) {
+      payload.put("ok", false);
+      payload.put("blocked", true);
+      payload.put("reason", "COMMAND_NOT_IN_ALLOW_LIST");
+      payload.put("executed", false);
+      payload.put("error", error("COMMAND_NOT_ALLOWED", "Comando fuera de allowCommands"));
       return payload;
     }
 

@@ -23,13 +23,13 @@ function getBundlesInfoPath(): string {
   return join(getStudioPath(), "configuration", "org.eclipse.equinox.simpleconfigurator", "bundles.info");
 }
 
-const targetJar = "talend-studio-bridge/com.andres.talend.bridge.repository/target/repository/plugins/com.andres.talend.bridge_0.1.0.202606031624.jar";
+const targetJar = "talend-studio-bridge/com.andres.talend.bridge.repository/target/repository/plugins/com.andres.talend.bridge_0.1.0.202606031644.jar";
 const pluginsDir = join(getStudioPath(), "plugins");
 const bundlesInfoPath = getBundlesInfoPath();
 
 async function main() {
   console.log(`Copying ${targetJar} to ${pluginsDir}...`);
-  const destJarName = "com.andres.talend.bridge_0.1.0.202606031624.jar";
+  const destJarName = "com.andres.talend.bridge_0.1.0.202606031644.jar";
   const destPath = join(pluginsDir, destJarName);
   copyFileSync(targetJar, destPath);
   console.log(`Copied successfully to ${destPath}`);
@@ -40,7 +40,7 @@ async function main() {
   // Search for the line containing com.andres.talend.bridge
   const lines = content.split("\n");
   let updated = false;
-  const newLine = "com.andres.talend.bridge,0.1.0.202606031624,plugins/com.andres.talend.bridge_0.1.0.202606031624.jar,4,true";
+  const newLine = "com.andres.talend.bridge,0.1.0.202606031644,plugins/com.andres.talend.bridge_0.1.0.202606031644.jar,4,true";
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

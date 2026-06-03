@@ -239,6 +239,38 @@ export class TalendStudioBridgeClient {
     return await this.request<Record<string, unknown>>("/talend/active-editor/introspect");
   }
 
+  async eventsRecent(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/events/recent");
+  }
+
+  async eventsClear(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/events/clear");
+  }
+
+  async saveActiveEditor(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/save-active");
+  }
+
+  async saveAllEditors(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/save-all");
+  }
+
+  async refreshWorkspace(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workspace/refresh");
+  }
+
+  async runActiveJob(options: {
+    dryRun?: boolean;
+    saveBefore?: boolean;
+    waitForTermination?: boolean;
+    timeoutMs?: number;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/run-active-job", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   private async request<T>(endpoint: string, init: BridgeRequestInit = {}): Promise<BridgeResult<T>> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);

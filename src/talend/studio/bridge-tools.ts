@@ -299,30 +299,22 @@ export function createStudioBridgeTools(): BridgeToolDef[] {
         if (result.ok) return bridgeOk(result);
 
         const fallback = await readOpenJobFallback();
+        const windows = fallback.job
+          ? [
+              {
+                openEditors: [fallback.job],
+              },
+            ]
+          : [];
         return bridgeOk({
           ok: true,
           source: "workspace-files",
-          confidence: fallback.job ? "medium" : "low",
+          confidence: "low",
           endpoint: "/workbench/state",
-          warning: "Bridge no disponible; se usó el workspace como referencia.",
+          warning: "Bridge no disponible. Datos inferidos desde workspace, no confirmados por Studio.",
           data: {
-            windows: [
-              {
-                shellTitle: "Talend Studio",
-                activePage: true,
-                activeEditor: fallback.job
-                  ? {
-                      title: fallback.job.label,
-                      editorId: "org.talend.designer.core.ui.editor.ProcessTalendEditor",
-                      dirty: false,
-                    }
-                  : undefined,
-                openEditors: fallback.job ? [fallback.job] : [],
-                visibleViews: [],
-                dirtyEditors: [],
-              },
-            ],
-            source: "workspace-files",
+            windows,
+            note: "activePage, dirty, editorId, shellTitle, visibleViews NO可以在 bridge 不可用时确认。",
           },
         });
       },
@@ -533,6 +525,80 @@ export function createStudioBridgeTools(): BridgeToolDef[] {
       handler: async () => {
         const bridge = await loadBridge();
         const result = bridgeResultToEnvelope(await bridge.activeEditorIntrospect(), "/talend/active-editor/introspect");
+        if (result.ok) return bridgeOk(result);
+        return bridgeFail(result);
+      },
+    },
+    {
+      name: "talend_bridge_events_recent",
+      description: "Devuelve los últimos 100 eventos capturados por el bridge (launches, editores, procesos).",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const bridge = await loadBridge();
+        const result = bridgeResultToEnvelope(await bridge.eventsRecent(), "/events/recent");
+        if (result.ok) return bridgeOk(result);
+        return bridgeFail(result);
+      },
+    },
+    {
+      name: "talend_bridge_events_clear",
+      description: "Limpia el buffer de eventos recientes del bridge.",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const bridge = await loadBridge();
+        const result = bridgeResultToEnvelope(await bridge.eventsClear(), "/events/clear");
+        if (result.ok) return bridgeOk(result);
+        return bridgeFail(result);
+      },
+    },
+    {
+      name: "talend_bridge_save_active_editor",
+      description: "Guarda el editor activo de Talend Studio si está dirty.",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const bridge = await loadBridge();
+        const result = bridgeResultToEnvelope(await bridge.saveActiveEditor(), "/workbench/save-active");
+        if (result.ok) return bridgeOk(result);
+        return bridgeFail(result);
+      },
+    },
+    {
+      name: "talend_bridge_save_all",
+      description: "Guarda todos los editores dirty del workbench.",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const bridge = await loadBridge();
+        const result = bridgeResultToEnvelope(await bridge.saveAllEditors(), "/workbench/save-all");
+        if (result.ok) return bridgeOk(result);
+        return bridgeFail(result);
+      },
+    },
+    {
+      name: "talend_bridge_refresh_workspace",
+      description: "Refresca el workspace de Eclipse (guarda archivos pendientes y sincroniza recursos).",
+      inputSchema: z.object({}),
+      handler: async () => {
+        const bridge = await loadBridge();
+        const result = bridgeResultToEnvelope(await bridge.refreshWorkspace(), "/workspace/refresh");
+        if (result.ok) return bridgeOk(result);
+        return bridgeFail(result);
+      },
+    },
+    {
+      name: "talend_auto_run_active_job",
+      description: "Detecta el editor activo, busca su launch config, guarda si es necesario, ejecuta y opcionalmente espera terminación.",
+      inputSchema: z.object({
+        dryRun: z.boolean().optional().default(true).describe("Si es true, solo valida sin ejecutar realmente"),
+        saveBefore: z.boolean().optional().default(true).describe("Guardar editor antes de ejecutar"),
+        waitForTermination: z.boolean().optional().default(false).describe("Esperar a que el job termine"),
+        timeoutMs: z.number().optional().default(30000).describe("Tiempo máximo de espera en ms"),
+      }),
+      handler: async ({ dryRun, saveBefore, waitForTermination, timeoutMs }) => {
+        const bridge = await loadBridge();
+        const result = bridgeResultToEnvelope(
+          await bridge.runActiveJob({ dryRun, saveBefore, waitForTermination, timeoutMs }),
+          "/automation/run-active-job"
+        );
         if (result.ok) return bridgeOk(result);
         return bridgeFail(result);
       },

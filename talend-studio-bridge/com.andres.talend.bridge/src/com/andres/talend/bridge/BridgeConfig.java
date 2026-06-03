@@ -16,13 +16,15 @@ public final class BridgeConfig {
   public final int port;
   public final boolean readOnly;
   public final boolean unsafeActions;
+  public final boolean allowAllCommands;
   public final List<String> allowCommands;
   public final int timeoutMs;
 
-  private BridgeConfig(int port, boolean readOnly, boolean unsafeActions, List<String> allowCommands, int timeoutMs) {
+  private BridgeConfig(int port, boolean readOnly, boolean unsafeActions, boolean allowAllCommands, List<String> allowCommands, int timeoutMs) {
     this.port = port;
     this.readOnly = readOnly;
     this.unsafeActions = unsafeActions;
+    this.allowAllCommands = allowAllCommands;
     this.allowCommands = allowCommands;
     this.timeoutMs = timeoutMs;
   }
@@ -65,20 +67,21 @@ public final class BridgeConfig {
     int port = readInt(json, "port", 3930);
     boolean readOnly = readBoolean(json, "readOnly", true);
     boolean unsafeActions = readBoolean(json, "unsafeActions", false);
+    boolean allowAllCommands = readBoolean(json, "allowAllCommands", false);
     int timeoutMs = readInt(json, "timeoutMs", 2500);
     List<String> allowCommands = readStringArray(json, "allowCommands");
     if (allowCommands.isEmpty()) {
       allowCommands.add("org.eclipse.ui.file.save");
       allowCommands.add("org.eclipse.ui.file.saveAll");
     }
-    return new BridgeConfig(port, readOnly, unsafeActions, allowCommands, timeoutMs);
+    return new BridgeConfig(port, readOnly, unsafeActions, allowAllCommands, allowCommands, timeoutMs);
   }
 
   private static BridgeConfig defaults() {
     List<String> allowCommands = new ArrayList<>();
     allowCommands.add("org.eclipse.ui.file.save");
     allowCommands.add("org.eclipse.ui.file.saveAll");
-    return new BridgeConfig(3930, true, false, allowCommands, 2500);
+    return new BridgeConfig(3930, true, false, false, allowCommands, 2500);
   }
 
   private static void writeDefaultConfig(Path configPath) {
@@ -88,6 +91,7 @@ public final class BridgeConfig {
           + "  \"port\": 3930,\n"
           + "  \"readOnly\": true,\n"
           + "  \"unsafeActions\": false,\n"
+          + "  \"allowAllCommands\": false,\n"
           + "  \"allowCommands\": [\n"
           + "    \"org.eclipse.ui.file.save\",\n"
           + "    \"org.eclipse.ui.file.saveAll\"\n"

@@ -109,19 +109,25 @@ public final class LaunchConfigService {
       return payload;
     }
 
-    // Check readOnly mode - block real execution
-    if (config.readOnly) {
+    if (config.readOnly && !dryRun) {
       payload.put("executed", false);
       payload.put("blocked", true);
-      payload.put("reason", "Bridge is in readOnly mode. Set unsafeActions=true in config to enable real execution.");
+      payload.put("reason", "READ_ONLY");
+      payload.put("error", error("READ_ONLY", "Bridge está en modo readOnly"));
       return payload;
     }
 
-    // Check unsafeActions flag
-    if (dryRun || !config.unsafeActions) {
+    if (dryRun) {
+      payload.put("executed", false);
+      payload.put("blocked", false);
+      return payload;
+    }
+
+    if (!config.unsafeActions) {
       payload.put("executed", false);
       payload.put("blocked", true);
-      payload.put("reason", "unsafeActions=false or dryRun=true. Set unsafeActions=true to execute.");
+      payload.put("reason", "UNSAFE_ACTIONS_DISABLED");
+      payload.put("error", error("UNSAFE_ACTIONS_DISABLED", "unsafeActions=false"));
       return payload;
     }
 
@@ -158,5 +164,12 @@ public final class LaunchConfigService {
     }
 
     return null;
+  }
+
+  private static Map<String, Object> error(String code, String message) {
+    Map<String, Object> err = new LinkedHashMap<>();
+    err.put("code", code);
+    err.put("message", message);
+    return err;
   }
 }
