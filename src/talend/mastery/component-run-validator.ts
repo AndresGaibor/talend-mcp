@@ -1,13 +1,17 @@
-import { TalendStudioBridgeClient } from "../studio/bridge-client";
 import { existsSync } from "node:fs";
+import { basename } from "node:path";
+import { TalendStudioBridgeClient } from "../studio/bridge-client";
+import type { BridgeLaunchConfig } from "../studio/bridge-client";
 
 export type RunValidationResult = {
   ok: boolean;
   componentName: string;
   launchConfigFound: boolean;
+  launchConfigName?: string;
   dryRunOk: boolean;
   realRunOk: boolean;
   launchTerminated: boolean;
+  launchId?: string;
   error?: string;
 };
 
@@ -18,6 +22,7 @@ export async function validateComponentRun(
   options?: {
     unsafeActions?: boolean;
     timeoutMs?: number;
+    jobName?: string;
   },
 ): Promise<RunValidationResult> {
   const result: RunValidationResult = {
@@ -39,6 +44,8 @@ export async function validateComponentRun(
     return result;
   }
 
+  const effectiveJobName = options?.jobName ?? basename(itemPath, ".item").replace(/_[\d.]+$/, "");
+
   try {
     const configsResult = await bridge.launchConfigs();
     if (!configsResult.ok || !configsResult.data?.configs?.length) {
@@ -46,9 +53,24 @@ export async function validateComponentRun(
       result.error = "No se encontraron launch configs";
       return result;
     }
-    result.launchConfigFound = true;
 
-    const configName = configsResult.data.configs[0]?.name ?? "Default";
+    const configs = configsResult.data.configs!;
+    const matchedConfig = configs.find((c: BridgeLaunchConfig) => {
+      const name = c.name ?? "";
+      const label = c.attributes?.PROCESS_LABEL ?? c.attributes?.processName ?? "";
+      return name.includes(effectiveJobName) || label.includes(effectiveJobName);
+    });
+
+    if (!matchedConfig) {
+      result.launchConfigFound = false;
+      result.error = "No se encontró launch config asociada al job fixture: " + effectiveJobName;
+      return result;
+    }
+
+    result.launchConfigFound = true;
+    result.launchConfigName = matchedConfig.name;
+
+    const configName = matchedConfig.name ?? "Default";
     const dryRunResult = await bridge.runLaunchConfig(configName, true, "run");
     result.dryRunOk = dryRunResult.ok;
 
@@ -61,12 +83,20 @@ export async function validateComponentRun(
     const realRunResult = await bridge.runLaunchConfig(configName, false, "run");
     result.realRunOk = realRunResult.ok;
 
-    if (result.realRunOk && options?.timeoutMs) {
-      await new Promise((resolve) => setTimeout(resolve, options.timeoutMs));
+    const launchId = (realRunResult as any).data?.launchId;
+    if (launchId) {
+      result.launchId = launchId;
+      try {
+        const statusResult = await bridge.eventsRecent();
+        result.launchTerminated = statusResult.ok && (statusResult.data as any)?.terminated === true;
+      } catch {
+        result.launchTerminated = false;
+      }
+    } else {
+      result.launchTerminated = false;
     }
 
-    result.launchTerminated = true;
-    result.ok = true;
+    result.ok = result.realRunOk;
     return result;
   } catch (e) {
     result.error = e instanceof Error ? e.message : String(e);

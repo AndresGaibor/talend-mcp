@@ -219,6 +219,23 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  async launchRuns(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/launch/runs");
+  }
+
+  async launchRunStatus(launchId: string): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>(
+      "/launch/run-status?launchId=" + encodeURIComponent(launchId)
+    );
+  }
+
+  async launchWait(launchId: string, timeoutMs = 60000): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/launch/wait", {
+      method: "POST",
+      body: { launchId, timeoutMs },
+    });
+  }
+
   async openResource(path: string): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/workbench/open-resource", {
       method: "POST",

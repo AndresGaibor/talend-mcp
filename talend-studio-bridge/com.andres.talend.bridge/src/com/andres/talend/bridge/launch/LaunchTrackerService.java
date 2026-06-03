@@ -21,6 +21,7 @@ public final class LaunchTrackerService {
   }
 
   private static final Map<String, LaunchRunInfo> launches = new ConcurrentHashMap<>();
+  private static final Map<String, String> launchNameToLatestId = new ConcurrentHashMap<>();
 
   private LaunchTrackerService() {}
 
@@ -33,7 +34,12 @@ public final class LaunchTrackerService {
     info.startedAt = System.currentTimeMillis();
     info.status = "started";
     launches.put(launchId, info);
+    launchNameToLatestId.put(launchConfigName, launchId);
     return launchId;
+  }
+
+  public static String findLatestLaunchIdByName(String launchConfigName) {
+    return launchNameToLatestId.get(launchConfigName);
   }
 
   public static void markTerminated(String launchId, Integer exitCode, Map<String, Object> extra) {

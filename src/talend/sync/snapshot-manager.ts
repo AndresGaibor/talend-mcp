@@ -40,6 +40,7 @@ export type SnapshotInfo = {
   reason: string;
   itemPath: string;
   propertiesPath: string;
+  manifestPath: string;
 };
 
 export async function createSnapshot(
@@ -104,6 +105,7 @@ export async function listSnapshots(projectPath: string): Promise<SnapshotInfo[]
       try {
         const content = readFileSync(join(snapshotDir, file), "utf8");
         const manifest = JSON.parse(content) as SnapshotManifest;
+        const manifestPath = join(snapshotDir, file);
         manifests.push({
           snapshotId: manifest.snapshotId,
           createdAt: manifest.createdAt,
@@ -111,6 +113,7 @@ export async function listSnapshots(projectPath: string): Promise<SnapshotInfo[]
           reason: manifest.reason,
           itemPath: manifest.itemPath,
           propertiesPath: manifest.propertiesPath,
+          manifestPath,
         });
       } catch {
       }
@@ -160,4 +163,54 @@ export async function restoreSnapshot(
   } catch (e) {
     return { ok: false, restoredFiles, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+export async function diffSnapshot(
+  projectPath: string,
+  snapshotId: string,
+): Promise<{
+  ok: boolean;
+  diffs: Array<{
+    file: string;
+    changed: boolean;
+    beforeLength: number;
+    afterLength: number;
+    beforePreview?: string;
+    afterPreview?: string;
+  }>;
+  error?: string;
+}> {
+  const manifest = await readSnapshot(projectPath, snapshotId);
+
+  if (!manifest) {
+    return { ok: false, diffs: [], error: "Snapshot not found: " + snapshotId };
+  }
+
+  const diffs = [];
+
+  for (const file of manifest.files) {
+    if (!existsSync(file.backup) || !existsSync(file.original)) {
+      diffs.push({
+        file: file.original,
+        changed: true,
+        beforeLength: existsSync(file.backup) ? readFileSync(file.backup, "utf8").length : 0,
+        afterLength: existsSync(file.original) ? readFileSync(file.original, "utf8").length : 0,
+      });
+      continue;
+    }
+
+    const before = readFileSync(file.backup, "utf8");
+    const after = readFileSync(file.original, "utf8");
+
+    diffs.push({
+      file: file.original,
+      changed: before !== after,
+      beforeLength: before.length,
+      afterLength: after.length,
+      beforePreview: before.slice(0, 500),
+      afterPreview: after.slice(0, 500),
+    });
+  }
+
+  return { ok: true, diffs };
 }

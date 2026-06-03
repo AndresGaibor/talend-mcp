@@ -101,8 +101,29 @@ export async function validateRoundTrip(componentName: string, itemPath: string)
 
     mastery.levels.roundTripReadWrite = hasComponents;
     mastery.levels.jobGenerated = hasComponents;
-  } catch {
+
+    mastery.evidence.push({
+      capability: "roundTripReadWrite",
+      ok: hasComponents,
+      source: "roundtrip",
+      confidence: hasComponents ? "high" : "low",
+      checkedAt: Date.now(),
+      details: {
+        components: parsed.components.length,
+        connections: parsed.connections.length,
+        contexts: parsed.contexts.length,
+      },
+    });
+  } catch (e) {
     mastery.levels.roundTripReadWrite = false;
+    mastery.evidence.push({
+      capability: "roundTripReadWrite",
+      ok: false,
+      source: "roundtrip",
+      confidence: "low",
+      checkedAt: Date.now(),
+      details: { error: e instanceof Error ? e.message : String(e) },
+    });
   }
 
   const { level, score } = calculateMasteryLevel(mastery.levels);
@@ -115,9 +136,17 @@ export async function validateRoundTrip(componentName: string, itemPath: string)
   return mastery;
 }
 
-export async function markOpensInStudio(componentName: string): Promise<ComponentMastery> {
+export async function markOpensInStudio(componentName: string, evidence?: { source?: "catalog" | "roundtrip" | "studio-bridge" | "launch" | "manual"; confidence?: "high" | "medium" | "low"; details?: unknown }): Promise<ComponentMastery> {
   let mastery = await getComponentMastery(componentName);
   mastery.levels.opensInStudio = true;
+  mastery.evidence.push({
+    capability: "opensInStudio",
+    ok: true,
+    source: evidence?.source ?? "manual",
+    confidence: evidence?.confidence ?? "low",
+    checkedAt: Date.now(),
+    details: evidence?.details,
+  });
 
   const { level, score } = calculateMasteryLevel(mastery.levels);
   mastery.level = level;
@@ -129,9 +158,17 @@ export async function markOpensInStudio(componentName: string): Promise<Componen
   return mastery;
 }
 
-export async function markCompilesWithoutProblems(componentName: string): Promise<ComponentMastery> {
+export async function markCompilesWithoutProblems(componentName: string, evidence?: { source?: "catalog" | "roundtrip" | "studio-bridge" | "launch" | "manual"; confidence?: "high" | "medium" | "low"; details?: unknown }): Promise<ComponentMastery> {
   let mastery = await getComponentMastery(componentName);
   mastery.levels.compilesWithoutProblems = true;
+  mastery.evidence.push({
+    capability: "compilesWithoutProblems",
+    ok: true,
+    source: evidence?.source ?? "manual",
+    confidence: evidence?.confidence ?? "low",
+    checkedAt: Date.now(),
+    details: evidence?.details,
+  });
 
   const { level, score } = calculateMasteryLevel(mastery.levels);
   mastery.level = level;
@@ -143,9 +180,17 @@ export async function markCompilesWithoutProblems(componentName: string): Promis
   return mastery;
 }
 
-export async function markRunsInStudio(componentName: string): Promise<ComponentMastery> {
+export async function markRunsInStudio(componentName: string, evidence?: { source?: "catalog" | "roundtrip" | "studio-bridge" | "launch" | "manual"; confidence?: "high" | "medium" | "low"; details?: unknown }): Promise<ComponentMastery> {
   let mastery = await getComponentMastery(componentName);
   mastery.levels.runsInStudio = true;
+  mastery.evidence.push({
+    capability: "runsInStudio",
+    ok: true,
+    source: evidence?.source ?? "manual",
+    confidence: evidence?.confidence ?? "low",
+    checkedAt: Date.now(),
+    details: evidence?.details,
+  });
 
   const { level, score } = calculateMasteryLevel(mastery.levels);
   mastery.level = level;
@@ -157,9 +202,17 @@ export async function markRunsInStudio(componentName: string): Promise<Component
   return mastery;
 }
 
-export async function markHandlesErrors(componentName: string): Promise<ComponentMastery> {
+export async function markHandlesErrors(componentName: string, evidence?: { source?: "catalog" | "roundtrip" | "studio-bridge" | "launch" | "manual"; confidence?: "high" | "medium" | "low"; details?: unknown }): Promise<ComponentMastery> {
   let mastery = await getComponentMastery(componentName);
   mastery.levels.handlesErrors = true;
+  mastery.evidence.push({
+    capability: "handlesErrors",
+    ok: true,
+    source: evidence?.source ?? "manual",
+    confidence: evidence?.confidence ?? "low",
+    checkedAt: Date.now(),
+    details: evidence?.details,
+  });
 
   const { level, score } = calculateMasteryLevel(mastery.levels);
   mastery.level = level;
@@ -171,9 +224,17 @@ export async function markHandlesErrors(componentName: string): Promise<Componen
   return mastery;
 }
 
-export async function markSafeEditingSupported(componentName: string): Promise<ComponentMastery> {
+export async function markSafeEditingSupported(componentName: string, evidence?: { source?: "catalog" | "roundtrip" | "studio-bridge" | "launch" | "manual"; confidence?: "high" | "medium" | "low"; details?: unknown }): Promise<ComponentMastery> {
   let mastery = await getComponentMastery(componentName);
   mastery.levels.safeEditingSupported = true;
+  mastery.evidence.push({
+    capability: "safeEditingSupported",
+    ok: true,
+    source: evidence?.source ?? "manual",
+    confidence: evidence?.confidence ?? "low",
+    checkedAt: Date.now(),
+    details: evidence?.details,
+  });
 
   const { level, score } = calculateMasteryLevel(mastery.levels);
   mastery.level = level;
@@ -185,9 +246,17 @@ export async function markSafeEditingSupported(componentName: string): Promise<C
   return mastery;
 }
 
-export async function markAutomationValidated(componentName: string): Promise<ComponentMastery> {
+export async function markAutomationValidated(componentName: string, evidence?: { source?: "catalog" | "roundtrip" | "studio-bridge" | "launch" | "manual"; confidence?: "high" | "medium" | "low"; details?: unknown }): Promise<ComponentMastery> {
   let mastery = await getComponentMastery(componentName);
   mastery.levels.automationValidated = true;
+  mastery.evidence.push({
+    capability: "automationValidated",
+    ok: true,
+    source: evidence?.source ?? "manual",
+    confidence: evidence?.confidence ?? "low",
+    checkedAt: Date.now(),
+    details: evidence?.details,
+  });
 
   const { level, score } = calculateMasteryLevel(mastery.levels);
   mastery.level = level;

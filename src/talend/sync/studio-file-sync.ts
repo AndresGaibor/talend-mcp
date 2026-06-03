@@ -40,7 +40,7 @@ export async function getSyncStatus(
   const { listSnapshots } = await import("./snapshot-manager");
   const snapshots = await listSnapshots(projectPath);
   const hasSnapshot = snapshots.length > 0;
-  const snapshotPath = hasSnapshot ? (snapshots[0]?.itemPath ?? null) : null;
+  const snapshotPath = hasSnapshot ? (snapshots[0]?.manifestPath ?? null) : null;
 
   let bridgeAvailable = false;
   let jobOpen = false;
@@ -187,13 +187,8 @@ export async function afterFileEdit(
     warnings.push("Bridge no disponible; no se pudo validar modelo interno.");
   }
 
-  const criticalSteps = steps.filter((s) =>
-    ["file_edit_applied", "write_item_file"].includes(s.name)
-  );
-  const ok = criticalSteps.every((s) => s.ok);
-
   return {
-    ok,
+    ok: true,
     source: bridgeClient ? "mcp+studio-bridge" : "workspace-files",
     confidence: bridgeClient ? "high" : "medium",
     steps,
@@ -201,6 +196,31 @@ export async function afterFileEdit(
     validatedWithStudio,
     snapshotPath: null,
     warnings: warnings.length > 0 ? warnings : undefined,
+  };
+}
+
+function mergeSyncResults(
+  beforeSteps: SyncStep[],
+  beforeSnapshotPath: string | null,
+  writeStepName: string,
+  afterResult: SyncResult
+): SyncResult {
+  const mergedSteps = [...beforeSteps, ...afterResult.steps];
+
+  const criticalStepNames = [
+    "validate_inputs",
+    "snapshot_created",
+    writeStepName,
+    "write_item_file",
+  ];
+  const criticalSteps = mergedSteps.filter((s) => criticalStepNames.includes(s.name));
+  const finalOk = criticalSteps.every((s) => s.ok);
+
+  return {
+    ...afterResult,
+    ok: finalOk,
+    steps: mergedSteps,
+    snapshotPath: beforeSnapshotPath,
   };
 }
 
@@ -277,11 +297,7 @@ export async function safeEditComponentParameter(
 
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);
 
-  return {
-    ...afterResult,
-    steps: [...steps, ...afterResult.steps],
-    snapshotPath: beforeResult.snapshotPath,
-  };
+  return mergeSyncResults(steps, beforeResult.snapshotPath, "apply_xml_edit", afterResult);
 }
 
 export async function safePatchComponent(
@@ -350,11 +366,7 @@ export async function safePatchComponent(
 
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);
 
-  return {
-    ...afterResult,
-    steps: [...steps, ...afterResult.steps],
-    snapshotPath: beforeResult.snapshotPath,
-  };
+  return mergeSyncResults(steps, beforeResult.snapshotPath, "apply_xml_patch", afterResult);
 }
 
 export async function safeAddConnection(
@@ -423,9 +435,5 @@ export async function safeAddConnection(
 
   const afterResult = await afterFileEdit(projectPath, [itemPath], bridgeClient);
 
-  return {
-    ...afterResult,
-    steps: [...steps, ...afterResult.steps],
-    snapshotPath: beforeResult.snapshotPath,
-  };
+  return mergeSyncResults(steps, beforeResult.snapshotPath, "apply_xml_connection", afterResult);
 }

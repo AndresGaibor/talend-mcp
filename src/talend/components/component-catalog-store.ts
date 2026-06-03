@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scanInstalledPlugins, entriesToCatalogFormat, type ComponentJarEntry } from "./component-jar-scanner";
+import { resolveTalendPluginsDir, resolveTalendStudioHome } from "./talend-paths";
 
 export type ComponentCatalogMetadata = {
   generatedAt: number;
@@ -37,10 +38,25 @@ export async function saveComponentCatalog(options?: {
   const errors: string[] = [];
   const scannedPlugins: string[] = [];
 
-  const pluginsDir = options?.pluginsDir ?? process.env.TALEND_STUDIO_PATH ?? "/Applications/TalendStudio-8.0.1/studio";
-  const talendStudioHome = options?.talendStudioHome ?? pluginsDir;
+  const pluginsDir = resolveTalendPluginsDir({
+    talendStudioHome: options?.talendStudioHome,
+    pluginsDir: options?.pluginsDir,
+  });
+
+  if (!pluginsDir) {
+    return {
+      ok: false,
+      catalogPath: null,
+      entryCount: 0,
+      lastUpdated: null,
+      scannedPlugins: [],
+      errors: ["No se pudo resolver TALEND_STUDIO_PLUGINS_DIR"],
+    };
+  }
 
   const scanResult = await scanInstalledPlugins({ pluginsDir });
+
+  const talendStudioHome = resolveTalendStudioHome({ talendStudioHome: options?.talendStudioHome }) ?? pluginsDir;
 
   const metadata = entriesToCatalogFormat(
     scanResult.entries,

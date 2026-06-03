@@ -118,6 +118,10 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
           Map<String, Object> info = launchInfo(launch);
           info.put("durationMs", duration);
           addEvent("launch.terminated", info);
+          String launchId = com.andres.talend.bridge.launch.LaunchTrackerService.findLatestLaunchIdByName(name);
+          if (launchId != null) {
+            com.andres.talend.bridge.launch.LaunchTrackerService.markTerminated(launchId, null, info);
+          }
         } else if (kind == DebugEvent.CHANGE) {
           addEvent("process.changed", launchInfo(launch));
         }

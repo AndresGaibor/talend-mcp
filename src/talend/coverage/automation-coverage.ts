@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export type CoverageArea = {
@@ -42,7 +42,7 @@ async function getMasteryScore(): Promise<number> {
   try {
     const masteryDir = join(process.cwd(), ".talend-mcp", "mastery");
     if (!existsSync(masteryDir)) return 0;
-    const files = (await Bun.file(masteryDir).text().then((t) => t.split("\n"))).filter((f) => f.endsWith(".json"));
+    const files = readdirSync(masteryDir).filter((f) => f.endsWith(".json"));
     if (files.length === 0) return 0;
     let totalScore = 0;
     for (const file of files) {
@@ -70,39 +70,39 @@ async function getCatalogComponentCount(): Promise<number> {
   }
 }
 
-async function getBridgeEndpointCount(): Promise<number> {
-  const endpoints = [
-    "/ping",
-    "/capabilities",
-    "/audit/environment",
-    "/workbench/state",
-    "/talend/active-job/model",
-    "/commands/list",
-    "/commands/execute",
-    "/launch/configs",
-    "/launch/run",
-    "/workbench/selection",
-    "/workbench/views",
-    "/workbench/open-resource",
-    "/workspace/state",
-    "/problems/markers",
-    "/talend/probe/classes",
-    "/talend/active-editor/introspect",
-    "/events/recent",
-    "/events/clear",
-    "/workbench/save-active",
-    "/workbench/save-all",
-    "/workspace/refresh",
-    "/automation/run-active-job",
-  ];
-  return endpoints.length;
+async function getBridgeHealthScore(bridge?: { ping: () => Promise<any>; capabilities: () => Promise<any>; workbenchState: () => Promise<any>; launchConfigs: () => Promise<any>; eventsRecent: () => Promise<any> }): Promise<number> {
+  if (!bridge) return 0;
+
+  let score = 0;
+
+  try {
+    if ((await bridge.ping()).ok) score += 20;
+  } catch { /* noop */ }
+
+  try {
+    if ((await bridge.capabilities()).ok) score += 20;
+  } catch { /* noop */ }
+
+  try {
+    if ((await bridge.workbenchState()).ok) score += 20;
+  } catch { /* noop */ }
+
+  try {
+    if ((await bridge.launchConfigs()).ok) score += 20;
+  } catch { /* noop */ }
+
+  try {
+    if ((await bridge.eventsRecent()).ok) score += 20;
+  } catch { /* noop */ }
+
+  return score;
 }
 
 async function getLaunchTracksDir(): Promise<{ count: number; hasTerminatedData: boolean }> {
   try {
     const tracksDir = join(process.cwd(), ".talend-mcp", "launch-tracks");
     if (!existsSync(tracksDir)) return { count: 0, hasTerminatedData: false };
-    const files = (await Bun.file(tracksDir).text().then((t) => t.split("\n"))).filter((f) => f.endsWith(".json"));
+    const files = readdirSync(tracksDir).filter((f) => f.endsWith(".json"));
     let hasTerminatedData = false;
     for (const file of files) {
       try {
@@ -120,17 +120,18 @@ async function getLaunchTracksDir(): Promise<{ count: number; hasTerminatedData:
 export async function generateCoverageReport(options?: {
   override?: Partial<CoverageArea>;
   missing?: string[];
+  bridge?: { ping: () => Promise<any>; capabilities: () => Promise<any>; workbenchState: () => Promise<any>; launchConfigs: () => Promise<any>; eventsRecent: () => Promise<any> };
 }): Promise<AutomationCoverageReport> {
   const masteryScore = await getMasteryScore();
   const componentCount = await getCatalogComponentCount();
   const launchTracks = await getLaunchTracksDir();
-  const bridgeEndpoints = await getBridgeEndpointCount();
+  const bridgeHealthScore = options?.bridge ? await getBridgeHealthScore(options.bridge) : 0;
 
   const componentsScore = masteryScore > 0 ? masteryScore : Math.min(100, componentCount * 5);
   const executionScore = launchTracks.hasTerminatedData
     ? Math.min(100, 50 + (launchTracks.count > 0 ? 25 : 0) + (launchTracks.hasTerminatedData ? 25 : 0))
     : launchTracks.count > 0 ? 55 : 40;
-  const studioBridgeScore = Math.min(100, (bridgeEndpoints / 22) * 70 + 30);
+  const studioBridgeScore = bridgeHealthScore;
 
   const dynamicAreas: CoverageArea = {
     workspace: 90,

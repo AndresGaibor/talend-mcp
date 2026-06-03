@@ -72,6 +72,7 @@ final class BridgeServer {
       server.createContext("/automation/run-active-job", exchange -> guarded(exchange, () -> handleAutomationRunActiveJob(exchange)));
       server.createContext("/launch/runs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchTrackerService.runs())));
       server.createContext("/launch/run-status", exchange -> guarded(exchange, () -> handleLaunchRunStatus(exchange)));
+      server.createContext("/launch/wait", exchange -> guarded(exchange, () -> handleLaunchWait(exchange)));
       server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
       server.start();
     } catch (IOException e) {
@@ -149,6 +150,34 @@ final class BridgeServer {
     Map<String, Object> body = readJsonBody(exchange);
     String launchId = asString(body.get("launchId"));
     respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
+  }
+
+  private void handleLaunchWait(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    String launchId = asString(body.get("launchId"));
+    int timeoutMs = asInt(body.get("timeoutMs"), 60000);
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      LaunchTrackerService.LaunchRunInfo info = LaunchTrackerService.getLaunch(launchId);
+      if (info != null && info.terminatedAt != null) {
+        respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
+        return;
+      }
+      try {
+        Thread.sleep(500);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "high");
+    payload.put("endpoint", "/launch/wait");
+    payload.put("timedOut", true);
+    payload.put("launchId", launchId);
+    respond(exchange, 200, payload);
   }
 
   private Map<String, Object> readJsonBody(HttpExchange exchange) throws IOException {

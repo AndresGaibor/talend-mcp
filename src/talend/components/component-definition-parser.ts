@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, basename } from "node:path";
-import { parseComponentXml } from "./component-jar-scanner";
+import { parseComponentXmlWithParser } from "./component-xml-parser";
 
 export type ComponentDefinitionParseResult = {
   ok: boolean;
@@ -32,7 +32,7 @@ export type ComponentDefinitionParseResult = {
 
 export function parseComponentDefinitionXml(xmlContent: string, sourceFile: string): ComponentDefinitionParseResult {
   try {
-    const parsed = parseComponentXml(xmlContent);
+    const parsed = parseComponentXmlWithParser(xmlContent);
     return {
       ok: true,
       componentName: parsed.name || basename(sourceFile, ".xml"),
