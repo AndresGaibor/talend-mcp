@@ -22,6 +22,9 @@ const PATTERN_RULES: Array<{
       "olist",
       "csv",
       "carregar",
+      "cargar",
+      "carga cruda",
+      "carga raw",
       "carga",
       "raw",
       "leer múltiples",
@@ -96,7 +99,7 @@ const PATTERN_RULES: Array<{
     ],
     talendResponsibilities: [
       "crear_job",
-      "leer_archivos_csv",
+      "leer_base_datos",
       "escribir_base_datos",
       "configurar_componentes",
     ],

@@ -1,6 +1,8 @@
 import * as z from "zod/v4";
 import { bridgeOk, bridgeFail } from "./tools-base";
 import { listContextProfiles, getContextProfile, applyContextToJobSpec } from "../contexts/context-profile";
+import { readFileSync } from "node:fs";
+import type { ContextProfile } from "../contexts/context-types";
 
 export const contextTools = [
   {
@@ -80,6 +82,48 @@ export const contextTools = [
         endpoint: "/context/profile-apply",
         data: { jobSpecWithContext: result },
       });
+    },
+  },
+  {
+    name: "talend_context_profile_load_from_file",
+    description: "Carga un perfil de contexto desde un archivo JSON externo.",
+    inputSchema: z.object({
+      filePath: z.string().describe("Ruta al archivo .context.json"),
+    }),
+    handler: async (input: { filePath: string }) => {
+      try {
+        const content = readFileSync(input.filePath, "utf8");
+        const profile = JSON.parse(content) as ContextProfile;
+
+        if (!profile.name || !profile.variables) {
+          return bridgeFail({
+            ok: false,
+            source: "context-profile",
+            confidence: "high",
+            endpoint: "/context/profile-load-from-file",
+            error: { code: "INVALID_FORMAT", message: "El archivo no tiene el formato válido de perfil de contexto" },
+          });
+        }
+
+        return bridgeOk({
+          ok: true,
+          source: "context-profile",
+          confidence: "high",
+          endpoint: "/context/profile-load-from-file",
+          data: {
+            profile,
+            loadedFrom: input.filePath,
+          },
+        });
+      } catch (err) {
+        return bridgeFail({
+          ok: false,
+          source: "context-profile",
+          confidence: "high",
+          endpoint: "/context/profile-load-from-file",
+          error: { code: "LOAD_FAILED", message: String(err) },
+        });
+      }
     },
   },
 ];

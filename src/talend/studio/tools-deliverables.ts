@@ -13,7 +13,7 @@ export const deliverableTools = [
     handler: async (input: { jobName: string; destinationDir?: string }) => {
       try {
         const files = collectJobFiles(input.jobName);
-        const pkg = createPackage(input.jobName, files);
+        const pkg = await createPackage(input.jobName, files, input.destinationDir);
 
         return bridgeOk({
           ok: true,
@@ -24,7 +24,7 @@ export const deliverableTools = [
             jobName: input.jobName,
             fileCount: files.length,
             package: pkg,
-            zipNote: "Necesita integración con zip del sistema",
+            zipPath: pkg.zipPath ?? null,
           },
         });
       } catch (err) {
@@ -78,13 +78,15 @@ export const deliverableTools = [
     }),
     handler: async (input: { jobName: string; files: Array<{ path: string; type: "job" | "context" | "schema" | "script" | "readme" | "other"; description?: string }> }) => {
       try {
-        const pkg = createPackage(input.jobName, input.files);
+        const filesWithSize = input.files.map((f) => ({ ...f, sizeBytes: undefined as number | undefined }));
+        const pkg = await createPackage(input.jobName, filesWithSize);
+
         return bridgeOk({
           ok: true,
           source: "deliverables",
           confidence: "high",
           endpoint: "/deliverable/create-package",
-          data: { package: pkg },
+          data: { package: pkg, zipPath: pkg.zipPath ?? null },
         });
       } catch (err) {
         return bridgeFail({

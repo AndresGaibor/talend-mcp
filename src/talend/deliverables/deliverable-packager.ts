@@ -1,34 +1,125 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, basename } from "node:path";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, readdirSync } from "node:fs";
+import { join, basename, extname } from "node:path";
 import type { DeliverablePackage, DeliverableFile, DeliverableChecklist, ChecklistItem } from "./deliverable-types";
 import { getConfiguredProjectPath } from "../workspace";
+
+function walkDirectory(dir: string): string[] {
+  const results: string[] = [];
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return results;
+  }
+  for (const entry of entries) {
+    const fullPath = join(dir, entry);
+    try {
+      const stat = statSync(fullPath);
+      if (stat.isDirectory()) {
+        results.push(...walkDirectory(fullPath));
+      } else {
+        results.push(fullPath);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return results;
+}
+
+function inferFileType(path: string): DeliverableFile["type"] {
+  const lower = path.toLowerCase();
+  if (lower.includes("/process/")) return "job";
+  if (lower.includes("/contexts/") || lower.includes("_context")) return "context";
+  if (lower.includes("_schema") || lower.includes("/schemas/")) return "schema";
+  if (lower.includes("_script") || lower.includes("/scripts/")) return "script";
+  if (lower.includes("readme") || lower.includes("read_me")) return "readme";
+  return "other";
+}
 
 export function collectJobFiles(jobName: string): DeliverableFile[] {
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) return [];
 
-  const files: DeliverableFile[] = [];
-  const jobPatterns = [
-    `**/${jobName}/*.item`,
-    `**/${jobName}/*.java`,
-    `**/${jobName}/*.properties`,
-    `**/${jobName}/*.xml`,
-    `**/${jobName}/*_stats*`,
-    `**/${jobName}/*_errors*`,
-    `**/${jobName}/*_sch*`,
-  ];
+  const processDir = join(projectPath, "process");
+  const codeDir = join(projectPath, "code");
+  const metadataDir = join(projectPath, "metadata");
 
-  return files;
+  const searchDirs = [processDir, codeDir, metadataDir].filter((d) => existsSync(d));
+
+  const allFiles: string[] = [];
+  for (const dir of searchDirs) {
+    allFiles.push(...walkDirectory(dir));
+  }
+
+  const nameLower = jobName.toLowerCase();
+  const matching = allFiles.filter((f) => {
+    const fname = basename(f, extname(f)).toLowerCase();
+    const fpath = f.toLowerCase();
+    return (
+      fname.includes(nameLower) ||
+      fpath.includes(`/${nameLower}/`) ||
+      fpath.includes(`\\${nameLower}\\`) ||
+      fpath.includes(`${nameLower}_`)
+    );
+  });
+
+  return matching.map((path) => {
+    let sizeBytes: number | undefined;
+    try {
+      sizeBytes = statSync(path).size;
+    } catch {
+      sizeBytes = undefined;
+    }
+    return {
+      path,
+      type: inferFileType(path),
+      sizeBytes,
+      description: basename(path),
+    };
+  });
 }
 
-export function createPackage(jobName: string, files: DeliverableFile[]): DeliverablePackage {
+export async function createPackage(jobName: string, files: DeliverableFile[], destinationDir?: string): Promise<DeliverablePackage> {
   const totalSizeBytes = files.reduce((acc, f) => acc + (f.sizeBytes ?? 0), 0);
-  return {
+
+  const pkg: DeliverablePackage = {
     jobName,
     files,
     createdAt: Date.now(),
     totalSizeBytes,
   };
+
+  if (destinationDir && files.length > 0) {
+    const cleanName = jobName.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const zipPath = join(destinationDir, `${cleanName}_package.zip`);
+
+    const tempDir = join(destinationDir, `.zip_temp_${Date.now()}`);
+    mkdirSync(tempDir, { recursive: true });
+
+    for (const file of files) {
+      try {
+        const data = await Bun.file(file.path).bytes();
+        const relativePath = file.path.replace(/^[\/\\]/, "").replace(/^process\//, "").replace(/^code\//, "").replace(/^metadata\//, "");
+        const destPath = join(tempDir, relativePath.replace(/\//g, "_"));
+        await Bun.write(destPath, data);
+      } catch {
+        continue;
+      }
+    }
+
+    const proc = Bun.spawnSync(["zip", "-r", zipPath, "."], { cwd: tempDir });
+    void proc;
+
+    try {
+      const stat = statSync(zipPath);
+      pkg.zipPath = zipPath;
+      pkg.totalSizeBytes = stat.size;
+    } catch {
+    }
+  }
+
+  return pkg;
 }
 
 export function buildChecklist(jobName: string, spec: {
@@ -94,9 +185,9 @@ export function buildChecklist(jobName: string, spec: {
   };
 }
 
-export function exportJobPackage(jobName: string, destinationDir: string): DeliverablePackage {
+export async function exportJobPackage(jobName: string, destinationDir: string): Promise<DeliverablePackage> {
   const files = collectJobFiles(jobName);
-  const pkg = createPackage(jobName, files);
+  const pkg = await createPackage(jobName, files, destinationDir);
 
   if (!existsSync(destinationDir)) {
     mkdirSync(destinationDir, { recursive: true });

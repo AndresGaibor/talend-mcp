@@ -28,14 +28,28 @@ export const executionTools = [
         }
 
         const launchId = launchResult.data?.launchId as string | undefined;
+        let waitData: unknown = null;
 
         if (input.waitForTermination && launchId && !input.dryRun) {
-          const waitResult = await bridge.runLaunchConfig(input.jobName, false, "wait");
-          void waitResult;
+          const waitResult = await bridge.launchWait(launchId, input.timeoutMs ?? 120000);
+          waitData = waitResult.data;
+
+          if (!waitResult.ok) {
+            return bridgeFail({
+              ok: false,
+              source: "studio-bridge",
+              confidence: "medium",
+              endpoint: "/job/run-by-name",
+              error: {
+                code: "WAIT_FAILED",
+                message: String(waitResult.error?.message ?? "No se pudo esperar el launch"),
+              },
+            });
+          }
         }
 
         return bridgeOk({
-          ok: launchResult.ok,
+          ok: true,
           source: "studio-bridge",
           confidence: "high",
           endpoint: "/job/run-by-name",
@@ -43,6 +57,7 @@ export const executionTools = [
             launched: true,
             launchId,
             launchResult: launchResult.data,
+            waitResult: waitData,
           },
         });
       } catch (err) {
@@ -65,15 +80,34 @@ export const executionTools = [
     }),
     handler: async (input: { launchId: string; timeoutMs?: number }) => {
       try {
+        const bridge = await loadBridge();
+        const waitResult = await bridge.launchWait(input.launchId, input.timeoutMs ?? 120000);
+
+        if (!waitResult.ok) {
+          return bridgeFail({
+            ok: false,
+            source: "studio-bridge",
+            confidence: "medium",
+            endpoint: "/job/wait-run",
+            error: {
+              code: "WAIT_FAILED",
+              message: String(waitResult.error?.message ?? "No se pudo esperar el launch"),
+            },
+          });
+        }
+
         return bridgeOk({
           ok: true,
-          source: "execution",
+          source: "studio-bridge",
           confidence: "high",
           endpoint: "/job/wait-run",
           data: {
             launchId: input.launchId,
-            status: "waiting",
-            timeoutMs: input.timeoutMs ?? 120000,
+            terminated: true,
+            status: waitResult.data?.status ?? "terminated",
+            durationMs: waitResult.data?.durationMs,
+            exitCode: waitResult.data?.exitCode,
+            result: waitResult.data,
           },
         });
       } catch (err) {
@@ -89,23 +123,91 @@ export const executionTools = [
   },
   {
     name: "talend_job_measure_runtime",
-    description: "Mide el tiempo de ejecución de un job.",
+    description: "Mide el tiempo de ejecución de un job consultando runs anteriores.",
     inputSchema: z.object({
-      jobName: z.string().describe("Nombre del job"),
-      targetMs: z.number().optional().describe("Tiempo objetivo en ms"),
+      jobName: z.string().describe("Nombre del job o launch config"),
+      targetMs: z.number().optional().describe("Tiempo objetivo en ms para comparar"),
+      latestOnly: z.boolean().optional().default(true).describe("Solo devolver el último run"),
     }),
-    handler: async (input: { jobName: string; targetMs?: number }) => {
+    handler: async (input: { jobName: string; targetMs?: number; latestOnly?: boolean }) => {
       try {
+        const bridge = await loadBridge();
+        const runsResult = await bridge.launchRuns();
+
+        if (!runsResult.ok) {
+          return bridgeFail({
+            ok: false,
+            source: "studio-bridge",
+            confidence: "low",
+            endpoint: "/job/measure-runtime",
+            error: { code: "RUNS_QUERY_FAILED", message: String(runsResult.error?.message ?? "No se pudieron obtener los runs") },
+          });
+        }
+
+        const runs = (runsResult.data?.runs ?? []) as Array<{
+          launchId?: string;
+          name?: string;
+          configName?: string;
+          status?: string;
+          startTime?: number;
+          endTime?: number;
+          durationMs?: number;
+          exitCode?: number;
+        }>;
+
+        const filteredRuns = runs.filter(
+          (r) => r.configName === input.jobName || r.name === input.jobName
+        );
+
+        if (filteredRuns.length === 0) {
+          return bridgeOk({
+            ok: true,
+            source: "studio-bridge",
+            confidence: "medium",
+            endpoint: "/job/measure-runtime",
+            data: {
+              jobName: input.jobName,
+              runsFound: 0,
+              message: "No se encontraron runs para este job",
+            },
+          });
+        }
+
+        const sorted = [...filteredRuns].sort((a, b) => (b.startTime ?? 0) - (a.startTime ?? 0));
+        const latest = sorted[0];
+        const allDurations = sorted.map((r) => r.durationMs).filter((d): d is number => d !== undefined);
+
+        const avgDuration = allDurations.length > 0
+          ? Math.round(allDurations.reduce((a, b) => a + b, 0) / allDurations.length)
+          : undefined;
+
+        const result: Record<string, unknown> = {
+          jobName: input.jobName,
+          runsFound: filteredRuns.length,
+          latestRun: latest ? {
+            launchId: latest.launchId,
+            status: latest.status,
+            durationMs: latest.durationMs,
+            startTime: latest.startTime,
+            endTime: latest.endTime,
+            exitCode: latest.exitCode,
+          } : null,
+          averageDurationMs: avgDuration,
+          allDurationsMs: input.latestOnly ? undefined : allDurations,
+        };
+
+        if (input.targetMs !== undefined && latest?.durationMs !== undefined) {
+          result.passedTarget = latest.durationMs <= input.targetMs;
+          result.targetMs = input.targetMs;
+          result.diffMs = latest.durationMs - input.targetMs;
+        }
+
         return bridgeOk({
           ok: true,
-          source: "execution",
-          confidence: "low",
+          source: "studio-bridge",
+          confidence: "high",
           endpoint: "/job/measure-runtime",
-          data: {
-            jobName: input.jobName,
-            targetMs: input.targetMs,
-            note: "Measurement requiere ejecutar el job primero y consultar launch-runs",
-          },
+          data: result,
         });
       } catch (err) {
         return bridgeFail({

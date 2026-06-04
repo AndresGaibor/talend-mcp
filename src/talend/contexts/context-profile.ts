@@ -17,21 +17,6 @@ export const DEFAULT_PROFILES: ContextProfile[] = [
     applicableTo: ["multi_csv_raw_loader", "csv_to_db_with_audit_columns"],
   },
   {
-    name: "olist_raw",
-    description: "Perfil específico para taller Olist",
-    variables: [
-      { name: "olist_path", type: "string", defaultValue: "/data/olist/raw", description: "Ruta archivos Olist" },
-      { name: "batch_size", type: "number", defaultValue: "5000", description: "Batch size para inserts" },
-      { name: "run_id", type: "string", defaultValue: "context.run_id", description: "Run ID desde contexto" },
-      { name: "db_host", type: "string", defaultValue: "localhost", description: "Host Postgres" },
-      { name: "db_port", type: "string", defaultValue: "5432", description: "Puerto Postgres" },
-      { name: "db_name", type: "string", defaultValue: "olist_stg", description: "Nombre base Olist" },
-      { name: "db_user", type: "string", defaultValue: "postgres", description: "Usuario" },
-      { name: "db_pass", type: "password", defaultValue: "", description: "Password" },
-    ],
-    applicableTo: ["multi_csv_raw_loader"],
-  },
-  {
     name: "api_loader",
     description: "Perfil para jobs que consumen APIs REST",
     variables: [

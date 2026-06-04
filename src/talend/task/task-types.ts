@@ -2,6 +2,7 @@ export type ResponsabilidadTalend =
   | "crear_job"
   | "configurar_contextos"
   | "leer_archivos_csv"
+  | "leer_base_datos"
   | "escribir_base_datos"
   | "configurar_componentes"
   | "ejecutar_job"

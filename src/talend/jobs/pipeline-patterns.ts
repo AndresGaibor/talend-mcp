@@ -136,7 +136,7 @@ export function generateJobSpec(pattern: PatrónTalend, name: string, options?: 
     auditColumns: options?.auditColumns ?? patternDef.supportsAuditColumns,
     technicalColumns: patternDef.supportsAuditColumns
       ? [
-          { name: "_load_ts", value: "TalendDate.getDate()" },
+          { name: "_load_ts", value: "TalendDate.getCurrentDate()" },
           { name: "_load_run", value: "context.run_id" },
         ]
       : undefined,

@@ -1,0 +1,15 @@
+{
+  "name": "olist_raw",
+  "description": "Perfil específico para taller LAB-09 de Olist (carga raw de archivos CSV)",
+  "variables": [
+    { "name": "olist_path", "type": "string", "defaultValue": "/data/olist/raw", "description": "Ruta base de archivos CSV de Olist" },
+    { "name": "batch_size", "type": "number", "defaultValue": "5000", "description": "Tamaño de batch para inserts" },
+    { "name": "run_id", "type": "string", "defaultValue": "", "description": "ID de ejecución (se genera dinámicamente)" },
+    { "name": "db_host", "type": "string", "defaultValue": "localhost", "description": "Host de Postgres" },
+    { "name": "db_port", "type": "string", "defaultValue": "5432", "description": "Puerto de Postgres" },
+    { "name": "db_name", "type": "string", "defaultValue": "olist_stg", "description": "Nombre de base de datos" },
+    { "name": "db_user", "type": "string", "defaultValue": "postgres", "description": "Usuario de Postgres" },
+    { "name": "db_pass", "type": "password", "defaultValue": "", "description": "Password de Postgres" }
+  ],
+  "applicableTo": ["multi_csv_raw_loader"]
+}
