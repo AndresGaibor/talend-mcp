@@ -2856,6 +2856,9 @@ export function createPresentationAppShellHtml(app: PresentationAppDefinition): 
   if (app.id === "deliverables") {
     return createDeliverablesHtml();
   }
+  if (app.id === "component-catalog") {
+    return createComponentCatalogHtml();
+  }
 
   const appJson = escapeForScript(JSON.stringify(app));
 
