@@ -48,10 +48,58 @@ function buildBaseState(projectPath: string | undefined) {
 export async function buildLauncherInitialStateForApp(appId: PresentationAppId): Promise<Record<string, unknown>> {
   const projectPath = getConfiguredProjectPath();
   const baseState = buildBaseState(projectPath);
+
+  if (appId === "home") {
+    const errorStats = getErrorStats();
+    return {
+      ...baseState,
+      environment: {
+        projectPath,
+        projectDetected: Boolean(projectPath),
+        watcherActive: Boolean(baseState.liveWatcher.ok && baseState.liveWatcher.data?.active),
+      },
+      quickStats: {
+        jobCount: 0,
+        runCount: 0,
+        snapshotCount: 0,
+        profileCount: listContextProfiles().length,
+        errorCount: errorStats.total,
+      },
+      recentJobs: [],
+      recentRuns: [],
+      recentSnapshots: [],
+      recentErrors: getLatestErrors(5),
+      errorStats,
+    };
+  }
+
+  if (!projectPath && appId === "dashboard") {
+    const errorStats = getErrorStats();
+    return {
+      ...baseState,
+      environment: {
+        projectPath,
+        projectDetected: false,
+        watcherActive: Boolean(baseState.liveWatcher.ok && baseState.liveWatcher.data?.active),
+      },
+      quickStats: {
+        jobCount: 0,
+        runCount: 0,
+        snapshotCount: 0,
+        profileCount: listContextProfiles().length,
+        errorCount: errorStats.total,
+      },
+      recentJobs: [],
+      recentRuns: [],
+      recentSnapshots: [],
+      recentErrors: getLatestErrors(5),
+      errorStats,
+    };
+  }
+
   const bundle = await loadWorkspaceBundle(projectPath);
 
   switch (appId) {
-    case "home":
     case "dashboard":
       return {
         ...baseState,

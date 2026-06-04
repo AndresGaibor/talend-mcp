@@ -45,6 +45,7 @@ export interface PresentationAppAction {
   inputPlaceholder?: string;
   defaultValue?: string;
   argumentName?: string;
+  requiresConfirmation?: boolean;
 }
 
 export interface PresentationAppDefinition {

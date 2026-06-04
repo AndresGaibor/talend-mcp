@@ -3,7 +3,10 @@ import { spawn } from "node:child_process";
 import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
-import { allTools, toolCount } from "../tools/registry";
+import { allTools as presentationTools } from "../tools/registry";
+import { createStudioBridgeTools } from "../../talend/studio/bridge-tools";
+import { studioToolDefs } from "../../tools/new-tools";
+import { listPresentationAppIds, registerPresentationApps } from "../apps";
 
 export interface NewServerOptions {
   port?: number;
@@ -18,8 +21,102 @@ export interface NewServerHandle {
   close(): Promise<void>;
 }
 
+type ToolDef = {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+  handler: (input: any) => Promise<unknown>;
+};
+
+const TOOL_NAME_ALIASES: Record<string, string> = {
+  analyze_logs: "talend_analyze_logs",
+  analyze_tdboutput: "talend_analyze_tdboutput",
+  duplicate_analysis: "talend_duplicate_analysis",
+  full_analysis: "talend_full_analysis",
+  inspect_component: "talend_inspect_component",
+  inspect_job: "talend_inspect_job",
+  list_analyses: "talend_list_analyses",
+  read_analysis: "talend_read_analysis",
+  read_run_log: "talend_read_run_log",
+  update_analysis: "talend_update_analysis",
+  view_logs: "talend_view_logs",
+  add_talend_connection: "talend_add_connection",
+  delete_talend_component: "talend_delete_component",
+  delete_talend_connection: "talend_delete_connection",
+  duplicate_talend_component: "talend_duplicate_component",
+  move_talend_component: "talend_move_component",
+  patch_talend_component: "talend_patch_component",
+  preview_delete_talend_component: "talend_preview_delete_component",
+  preview_delete_talend_connection: "talend_preview_delete_connection",
+  preview_talend_component_parameter: "talend_preview_component_parameter",
+  preview_talend_schema_column: "talend_preview_schema_column",
+  update_talend_component_parameter: "talend_update_component_parameter",
+  update_talend_schema_column: "talend_update_schema_column",
+  create_repository_context: "talend_create_repository_context",
+  delete_repository_context: "talend_delete_repository_context",
+  delete_repository_context_parameter: "talend_delete_repository_context_parameter",
+  list_project_contexts: "talend_list_project_contexts",
+  list_repository_contexts: "talend_list_repository_contexts",
+  read_repository_context: "talend_read_repository_context",
+  upsert_repository_context_parameter: "talend_upsert_repository_context_parameter",
+  repo_pull: "talend_repo_pull",
+  repo_setup: "talend_repo_setup",
+  repo_sources: "talend_repo_sources",
+  repo_status: "talend_repo_status",
+  repo_switch: "talend_repo_switch",
+  latest_changes: "talend_latest_changes",
+  live_start: "talend_live_start",
+  live_status: "talend_live_status",
+  live_stop: "talend_live_stop",
+  detect_open_jobs: "talend_detect_open_jobs",
+  summarize_open_job: "talend_summarize_open_job",
+  detect_process: "talend_studio_process",
+  diagnose_environment: "talend_diagnose_environment",
+  list_launch_configs: "talend_list_launch_configs",
+  list_open_editors: "talend_list_open_editors",
+  get_probable_active_job: "talend_get_probable_active_job",
+  analyze_job: "talend_analyze_job",
+};
+
+function dedupeTools(tools: ToolDef[]): ToolDef[] {
+  const seen = new Set<string>();
+  const result: ToolDef[] = [];
+  for (const tool of tools) {
+    if (seen.has(tool.name)) continue;
+    seen.add(tool.name);
+    result.push(tool);
+  }
+  return result;
+}
+
+function buildAliasTools(tools: ToolDef[]): ToolDef[] {
+  const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
+  const aliasTools: ToolDef[] = [];
+
+  for (const [sourceName, aliasName] of Object.entries(TOOL_NAME_ALIASES)) {
+    const sourceTool = toolByName.get(sourceName);
+    if (!sourceTool || toolByName.has(aliasName)) continue;
+    aliasTools.push({ ...sourceTool, name: aliasName });
+  }
+
+  return aliasTools;
+}
+
+const registeredTools = dedupeTools([
+  ...presentationTools,
+  ...createStudioBridgeTools(),
+  ...studioToolDefs,
+]);
+
+const aliasTools = buildAliasTools(registeredTools);
+
 function createHealthPayload() {
-  return { ok: true, service: "talend-mcp", version: "1.0.0", toolCount };
+  return {
+    ok: true,
+    service: "talend-mcp",
+    version: "1.0.0",
+    toolCount: registeredTools.length + aliasTools.length + listPresentationAppIds().length,
+  };
 }
 
 function isLocalOrigin(origin: string): boolean {
@@ -90,7 +187,7 @@ function getToolAnnotations(name: string) {
 export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.WritableStream }) {
   const server = new McpServer({ name: "talend-mcp", version: "1.0.0" });
 
-  for (const tool of allTools) {
+  for (const tool of [...registeredTools, ...aliasTools]) {
     server.registerTool(
       tool.name,
       {
@@ -102,8 +199,12 @@ export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.W
     );
   }
 
+  registerPresentationApps(server);
+
   return server;
 }
+
+export const createTalendMcpServer = createNewMcpServer;
 
 export async function runNewStdioServer(options?: { live?: boolean }): Promise<void> {
   const server = createNewMcpServer({ live: options?.live, stderr: process.stderr });
