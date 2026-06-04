@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { buildLauncherInitialStateForApp } from "../../src/presentation/apps";
-import { createTalendMcpServer } from "../../src/server";
+import { createTalendMcpServer } from "../../src/presentation/server/new-server";
 
 describe("Talend presentation apps", () => {
   test("registra launchers y recursos visuales", () => {
@@ -75,13 +75,20 @@ describe("Talend presentation apps", () => {
   });
 
   test("home arranca con estado inicial del entorno", async () => {
-    const initialState = await buildLauncherInitialStateForApp("home");
+    const originalDisableAutodetect = process.env.TALEND_DISABLE_AUTODETECT;
+    process.env.TALEND_DISABLE_AUTODETECT = "1";
 
-    expect(initialState).toHaveProperty("environment");
-    expect(initialState).toHaveProperty("quickStats");
-    expect(initialState).toHaveProperty("recentJobs");
-    expect(initialState).toHaveProperty("recentRuns");
-    expect(initialState).toHaveProperty("recentSnapshots");
-    expect(initialState).toHaveProperty("errorStats");
+    try {
+      const initialState = await buildLauncherInitialStateForApp("home");
+
+      expect(initialState).toHaveProperty("environment");
+      expect(initialState).toHaveProperty("quickStats");
+      expect(initialState).toHaveProperty("recentJobs");
+      expect(initialState).toHaveProperty("recentRuns");
+      expect(initialState).toHaveProperty("recentSnapshots");
+      expect(initialState).toHaveProperty("errorStats");
+    } finally {
+      process.env.TALEND_DISABLE_AUTODETECT = originalDisableAutodetect;
+    }
   });
 });

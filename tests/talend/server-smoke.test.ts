@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createTalendMcpServer } from "../../src/server";
+import { createTalendMcpServer } from "../../src/presentation/server/new-server";
 
 describe("MCP server", () => {
   test("crea servidor MCP", () => {

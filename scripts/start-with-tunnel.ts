@@ -17,42 +17,179 @@ const TUNNEL_PROFILE = join(TUNNEL_CONFIG, "talend.yaml");
 
 const CONTROL_PLANE_API_KEY_VAR = "CONTROL_PLANE_API_KEY";
 
+// ─── Estética ──────────────────────────────────────────────
+const C = {
+  reset: "\x1b[0m",
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  magenta: "\x1b[35m",
+  cyan: "\x1b[36m",
+  dim: "\x1b[2m",
+  bold: "\x1b[1m",
+};
+
+function c(valor: unknown, color: string): string {
+  return `${color}${valor}${C.reset}`;
+}
+
+function log(icono: string, msg: string, color = C.reset): void {
+  console.error(`${color}${icono}${C.reset} ${msg}`);
+}
+function ok(msg: string): void { log("✓", msg, C.green); }
+function info(msg: string): void { log("•", msg, C.cyan); }
+function warn(msg: string): void { log("⚠", msg, C.yellow); }
+function fail(msg: string): void { log("✖", msg, C.red); }
+
+function banner(titulo: string, lineas: string[], color = C.red): void {
+  const border = "─".repeat(50);
+  console.error();
+  console.error(`  ${c(border, color)}`);
+  console.error(`  ${c(titulo, C.bold)}`);
+  console.error(`  ${c(border, color)}`);
+  for (const l of lineas) console.error(`  ${l}`);
+  console.error(`  ${c(border, color)}`);
+  console.error();
+}
+
+function separador(): void {
+  console.error(`  ${c("─".repeat(40), C.dim)}`);
+}
+
+// ─── Filtro de logs del tunnel ────────────────────────────
+const TUNNEL_SKIP = [
+  '"provided"', '"supplied"', '"run"', '"invoking"',
+  'OnStart hook', 'initialized custom',
+];
+
+const TUNNEL_FORMAT_MSG: Record<string, { icon: string; color: string; msg?: string }> = {
+  "tunnel-client startup summary": { icon: "🚀", color: C.green },
+  "🟢 tunnel-client started": { icon: "", color: C.green },
+  "WEB UI:": { icon: "🌐", color: C.cyan },
+  "mcp session initialized": { icon: "🔗", color: C.green, msg: "Conectado al MCP server" },
+  "health server listening": { icon: "💚", color: C.green, msg: "Health check activo" },
+  "Codex detected without": { icon: "ℹ", color: C.dim },
+  "dispatcher forwarded command": { icon: "↦", color: C.reset, msg: "Comando MCP" },
+  "dispatcher acknowledged": { icon: "↤", color: C.reset, msg: "Notificación ACK" },
+  "tunnel metadata fetched": { icon: "↻", color: C.green, msg: "Tunnel sincronizado" },
+  "failed to connect to mcp": { icon: "✖", color: C.red, msg: "MCP server no disponible" },
+  "dispatcher received MCP upstream error": { icon: "✖", color: C.red, msg: "Error MCP — el server no responde" },
+};
+
+function formatTunnelLine(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+
+  let entry: Record<string, any>;
+  try { entry = JSON.parse(t); } catch { return t; }
+
+  const level = (entry.level || "").toUpperCase();
+  const msg = entry.msg || "";
+
+  if (level === "ERROR") return `${c("✖", C.red)} ${msg}`;
+  if (level === "WARN" && !msg.includes("OAuth")) return `${c("⚠", C.yellow)} ${msg}`;
+  if (msg.includes("OAuth")) return null;
+
+  const rawJson = JSON.stringify(entry);
+  if (TUNNEL_SKIP.some((s) => rawJson.includes(s))) return null;
+  if (entry.stacktrace || entry.moduletrace) return null;
+  if (entry.constructor || entry.kind === "provide" || entry.kind === "supply") return null;
+
+  // Startup summary → extraer info
+  if (msg === "tunnel-client startup summary") {
+    const items: { label: string; val: string }[] = [];
+    if (entry.tunnel_id) items.push({ label: "Tunnel ID", val: entry.tunnel_id });
+    if (entry.version) items.push({ label: "Versión", val: entry.version });
+    if (entry.tunnel_url) items.push({ label: "URL", val: entry.tunnel_url });
+    if (entry.mcp_target_value) items.push({ label: "MCP target", val: entry.mcp_target_value });
+    if (entry.tunnel_name) items.push({ label: "Nombre", val: entry.tunnel_name });
+    if (entry.config_source === "profile") items.push({ label: "Perfil", val: entry.profile_name || "talend" });
+    const lines = items.map(
+      (i) => `  ${c("▸", C.green)} ${c(i.label + ":", C.dim)} ${c(i.val, C.cyan)}`,
+    );
+    return lines.join("\n");
+  }
+
+  // 🟢
+  if (msg.includes("🟢")) {
+    const out = [`  ${c("Tunnel activo", C.green)}`];
+    if (entry.tunnel_url) out.push(`  ${c(entry.tunnel_url, C.cyan)}`);
+    if (entry.name) out.push(`  ${c("Nombre:", C.dim)} ${c(entry.name, C.cyan)}`);
+    return [
+      ...out,
+      "",
+      c("  ⏎ En espera de comandos...", C.dim),
+      "",
+    ].join("\n");
+  }
+
+  for (const [key, f] of Object.entries(TUNNEL_FORMAT_MSG)) {
+    if (msg.includes(key)) {
+      const text = f.msg || msg;
+      return `${c(f.icon, f.color)} ${c(text, f.color)}`;
+    }
+  }
+
+  return `${c("•", C.dim)} ${msg}`;
+}
+
+function processTunnelOutput(stream: any): void {
+  if (!stream) return;
+  const rl = createInterface({ input: stream });
+  rl.on("line", (line: string) => {
+    const f = formatTunnelLine(line);
+    if (f) console.error(f);
+  });
+}
+
+// ─── MCP server output filter (Bun ReadableStream) ────────
+async function processMcpOutput(stream: ReadableStream<Uint8Array> | null): Promise<void> {
+  if (!stream) return;
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t) continue;
+        if (t.startsWith("error:")) console.error(`  ${c("✖", C.red)} ${c(t, C.red)}`);
+        else console.error(`  ${c("│", C.dim)} ${t}`);
+      }
+    }
+  } catch {}
+}
+
+function processMcpOutputBg(stream: ReadableStream<Uint8Array> | null): void {
+  processMcpOutput(stream).catch(() => {});
+}
+
+// ─── OS detection ─────────────────────────────────────────
 function detectOS(): { label: string; archSuffix: string } {
   const p = platform();
   const a = arch();
-
-  if (p === "darwin") {
-    return {
-      label: `macOS (${a === "arm64" ? "Apple Silicon" : "Intel"})`,
-      archSuffix: "darwin-arm64",
-    };
-  }
-
-  if (p === "win32") {
-    return { label: "Windows", archSuffix: "windows-amd64" };
-  }
-
+  if (p === "darwin") return { label: `macOS (${a === "arm64" ? "Apple Silicon" : "Intel"})`, archSuffix: "darwin-arm64" };
+  if (p === "win32") return { label: "Windows", archSuffix: "windows-amd64" };
   if (p === "linux") {
     let label = "Linux";
     try {
-      const version = execSync("cat /proc/version 2>/dev/null", { encoding: "utf8" }).toLowerCase();
-      if (version.includes("microsoft") || version.includes("wsl")) {
-        label = "WSL (Ubuntu)";
-      }
+      if (execSync("cat /proc/version 2>/dev/null", { encoding: "utf8" }).toLowerCase().includes("microsoft")) label = "WSL (Ubuntu)";
     } catch {}
     return { label, archSuffix: "linux-amd64" };
   }
-
-  throw new Error(`Sistema operativo no soportado: ${p}`);
+  throw new Error(`SO no soportado: ${p}`);
 }
 
 async function prompt(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
+    rl.question(question, (answer) => { rl.close(); resolve(answer.trim()); });
   });
 }
 
@@ -61,219 +198,172 @@ async function getLatestReleaseTag(): Promise<string> {
     "https://api.github.com/repos/openai/tunnel-client/releases/latest",
     { headers: { "User-Agent": "talend-mcp/1.0" } },
   );
-  if (!res.ok) throw new Error(`Error obteniendo última versión: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Error obteniendo versión: HTTP ${res.status}`);
   const data = await res.json() as { tag_name?: string };
   if (!data.tag_name) throw new Error("No se pudo determinar la última versión");
   return data.tag_name;
 }
 
 async function downloadTunnelClient(os: { label: string; archSuffix: string }): Promise<void> {
-  console.error(`\nObteniendo última versión de tunnel-client para ${os.label}...`);
+  info(`Descargando tunnel-client para ${os.label}...`);
   const tag = await getLatestReleaseTag();
   const zipName = `tunnel-client-${tag}-${os.archSuffix}.zip`;
   const url = `https://github.com/openai/tunnel-client/releases/download/${tag}/${zipName}`;
-
-  console.error(`  Descargando: ${url}`);
-
+  info(`URL: ${url}`);
   mkdirSync(BIN_DIR, { recursive: true });
   const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Error descargando tunnel-client: HTTP ${response.status} ${response.statusText}`);
-  }
-
+  if (!response.ok) throw new Error(`Error descargando: HTTP ${response.status} ${response.statusText}`);
   const buffer = await response.arrayBuffer();
   const zipPath = join(BIN_DIR, zipName);
   Bun.write(zipPath, buffer);
-
-  console.error("  Extrayendo...");
+  info("Extrayendo...");
   const tmpDir = join(BIN_DIR, "extract");
   mkdirSync(tmpDir, { recursive: true });
-
   if (IS_WIN) {
-    const result = spawnSync("powershell", [
-      "-Command",
-      `Expand-Archive -Path '${zipPath}' -DestinationPath '${tmpDir}' -Force`,
-    ], { stdio: "pipe", timeout: 30_000 });
-    if (result.status !== 0) {
-      throw new Error(`Error extrayendo zip en Windows: ${result.stderr?.toString() || result.error?.message}`);
-    }
+    const result = spawnSync("powershell", ["-Command", `Expand-Archive -Path '${zipPath}' -DestinationPath '${tmpDir}' -Force`], { stdio: "pipe", timeout: 30_000 });
+    if (result.status !== 0) throw new Error(`Error extrayendo zip: ${result.stderr?.toString() || result.error?.message}`);
   } else {
-    // Verificar que unzip existe
-    try {
-      execSync("which unzip", { stdio: "pipe" });
-    } catch {
-      throw new Error(
-        "unzip no está instalado. Instálalo con:\n"
-        + "  Ubuntu/Debian: sudo apt install unzip\n"
-        + "  macOS: ya viene preinstalado",
-      );
-    }
-    const result = spawnSync("unzip", ["-o", zipPath, "-d", tmpDir], {
-      cwd: BIN_DIR, stdio: "pipe", timeout: 30_000,
-    });
-    if (result.status !== 0) {
-      throw new Error(`Error extrayendo zip: ${result.stderr?.toString() || result.error?.message}`);
-    }
+    try { execSync("which unzip", { stdio: "pipe" }); } catch { throw new Error("unzip no instalado. macOS: viene preinstalado, Debian: sudo apt install unzip"); }
+    const result = spawnSync("unzip", ["-o", zipPath, "-d", tmpDir], { cwd: BIN_DIR, stdio: "pipe", timeout: 30_000 });
+    if (result.status !== 0) throw new Error(`Error extrayendo: ${result.stderr?.toString() || result.error?.message}`);
   }
-
-  // Buscar el binario extraído
-  const binCandidates = IS_WIN
-    ? [join(tmpDir, "tunnel-client.exe"), join(tmpDir, BIN_NAME)]
-    : [join(tmpDir, "tunnel-client")];
-
+  const binCandidates = IS_WIN ? [join(tmpDir, "tunnel-client.exe"), join(tmpDir, BIN_NAME)] : [join(tmpDir, "tunnel-client")];
   const finalBin = binCandidates.find((p) => existsSync(p));
-  if (!finalBin) {
-    throw new Error(`No se encontró ${BIN_NAME} dentro del zip extraído`);
-  }
-
+  if (!finalBin) throw new Error(`No se encontró ${BIN_NAME} en el zip`);
   cpSync(finalBin, BIN_PATH);
-
-  if (!IS_WIN) {
-    chmodSync(BIN_PATH, 0o755);
-  }
-
-  // Limpiar temporales
-  try {
-    rmSync(tmpDir, { recursive: true, force: true });
-    rmSync(zipPath, { force: true });
-  } catch {}
-
-  console.error(`  Instalado en: ${BIN_PATH}`);
+  if (!IS_WIN) chmodSync(BIN_PATH, 0o755);
+  try { rmSync(tmpDir, { recursive: true, force: true }); rmSync(zipPath, { force: true }); } catch {}
+  ok(`Instalado en: ${BIN_PATH}`);
 }
 
 async function ensureApiKey(): Promise<void> {
   const fromEnv = process.env[CONTROL_PLANE_API_KEY_VAR];
-  if (fromEnv) {
-    console.error(`  ${CONTROL_PLANE_API_KEY_VAR} ya está definida en el entorno`);
-    return;
-  }
-
+  if (fromEnv) { ok(`${CONTROL_PLANE_API_KEY_VAR} definida en el entorno`); return; }
   if (existsSync(ENV_FILE)) {
     const content = await Bun.file(ENV_FILE).text();
-    if (content.includes(CONTROL_PLANE_API_KEY_VAR)) {
-      console.error(`  ${CONTROL_PLANE_API_KEY_VAR} ya está en .env.local`);
-      return;
-    }
+    if (content.includes(CONTROL_PLANE_API_KEY_VAR)) { ok(`${CONTROL_PLANE_API_KEY_VAR} ya está en .env.local`); return; }
   }
-
-  const key = await prompt(`\nIngresa tu CONTROL_PLANE_API_KEY de OpenAI (sk-...): `);
-  if (!key) {
-    throw new Error("CONTROL_PLANE_API_KEY es requerida");
-  }
-
+  const key = await prompt(`\nIngresa tu ${c(CONTROL_PLANE_API_KEY_VAR, C.yellow)} de OpenAI (sk-...): `);
+  if (!key) throw new Error("CONTROL_PLANE_API_KEY es requerida");
   appendFileSync(ENV_FILE, `\n${CONTROL_PLANE_API_KEY_VAR}="${key}"\n`);
-  console.error(`  Guardada en ${ENV_FILE}`);
-
+  ok(`Guardada en ${ENV_FILE}`);
   process.env[CONTROL_PLANE_API_KEY_VAR] = key;
 }
 
 async function ensureTunnelProfile(): Promise<void> {
-  if (existsSync(TUNNEL_PROFILE)) {
-    console.error(`  Perfil talend ya existe en ${TUNNEL_PROFILE}`);
-    return;
-  }
-
-  const tunnelId = await prompt(`\nIngresa tu Tunnel ID (ej: tunnel_6a1f1012a92c8191931616ac46216eed): `);
-  if (!tunnelId) {
-    throw new Error("Tunnel ID es requerido");
-  }
-
-  console.error("\nInicializando perfil del tunnel...");
-  const result = Bun.spawnSync([
-    BIN_PATH,
-    "init",
-    "--sample", "sample_mcp_remote_no_auth",
-    "--profile", "talend",
-    "--tunnel-id", tunnelId,
-    "--mcp-server-url", "http://127.0.0.1:3927/mcp",
-  ], {
-    env: { ...process.env },
-    stdio: ["inherit", "pipe", "pipe"],
+  if (existsSync(TUNNEL_PROFILE)) { ok(`Perfil talend encontrado`); return; }
+  const tunnelId = await prompt(`\nIngresa tu ${c("Tunnel ID", C.yellow)}: `);
+  if (!tunnelId) throw new Error("Tunnel ID es requerido");
+  info("Inicializando perfil del tunnel...");
+  const result = Bun.spawnSync([BIN_PATH, "init", "--sample", "sample_mcp_remote_no_auth", "--profile", "talend", "--tunnel-id", tunnelId, "--mcp-server-url", "http://127.0.0.1:3927/mcp"], {
+    env: { ...process.env }, stdio: ["inherit", "pipe", "pipe"],
   });
-
-  if (result.exitCode !== 0) {
-    throw new Error(`tunnel-client init falló (exit ${result.exitCode}):\n${result.stderr.toString()}`);
-  }
+  if (result.exitCode !== 0) throw new Error(`tunnel-client init falló (exit ${result.exitCode}):\n${result.stderr.toString()}`);
 }
 
 function waitForHealth(url: string, timeoutMs = 15_000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
-
     function check() {
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error(`Timeout esperando a ${url}`));
-        return;
-      }
-
-      fetch(url)
-        .then((res) => {
-          if (res.ok) resolve();
-          else setTimeout(check, 300);
-        })
-        .catch(() => setTimeout(check, 300));
+      if (Date.now() - start > timeoutMs) { reject(new Error(`Timeout`)); return; }
+      fetch(url).then((res) => { if (res.ok) resolve(); else setTimeout(check, 300); }).catch(() => setTimeout(check, 300));
     }
-
     check();
   });
 }
 
-function killProcess(proc: { kill: (...args: any[]) => unknown } | null, signal: string | number): void {
+function killProcess(proc: { pid?: number; kill: (...args: any[]) => unknown } | null, signal: string | number): void {
   if (!proc) return;
   try { proc.kill(signal); } catch {}
 }
 
+// ─── Main ─────────────────────────────────────────────────
 async function main() {
-  console.error("=== Talend MCP - Inicio automatizado ===\n");
+  console.error(`\n  ${c("Talend MCP", C.bold)} ${c("— Inicio automatizado", C.dim)}\n`);
 
+  // ── Preliminares ──────────────────────────────────────
   const os = detectOS();
-  console.error(`Sistema detectado: ${os.label}`);
+  info(`Sistema: ${c(os.label, C.cyan)}`);
 
-  if (!existsSync(BIN_PATH)) {
-    await downloadTunnelClient(os);
-  } else {
-    console.error(`tunnel-client ya está instalado en ${BIN_PATH}`);
-  }
+  if (!existsSync(BIN_PATH)) await downloadTunnelClient(os);
+  else ok("tunnel-client instalado");
 
-  console.error(`\nVerificando ${CONTROL_PLANE_API_KEY_VAR}...`);
+  info(`Verificando ${CONTROL_PLANE_API_KEY_VAR}...`);
   await ensureApiKey();
   process.env[CONTROL_PLANE_API_KEY_VAR] = process.env[CONTROL_PLANE_API_KEY_VAR]!;
-
-  console.error("\nVerificando perfil del tunnel...");
   await ensureTunnelProfile();
 
-  console.error("\nIniciando servidor MCP...");
+  // ── Iniciar MCP server ────────────────────────────────
+  separador();
+  info("Iniciando servidor MCP...");
+
+  const mcpPort = process.env.TALEND_MCP_PORT || 3927;
   const mcpServer = Bun.spawn(["bun", "run", join(import.meta.dir, "..", "index.ts")], {
     env: { ...process.env, TALEND_MCP_FUNNEL: "false" },
-    stdio: ["ignore", "inherit", "inherit"],
+    stdio: ["ignore", "inherit", "pipe"],
   });
 
-  const mcpUrl = `http://127.0.0.1:${process.env.TALEND_MCP_PORT || 3927}/healthz`;
-  console.error(`Esperando a que el servidor MCP responda...`);
+  // Capturar stderr del MCP server y formatearlo
+  processMcpOutputBg(mcpServer.stderr);
+
+  const mcpUrl = `http://127.0.0.1:${mcpPort}/healthz`;
+  let mcpReady = false;
+  info("Esperando al servidor MCP...");
   try {
     await waitForHealth(mcpUrl);
-    console.error("Servidor MCP listo.\n");
+    ok("Servidor MCP listo");
+    mcpReady = true;
   } catch {
-    console.error("Servidor MCP no responde, iniciando tunnel de todas formas...");
+    warn("Servidor MCP no responde");
   }
 
-  console.error("Iniciando tunnel-client...\n");
+  // Detectar si el MCP server se cae después
+  let mcpCrashed = false;
+  mcpServer.ref();
+  mcpServer.exited.then((code: number | null) => {
+    if (code !== null && code !== 0) {
+      mcpCrashed = true;
+      if (mcpReady) fail(`Servidor MCP terminó inesperadamente (código ${code})`);
+    }
+  });
+
+  // ── Iniciar tunnel-client ─────────────────────────────
+  separador();
+  info("Iniciando tunnel-client...\n");
   const tunnel = spawn(BIN_PATH, ["run", "--profile", "talend"], {
-    stdio: ["ignore", "inherit", "inherit"],
+    stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env },
   });
 
-  function cleanup() {
-    console.error("\nCerrando servicios...");
-    if (IS_WIN) {
-      killProcess(tunnel, "SIGBREAK");
-      killProcess(mcpServer, "SIGBREAK");
-    } else {
-      killProcess(tunnel, "SIGTERM");
-      killProcess(mcpServer, "SIGTERM");
-    }
+  processTunnelOutput(tunnel.stdout);
+  processTunnelOutput(tunnel.stderr);
 
+  // Si el MCP no estaba listo al arrancar, mostrar ayuda
+  if (!mcpReady) {
+    setTimeout(() => {
+      banner(
+        "MCP server no disponible",
+        [
+          `  ${c("El servidor MCP local falló al iniciar.", C.reset)}`,
+          `  ${c("Esto impide que el tunnel funcione correctamente.", C.reset)}`,
+          ``,
+          `  ${c("Posibles causas:", C.bold)}`,
+          `  ${c("• Módulos faltantes — revisa el error de Bun arriba", C.dim)}`,
+          `  ${c("• Error de compilación o importación", C.dim)}`,
+          `  ${c(`• Puerto ${mcpPort} ocupado`, C.dim)}`,
+          ``,
+          `  ${c("Para debug:", C.bold)} ${c("bun run scripts/start-with-tunnel.ts 2>&1", C.cyan)}`,
+        ],
+        C.yellow,
+      );
+    }, 2000);
+  }
+
+  // ── Cleanup ───────────────────────────────────────────
+  function cleanup() {
+    info("Cerrando servicios...");
+    if (IS_WIN) { killProcess(tunnel, "SIGBREAK"); killProcess(mcpServer, "SIGBREAK"); }
+    else { killProcess(tunnel, "SIGTERM"); killProcess(mcpServer, "SIGTERM"); }
     setTimeout(() => {
       if (IS_WIN) {
         spawnSync("taskkill", ["/F", "/T", "/PID", String(tunnel.pid)], { stdio: "pipe" });
@@ -290,12 +380,12 @@ async function main() {
   process.on("SIGTERM", cleanup);
 
   tunnel.on("exit", (code) => {
-    console.error(`tunnel-client terminó con código ${code}`);
+    fail(`tunnel-client terminó (código ${code})`);
     cleanup();
   });
 }
 
 main().catch((err) => {
-  console.error(`\nError: ${err.message}`);
+  fail(err.message);
   process.exit(1);
 });
