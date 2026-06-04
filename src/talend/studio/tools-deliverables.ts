@@ -75,11 +75,12 @@ export const deliverableTools = [
         type: z.enum(["job", "context", "schema", "script", "readme", "other"]),
         description: z.string().optional(),
       })).describe("Lista de archivos a incluir"),
+      destinationDir: z.string().optional().describe("Directorio destino para el ZIP"),
     }),
-    handler: async (input: { jobName: string; files: Array<{ path: string; type: "job" | "context" | "schema" | "script" | "readme" | "other"; description?: string }> }) => {
+    handler: async (input: { jobName: string; files: Array<{ path: string; type: "job" | "context" | "schema" | "script" | "readme" | "other"; description?: string }>; destinationDir?: string }) => {
       try {
         const filesWithSize = input.files.map((f) => ({ ...f, sizeBytes: undefined as number | undefined }));
-        const pkg = await createPackage(input.jobName, filesWithSize);
+        const pkg = await createPackage(input.jobName, filesWithSize, input.destinationDir ?? `dist/talend-deliverables/${input.jobName.replace(/[^a-zA-Z0-9_-]/g, "_")}`);
 
         return bridgeOk({
           ok: true,

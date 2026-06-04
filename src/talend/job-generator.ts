@@ -1,6 +1,7 @@
 import { buildXml, parseXml } from "./xml";
 import { createEmptyJobItemXml } from "./job-crud";
 import { generateTalendId } from "./utils";
+import { buildMapNodeData } from "./component-mappers";
 
 export interface ComponentSpec {
   uniqueName: string;
@@ -91,6 +92,10 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
       column: spec.schema.columns.map((c) => buildColumn(c)),
     };
     node.metadata = metadata;
+  }
+
+  if (spec.componentName === "tMap" && spec.schema?.columns) {
+    node.nodeData = buildMapNodeData(spec.uniqueName);
   }
 
   return node;

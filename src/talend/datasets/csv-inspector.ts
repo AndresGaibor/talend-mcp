@@ -150,7 +150,7 @@ export async function inspectCsvFolder(folderPath: string, _globPattern = "*.csv
 
 export function inferSchemaFromInspection(inspection: CsvFolderInspection, tableName: string): SchemaInference {
   const technicalColumns = [
-    { name: "_load_ts", value: "TalendDate.getDate()", description: "Timestamp de carga" },
+    { name: "_load_ts", value: "TalendDate.getCurrentDate()", description: "Timestamp de carga" },
     { name: "_load_run", value: "context.run_id", description: "ID de ejecución del job" },
   ];
 

@@ -97,11 +97,22 @@ export async function createPackage(jobName: string, files: DeliverableFile[], d
     const tempDir = join(destinationDir, `.zip_temp_${Date.now()}`);
     mkdirSync(tempDir, { recursive: true });
 
+    const projectPath = getConfiguredProjectPath();
+
     for (const file of files) {
       try {
         const data = await Bun.file(file.path).bytes();
-        const relativePath = file.path.replace(/^[\/\\]/, "").replace(/^process\//, "").replace(/^code\//, "").replace(/^metadata\//, "");
-        const destPath = join(tempDir, relativePath.replace(/\//g, "_"));
+
+        let relativePath: string;
+        if (projectPath && file.path.startsWith(projectPath)) {
+          relativePath = file.path.slice(projectPath.length).replace(/^[\/\\]/, "");
+        } else {
+          relativePath = basename(file.path);
+        }
+
+        const destPath = join(tempDir, relativePath);
+        const dirOfDest = destPath.substring(0, destPath.lastIndexOf("/"));
+        if (dirOfDest) mkdirSync(dirOfDest, { recursive: true });
         await Bun.write(destPath, data);
       } catch {
         continue;
