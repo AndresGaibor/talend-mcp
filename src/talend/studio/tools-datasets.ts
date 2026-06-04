@@ -42,11 +42,12 @@ export const datasetTools = [
     description: "Infiere el schema de base de datos a partir de la inspección de un folder de CSVs.",
     inputSchema: z.object({
       folderPath: z.string().describe("Ruta a la carpeta con CSVs"),
-      tableName: z.string().describe("Nombre de la tabla destino"),
+      tableName: z.string().optional().describe("Nombre de la tabla destino (opcional, se infiere del nombre del archivo)"),
     }),
-    handler: async ({ folderPath, tableName }: { folderPath: string; tableName: string }) => {
+    handler: async ({ folderPath, tableName }: { folderPath: string; tableName?: string }) => {
       try {
         const inspection = await inspectCsvFolder(folderPath);
+        const resolvedTableName = tableName ?? (inspection.files[0]?.relativePath.replace(/\\/g, "/").replace(/\.csv$/i, "").split("/").pop() ?? "raw_table");
         const schema = inspection.files[0]?.columns.map((col) => ({
           csvColumn: col.name,
           inferredType: col.inferredType,
@@ -60,7 +61,7 @@ export const datasetTools = [
           confidence: "high",
           endpoint: "/dataset/infer-csv-schema",
           data: {
-            tableName,
+            tableName: resolvedTableName,
             csvFileCount: inspection.files.length,
             totalRows: inspection.totalRows,
             columns: schema,

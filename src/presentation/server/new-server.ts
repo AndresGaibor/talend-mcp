@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { listPresentationAppIds, registerPresentationApps } from "../apps";
 import { getRegisteredServerToolAnnotations, getRegisteredServerToolCount, getRegisteredServerTools } from "./tool-registry";
+import { resolvePublicUrl } from "../../tailscale/resolve-public-url";
 
 export interface NewServerOptions {
   port?: number;
@@ -171,7 +172,16 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     if (tsStatus.ok) {
       const funnelResult = await runProcess("tailscale", ["funnel", "--bg", "--yes", "--https=443", String(listenPort)], 15_000);
       if (funnelResult.ok) {
-        publicUrl = `https://${localUrl}/mcp`;
+        publicUrl = await resolvePublicUrl({
+          path: "/mcp",
+          timeoutMs: 15_000,
+          intervalMs: 1_000,
+          readTailscaleStatus: async () =>
+            (await runProcess("tailscale", ["status", "--json"])).stdout,
+          readFunnelStatus: async () =>
+            (await runProcess("tailscale", ["funnel", "status", "--json"])).stdout,
+          publicPort: 443,
+        });
       }
     }
   }

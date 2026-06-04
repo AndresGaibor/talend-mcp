@@ -64,12 +64,33 @@ export function createPresentationAppShellHtml(app: PresentationAppDefinition): 
         <div class="eyebrow">Resultado</div>
         <div id="result" class="result empty">Selecciona una acción para ver la salida.</div>
       </section>
+
+      <section class="panel">
+        <div class="eyebrow">Estado inicial</div>
+        <div id="initial-state" class="result empty">Cargando estado...</div>
+      </section>
     </main>
 
     <script>
       const app = ${appJson};
       const actionsRoot = document.getElementById("actions");
       const resultRoot = document.getElementById("result");
+      const initialStateRoot = document.getElementById("initial-state");
+
+      function renderInitialState(output) {
+        const data = output?.initialState ?? output?.structuredContent?.initialState ?? output;
+        if (!data) {
+          initialStateRoot.textContent = "Sin estado inicial.";
+          return;
+        }
+        initialStateRoot.textContent = JSON.stringify(data, null, 2);
+      }
+
+      renderInitialState(window.openai?.toolOutput);
+
+      window.addEventListener("openai:set_globals", (event) => {
+        renderInitialState(event.detail?.globals?.toolOutput ?? window.openai?.toolOutput);
+      });
 
       function parseInput(action, input) {
         if (action.inputMode === "none") return {};

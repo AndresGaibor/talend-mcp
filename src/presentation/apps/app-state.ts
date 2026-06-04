@@ -50,7 +50,7 @@ export async function buildLauncherInitialStateForApp(appId: PresentationAppId):
   const baseState = buildBaseState(projectPath);
 
   if (appId === "home") {
-    const errorStats = getErrorStats();
+    const bundle = await loadWorkspaceBundle(projectPath);
     return {
       ...baseState,
       environment: {
@@ -59,17 +59,21 @@ export async function buildLauncherInitialStateForApp(appId: PresentationAppId):
         watcherActive: Boolean(baseState.liveWatcher.ok && baseState.liveWatcher.data?.active),
       },
       quickStats: {
-        jobCount: 0,
-        runCount: 0,
-        snapshotCount: 0,
-        profileCount: listContextProfiles().length,
-        errorCount: errorStats.total,
+        jobCount: bundle.jobs.length,
+        runCount: bundle.runs.length,
+        snapshotCount: bundle.snapshots.length,
+        profileCount: bundle.profiles.length,
+        errorCount: bundle.errorStats.total,
       },
-      recentJobs: [],
-      recentRuns: [],
-      recentSnapshots: [],
-      recentErrors: getLatestErrors(5),
-      errorStats,
+      recentJobs: bundle.jobs.slice(0, 5).map((job) => ({
+        label: job.label,
+        folderPath: job.folderPath,
+        itemPath: job.itemPath,
+      })),
+      recentRuns: bundle.runs.slice(0, 5),
+      recentSnapshots: bundle.snapshots.slice(0, 5),
+      recentErrors: bundle.recentErrors,
+      errorStats: bundle.errorStats,
     };
   }
 

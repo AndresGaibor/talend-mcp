@@ -95,7 +95,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el inspector de datasets.",
     actions: [
       createTextAction("Inspect CSV folder", "talend_dataset_inspect_csv_folder", "Inspecciona una carpeta de CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
-      createTextAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere schema para una carpeta.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createJsonAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere schema para una carpeta.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
       createTextAction("Generate raw mappings", "talend_dataset_generate_raw_table_mappings", "Genera mappings raw por archivo.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
     ],
   },
@@ -251,8 +251,8 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo la galería de patrones.",
     actions: [
       createTextAction("Validate job design", "talend_job_validate_design", "Valida el diseño del job.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Generate job", "talend_job_generate_from_pipeline_spec", "Genera job desde spec.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob", requiresConfirmation: true }),
-      createTextAction("Preview pipeline", "talend_job_preview_pipeline_spec", "Previsualiza una spec.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createJsonAction("Generate job", "talend_job_generate_from_pipeline_spec", "Genera job desde spec.", { pattern: "multi_csv_raw_loader", name: "myJob" }, { requiresConfirmation: true }),
+      createJsonAction("Preview pipeline", "talend_job_preview_pipeline_spec", "Previsualiza una spec.", { pattern: "multi_csv_raw_loader", name: "myJob" }),
     ],
   },
   {
@@ -264,8 +264,8 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el diseñador visual.",
     actions: [
       createTextAction("Create job", "talend_create_job", "Crea un job nuevo.", "jobName", { inputLabel: "Job name", inputPlaceholder: "new_job", requiresConfirmation: true }),
-      createTextAction("Patch component", "talend_patch_component", "Parchea propiedades de un componente.", "uniqueName", { inputLabel: "Unique name", inputPlaceholder: "tMysqlInput_1", requiresConfirmation: true }),
-      createTextAction("Add connection", "talend_add_connection", "Agrega una conexión.", "sourceUniqueName", { inputLabel: "Source unique name", inputPlaceholder: "tInput_1", requiresConfirmation: true }),
+      createJsonAction("Patch component", "talend_patch_component", "Parchea propiedades de un componente.", { jobName: "myJob", uniqueName: "tMap_1", patch: { LABEL: "Nuevo valor" } }, { requiresConfirmation: true }),
+      createJsonAction("Add connection", "talend_add_connection", "Agrega una conexión.", { jobName: "myJob", sourceUniqueName: "tInput_1", targetUniqueName: "tMap_1", label: "row", connectorName: "FLOW", metaname: "", uniqueName: "connection_1" }, { requiresConfirmation: true }),
     ],
   },
   {
@@ -276,9 +276,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_pipeline_spec_editor",
     launchMessage: "Abriendo el editor de pipeline spec.",
     actions: [
-      createJsonAction("Validate spec", "talend_job_validate_pipeline_spec", "Valida una spec de pipeline.", { pattern: "multi_csv_raw_loader", jobName: "new_job" }),
-      createJsonAction("Preview spec", "talend_job_preview_pipeline_spec", "Previsualiza una spec de pipeline.", { pattern: "multi_csv_raw_loader", jobName: "new_job" }),
-      createJsonAction("Generate job", "talend_job_generate_from_pipeline_spec", "Genera un job desde la spec.", { pattern: "multi_csv_raw_loader", jobName: "new_job" }, { requiresConfirmation: true }),
+      createJsonAction("Validate spec", "talend_job_validate_pipeline_spec", "Valida una spec de pipeline.", { spec: { pattern: "multi_csv_raw_loader", name: "new_job" } }),
+      createJsonAction("Preview spec", "talend_job_preview_pipeline_spec", "Previsualiza una spec de pipeline.", { pattern: "multi_csv_raw_loader", name: "new_job" }),
+      createJsonAction("Generate job", "talend_job_generate_from_pipeline_spec", "Genera un job desde la spec.", { pattern: "multi_csv_raw_loader", name: "new_job" }, { requiresConfirmation: true }),
     ],
   },
   {
@@ -303,8 +303,8 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el diseñador de tMap.",
     actions: [
       createTextAction("Inspect component", "talend_components_inspect", "Inspecciona un componente.", "componentName", { inputLabel: "Component name", inputPlaceholder: "tMap" }),
-      createTextAction("Preview schema", "talend_preview_schema_column", "Previsualiza un cambio de schema.", "columnName", { inputLabel: "Column name", inputPlaceholder: "id" }),
-      createTextAction("Patch component", "talend_patch_component", "Aplica un patch al componente.", "uniqueName", { inputLabel: "Unique name", inputPlaceholder: "tMap_1", requiresConfirmation: true }),
+      createJsonAction("Preview schema", "talend_preview_schema_column", "Previsualiza un cambio de schema.", { jobName: "myJob", uniqueName: "tMap_1", schemaName: "Schema", columnName: "id", patch: { type: "id_Integer" } }),
+      createJsonAction("Patch component", "talend_patch_component", "Aplica un patch al componente.", { jobName: "myJob", uniqueName: "tMap_1", patch: { LABEL: "Nuevo valor" } }, { requiresConfirmation: true }),
     ],
   },
   {
@@ -316,7 +316,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el inspector pro de datasets.",
     actions: [
       createTextAction("Inspect CSV folder", "talend_dataset_inspect_csv_folder", "Inspecciona CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
-      createTextAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere el schema de CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createJsonAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere el schema de CSVs.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
       createTextAction("Generate raw mappings", "talend_dataset_generate_raw_table_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
     ],
   },
@@ -330,7 +330,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     actions: [
       createTextAction("Inspect CSV folder", "talend_dataset_inspect_csv_folder", "Inspecciona CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
       createTextAction("Generate raw mappings", "talend_dataset_generate_raw_table_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
-      createTextAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere schema para raw tables.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createJsonAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere schema para raw tables.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
     ],
   },
   {
@@ -342,7 +342,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo la matriz de mappings raw.",
     actions: [
       createNoInputAction("Analyze tDBOutput", "talend_analyze_tdboutput", "Analiza salidas a base de datos."),
-      createTextAction("Preview pipeline", "talend_job_preview_pipeline_spec", "Previsualiza la spec.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createJsonAction("Preview pipeline", "talend_job_preview_pipeline_spec", "Previsualiza la spec.", { pattern: "multi_csv_raw_loader", name: "myJob" }),
       createTextAction("Generate raw mappings", "talend_dataset_generate_raw_table_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
     ],
   },
@@ -368,9 +368,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_database_connection_wizard",
     launchMessage: "Abriendo el asistente de conexión a base de datos.",
     actions: [
-      createTextAction("Build connection profile", "talend_connection_build_profile", "Construye un perfil de conexión.", "connectionType", { inputLabel: "Connection type", inputPlaceholder: "postgresql" }),
-      createTextAction("Add connection", "talend_add_connection", "Agrega una conexión entre componentes.", "sourceUniqueName", { inputLabel: "Source unique name", inputPlaceholder: "tInput_1", requiresConfirmation: true }),
-      createTextAction("Update schema column", "talend_update_schema_column", "Actualiza una columna de schema.", "uniqueName", { inputLabel: "Unique name", inputPlaceholder: "tMysqlOutput_1", requiresConfirmation: true }),
+      createJsonAction("Build connection profile", "talend_connection_build_profile", "Construye un perfil de conexión.", { connectionType: "postgresql", host: "localhost", port: 5432, database: "mydb", user: "admin" }),
+      createJsonAction("Add connection", "talend_add_connection", "Agrega una conexión entre componentes.", { jobName: "myJob", sourceUniqueName: "tInput_1", targetUniqueName: "tMap_1", label: "row", connectorName: "FLOW", metaname: "", uniqueName: "connection_1" }, { requiresConfirmation: true }),
+      createJsonAction("Update schema column", "talend_update_schema_column", "Actualiza una columna de schema.", { jobName: "myJob", uniqueName: "tMysqlOutput_1", schemaName: "Schema", columnName: "id", patch: { type: "id_Integer" } }, { requiresConfirmation: true }),
     ],
   },
   {
@@ -524,7 +524,22 @@ export function registerPresentationAppResources(server: McpServer): void {
       description: app.description,
       mimeType: APP_MIME_TYPE,
     }, async () => ({
-      contents: [{ uri: app.resourceUri, mimeType: APP_MIME_TYPE, text: createPresentationAppShellHtml(app) }],
+      contents: [{
+        uri: app.resourceUri,
+        mimeType: APP_MIME_TYPE,
+        text: createPresentationAppShellHtml(app),
+        _meta: {
+          ui: {
+            prefersBorder: true,
+            csp: {
+              connectDomains: [],
+              resourceDomains: [],
+            },
+          },
+          "openai/widgetDescription": app.description,
+          "openai/widgetPrefersBorder": true,
+        },
+      }],
     }));
   }
 }
