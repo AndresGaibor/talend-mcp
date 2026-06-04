@@ -1,5 +1,5 @@
 import type { ListJobsUseCase } from "../../../application/jobs/list-jobs.usecase";
-import { ok, fail } from "../common/response";
+import { okResult, errorResult } from "../common/result";
 
 export function createListJobsTool(listJobsUseCase: ListJobsUseCase) {
   return {
@@ -15,9 +15,9 @@ export function createListJobsTool(listJobsUseCase: ListJobsUseCase) {
     handler: async (input: { projectPath: string }) => {
       try {
         const jobs = await listJobsUseCase.execute(input.projectPath);
-        return ok({ jobs, count: jobs.length });
+        return okResult({ jobs, count: jobs.length }, "list-jobs");
       } catch (err) {
-        return fail("LIST_JOBS_ERROR", `Error listando jobs: ${err}`);
+        return errorResult("list-jobs", "LIST_JOBS_ERROR", `Error listando jobs: ${err}`);
       }
     },
   };

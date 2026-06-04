@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import { createTalendJob } from "../../../talend/job-crud";
-import { ok, fail } from "../common/response";
+import { okResult, errorResult } from "../common/result";
 
 const CreateJobSchema = z.object({
   jobName: z.string().describe("Nombre del job"),
@@ -20,7 +20,7 @@ export function createCreateJobTool() {
     handler: async (input: z.infer<typeof CreateJobSchema>) => {
       try {
         const projectPath = process.env.TALEND_PROJECT;
-        if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT.");
+        if (!projectPath) return errorResult("create-job", "NO_PROJECT", "No se detectó TALEND_PROJECT.");
         const result = await createTalendJob(projectPath, {
           jobName: input.jobName,
           version: input.version ?? "0.1",
@@ -30,14 +30,14 @@ export function createCreateJobTool() {
           description: input.description,
           purpose: input.purpose,
         });
-        return ok({
+        return okResult({
           itemPath: result.itemPath,
           propertiesPath: result.propertiesPath,
           jobName: input.jobName,
           version: input.version ?? "0.1"
-        });
+        }, "create-job");
       } catch (err) {
-        return fail("CREATE_JOB_ERROR", `Error creando job: ${err}`);
+        return errorResult("create-job", "CREATE_JOB_ERROR", `Error creando job: ${err}`);
       }
     },
   };

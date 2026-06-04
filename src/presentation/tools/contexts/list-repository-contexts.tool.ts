@@ -1,4 +1,4 @@
-import { ok, fail } from "../common/response";
+import { okResult, errorResult } from "../common/result";
 
 interface RepositoryContext {
   name: string;
@@ -21,12 +21,11 @@ export function createListRepositoryContextsTool() {
       required: ["projectPath"],
     },
     handler: async (input: { projectPath: string }) => {
-      const start = Date.now();
       try {
         const contexts = await listRepositoryContexts(input.projectPath);
-        return ok({ contexts }, { startTime: start });
+        return okResult({ contexts }, "list-repository-contexts");
       } catch (err) {
-        return fail("LIST_REPO_CONTEXTS_ERROR", `Error listando contextos: ${err}`, { startTime: start });
+        return errorResult("list-repository-contexts", "LIST_REPO_CONTEXTS_ERROR", `Error listando contextos: ${err}`);
       }
     },
   };

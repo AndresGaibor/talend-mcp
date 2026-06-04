@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import { JobXmlRepository } from "../../../infrastructure/repositories/job-xml.repository";
-import { ok, fail } from "../common/response";
+import { okResult, errorResult } from "../common/result";
 
 const ReadJobSchema = z.object({
   jobName: z.string().describe("Nombre del job a leer"),
@@ -15,18 +15,18 @@ export function createReadJobTool() {
     handler: async (input: z.infer<typeof ReadJobSchema>) => {
       try {
         const projectPath = process.env.TALEND_PROJECT;
-        if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT.");
+        if (!projectPath) return errorResult("read-job", "NO_PROJECT", "No se detectó TALEND_PROJECT.");
         const repo = new JobXmlRepository();
         const jobs = await repo.listJobs(projectPath);
         const jobPath = jobs.find((j: string) => {
           const nameFromPath = j.split("/").pop()?.replace(/_\d+\.\d+\.item$/, "") ?? "";
           return nameFromPath === input.jobName;
         });
-        if (!jobPath) return fail("JOB_NOT_FOUND", `Job no encontrado: ${input.jobName}`);
+        if (!jobPath) return errorResult("read-job", "JOB_NOT_FOUND", `Job no encontrado: ${input.jobName}`);
         const xml = await repo.findJob(jobPath);
-        return ok({ jobName: input.jobName, itemPath: jobPath, xml });
+        return okResult({ jobName: input.jobName, itemPath: jobPath, xml }, "read-job");
       } catch (err) {
-        return fail("READ_JOB_ERROR", `Error leyendo job: ${err}`);
+        return errorResult("read-job", "READ_JOB_ERROR", `Error leyendo job: ${err}`);
       }
     },
   };

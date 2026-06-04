@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 import { rmSync } from "node:fs";
 import { deleteTalendJob, findTalendJob } from "../../../talend/job-crud";
-import { ok, fail } from "../common/response";
+import { okResult, errorResult } from "../common/result";
 
 const DeleteJobSchema = z.object({
   jobName: z.string().describe("Nombre del job a eliminar"),
@@ -16,19 +16,19 @@ export function createDeleteJobTool() {
     handler: async (input: z.infer<typeof DeleteJobSchema>) => {
       try {
         const projectPath = process.env.TALEND_PROJECT;
-        if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT.");
+        if (!projectPath) return errorResult("delete-job", "NO_PROJECT", "No se detectó TALEND_PROJECT.");
         const job = await findTalendJob(projectPath, input.jobName, input.folderPath);
         rmSync(job.itemPath, { force: true });
         rmSync(job.propertiesPath, { force: true });
-        return ok({ deletedJob: input.jobName, itemPath: job.itemPath, propertiesPath: job.propertiesPath });
+        return okResult({ deletedJob: input.jobName, itemPath: job.itemPath, propertiesPath: job.propertiesPath }, "delete-job");
       } catch (err) {
         if (String(err).includes("no encontrado")) {
-          return fail("JOB_NOT_FOUND", `Job no encontrado: ${input.jobName}`);
+          return errorResult("delete-job", "JOB_NOT_FOUND", `Job no encontrado: ${input.jobName}`);
         }
         if (String(err).includes("ambiguo")) {
-          return fail("JOB_AMBIGUOUS", `Job ambiguo: ${input.jobName}`);
+          return errorResult("delete-job", "JOB_AMBIGUOUS", `Job ambiguo: ${input.jobName}`);
         }
-        return fail("DELETE_JOB_ERROR", `Error eliminando job: ${err}`);
+        return errorResult("delete-job", "DELETE_JOB_ERROR", `Error eliminando job: ${err}`);
       }
     },
   };
