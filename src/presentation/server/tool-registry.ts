@@ -206,55 +206,18 @@ const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_deliverable_validate_checklist: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_deliverable_create_package: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
 
-  talend_error_stats: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+talend_error_stats: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_error_explain: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_error_suggest_fix: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_error_map_to_component: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
 
-  talend_coverage_report: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-
-  talend_studio_process: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_diagnose_environment: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-
-  talend_detect_open_jobs: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_read_latest_run_log: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_read_job_errors: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_summarize_open_job: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_view_logs: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_analyze_logs: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_list_open_editors: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_get_probable_active_job: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_analyze_job: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-
-  talend_live_start: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: true },
-  talend_live_stop: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  talend_live_status: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_latest_changes: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-
-  repo_pull: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  repo_setup: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  repo_sources: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  repo_status: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  repo_switch: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-
-  talend_full_analysis: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_duplicate_analysis: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  talend_update_analysis: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  talend_list_analyses: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_read_analysis: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_inspect_job: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_inspect_component: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-  talend_read_run_log: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-
-  talend_job_apply_pipeline_spec: { readOnlyHint: false, idempotentHint: false, destructiveHint: true, openWorldHint: false },
-  talend_snapshot_diff: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
-
-  talend_bridge_launch_runs: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  talend_bridge_launch_status: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  talend_bridge_launch_wait: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  talend_bridge_open_resource: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: true },
-  talend_bridge_refresh_workspace: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  talend_bridge_run_launch_config: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
-  talend_bridge_problems_markers: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_mastery_all_components: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_mastery_report: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_mastery_component: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_mastery_generate_fixture: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
+  talend_mastery_validate_roundtrip: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_mastery_validate_in_studio: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: true },
+  talend_mastery_validate_run: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: true },
 
   talend_connection_detect_available_db_components: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
 
@@ -309,8 +272,15 @@ const registeredTools = dedupeTools([
 
 const aliasTools = buildAliasTools(registeredTools);
 
+function withDefaultOutputSchema(tool: ToolDef): ToolDef {
+  return {
+    ...tool,
+    outputSchema: tool.outputSchema ?? GENERIC_TOOL_OUTPUT_SCHEMA,
+  };
+}
+
 export function getRegisteredServerTools(): ToolDef[] {
-  return [...registeredTools, ...aliasTools];
+  return [...registeredTools, ...aliasTools].map(withDefaultOutputSchema);
 }
 
 export function getRegisteredServerToolCount(): number {

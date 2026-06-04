@@ -4,6 +4,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { findExportedJobScripts } from "./exported-job-finder.js";
 import { saveRun } from "./run-history.js";
 import type { Evidence } from "../diagnostics/types";
+import { createPlatformContext, detectJobRunnerStrategy, buildScriptExecutionArgs, selectScriptByPlatform } from "../../platform";
 
 export interface RunResult {
   ok: boolean;
@@ -61,7 +62,25 @@ export async function runExportedJob(options: {
         error: findResult.error ?? `No se encontró script exportado para '${options.jobName}'. Configura TALEND_BUILDS_DIR.`,
       };
     }
-    const matchingScript = findResult.data.find((s) => s.platform === "posix") ?? findResult.data[0]!;
+    const ctx = createPlatformContext();
+    const strategy = detectJobRunnerStrategy(ctx);
+    const matchingScript = selectScriptByPlatform(findResult.data, strategy);
+    if (!matchingScript) {
+      return {
+        ok: false,
+        source: "unknown",
+        confidence: "low",
+        runId,
+        jobName: options.jobName,
+        scriptPath: "",
+        exitCode: null,
+        durationMs: 0,
+        stdoutTail: "",
+        stderrTail: "",
+        logPath: "",
+        error: `No se encontró script exportado para '${options.jobName}'.`,
+      };
+    }
     scriptPath = matchingScript.scriptPath;
   }
 
@@ -82,7 +101,8 @@ export async function runExportedJob(options: {
     };
   }
 
-  const isWindows = process.platform === "win32";
+  const ctx = createPlatformContext();
+  const strategy = detectJobRunnerStrategy(ctx);
   const env = { ...process.env } as Record<string, string>;
   if (options.contextName) {
     env["TALEND_CONTEXT"] = options.contextName;
@@ -99,11 +119,8 @@ export async function runExportedJob(options: {
   const startMs = Date.now();
 
   return new Promise<RunResult>((resolvePromise) => {
-    const child = spawn(
-      isWindows ? "cmd.exe" : "/bin/sh",
-      isWindows ? ["/C", scriptPath!] : ["-c", `chmod +x "${scriptPath}" && "${scriptPath}"`],
-      { cwd: dirname(scriptPath!), env, stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const args = buildScriptExecutionArgs(scriptPath!, strategy, ctx);
+    const child = spawn(strategy.shell, args, { cwd: dirname(scriptPath!), env, stdio: ["ignore", "pipe", "pipe"] });
 
     let stdout = "";
     let stderr = "";
@@ -112,7 +129,7 @@ export async function runExportedJob(options: {
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
-        killProcess(child, "SIGKILL");
+        killProcess(child, "SIGKILL", ctx.runtimeOs);
         finalizeRun(runsDir, runId, stdout, stderr, startMs, null, "timeout", options.jobName, scriptPath!, stdoutPath, stderrPath).then(
           (result) => resolvePromise(result),
         );
@@ -166,9 +183,9 @@ export async function runExportedJob(options: {
   });
 }
 
-function killProcess(child: ReturnType<typeof spawn>, signal: string): void {
+function killProcess(child: ReturnType<typeof spawn>, signal: string, runtimeOs?: string): void {
   if (child.pid === undefined) return;
-  if (process.platform === "win32") {
+  if (runtimeOs === "windows" || process.platform === "win32") {
     spawn("taskkill", ["/F", "/T", "/PID", String(child.pid)]);
   } else {
     child.kill(signal as any);

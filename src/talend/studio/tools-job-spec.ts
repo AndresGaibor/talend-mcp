@@ -1,4 +1,5 @@
 import * as z from "zod/v4";
+import { join } from "node:path";
 import { bridgeOk, bridgeFail, loadBridge } from "./tools-base";
 import { generateJobSpec, validateJobSpec } from "../jobs/pipeline-patterns";
 import { toGeneratorSpec, validateGeneratorSpec } from "../jobs/job-spec-generator";
@@ -192,17 +193,17 @@ export const jobSpecTools = [
 
         const version = "0.1";
         const itemFileName = `${input.name}_${version}.item`;
-        const folderParts = (input.folderPath ?? "Process").split("/").filter(Boolean);
+        const folderParts = (input.folderPath ?? "Process").replace(/\\/g, "/").split("/").filter(Boolean);
         const jobDir = folderParts.length > 0
-          ? [projectPath, "process", ...folderParts].join("/")
-          : projectPath + "/process";
+          ? join(projectPath, "process", ...folderParts)
+          : join(projectPath, "process");
 
         const { mkdirSync } = await import("node:fs");
         mkdirSync(jobDir, { recursive: true });
 
-        const itemPath = `${jobDir}/${itemFileName}`;
+        const itemPath = join(jobDir, itemFileName);
         const propertiesFileName = `${input.name}_${version}.properties`;
-        const propertiesPath = `${jobDir}/${propertiesFileName}`;
+        const propertiesPath = join(jobDir, propertiesFileName);
 
         const { xml: itemXml, rootId } = buildJobItemXml(genSpec);
         const propertiesXml = buildJobPropertiesXml(genSpec, rootId);

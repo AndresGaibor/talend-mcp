@@ -79,7 +79,7 @@ export async function buildComponentCatalog(talendStudioPath?: string): Promise<
 
   const catalog = scanResult.entries.map(jarToCatalogEntry);
 
-  const talendStudioHome = resolveTalendStudioHome({ talendStudioHome: talendStudioPath }) ?? "/Applications/TalendStudio-8.0.1/studio";
+  const talendStudioHome = resolveTalendStudioHome({ talendStudioHome: talendStudioPath }) ?? "Talend Studio (ruta no detectada)";
   const catalogData = entriesToCatalogFormat(
     scanResult.entries,
     scanResult.scannedPlugins,

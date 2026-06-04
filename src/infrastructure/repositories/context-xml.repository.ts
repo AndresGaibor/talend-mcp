@@ -1,5 +1,6 @@
 import { listFilesRecursive, readTextFile } from "../filesystem/file-reader";
 import { parseXml, asArray } from "../xml/xml-utils";
+import { getDirNamePortable, getBaseNamePortable } from "../../platform/path-bridge";
 
 export interface TalendContextParameter {
   name: string;
@@ -57,7 +58,8 @@ export async function listProjectContexts(projectPath: string): Promise<ProjectC
 
       const jobName = attr(root, "label") ?? "unknown";
       const version = attr(root, "version") ?? "0.1";
-      const folderPath = itemPath.replace(projectPath, "").split("/").slice(-2, -1)[0];
+      const relativePath = itemPath.replace(projectPath, "").replace(/\\/g, "/");
+      const folderPath = getDirNamePortable(relativePath).split("/").filter(Boolean).pop() ?? "";
 
       for (const context of parseProjectJobContexts(xml)) {
         contexts.push({

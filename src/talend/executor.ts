@@ -3,6 +3,8 @@ import { join, dirname } from "node:path";
 import { getConfiguredProjectPath } from "./workspace";
 import { listJobs } from "./repository";
 import { readTextFile } from "./files";
+import { createPlatformContext, detectJobRunnerStrategy, buildScriptExecutionArgs } from "../platform";
+import { getBaseNamePortable } from "../platform/path-bridge";
 
 export interface RunResult {
   ok: boolean;
@@ -43,8 +45,9 @@ export async function runJob(options: RunJobOptions): Promise<RunResult> {
 
   const contextName = options.contextName ?? "Default";
   const jobScriptPath = resolveJobScriptPath(target.itemPath, projectPath);
-  const isWindows = process.platform === "win32";
-  const scriptExt = isWindows ? ".bat" : ".sh";
+  const ctx = createPlatformContext();
+  const strategy = detectJobRunnerStrategy(ctx);
+  const scriptExt = strategy.preferredScriptPlatform === "windows" ? ".bat" : ".sh";
   const fullScriptPath = `${jobScriptPath}${scriptExt}`;
 
   const env = { ...process.env };
@@ -59,11 +62,8 @@ export async function runJob(options: RunJobOptions): Promise<RunResult> {
   const timeoutMs = options.timeoutMs ?? 300_000;
 
   return new Promise<RunResult>((resolve) => {
-    const child = spawn(
-      isWindows ? "cmd.exe" : "/bin/sh",
-      isWindows ? ["/C", fullScriptPath] : ["-c", `chmod +x "${fullScriptPath}" && "${fullScriptPath}"`],
-      { cwd: dirname(fullScriptPath), env, stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const args = buildScriptExecutionArgs(fullScriptPath, strategy, ctx);
+    const child = spawn(strategy.shell, args, { cwd: dirname(fullScriptPath), env, stdio: ["ignore", "pipe", "pipe"] });
 
     let stdout = "";
     let stderr = "";
@@ -100,7 +100,7 @@ export async function runJob(options: RunJobOptions): Promise<RunResult> {
 
 function resolveJobScriptPath(itemPath: string, projectPath: string): string {
   const codeDir = join(projectPath, "code", "routines");
-  const itemFileName = itemPath.split("/").pop() ?? "";
+  const itemFileName = getBaseNamePortable(itemPath);
   const jobBaseName = itemFileName.replace(/\.item$/, "");
   return join(codeDir, jobBaseName, jobBaseName);
 }
@@ -118,8 +118,9 @@ export async function getJobExecutionInfo(jobName?: string): Promise<{
   const target = jobName ? jobs.find((j) => j.label === jobName) : jobs[0];
   if (!target) return null;
 
-  const isWindows = process.platform === "win32";
-  const scriptExt = isWindows ? ".bat" : ".sh";
+  const ctx = createPlatformContext();
+  const strategy = detectJobRunnerStrategy(ctx);
+  const scriptExt = strategy.preferredScriptPlatform === "windows" ? ".bat" : ".sh";
   const jobScriptPath = resolveJobScriptPath(target.itemPath, projectPath);
   const fullScriptPath = `${jobScriptPath}${scriptExt}`;
 

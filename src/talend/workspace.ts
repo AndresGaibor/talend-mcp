@@ -3,8 +3,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import type { TalendWorkspace } from "./types";
 import { parseLaunchConfig } from "./open-job";
-
-// ── Estado mutable para modo repositorio ──
+import { createPlatformContext } from "../platform";
+import { toMcpPath } from "../platform/path-bridge";
 
 let activeRepoPath: string | undefined;
 let activeProjectName: string | undefined;
@@ -27,8 +27,6 @@ export function isRepoMode(): boolean {
   return activeRepoPath !== undefined;
 }
 
-// ── Funciones de workspace ──
-
 export function resolveWorkspaceFromProject(rawPath: string): TalendWorkspace {
   const projectPath = resolve(rawPath);
   const projectName = basename(projectPath);
@@ -46,7 +44,6 @@ export function extractWorkspacePathFromLsofOutput(output: string): string | und
     const match = line.match(/(\/[^\s]+\/studio\/workspace\/[^\/\s]+)/);
     if (match?.[1]) return match[1];
   }
-
   return undefined;
 }
 
@@ -70,7 +67,6 @@ export function extractProjectPathFromLsofOutput(output: string): string | undef
           if (existsSync(join(childPath, "talend.project"))) return childPath;
         }
       } catch {
-        // Ignorar carpetas inaccesibles y seguir con los padres.
       }
 
       const parent = dirname(current);
@@ -88,7 +84,27 @@ function runProcess(command: string, args: string[]): string {
 }
 
 function detectProjectFromRunningStudio(): string | undefined {
-  if (process.platform === "win32") return undefined;
+  const ctx = createPlatformContext();
+
+  if (ctx.runtimeOs === "windows") return undefined;
+  if (ctx.runtimeOs === "wsl") return undefined;
+
+  if (ctx.runtimeOs === "linux") {
+    const psOutput = runProcess("ps", ["-axo", "pid,command"]);
+    const candidates = psOutput
+      .split(/\r?\n/)
+      .filter((line) => line.includes("talend") || line.includes("Talend"));
+
+    for (const line of candidates) {
+      const pid = line.trim().split(/\s+/)[0];
+      if (!pid || !/^[0-9]+$/.test(pid)) continue;
+
+      const lsofOutput = runProcess("lsof", ["-p", pid]);
+      const projectPath = extractProjectPathFromLsofOutput(lsofOutput);
+      if (projectPath) return projectPath;
+    }
+    return undefined;
+  }
 
   const psOutput = runProcess("ps", ["-axo", "pid,command"]);
   const candidates = psOutput
@@ -125,7 +141,9 @@ function collectProjectCandidates(rutaDirectorio: string, candidatos: string[]):
 }
 
 export function discoverProjectPathFromWorkspace(workspacePath: string): string | undefined {
-  const metadataPath = join(workspacePath, ".metadata");
+  const ctx = createPlatformContext();
+  const mcpWorkspacePath = toMcpPath(workspacePath, ctx);
+  const metadataPath = join(mcpWorkspacePath, ".metadata");
   const launchesDir = join(metadataPath, ".plugins", "org.eclipse.debug.core", ".launches");
   const projectNames = new Set<string>();
 
@@ -146,7 +164,7 @@ export function discoverProjectPathFromWorkspace(workspacePath: string): string 
   }
 
   const projectCandidates: string[] = [];
-  collectProjectCandidates(workspacePath, projectCandidates);
+  collectProjectCandidates(mcpWorkspacePath, projectCandidates);
 
   if (projectCandidates.length === 0) return undefined;
 
@@ -171,7 +189,7 @@ export function getConfiguredProjectPath(
     if (detectedFromWorkspace) return detectedFromWorkspace;
   }
 
-  if (env.TALEND_DISABLE_AUTODETECT === "1") return undefined;
+  if (env.TALEND_DISABLE_AUTODETECT === "1" || env.TALEND_DISABLE_AUTODETECT === "true") return undefined;
 
   const detectedProject = detectProjectFromRunningStudio();
   if (detectedProject) return detectedProject;

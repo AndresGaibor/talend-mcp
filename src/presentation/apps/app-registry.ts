@@ -173,7 +173,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_component_catalog",
     launchMessage: "Abriendo el catálogo de componentes.",
     actions: [
-      createTextAction("Scan installed", "talend_components_scan_installed", "Escanea componentes instalados.", "pluginsDir", { inputLabel: "Plugins dir", inputPlaceholder: "/Applications/TalendStudio-8.0.1/studio/plugins" }),
+      createTextAction("Scan installed", "talend_components_scan_installed", "Escanea componentes instalados.", "pluginsDir", { inputLabel: "Plugins dir", inputPlaceholder: "Ruta a plugins de Talend Studio" }),
       createTextAction("Search component", "talend_components_search", "Busca componentes en el catálogo.", "query", { inputLabel: "Query", inputPlaceholder: "mysql" }),
       createTextAction("Inspect component", "talend_components_inspect", "Inspecciona un componente.", "componentName", { inputLabel: "Component name", inputPlaceholder: "tMysqlInput" }),
     ],

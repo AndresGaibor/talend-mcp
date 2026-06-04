@@ -2,6 +2,7 @@ import { rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { asArray, buildXml, parseXml } from "../xml/xml-utils";
 import { readTextFile, writeTextFile, listFilesRecursive } from "../filesystem/file-reader";
+import { splitPortable } from "../../platform/path-bridge";
 import type { IJobRepository, ParsedJob, JobSpec } from "../../domain/job/job.repository";
 import type { TalendComponent, TalendConnection, TalendContextParameter, MapperEntry, TalendJobResource } from "../../domain/job/job.entity";
 
@@ -306,11 +307,11 @@ async function listTalendJobs(projectPath: string): Promise<TalendJobResource[]>
   return jobs;
 }
 
-function normalizeFolderPath(folderPath?: string): string | undefined {
+  function normalizeFolderPath(folderPath?: string): string | undefined {
   const normalized = folderPath?.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim();
   if (!normalized) return undefined;
 
-  const parts = normalized.split("/");
+  const parts = splitPortable(normalized);
   if (parts.some((part) => part === ".." || part === "." || part === "")) {
     throw new Error(`Ruta de carpeta inválida: ${folderPath}`);
   }
@@ -320,7 +321,7 @@ function normalizeFolderPath(folderPath?: string): string | undefined {
 
 function resolveFolderDir(projectPath: string, folderPath?: string): string {
   const normalized = normalizeFolderPath(folderPath);
-  return normalized ? join(projectPath, "process", ...normalized.split("/")) : join(projectPath, "process");
+  return normalized ? join(projectPath, "process", ...splitPortable(normalized)) : join(projectPath, "process");
 }
 
 async function findTalendJob(projectPath: string, jobName: string, folderPath?: string): Promise<TalendJobResource> {
@@ -460,7 +461,8 @@ export class JobXmlRepository implements IJobRepository {
   async renameJob(itemPath: string, newName: string): Promise<string> {
     const projectPath = dirname(dirname(dirname(itemPath)));
     const jobName = basename(itemPath).replace(/_\d+\.\d+\.item$/, "");
-    const folderPath = itemPath.includes("/process/") ? itemPath.split("/process/")[1]?.replace(/\/[^/]+$/, "") : undefined;
+    const itemNormalized = itemPath.replace(/\\/g, "/");
+    const folderPath = itemNormalized.includes("/process/") ? itemNormalized.split("/process/")[1]?.replace(/\/[^/]+$/, "") : undefined;
 
     const source = await findTalendJob(projectPath, jobName, folderPath);
     const oldItemXml = await readTextFile(source.itemPath, projectPath);
@@ -488,7 +490,8 @@ export class JobXmlRepository implements IJobRepository {
   async duplicateJob(itemPath: string, newName: string): Promise<string> {
     const projectPath = dirname(dirname(dirname(itemPath)));
     const jobName = basename(itemPath).replace(/_\d+\.\d+\.item$/, "");
-    const folderPath = itemPath.includes("/process/") ? itemPath.split("/process/")[1]?.replace(/\/[^/]+$/, "") : undefined;
+    const itemNormalized = itemPath.replace(/\\/g, "/");
+    const folderPath = itemNormalized.includes("/process/") ? itemNormalized.split("/process/")[1]?.replace(/\/[^/]+$/, "") : undefined;
 
     const source = await findTalendJob(projectPath, jobName, folderPath);
     const version = getJobVersion(source.itemPath);
