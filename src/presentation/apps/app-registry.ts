@@ -378,14 +378,14 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
   {
     id: "secret-safety",
     title: "Talend Secret Safety",
-    description: "Revisa secretos, contexto y operaciones seguras.",
+    description: "Escanea el proyecto en busca de secretos expuestos y sugiere migraciones a context profiles.",
     resourceUri: "ui://talend/secret-safety.html",
     launcherToolName: "talend_app_secret_safety",
-    launchMessage: "Abriendo la vista de seguridad de secretos.",
+    launchMessage: "Abriendo el scanner de secretos.",
     actions: [
-      createTextAction("Explain error", "talend_error_explain", "Explica un mensaje de error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
-      createTextAction("Error stats", "talend_error_stats", "Muestra estadísticas de errores.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
-      createTextAction("Suggest fix", "talend_error_suggest_fix", "Sugiere un fix para un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
+      createNoInputAction("Scan project", "talend_secret_scan_project", "Escanea todo el proyecto en busca de secretos expuestos."),
+      createTextAction("Scan job", "talend_secret_scan_job", "Escanea un job específico.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Suggest context migration", "talend_secret_suggest_context_migration", "Sugiere cómo migrar secretos a context profiles.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
   {

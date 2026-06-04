@@ -1,6 +1,7 @@
 import { allTools as presentationTools } from "../tools/registry";
 import { createStudioBridgeTools } from "../../talend/studio/bridge-tools";
 import { studioToolDefs } from "../../tools/new-tools";
+import { secretTools } from "../../talend/studio/tools-secrets";
 import { z } from "zod/v4";
 
 type ToolDef = {
@@ -267,6 +268,10 @@ const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_task_analyze_requirements: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_task_build_execution_plan: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_task_extract_talend_responsibilities: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_secret_scan_project: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_secret_scan_job: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_secret_suggest_context_migration: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
 };
 
 const TOOL_REQUIRES_WORKSPACE = new Set([
@@ -299,6 +304,7 @@ const registeredTools = dedupeTools([
   ...presentationTools,
   ...createStudioBridgeTools(),
   ...studioToolDefs,
+  ...secretTools,
 ]);
 
 const aliasTools = buildAliasTools(registeredTools);
