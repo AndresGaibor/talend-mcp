@@ -27,8 +27,15 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cache
 *.tsbuildinfo
 
+# talend-mcp runtime
+.talend-mcp/runs/
+
 # IntelliJ based IDEs
 .idea
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# Build artifacts
+*.class
+target/
