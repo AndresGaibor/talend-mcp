@@ -20,21 +20,20 @@ bun install
 
 ## Ejecucion
 
-Por defecto el servidor se levanta en modo **HTTP** en `http://127.0.0.1:3927`.
-
 ```bash
 bun run start
 ```
 
-Salida esperada:
+Este comando hace todo automaticamente:
 
-```
-Talend MCP server running:
-  Local:  http://127.0.0.1:3927/mcp
-  Health: http://127.0.0.1:3927/healthz
-```
+1. **Detecta tu SO** (macOS, Windows o Linux/WSL)
+2. **Descarga tunnel-client** si no esta instalado
+3. **Pide `CONTROL_PLANE_API_KEY`** si no la encuentra y la persiste en `.env.local`
+4. **Pide Tunnel ID** (solo la primera vez) e inicializa el perfil
+5. **Inicia el servidor MCP** en `http://127.0.0.1:3927`
+6. **Inicia el tunnel** hacia OpenAI
 
-> Si prefieres modo stdio: `TALEND_MCP_MODE=stdio bun run start`
+Si quieres solo el servidor sin tunnel: `bun run start:server`
 
 ## Variables de entorno
 
@@ -43,10 +42,10 @@ Talend MCP server running:
 | `TALEND_MCP_MODE` | `http` | `http` o `stdio` |
 | `TALEND_MCP_PORT` | `3927` | Puerto del servidor HTTP |
 | `TALEND_MCP_HOST` | `127.0.0.1` | Host del servidor HTTP |
-| `TALEND_MCP_FUNNEL` | `true` | Activa/desactiva Tailscale Funnel |
 | `TALEND_MCP_LIVE` | `true` | Modo live (logs en stderr) |
 | `TALEND_WORKSPACE` | - | Ruta al workspace de Talend Studio |
 | `TALEND_PROJECT` | - | Ruta directa al proyecto (opcional) |
+| `CONTROL_PLANE_API_KEY` | - | API key de OpenAI para el tunnel (se persiste en `.env.local`) |
 
 ## Herramientas disponibles
 
@@ -118,72 +117,41 @@ Talend MCP server running:
 Para conectar este servidor a ChatGPT via web necesitas el **Secure MCP Tunnel** de OpenAI,
 que crea un enlace HTTPS saliente sin exponer el servidor al internet publico.
 
-### macOS
+### Setup automatico (recomendado)
 
 ```bash
-# 1. Descarga tunnel-client (o descargalo manualmente desde GitHub)
-curl -LO https://github.com/openai/tunnel-client/releases/latest/download/tunnel-client-darwin-amd64
-chmod +x tunnel-client-darwin-amd64
-sudo mv tunnel-client-darwin-amd64 /usr/local/bin/tunnel-client
-
-# 2. Crea un API key en https://platform.openai.com/settings/organization/api-keys
-export CONTROL_PLANE_API_KEY="sk-..."
-
-# 3. Crea un tunnel en https://platform.openai.com/settings/organization/tunnels
-#    y copia el tunnel ID (ej: tunnel_6a1f1012a92c8191931616ac46216eed)
-
-# 4. Inicia talend-mcp (en otra terminal)
+# 1. Clona e instala
+git clone <repo-url> talend-mcp
 cd talend-mcp
-TALEND_MCP_FUNNEL=false bun run start
+bun install
 
-# 5. Inicializa el perfil del tunnel
-tunnel-client init \
-  --sample sample_mcp_remote_no_auth \
-  --profile talend \
-  --tunnel-id tunnel_<tu-id> \
-  --mcp-server-url http://127.0.0.1:3927/mcp
-
-# 6. Valida la configuracion
-tunnel-client doctor --profile talend --explain
-
-# 7. Inicia el tunnel (debe quedar corriendo)
-tunnel-client run --profile talend
+# 2. Inicia (descarga tunnel-client, pide API key y tunnel ID si es primera vez)
+bun run start
 ```
 
-### Windows (PowerShell)
+El script te guiara paso a paso:
 
-```powershell
-# 1. Descarga tunnel-client
-Invoke-WebRequest -Uri "https://github.com/openai/tunnel-client/releases/latest/download/tunnel-client-windows-amd64.exe" -OutFile "$env:USERPROFILE\Downloads\tunnel-client.exe"
-
-# 2. Mueve el binario a una ruta en el PATH
-Move-Item "$env:USERPROFILE\Downloads\tunnel-client.exe" "$env:USERPROFILE\AppData\Local\Microsoft\WindowsApps\tunnel-client.exe"
-
-# 3. Define las variables de entorno
-$env:CONTROL_PLANE_API_KEY="sk-..."
-
-# 4. Inicia talend-mcp (en otra terminal)
-#    Navega a la carpeta del proyecto y ejecuta:
-#    $env:TALEND_MCP_FUNNEL="false"
-#    bun run start
-
-# 5. Inicializa el perfil del tunnel
-tunnel-client init `
-  --sample sample_mcp_remote_no_auth `
-  --profile talend `
-  --tunnel-id tunnel_<tu-id> `
-  --mcp-server-url http://127.0.0.1:3927/mcp
-
-# 6. Valida la configuracion
-tunnel-client doctor --profile talend --explain
-
-# 7. Inicia el tunnel
-tunnel-client run --profile talend
 ```
+=== Talend MCP - Inicio automatizado ===
+Sistema detectado: macOS (Apple Silicon)
+Descargando tunnel-client...
+Ingresa tu CONTROL_PLANE_API_KEY de OpenAI (sk-...):
+Ingresa tu Tunnel ID (ej: tunnel_6a1f1012a92c8191931616ac46216eed):
+```
+
+La `CONTROL_PLANE_API_KEY` se persiste en `.env.local` (Bun la carga automaticamente).
+
+### Prerequisitos
+
+Antes de ejecutar, necesitas:
+
+1. Una **API key** en https://platform.openai.com/settings/organization/api-keys
+2. Un **tunnel** creado en https://platform.openai.com/settings/organization/tunnels
+   (copia el Tunnel ID, ej: `tunnel_6a1f1012a92c8191931616ac46216eed`)
 
 ### Conectar en ChatGPT
 
-1. Manten `talend-mcp` y `tunnel-client run` corriendo
+1. Manten `bun run start` corriendo
 2. Ve a https://chatgpt.com/#settings/Connectors
 3. Presiona **+** y selecciona **Tunnel**
 4. Elige el tunnel ID que creaste
@@ -193,7 +161,7 @@ tunnel-client run --profile talend
 
 Si usas la app de escritorio de ChatGPT, puedes conectar directo sin tunnel:
 
-1. Inicia el servidor: `TALEND_MCP_FUNNEL=false bun run start`
+1. Inicia el servidor: `bun run start:server`
 2. En ChatGPT Desktop: Settings > Connectors > + > URL
 3. Ingresa: `http://127.0.0.1:3927/mcp`
 

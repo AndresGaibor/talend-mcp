@@ -10,7 +10,8 @@
     "typescript": "^5"
   },
   "scripts": {
-    "start": "bun run index.ts",
+    "start": "bun run scripts/start-with-tunnel.ts",
+    "start:server": "bun run index.ts",
     "detect:talend-project": "bun run scripts/detect-talend-project.ts",
     "dq:analyses": "bun run scripts/list-dq-analyses.ts",
     "jobs": "bun run scripts/jobs.ts",
