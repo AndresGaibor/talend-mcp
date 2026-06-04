@@ -181,11 +181,15 @@ export function getConfiguredProjectPath(
   env: Record<string, string | undefined> = process.env,
 ): string | undefined {
   if (activeRepoPath) return activeRepoPath;
-  if (env.TALEND_PROJECT) return env.TALEND_PROJECT;
+
+  if (env.TALEND_PROJECT) {
+    const ctx = createPlatformContext();
+    return toMcpPath(env.TALEND_PROJECT, ctx);
+  }
 
   const workspacePath = env.TALEND_WORKSPACE;
   if (workspacePath) {
-    const detectedFromWorkspace = discoverProjectPathFromWorkspace(workspacePath);
+    const detectedFromWorkspace = discoverProjectPathFromWorkspace(toMcpPath(workspacePath, createPlatformContext()));
     if (detectedFromWorkspace) return detectedFromWorkspace;
   }
 

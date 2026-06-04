@@ -1,6 +1,8 @@
 import { TalendStudioBridgeClient } from "../studio/bridge-client";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import { createPlatformContext } from "../../platform";
+import { toTalendHostPath } from "../../platform/path-bridge";
 
 export type StudioValidationResult = {
   ok: boolean;
@@ -37,7 +39,9 @@ export async function validateComponentInStudio(
   }
 
   try {
-    const openResult = await bridge.openResource(itemPath);
+    const ctx = createPlatformContext();
+    const studioPath = toTalendHostPath(itemPath, ctx);
+    const openResult = await bridge.openResource(studioPath);
     result.opensInStudio = openResult.ok;
 
     if (!result.opensInStudio) {

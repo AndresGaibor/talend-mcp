@@ -4,6 +4,8 @@ import { TalendStudioBridgeClient } from "../studio/bridge-client";
 import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec } from "../job-generator";
 import { inspectComponent } from "../components/component-catalog-builder";
 import { createSnapshot } from "../sync/snapshot-manager";
+import { createPlatformContext } from "../../platform";
+import { toTalendHostPath } from "../../platform/path-bridge";
 
 export type TalendJobSpec = {
   name: string;
@@ -134,7 +136,9 @@ export async function createJobFromSpec(
 
     if (bridge) {
       try {
-        await bridge.openResource(itemPath);
+        const ctx = createPlatformContext();
+        const studioPath = toTalendHostPath(itemPath, ctx);
+        await bridge.openResource(studioPath);
         await bridge.refreshWorkspace();
       } catch {
       }

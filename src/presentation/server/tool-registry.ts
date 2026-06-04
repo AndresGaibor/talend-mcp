@@ -2,6 +2,7 @@ import { allTools as presentationTools } from "../tools/registry";
 import { createStudioBridgeTools } from "../../talend/studio/bridge-tools";
 import { studioToolDefs } from "../../tools/new-tools";
 import { secretTools } from "../../talend/studio/tools-secrets";
+import { fromJsonSchema } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
 type ToolDef = {
@@ -94,7 +95,9 @@ function dedupeTools(tools: ToolDef[]): ToolDef[] {
   const result: ToolDef[] = [];
 
   for (const tool of tools) {
-    if (seen.has(tool.name)) continue;
+    if (seen.has(tool.name)) {
+      throw new Error(`Tool duplicada detectada: "${tool.name}". Revisa que no haya definiciones duplicadas en presentationTools, bridgeTools, studioToolDefs o secretTools.`);
+    }
     seen.add(tool.name);
     result.push(tool);
   }
@@ -272,9 +275,21 @@ const registeredTools = dedupeTools([
 
 const aliasTools = buildAliasTools(registeredTools);
 
+function isPlainJsonSchema(schema: unknown): schema is Record<string, unknown> {
+  return typeof schema === "object" && schema !== null && !("~standard" in schema);
+}
+
+function normalizeInputSchema(schema: unknown): unknown {
+  if (isPlainJsonSchema(schema)) {
+    return fromJsonSchema(schema as Record<string, unknown>);
+  }
+  return schema;
+}
+
 function withDefaultOutputSchema(tool: ToolDef): ToolDef {
   return {
     ...tool,
+    inputSchema: normalizeInputSchema(tool.inputSchema),
     outputSchema: tool.outputSchema ?? GENERIC_TOOL_OUTPUT_SCHEMA,
   };
 }

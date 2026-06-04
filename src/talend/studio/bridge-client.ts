@@ -109,8 +109,8 @@ function getWindowsHomeDir(): string | undefined {
   if (isWsl()) {
     try {
       const result = Bun.spawnSync(["cmd.exe", "/C", "echo", "%USERPROFILE%"]);
-      const path = result.stdout?.toString().trim();
-      if (path) return path.replace(/\\/g, "/");
+      const rawPath = result.stdout?.toString().trim();
+      if (rawPath) return wslPathToMcp(rawPath);
     } catch {}
   }
   return undefined;
@@ -120,6 +120,8 @@ function expandHomePath(ruta: string): string {
   if (!ruta.startsWith("~")) return ruta;
   return join(getHomeDir(), ruta.slice(1).replace(/^[\\/]/, ""));
 }
+
+import { toMcpPath } from "../../platform/path-bridge";
 
 async function readJsonFile<T>(rutaArchivo: string): Promise<T | undefined> {
   try {
@@ -138,17 +140,22 @@ async function readTextFile(rutaArchivo: string): Promise<string | undefined> {
   }
 }
 
+function wslPathToMcp(rawWindowsPath: string): string {
+  const ctx = { runtimeOs: "wsl" as const, talendHostOs: "windows" as const, pathMode: "wsl-windows" as const };
+  return toMcpPath(rawWindowsPath, ctx);
+}
+
 export async function readTalendStudioBridgeConfig(): Promise<BridgeConfig> {
   const envConfig = process.env.TALEND_BRIDGE_CONFIG;
   if (envConfig) {
     const parsed = await readJsonFile<Partial<BridgeConfig>>(expandHomePath(envConfig));
     if (parsed) {
-      return {
+      return applyEnvOverrides({
         ...DEFAULT_CONFIG,
         ...parsed,
         allowCommands: parsed?.allowCommands?.length ? parsed.allowCommands : DEFAULT_CONFIG.allowCommands,
         allowAllCommands: parsed?.allowAllCommands ?? DEFAULT_CONFIG.allowAllCommands,
-      };
+      });
     }
   }
 
@@ -158,24 +165,33 @@ export async function readTalendStudioBridgeConfig(): Promise<BridgeConfig> {
   if (!parsed && isWsl()) {
     const winHome = getWindowsHomeDir();
     if (winHome) {
-      const winConfigPath = join(winHome, ".talend-bridge", "config.json");
+      const mcpWinHome = wslPathToMcp(winHome);
+      const winConfigPath = join(mcpWinHome, ".talend-bridge", "config.json");
       const winParsed = await readJsonFile<Partial<BridgeConfig>>(winConfigPath);
       if (winParsed) {
-        return {
+        return applyEnvOverrides({
           ...DEFAULT_CONFIG,
           ...winParsed,
           allowCommands: winParsed?.allowCommands?.length ? winParsed.allowCommands : DEFAULT_CONFIG.allowCommands,
           allowAllCommands: winParsed?.allowAllCommands ?? DEFAULT_CONFIG.allowAllCommands,
-        };
+        });
       }
     }
   }
 
-  return {
+  return applyEnvOverrides({
     ...DEFAULT_CONFIG,
     ...parsed,
     allowCommands: parsed?.allowCommands?.length ? parsed.allowCommands : DEFAULT_CONFIG.allowCommands,
     allowAllCommands: parsed?.allowAllCommands ?? DEFAULT_CONFIG.allowAllCommands,
+  });
+}
+
+function applyEnvOverrides(config: BridgeConfig): BridgeConfig {
+  return {
+    ...config,
+    host: process.env.TALEND_BRIDGE_HOST ?? config.host,
+    port: process.env.TALEND_BRIDGE_PORT ? Number(process.env.TALEND_BRIDGE_PORT) : config.port,
   };
 }
 
@@ -193,7 +209,8 @@ export async function readTalendStudioBridgeToken(): Promise<string | undefined>
   if (!token && isWsl()) {
     const winHome = getWindowsHomeDir();
     if (winHome) {
-      const winTokenPath = join(winHome, ".talend-bridge", "token");
+      const mcpWinHome = wslPathToMcp(winHome);
+      const winTokenPath = join(mcpWinHome, ".talend-bridge", "token");
       token = await readTextFile(winTokenPath);
     }
   }

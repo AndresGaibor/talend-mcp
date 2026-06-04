@@ -25,7 +25,9 @@ let registeredToolNames: Set<string>;
 
 beforeEach(() => {
   server = createTalendMcpServer();
-  registeredToolNames = new Set(getRegisteredServerTools().map((t) => t.name));
+  const serverTools = getRegisteredServerTools().map((t) => t.name);
+  const launcherTools = PRESENTATION_APP_DEFINITIONS.map((a) => a.launcherToolName);
+  registeredToolNames = new Set([...serverTools, ...launcherTools]);
 });
 
 describe("MCP Apps Registry", () => {

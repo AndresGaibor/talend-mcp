@@ -5,6 +5,7 @@ import { findExportedJobScripts } from "./exported-job-finder.js";
 import { saveRun } from "./run-history.js";
 import type { Evidence } from "../diagnostics/types";
 import { createPlatformContext, detectJobRunnerStrategy, buildScriptExecutionArgs, selectScriptByPlatform } from "../../platform";
+import { toMcpPath, toTalendHostPath } from "../../platform/path-bridge";
 
 export interface RunResult {
   ok: boolean;
@@ -42,6 +43,8 @@ export async function runExportedJob(options: {
   const runsDir = getRunsDir();
   mkdirSync(runsDir, { recursive: true });
 
+  const ctx = createPlatformContext();
+
   let scriptPath = options.scriptPath;
 
   if (!scriptPath) {
@@ -62,7 +65,6 @@ export async function runExportedJob(options: {
         error: findResult.error ?? `No se encontró script exportado para '${options.jobName}'. Configura TALEND_BUILDS_DIR.`,
       };
     }
-    const ctx = createPlatformContext();
     const strategy = detectJobRunnerStrategy(ctx);
     const matchingScript = selectScriptByPlatform(findResult.data, strategy);
     if (!matchingScript) {
@@ -84,7 +86,9 @@ export async function runExportedJob(options: {
     scriptPath = matchingScript.scriptPath;
   }
 
-  if (!scriptPath || !existsSync(scriptPath)) {
+  const mcpScriptPath = toMcpPath(scriptPath, ctx);
+
+  if (!mcpScriptPath || !existsSync(mcpScriptPath)) {
     return {
       ok: false,
       source: "unknown",
@@ -97,11 +101,10 @@ export async function runExportedJob(options: {
       stdoutTail: "",
       stderrTail: "",
       logPath: "",
-      error: `Script no encontrado: ${scriptPath}`,
+      error: `Script no encontrado: ${mcpScriptPath}`,
     };
   }
 
-  const ctx = createPlatformContext();
   const strategy = detectJobRunnerStrategy(ctx);
   const env = { ...process.env } as Record<string, string>;
   if (options.contextName) {
@@ -119,8 +122,8 @@ export async function runExportedJob(options: {
   const startMs = Date.now();
 
   return new Promise<RunResult>((resolvePromise) => {
-    const args = buildScriptExecutionArgs(scriptPath!, strategy, ctx);
-    const child = spawn(strategy.shell, args, { cwd: dirname(scriptPath!), env, stdio: ["ignore", "pipe", "pipe"] });
+    const args = buildScriptExecutionArgs(mcpScriptPath, strategy, ctx);
+    const child = spawn(strategy.shell, args, { cwd: dirname(mcpScriptPath), env, stdio: ["ignore", "pipe", "pipe"] });
 
     let stdout = "";
     let stderr = "";

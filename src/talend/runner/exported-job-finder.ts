@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join, basename } from "node:path";
 import type { Evidence } from "../diagnostics/types";
+import { createPlatformContext } from "../../platform";
+import { toMcpPath } from "../../platform/path-bridge";
 
 export interface ExportedJobScript {
   jobName: string;
@@ -13,7 +15,9 @@ export interface ExportedJobScript {
 }
 
 function getBuildsDir(): string | undefined {
-  return process.env.TALEND_BUILDS_DIR;
+  const raw = process.env.TALEND_BUILDS_DIR;
+  if (!raw) return undefined;
+  return toMcpPath(raw, createPlatformContext());
 }
 
 async function findScriptsRecursive(

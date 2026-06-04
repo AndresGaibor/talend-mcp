@@ -7,6 +7,8 @@ import { buildJobItemXml, buildJobPropertiesXml } from "../job-generator";
 import { writeTextFile } from "../files";
 import { getConfiguredProjectPath } from "../workspace";
 import { listJobs } from "../repository";
+import { createPlatformContext } from "../../platform";
+import { toTalendHostPath } from "../../platform/path-bridge";
 import type { PatrónTalend } from "../task/task-types";
 
 async function findExistingJob(projectPath: string, jobName: string): Promise<{ itemPath: string; propertiesPath: string } | null> {
@@ -216,10 +218,12 @@ export const jobSpecTools = [
         let problemsData: unknown = null;
 
         try {
+          const ctx = createPlatformContext();
           const bridge = await loadBridge();
           await bridge.refreshWorkspace();
 
-          const openResult = await bridge.openResource(itemPath);
+          const studioPath = toTalendHostPath(itemPath, ctx);
+          const openResult = await bridge.openResource(studioPath);
           bridgeOpened = openResult.ok;
 
           const problemsResult = await bridge.problemsMarkers();

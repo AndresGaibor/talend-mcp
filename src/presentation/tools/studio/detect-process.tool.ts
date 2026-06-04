@@ -1,14 +1,5 @@
 import { ok, fail } from "../common/response";
-
-interface ProcessEvidence {
-  running: boolean;
-  pid?: number;
-  command?: string;
-}
-
-async function detectTalendStudioProcess(): Promise<ProcessEvidence> {
-  return { running: false };
-}
+import { detectTalendStudioProcess } from "../../../talend/studio/process";
 
 export function createDetectProcessTool() {
   return {
@@ -21,8 +12,19 @@ export function createDetectProcessTool() {
     handler: async () => {
       const start = Date.now();
       try {
-        const result = await detectTalendStudioProcess();
-        return ok({ ...result }, { startTime: start });
+        const evidence = await detectTalendStudioProcess();
+        const result = {
+          running: evidence.ok,
+          processes: evidence.processes?.map((p) => ({
+            pid: p.pid,
+            name: p.name,
+            command: p.commandLine,
+            matchedBy: p.matchedBy,
+          })),
+          confidence: evidence.confidence,
+          source: evidence.source,
+        };
+        return ok(result, { startTime: start });
       } catch (err) {
         return fail("DETECT_PROCESS_ERROR", `Error detectando proceso: ${err}`, { startTime: start });
       }

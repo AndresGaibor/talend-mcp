@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { detectRuntimeOS } from "../../platform/runtime";
+import { createPlatformContext } from "../../platform";
+import { toMcpPath } from "../../platform/path-bridge";
 
 export type TalendStudioCandidates = {
   pluginsDirCandidates: string[];
@@ -66,13 +68,18 @@ export function resolveTalendPluginsDir(input?: {
   talendStudioHome?: string;
   pluginsDir?: string;
 }): string | null {
-  if (input?.pluginsDir && existsSync(input.pluginsDir)) {
-    return input.pluginsDir;
+  const ctx = createPlatformContext();
+
+  if (input?.pluginsDir && existsSync(toMcpPath(input.pluginsDir, ctx))) {
+    return toMcpPath(input.pluginsDir, ctx);
   }
 
   const envPluginsDir = process.env.TALEND_STUDIO_PLUGINS_DIR;
-  if (envPluginsDir && existsSync(envPluginsDir)) {
-    return envPluginsDir;
+  if (envPluginsDir) {
+    const mcpPath = toMcpPath(envPluginsDir, ctx);
+    if (existsSync(mcpPath)) {
+      return mcpPath;
+    }
   }
 
   const home =
@@ -81,7 +88,8 @@ export function resolveTalendPluginsDir(input?: {
     process.env.TALEND_STUDIO_PATH;
 
   if (home) {
-    const plugins = join(home, "plugins");
+    const mcpHome = toMcpPath(home, ctx);
+    const plugins = join(mcpHome, "plugins");
     if (existsSync(plugins)) {
       return plugins;
     }
@@ -100,13 +108,18 @@ export function resolveTalendPluginsDir(input?: {
 export function resolveTalendStudioHome(input?: {
   talendStudioHome?: string;
 }): string | null {
+  const ctx = createPlatformContext();
+
   const home =
     input?.talendStudioHome ??
     process.env.TALEND_STUDIO_HOME ??
     process.env.TALEND_STUDIO_PATH;
 
-  if (home && existsSync(home)) {
-    return home;
+  if (home) {
+    const mcpHome = toMcpPath(home, ctx);
+    if (existsSync(mcpHome)) {
+      return mcpHome;
+    }
   }
 
   const { studioHomeCandidates } = getPlatformCandidates();
