@@ -107,9 +107,10 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_job_designer",
     launchMessage: "Abriendo el diseñador de jobs.",
     actions: [
-      createJsonAction("Create job", "talend_create_job", "Crea un job nuevo.", { jobName: "new_job" }),
+      createJsonAction("Create job", "talend_create_job", "Crea un job nuevo.", { jobName: "new_job" }, { requiresConfirmation: true }),
       createTextAction("Read job", "talend_read_job", "Lee un job existente.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
       createTextAction("Show flow", "talend_show_flow", "Muestra el flujo entre componentes.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createJsonAction("Apply pipeline spec", "talend_job_apply_pipeline_spec", "Genera y escribe archivos .item/.properties.", { pattern: "multi_csv_raw_loader", name: "new_job", folderPath: "Process" }, { requiresConfirmation: true }),
     ],
   },
   {
@@ -172,7 +173,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_component_catalog",
     launchMessage: "Abriendo el catálogo de componentes.",
     actions: [
-      createTextAction("Scan installed", "talend_components_scan_installed", "Escanea componentes instalados.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/opt/talend" }),
+      createTextAction("Scan installed", "talend_components_scan_installed", "Escanea componentes instalados.", "pluginsDir", { inputLabel: "Plugins dir", inputPlaceholder: "/Applications/TalendStudio-8.0.1/studio/plugins" }),
       createTextAction("Search component", "talend_components_search", "Busca componentes en el catálogo.", "query", { inputLabel: "Query", inputPlaceholder: "mysql" }),
       createTextAction("Inspect component", "talend_components_inspect", "Inspecciona un componente.", "componentName", { inputLabel: "Component name", inputPlaceholder: "tMysqlInput" }),
     ],
@@ -239,7 +240,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     actions: [
       createNoInputAction("List jobs", "talend_list_jobs", "Lista los jobs disponibles."),
       createTextAction("Read job", "talend_read_job", "Lee un job por nombre.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createNoInputAction("Read contexts", "talend_read_contexts", "Lee los contextos del job abierto."),
+      createTextAction("Read contexts", "talend_read_contexts", "Lee los contextos de un job.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
   {
@@ -263,9 +264,10 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_visual_job_designer",
     launchMessage: "Abriendo el diseñador visual.",
     actions: [
-      createTextAction("Create job", "talend_create_job", "Crea un job nuevo.", "jobName", { inputLabel: "Job name", inputPlaceholder: "new_job", requiresConfirmation: true }),
+      createJsonAction("Create job", "talend_create_job", "Crea un job nuevo.", { jobName: "new_job" }, { requiresConfirmation: true }),
       createJsonAction("Patch component", "talend_patch_component", "Parchea propiedades de un componente.", { jobName: "myJob", uniqueName: "tMap_1", patch: { LABEL: "Nuevo valor" } }, { requiresConfirmation: true }),
       createJsonAction("Add connection", "talend_add_connection", "Agrega una conexión.", { jobName: "myJob", sourceUniqueName: "tInput_1", targetUniqueName: "tMap_1", label: "row", connectorName: "FLOW", metaname: "", uniqueName: "connection_1" }, { requiresConfirmation: true }),
+      createJsonAction("Apply pipeline spec", "talend_job_apply_pipeline_spec", "Genera y escribe archivos .item/.properties.", { pattern: "multi_csv_raw_loader", name: "new_job", folderPath: "Process" }, { requiresConfirmation: true }),
     ],
   },
   {
@@ -278,7 +280,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     actions: [
       createJsonAction("Validate spec", "talend_job_validate_pipeline_spec", "Valida una spec de pipeline.", { spec: { pattern: "multi_csv_raw_loader", name: "new_job" } }),
       createJsonAction("Preview spec", "talend_job_preview_pipeline_spec", "Previsualiza una spec de pipeline.", { pattern: "multi_csv_raw_loader", name: "new_job" }),
-      createJsonAction("Generate job", "talend_job_generate_from_pipeline_spec", "Genera un job desde la spec.", { pattern: "multi_csv_raw_loader", name: "new_job" }, { requiresConfirmation: true }),
+      createJsonAction("Apply pipeline spec", "talend_job_apply_pipeline_spec", "Genera y escribe archivos .item/.properties en el proyecto.", { pattern: "multi_csv_raw_loader", name: "new_job", folderPath: "Process" }, { requiresConfirmation: true }),
     ],
   },
   {

@@ -1,13 +1,35 @@
 import { allTools as presentationTools } from "../tools/registry";
 import { createStudioBridgeTools } from "../../talend/studio/bridge-tools";
 import { studioToolDefs } from "../../tools/new-tools";
+import { z } from "zod/v4";
 
 type ToolDef = {
   name: string;
   description: string;
   inputSchema: unknown;
+  outputSchema?: unknown;
   handler: (input: any) => Promise<unknown>;
 };
+
+export const GENERIC_TOOL_OUTPUT_SCHEMA = z.object({
+  ok: z.boolean().optional(),
+  source: z.string().optional(),
+  confidence: z.union([
+    z.literal("high"),
+    z.literal("medium"),
+    z.literal("low"),
+    z.literal("none"),
+  ]).optional(),
+  endpoint: z.string().optional(),
+  data: z.unknown().optional(),
+  warning: z.string().optional(),
+  limitations: z.array(z.string()).optional(),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.record(z.string(), z.unknown()).optional(),
+  }).optional(),
+}).passthrough();
 
 type ToolSafetyAnnotation = {
   readOnlyHint: boolean;
@@ -221,6 +243,30 @@ const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_inspect_job: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_inspect_component: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_read_run_log: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_job_apply_pipeline_spec: { readOnlyHint: false, idempotentHint: false, destructiveHint: true, openWorldHint: false },
+  talend_snapshot_diff: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_bridge_launch_runs: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
+  talend_bridge_launch_status: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
+  talend_bridge_launch_wait: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
+  talend_bridge_open_resource: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: true },
+  talend_bridge_refresh_workspace: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
+  talend_bridge_run_launch_config: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
+  talend_bridge_problems_markers: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_connection_detect_available_db_components: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_components_catalog_status: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_components_connectors: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_components_parameters: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_list_repository_contexts: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_read_contexts: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_task_analyze_requirements: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_task_build_execution_plan: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_task_extract_talend_responsibilities: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
 };
 
 const TOOL_REQUIRES_WORKSPACE = new Set([
@@ -241,8 +287,8 @@ function getToolAnnotations(name: string): ToolSafetyAnnotation & { requiresWork
   }
 
   return {
-    readOnlyHint: true,
-    idempotentHint: true,
+    readOnlyHint: false,
+    idempotentHint: false,
     destructiveHint: false,
     openWorldHint: false,
     requiresWorkspace: TOOL_REQUIRES_WORKSPACE.has(name),

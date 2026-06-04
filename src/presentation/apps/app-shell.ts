@@ -169,7 +169,7 @@ export function createPresentationAppShellHtml(app: PresentationAppDefinition): 
         const inputEl = document.getElementById("action-input-" + index);
         const payload = parseInput(action, inputEl ? inputEl.value : "");
 
-        const dangerousPattern = /(create|update|delete|patch|apply|restore|run|stop|start|duplicate|move|execute|save)$/i;
+        const dangerousPattern = /(create|update|delete|patch|apply|restore|run|stop|start|duplicate|move|execute|save|export|package|pull|switch)$/i;
         if (action.requiresConfirmation || dangerousPattern.test(action.toolName)) {
           const confirmed = window.confirm("Esta acción puede modificar el proyecto. ¿Continuar?");
           if (!confirmed) {

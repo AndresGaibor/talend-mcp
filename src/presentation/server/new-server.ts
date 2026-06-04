@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { listPresentationAppIds, registerPresentationApps } from "../apps";
-import { getRegisteredServerToolAnnotations, getRegisteredServerToolCount, getRegisteredServerTools } from "./tool-registry";
+import { getRegisteredServerToolAnnotations, getRegisteredServerToolCount, getRegisteredServerTools, GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
 import { resolvePublicUrl } from "../../tailscale/resolve-public-url";
 
 export interface NewServerOptions {
@@ -80,6 +80,7 @@ export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.W
       {
         description: tool.description,
         inputSchema: tool.inputSchema as Parameters<typeof server.registerTool>[1]["inputSchema"],
+        outputSchema: (tool.outputSchema ?? GENERIC_TOOL_OUTPUT_SCHEMA) as Parameters<typeof server.registerTool>[1]["outputSchema"],
         annotations: getRegisteredServerToolAnnotations(tool.name),
       },
       tool.handler as never,
