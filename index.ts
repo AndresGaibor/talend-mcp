@@ -1,4 +1,4 @@
-import { runStdioServer, runHttpServer } from "./src/server";
+import { runNewHttpServer, runNewStdioServer } from "./src/presentation/server/new-server";
 
 const mode = process.env.TALEND_MCP_MODE ?? "http";
 
@@ -8,7 +8,7 @@ if (mode === "http") {
   const autoFunnel = process.env.TALEND_MCP_FUNNEL !== "false";
   const live = process.env.TALEND_MCP_LIVE !== "false";
 
-  const handle = await runHttpServer({
+  const handle = await runNewHttpServer({
     port,
     host,
     autoFunnel,
@@ -34,5 +34,5 @@ if (mode === "http") {
   }
 } else {
   const live = process.env.TALEND_MCP_LIVE !== "false";
-  await runStdioServer({ live, stderr: process.stderr });
+  await runNewStdioServer({ live });
 }

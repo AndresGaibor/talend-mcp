@@ -1,15 +1,20 @@
-import { buildJobItemXml, buildJobPropertiesXml } from "./src/talend/job-generator";
+import { buildJobItemXml, buildJobPropertiesXml, type JobSpec } from "./src/talend/job-generator";
 import { parseJobItem } from "./src/talend/job-parser";
 
-const spec = {
+const spec: JobSpec = {
   jobName: "MasteryTest",
   folderPath: "experts/tests",
+  version: "0.1",
+  label: "MasteryTest",
+  description: "Test description",
+  defaultContext: "Default",
   components: [
     {
       uniqueName: "tMap_1",
       componentName: "tMap",
       posX: 200,
       posY: 200,
+      parameters: {}
     },
     {
       uniqueName: "tDBOutput_1",
@@ -33,8 +38,8 @@ const spec = {
 };
 
 console.log("1. Generando XML experto...");
-const { xml: itemXml, rootId } = buildJobItemXml(spec as any);
-const propertiesXml = buildJobPropertiesXml(spec as any, rootId);
+const { xml: itemXml, rootId } = buildJobItemXml(spec);
+const propertiesXml = buildJobPropertiesXml(spec, rootId);
 
 console.log("2. Parseando XML generado para validación...");
 const parsed = parseJobItem(itemXml, "MasteryTest_0.1.item");
@@ -44,7 +49,8 @@ const tMap = parsed.components.find(c => c.componentName === "tMap");
 console.log("- tMap encontrado:", !!tMap);
 console.log("- tMap tiene nodeData (TalendMapper):", !!tMap?.rawNodeData);
 if (tMap?.rawNodeData) {
-    console.log("  - xsi:type:", tMap.rawNodeData["@_xsi:type"]);
+    const rawData = tMap.rawNodeData as Record<string, any>;
+    console.log("  - xsi:type:", rawData["@_xsi:type"]);
 }
 
 const tOutput = parsed.components.find(c => c.componentName === "tMysqlOutput");

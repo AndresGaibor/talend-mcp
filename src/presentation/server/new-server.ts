@@ -4,7 +4,6 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { allTools, toolCount } from "../tools/registry";
-import { registerPresentationApps } from "../apps";
 
 export interface NewServerOptions {
   port?: number;
@@ -102,8 +101,6 @@ export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.W
       tool.handler as never,
     );
   }
-
-  registerPresentationApps(server);
 
   return server;
 }
