@@ -11,7 +11,7 @@ import com.andres.talend.bridge.workbench.WorkbenchService;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.ui.IEditorPart;
-import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.IWorkbenchPage;
 
 public final class AutomationService {
 

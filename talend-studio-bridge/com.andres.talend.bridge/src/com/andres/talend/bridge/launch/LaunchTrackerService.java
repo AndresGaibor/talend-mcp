@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.andres.talend.bridge.JsonUtil;
-
 public final class LaunchTrackerService {
 
   public static class LaunchRunInfo {
@@ -43,12 +41,10 @@ public final class LaunchTrackerService {
       while ((line = reader.readLine()) != null) {
         if (line.trim().isEmpty()) continue;
         try {
-          LaunchRunInfo info = JsonUtil.parse(line, LaunchRunInfo.class);
+          LaunchRunInfo info = deserialize(line);
           if (info != null && info.launchId != null) {
-            // Último evento gana por launchId
             launches.put(info.launchId, info);
-            
-            // Actualizar mapping de nombre a ID si es el más reciente
+
             String currentLatest = launchNameToLatestId.get(info.launchConfigName);
             if (currentLatest == null) {
               launchNameToLatestId.put(info.launchConfigName, info.launchId);
@@ -67,7 +63,8 @@ public final class LaunchTrackerService {
   }
 
   public static String registerLaunch(String launchConfigName, String mode) {
-    String launchId = "launch_" + System.currentTimeMillis() + "_" + launchConfigName.replaceAll("\\s+", "_");
+    String safeName = launchConfigName.replaceAll("[^a-zA-Z0-9_.-]+", "_");
+    String launchId = "launch_" + System.currentTimeMillis() + "_" + safeName;
     LaunchRunInfo info = new LaunchRunInfo();
     info.launchId = launchId;
     info.launchConfigName = launchConfigName;
@@ -119,7 +116,7 @@ public final class LaunchTrackerService {
     try {
       File file = getStoreFile();
       try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(file, true), StandardCharsets.UTF_8)) {
-        writer.write(JsonUtil.stringify(info) + "\n");
+        writer.write(serialize(info) + "\n");
       }
     } catch (Exception e) {
       System.err.println("Failed to persist launch run: " + e.getMessage());
@@ -129,7 +126,44 @@ public final class LaunchTrackerService {
   private static File getStoreFile() {
     File dir = new File(System.getProperty("user.home"), ".talend-bridge");
     if (!dir.exists()) dir.mkdirs();
-    return new File(dir, "launch-runs.jsonl");
+    return new File(dir, "launch-runs.txt");
+  }
+
+  private static String serialize(LaunchRunInfo info) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(nullSafe(info.launchId)).append("|");
+    sb.append(nullSafe(info.launchConfigName)).append("|");
+    sb.append(nullSafe(info.mode)).append("|");
+    sb.append(info.startedAt).append("|");
+    sb.append(info.terminatedAt != null ? info.terminatedAt : "").append("|");
+    sb.append(info.durationMs != null ? info.durationMs : "").append("|");
+    sb.append(nullSafe(info.status)).append("|");
+    sb.append(info.exitCode != null ? info.exitCode : "").append("|");
+    sb.append(info.extra != null ? info.extra.toString() : "");
+    return sb.toString();
+  }
+
+  private static String nullSafe(String s) {
+    return s != null ? s : "";
+  }
+
+  private static LaunchRunInfo deserialize(String line) {
+    try {
+      String[] parts = line.split("\\|", -1);
+      if (parts.length < 8) return null;
+      LaunchRunInfo info = new LaunchRunInfo();
+      info.launchId = parts[0];
+      info.launchConfigName = parts[1];
+      info.mode = parts[2];
+      info.startedAt = Long.parseLong(parts[3]);
+      info.terminatedAt = parts[4].isEmpty() ? null : Long.parseLong(parts[4]);
+      info.durationMs = parts[5].isEmpty() ? null : Long.parseLong(parts[5]);
+      info.status = parts[6];
+      info.exitCode = parts[7].isEmpty() ? null : Integer.parseInt(parts[7]);
+      return info;
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   public static String findLatestLaunchIdByName(String launchConfigName) {

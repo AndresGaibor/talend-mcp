@@ -30,7 +30,7 @@ export const automationTools = [
     },
   },
   {
-    name: "talend_command_catalog",
+    name: "talend_commands_catalog",
     description: "Lista el catálogo de comandos disponibles.",
     inputSchema: z.object({}),
     handler: async () => {
@@ -46,7 +46,7 @@ export const automationTools = [
     },
   },
   {
-    name: "talend_command_search",
+    name: "talend_commands_search",
     description: "Busca comandos por nombre o categoría.",
     inputSchema: z.object({
       query: z.string().describe("Texto a buscar"),
@@ -64,7 +64,7 @@ export const automationTools = [
     },
   },
   {
-    name: "talend_command_allow",
+    name: "talend_commands_allow",
     description: "Permite un comando peligroso.",
     inputSchema: z.object({
       commandId: z.string().describe("ID del comando a permitir"),
@@ -82,7 +82,7 @@ export const automationTools = [
     },
   },
   {
-    name: "talend_command_block",
+    name: "talend_commands_block",
     description: "Bloquea un comando peligroso.",
     inputSchema: z.object({
       commandId: z.string().describe("ID del comando a bloquear"),
@@ -131,12 +131,13 @@ export const automationTools = [
   },
   {
     name: "talend_commands_execute_safe",
-    description: "Ejecuta un comando solo si está permitido y es seguro.",
+    description: "Ejecuta un comando solo si está permitido y es seguro. Los comandos danger requieren allowDanger=true.",
     inputSchema: z.object({
       commandId: z.string().describe("ID del comando"),
       dryRun: z.boolean().optional().default(false).describe("Si es dry run"),
+      allowDanger: z.boolean().optional().default(false).describe("Permitir ejecutar comandos peligrosos"),
     }),
-    handler: async ({ commandId, dryRun }: { commandId: string; dryRun?: boolean }) => {
+    handler: async ({ commandId, dryRun, allowDanger }: { commandId: string; dryRun?: boolean; allowDanger?: boolean }) => {
       const { isCommandAllowed, getCommand } = await import("../commands/command-catalog");
       const cmd = getCommand(commandId);
       if (!cmd) {
@@ -146,6 +147,15 @@ export const automationTools = [
           confidence: "low",
           endpoint: "/commands/execute-safe",
           error: { code: "NOT_FOUND", message: "Comando no encontrado en catálogo: " + commandId },
+        });
+      }
+      if (cmd.risk === "danger" && !allowDanger) {
+        return bridgeFail({
+          ok: false,
+          source: "mcp",
+          confidence: "high",
+          endpoint: "/commands/execute-safe",
+          error: { code: "DANGER_COMMAND_BLOCKED", message: "El comando es peligroso. Usa allowDanger=true explícitamente si realmente quieres ejecutarlo." },
         });
       }
       if (!isCommandAllowed(commandId)) {

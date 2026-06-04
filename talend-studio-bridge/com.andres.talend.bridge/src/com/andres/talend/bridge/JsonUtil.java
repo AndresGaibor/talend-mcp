@@ -4,10 +4,10 @@ import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.Map;
 
-final class JsonUtil {
+public final class JsonUtil {
   private JsonUtil() {}
 
-  static String stringify(Object value) {
+  public static String stringify(Object value) {
     StringBuilder sb = new StringBuilder();
     append(sb, value);
     return sb.toString();

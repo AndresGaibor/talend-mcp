@@ -14,6 +14,7 @@ import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.model.IProcess;
+import org.eclipse.debug.core.DebugException;
 
 import org.eclipse.ui.ISelectionListener;
 import org.eclipse.ui.ISelectionService;
@@ -237,7 +238,7 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
     IResourceDelta delta = event.getDelta();
     if (delta == null) return;
     Map<String, Object> info = new LinkedHashMap<>();
-    info.put("kind", kindName(event.getKind()));
+    info.put("kind", resourceKindName(event.getType()));
     info.put("resource", delta.getFullPath().toString());
     info.put("flags", delta.getFlags());
     boolean isProblem = (delta.getFlags() & IResourceDelta.MARKERS) != 0;
@@ -248,14 +249,13 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
     }
   }
 
-  private static String kindName(int kind) {
-    switch (kind) {
+  private static String resourceKindName(int type) {
+    switch (type) {
       case IResourceChangeEvent.PRE_DELETE: return "pre_delete";
       case IResourceChangeEvent.PRE_BUILD: return "pre_build";
       case IResourceChangeEvent.POST_BUILD: return "post_build";
       case IResourceChangeEvent.POST_CHANGE: return "post_change";
       case IResourceChangeEvent.PRE_REFRESH: return "pre_refresh";
-      case IResourceChangeEvent.POST_REFRESH: return "post_refresh";
       default: return "unknown";
     }
   }
