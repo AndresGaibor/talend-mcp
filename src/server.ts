@@ -64,6 +64,7 @@ import { studioToolDefs } from "./tools/new-tools";
 import { parseXml, buildXml, asArray } from "./talend/xml";
 import { wrapHandler } from "./tools/live-logger";
 import { resolvePublicUrl } from "./tailscale/resolve-public-url";
+import { registerPresentationApps } from "./presentation/apps";
 
 // ──────────────────── Helpers internos ────────────────────
 
@@ -1822,6 +1823,8 @@ export function createTalendMcpServer(options?: CreateServerOptions): McpServer 
       annotations: getToolAnnotations(tool.name),
     }, handler);
   }
+
+  registerPresentationApps(server);
 
   return server;
 }
