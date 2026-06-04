@@ -29,6 +29,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # talend-mcp runtime
 .talend-mcp/runs/
+.talend-mcp/bin/
+
+# Gemini/Antigravity local config
+.antigravitycli/
 
 # IntelliJ based IDEs
 .idea
