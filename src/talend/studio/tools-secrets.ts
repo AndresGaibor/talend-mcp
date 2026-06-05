@@ -26,7 +26,7 @@ interface SecretScanResult {
 }
 
 const SECRET_PATTERNS = [
-  { pattern: /password\s*=\s*["'][^"']{1,50}["']/gi, risk: "high" as const, description: "Password en texto plano", suggestion: "Usar contexto con переменная de entorno o credential store" },
+  { pattern: /password\s*=\s*["'][^"']{1,50}["']/gi, risk: "high" as const, description: "Password en texto plano", suggestion: "Usar contexto con variable de entorno o credential store" },
   { pattern: /passwd\s*=\s*["'][^"']{1,50}["']/gi, risk: "high" as const, description: "Passwd en texto plano", suggestion: "Usar contexto con переменная de entorno o credential store" },
   { pattern: /db_password\s*=\s*["'][^"']{1,50}["']/gi, risk: "high" as const, description: "Database password en texto plano", suggestion: "Migrar a context profile con secret storage" },
   { pattern: /secret\s*=\s*["'][^"']{1,50}["']/gi, risk: "high" as const, description: "Secret en texto plano", suggestion: "Usar credential store o vault" },

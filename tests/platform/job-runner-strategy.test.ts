@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { detectJobRunnerStrategy, buildScriptExecutionArgs, selectScriptByPlatform } from "../../src/platform/job-runner-strategy";
+import { detectJobRunnerStrategy, buildScriptExecutionArgs, selectScriptByPlatform, getScriptPathForExistsSync, executeJob } from "../../src/platform/job-runner-strategy";
 import type { PlatformContext } from "../../src/platform/runtime";
 
 const macContext: PlatformContext = { runtimeOs: "macos", talendHostOs: "macos", pathMode: "native" };
@@ -72,5 +72,14 @@ describe("selectScriptByPlatform", () => {
     const onlyWindows = [{ platform: "windows", scriptPath: "/path/script.bat" }];
     const result = selectScriptByPlatform(onlyWindows, s);
     expect(result?.platform).toBe("windows");
+  });
+});
+
+describe("WSL path conversion para existsSync", () => {
+  test("C:\\... se convierte a /mnt/c/... para existsSync en WSL", () => {
+    const wslCtx: PlatformContext = { runtimeOs: "wsl", talendHostOs: "windows", pathMode: "wsl-windows" };
+    const winPath = "C:\\talend\\jobs\\test.bat";
+    const mcpPath = getScriptPathForExistsSync(winPath, wslCtx);
+    expect(mcpPath).toMatch(/^\/mnt\/c\/talend/);
   });
 });

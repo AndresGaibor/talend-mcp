@@ -1,0 +1,1 @@
+export { registerReactAppResource, registrarAppsReact } from "./react-app-resource";

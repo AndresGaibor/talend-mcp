@@ -1,5 +1,7 @@
 import * as z from "zod/v4";
 import { bridgeOk, bridgeFail, loadBridge, bridgeResultToEnvelope } from "./tools-base";
+import { createPlatformContext } from "../../platform";
+import { toTalendHostPath } from "../../platform/path-bridge";
 
 export const bridgeTools = [
   {
@@ -100,7 +102,9 @@ export const bridgeTools = [
     }),
     handler: async ({ path }: { path: string }) => {
       const bridge = await loadBridge();
-      const result = await bridge.openResource(path);
+      const ctx = createPlatformContext();
+      const studioPath = toTalendHostPath(path, ctx);
+      const result = await bridge.openResource(studioPath);
       return bridgeOk(bridgeResultToEnvelope(result, "/workbench/open-resource"));
     },
   },

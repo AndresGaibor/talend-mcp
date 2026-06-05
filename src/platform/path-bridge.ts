@@ -42,7 +42,10 @@ function windowsToWslManual(windowsPath: string): string {
 export function toMcpPath(talendHostPath: string, ctx: PlatformContext): string {
   if (ctx.pathMode !== "wsl-windows") return talendHostPath;
 
-  if (talendHostPath.includes(":\\") || talendHostPath.startsWith("\\\\")) {
+  if (talendHostPath.includes(":\\") || talendHostPath.includes(":/") || talendHostPath.startsWith("\\\\")) {
+    if (talendHostPath.startsWith("\\\\")) {
+      throw new Error(`Ruta UNC no soportada: ${talendHostPath}. Usa rutas de unidad de red mapeadas (ej. Z:\\).`);
+    }
     const wslResult = tryWslpathToPosix(talendHostPath);
     if (wslResult) return wslResult;
     return windowsToWslManual(talendHostPath);
@@ -84,6 +87,20 @@ export function getDirNamePortable(path: string): string {
   const idx = normalized.lastIndexOf("/");
   if (idx === -1) return ".";
   return normalized.slice(0, idx) || "/";
+}
+
+export function normalizeLogicalTalendPath(folderPath: string): string {
+  return normalizeLogicalTalendFolderPath(folderPath);
+}
+
+export function toRuntimeShellPath(path: string, ctx: PlatformContext): string {
+  if (ctx.pathMode !== "wsl-windows") return path;
+  if (path.startsWith("/mnt/")) {
+    const wslResult = tryWslpathToWindows(path);
+    if (wslResult) return wslResult;
+    return wslToWindowsManual(path);
+  }
+  return path;
 }
 
 export function splitPortable(path: string): string[] {

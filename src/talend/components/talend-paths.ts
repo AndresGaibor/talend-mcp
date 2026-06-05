@@ -9,34 +9,43 @@ export type TalendStudioCandidates = {
   studioHomeCandidates: string[];
 };
 
+function getStudioVersion(): string {
+  return process.env.TALEND_STUDIO_VERSION ?? "8.0.1";
+}
+
+function getTalendBaseDir(): string {
+  return process.env.TALEND_BASE_DIR ?? (detectRuntimeOS() === "windows" ? "C:\\Program Files" : "/opt/talend");
+}
+
 function getPlatformCandidates(): TalendStudioCandidates {
   const os = detectRuntimeOS();
+  const version = getStudioVersion();
 
   if (os === "macos") {
     return {
       pluginsDirCandidates: [
-        "/Applications/TalendStudio-8.0.1/studio/plugins",
-        "/Applications/TalendStudio-7.3.1/studio/plugins",
+        `${getTalendBaseDir()}/TalendStudio-${version}/studio/plugins`,
+        `${getTalendBaseDir()}/TalendStudio-7.3.1/studio/plugins`,
       ],
       studioHomeCandidates: [
-        "/Applications/TalendStudio-8.0.1/studio",
-        "/Applications/TalendStudio-7.3.1/studio",
+        `${getTalendBaseDir()}/TalendStudio-${version}/studio`,
+        `${getTalendBaseDir()}/TalendStudio-7.3.1/studio`,
         "/Applications/Talicend Studio.app",
       ],
     };
   }
 
   if (os === "windows") {
-    const pf = process.env["ProgramFiles"] ?? "C:\\Program Files";
+    const base = getTalendBaseDir();
     const pf86 = process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";
     return {
       pluginsDirCandidates: [
-        join(pf, "TalendStudio-8.0.1", "studio", "plugins"),
-        join(pf86, "TalendStudio-8.0.1", "studio", "plugins"),
+        join(base, `TalendStudio-${version}`, "studio", "plugins"),
+        join(pf86, `TalendStudio-${version}`, "studio", "plugins"),
       ],
       studioHomeCandidates: [
-        join(pf, "TalendStudio-8.0.1", "studio"),
-        join(pf86, "TalendStudio-8.0.1", "studio"),
+        join(base, `TalendStudio-${version}`, "studio"),
+        join(pf86, `TalendStudio-${version}`, "studio"),
       ],
     };
   }
@@ -44,10 +53,10 @@ function getPlatformCandidates(): TalendStudioCandidates {
   if (os === "wsl") {
     return {
       pluginsDirCandidates: [
-        "/mnt/c/Program Files/TalendStudio-8.0.1/studio/plugins",
+        `/mnt/c/Program Files/TalendStudio-${version}/studio/plugins`,
       ],
       studioHomeCandidates: [
-        "/mnt/c/Program Files/TalendStudio-8.0.1/studio",
+        `/mnt/c/Program Files/TalendStudio-${version}/studio`,
       ],
     };
   }

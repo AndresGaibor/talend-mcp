@@ -23,7 +23,16 @@ export function isWsl(): boolean {
   return false;
 }
 
-export function detectRuntimeOS(): RuntimeOS {
+export function detectRuntimeOS(overrides?: {
+  platform?: string;
+  isWslOverride?: boolean;
+}): RuntimeOS {
+  if (overrides?.platform) {
+    if (overrides.platform === "darwin") return "macos";
+    if (overrides.platform === "win32") return "windows";
+    if (overrides.platform === "linux" && (overrides.isWslOverride ?? isWsl())) return "wsl";
+    return "linux";
+  }
   if (process.platform === "darwin") return "macos";
   if (process.platform === "win32") return "windows";
   if (process.platform === "linux" && isWsl()) return "wsl";
@@ -42,7 +51,11 @@ export function detectTalendHostOS(talendHostOsEnv?: string): TalendHostOS {
   return "linux";
 }
 
-export function detectPathMode(talendPathModeEnv?: string, runtimeOs?: RuntimeOS, talendHostOs?: TalendHostOS): PathMode {
+export function detectPathMode(
+  talendPathModeEnv?: string,
+  runtimeOs?: RuntimeOS,
+  talendHostOs?: TalendHostOS,
+): PathMode {
   if (talendPathModeEnv === "wsl-windows") return "wsl-windows";
   if (talendPathModeEnv === "native") return "native";
 
@@ -55,8 +68,10 @@ export function detectPathMode(talendPathModeEnv?: string, runtimeOs?: RuntimeOS
 export function createPlatformContext(overrides?: {
   talendHostOs?: string;
   pathMode?: string;
+  runtimeOs?: RuntimeOS;
+  platformOverrides?: { platform?: string; isWslOverride?: boolean };
 }): PlatformContext {
-  const runtimeOs = detectRuntimeOS();
+  const runtimeOs = overrides?.runtimeOs ?? detectRuntimeOS(overrides?.platformOverrides);
   const talendHostOs = detectTalendHostOS(overrides?.talendHostOs ?? process.env.TALEND_HOST_OS);
   const pathMode = detectPathMode(
     overrides?.pathMode ?? process.env.TALEND_PATH_MODE,
