@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
 import { useAppSession } from "../../openai/useAppSession";
+import { AppHeader, ErrorBanner } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Badge } from "../../components/Badge";
+import { Button } from "../../components/Button";
 import { ScoreCard } from "./ScoreCard";
 import { ChecksList, type ValidationCheck } from "./ChecksList";
 import { ProblemsTable, type Problem } from "./ProblemsTable";
@@ -78,9 +80,9 @@ export function ValidationReportApp() {
         const data = JSON.parse(designResult.result);
         checks.push({
           id: "design",
-          label: "Diseño del Job",
+          label: "Diseno del Job",
           status: data.valid ? "ok" : "error",
-          message: data.valid ? "Válido" : "Diseño inválido",
+          message: data.valid ? "Valido" : "Diseno invalido",
         });
         if (!data.valid && data.errors) {
           data.errors.forEach((err: string, idx: number) => {
@@ -88,19 +90,19 @@ export function ValidationReportApp() {
               marker: "D",
               severity: "error",
               description: err,
-              suggestedFix: `Revisar diseño del job: ${err}`,
+              suggestedFix: `Revisar diseno del job: ${err}`,
             });
             suggestedFixes.push({
               id: `fix-design-${fixIdCounter++}`,
               problemId: `design-${idx}`,
-              description: `Revisar diseño del job: ${err}`,
+              description: `Revisar diseno del job: ${err}`,
               automated: false,
               effort: "medium",
             });
           });
         }
       } catch {
-        checks.push({ id: "design", label: "Diseño del Job", status: "error", message: "Error al validar" });
+        checks.push({ id: "design", label: "Diseno del Job", status: "error", message: "Error al validar" });
       }
     }
 
@@ -159,12 +161,12 @@ export function ValidationReportApp() {
               marker: "A",
               severity: "warning",
               description: "Columnas de audit no habilitadas",
-              suggestedFix: "Habilitar auditColumns en la especificación del job",
+              suggestedFix: "Habilitar auditColumns en la especificacion del job",
             });
             suggestedFixes.push({
               id: `fix-audit-${fixIdCounter++}`,
               problemId: "audit-1",
-              description: "Habilitar auditColumns en la especificación del job",
+              description: "Habilitar auditColumns en la especificacion del job",
               automated: true,
               effort: "low",
             });
@@ -173,14 +175,14 @@ export function ValidationReportApp() {
             problems.push({
               marker: "T",
               severity: "warning",
-              description: "Falta columna técnica _load_ts",
+              description: "Falta columna tecnica _load_ts",
             });
           }
           if (!data.has_load_run) {
             problems.push({
               marker: "T",
               severity: "warning",
-              description: "Falta columna técnica _load_run",
+              description: "Falta columna tecnica _load_run",
             });
           }
         }
@@ -200,9 +202,9 @@ export function ValidationReportApp() {
         performanceSettings.issues = data.issues ?? [];
         checks.push({
           id: "performance",
-          label: "Configuración de Performance",
+          label: "Configuracion de Performance",
           status: hasIssues ? "warning" : "ok",
-          message: data.recommendation ?? (hasIssues ? `${data.issues?.length} problema(s)` : "Óptimo"),
+          message: data.recommendation ?? (hasIssues ? `${data.issues?.length} problema(s)` : "Optimo"),
         });
         if (hasIssues && data.issues) {
           data.issues.forEach((issue: string) => {
@@ -214,7 +216,7 @@ export function ValidationReportApp() {
           });
         }
       } catch {
-        checks.push({ id: "performance", label: "Configuración de Performance", status: "error", message: "Error al validar" });
+        checks.push({ id: "performance", label: "Configuracion de Performance", status: "error", message: "Error al validar" });
       }
     }
 
@@ -260,12 +262,12 @@ export function ValidationReportApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Reporte de Validación</h2>
-          <p className="text-gray-500 mt-1">Validación de jobs y contexto</p>
-        </div>
-      </div>
+      <AppHeader
+        title="Reporte de Validacion"
+        subtitle="Validacion de jobs y contexto"
+      />
+
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
       <Card className="p-4">
         <div className="flex gap-4 items-end">
@@ -280,15 +282,10 @@ export function ValidationReportApp() {
               onKeyDown={(e) => e.key === "Enter" && runValidations(jobName)}
             />
           </div>
-          <button
-            onClick={() => runValidations(jobName)}
-            disabled={isLoading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button onClick={() => runValidations(jobName)} disabled={isLoading || !jobName.trim()}>
             {isLoading ? "Validando..." : "Validar"}
-          </button>
+          </Button>
         </div>
-        {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
       </Card>
 
       {hasData && (
@@ -307,11 +304,16 @@ export function ValidationReportApp() {
               <Card className="p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Contextos Faltantes</h3>
                 {state.missingContexts.length === 0 ? (
-                  <p className="text-sm text-emerald-600">✓ Sin contextos faltantes</p>
+                  <p className="text-sm text-emerald-600">Sin contextos faltantes</p>
                 ) : (
                   <ul className="space-y-1">
                     {state.missingContexts.map((ctx, idx) => (
-                      <li key={idx} className="text-sm text-amber-600">⚠ {ctx}</li>
+                      <li key={idx} className="text-sm text-amber-600 flex items-center gap-1.5">
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                        {ctx}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -328,13 +330,13 @@ export function ValidationReportApp() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={state.auditColumns.has_load_ts ? "success" : "error"}>
-                      {state.auditColumns.has_load_ts ? "✓" : "✗"}
+                      {state.auditColumns.has_load_ts ? "OK" : "N/A"}
                     </Badge>
                     <span className="text-sm text-gray-700">_load_ts</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={state.auditColumns.has_load_run ? "success" : "error"}>
-                      {state.auditColumns.has_load_run ? "✓" : "✗"}
+                      {state.auditColumns.has_load_run ? "OK" : "N/A"}
                     </Badge>
                     <span className="text-sm text-gray-700">_load_run</span>
                   </div>
@@ -344,15 +346,15 @@ export function ValidationReportApp() {
           </div>
 
           <Card className="p-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Configuración de Performance</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Configuracion de Performance</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <p className="text-sm text-gray-500">Batch Size</p>
                 <p className="text-xl font-semibold text-gray-900">{state.performanceSettings.batchSize}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Recomendación</p>
-                <p className="text-sm text-gray-700">{state.performanceSettings.recommendation || "—"}</p>
+                <p className="text-sm text-gray-500">Recomendacion</p>
+                <p className="text-sm text-gray-700">{state.performanceSettings.recommendation || "-"}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Problemas</p>
@@ -364,7 +366,12 @@ export function ValidationReportApp() {
             {state.performanceSettings.issues.length > 0 && (
               <ul className="mt-3 space-y-1">
                 {state.performanceSettings.issues.map((issue, idx) => (
-                  <li key={idx} className="text-sm text-amber-600">⚠ {issue}</li>
+                  <li key={idx} className="text-sm text-amber-600 flex items-center gap-1.5">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                    </svg>
+                    {issue}
+                  </li>
                 ))}
               </ul>
             )}
@@ -373,7 +380,7 @@ export function ValidationReportApp() {
           <Card className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">DB Outputs</h3>
             {state.dbOutputs.length === 0 ? (
-              <p className="text-sm text-gray-500">No hay información de DB outputs</p>
+              <p className="text-sm text-gray-500">No hay informacion de DB outputs</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { AppHeader, ErrorBanner, LoadingState } from "../../design-system";
+import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { SecretsTable, type SecretFinding } from "./SecretsTable";
 import { ContextMigrationPanel } from "./ContextMigrationPanel";
@@ -82,25 +84,17 @@ export function SecretSafetyApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Secret Safety</h2>
-          <p className="text-gray-500 mt-1">Detect and migrate exposed secrets</p>
-        </div>
-        <button
-          onClick={runScan}
-          disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {isLoading ? "Scanning..." : "Run Scan"}
-        </button>
-      </div>
+      <AppHeader
+        title="Secret Safety"
+        subtitle="Detect and migrate exposed secrets"
+        actions={
+          <Button onClick={runScan} disabled={isLoading} size="sm">
+            {isLoading ? "Scanning..." : "Run Scan"}
+          </Button>
+        }
+      />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
+      <ErrorBanner message={error} />
 
       {scanResult && stats && (
         <>
@@ -169,14 +163,7 @@ export function SecretSafetyApp() {
         </Card>
       )}
 
-      {isLoading && (
-        <Card className="p-6 text-center">
-          <div className="flex items-center justify-center gap-3">
-            <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
-            <span className="text-gray-500">Scanning for secrets...</span>
-          </div>
-        </Card>
-      )}
+      {isLoading && <LoadingState message="Scanning for secrets..." />}
     </div>
   );
 }

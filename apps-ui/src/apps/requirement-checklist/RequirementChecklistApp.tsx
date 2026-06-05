@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { AppHeader, ErrorBanner } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Badge } from "../../components/Badge";
+import { Button } from "../../components/Button";
 import type { RequirementItem, RequirementAnalysisResult, ChecklistBuildResult } from "./types";
 
 const RESPONSIBILITY_COLORS = {
@@ -74,7 +76,7 @@ export function RequirementChecklistApp() {
         setItems(data.requirements);
       }
     } catch {
-      setError("Error al parsear resultado del análisis");
+      setError("Error al parsear resultado del analisis");
     }
   }, [callTool, requirementText]);
 
@@ -94,12 +96,12 @@ export function RequirementChecklistApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Requirement Checklist</h2>
-          <p className="text-gray-500 mt-1">Analiza requerimientos de workshop y genera checklist</p>
-        </div>
-      </div>
+      <AppHeader
+        title="Requirement Checklist"
+        subtitle="Analiza requerimientos de workshop y genera checklist"
+      />
+
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
       <Card className="p-4">
         <div className="space-y-4">
@@ -111,19 +113,14 @@ export function RequirementChecklistApp() {
               id="requirement-text"
               value={requirementText}
               onChange={(e) => setRequirementText(e.target.value)}
-              placeholder="Pega aquí el texto del requerimiento del workshop..."
+              placeholder="Pega aqui el texto del requerimiento del workshop..."
               rows={6}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
             />
           </div>
-          <button
-            onClick={analyzeRequirements}
-            disabled={isLoading || !requirementText.trim()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button onClick={analyzeRequirements} disabled={isLoading || !requirementText.trim()}>
             {isLoading ? "Analizando..." : "Analizar Requerimientos"}
-          </button>
-          {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+          </Button>
         </div>
       </Card>
 
@@ -209,7 +206,7 @@ export function RequirementChecklistApp() {
                     type="text"
                     value={item.evidence ?? ""}
                     onChange={(e) => updateItemEvidence(item.id, e.target.value)}
-                    placeholder="Documenta la evidencia aquí..."
+                    placeholder="Documenta la evidencia aqui..."
                     className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>

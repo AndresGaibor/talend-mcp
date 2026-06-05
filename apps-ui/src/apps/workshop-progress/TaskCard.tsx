@@ -76,10 +76,12 @@ export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
           <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
           <button
             onClick={() => onDelete(task.id)}
-            className="text-gray-400 hover:text-red-500 text-xs"
+            className="text-gray-400 hover:text-red-500"
             title="Eliminar tarea"
           >
-            ✕
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
         {task.description && (
@@ -93,18 +95,22 @@ export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
             <button
               onClick={handleMoveLeft}
               disabled={STATUS_ORDER.indexOf(task.status) === 0}
-              className="text-xs px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-30"
+              className="p-1 bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-30"
               title="Mover a la izquierda"
             >
-              ←
+              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
             <button
               onClick={handleMoveRight}
               disabled={STATUS_ORDER.indexOf(task.status) === STATUS_ORDER.length - 1}
-              className="text-xs px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-30"
+              className="p-1 bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-30"
               title="Mover a la derecha"
             >
-              →
+              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </button>
           </div>
         </div>

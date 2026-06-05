@@ -1,5 +1,6 @@
 import type { PresentationAppDefinition } from "../app-types";
 import { createJsonAction, createTextAction, createNoInputAction } from "./action-helpers";
+import { TOOL_NAMES } from "../../../tools/tool-names";
 
 export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
   {
@@ -10,8 +11,8 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_dashboard",
     launchMessage: "Abriendo el dashboard de Talend.",
     actions: [
-      createNoInputAction("Bridge ping", "talend_bridge_ping", "Verifica el bridge."),
-      createNoInputAction("List jobs", "talend_jobs_list", "Lista los jobs disponibles."),
+      createNoInputAction("Bridge ping", TOOL_NAMES.BRIDGE.PING, "Verifica el bridge."),
+      createNoInputAction("List jobs", TOOL_NAMES.JOBS.LIST, "Lista los jobs disponibles."),
       createNoInputAction("Coverage report", "talend_coverage_report", "Muestra cobertura y gaps."),
     ],
   },
@@ -24,9 +25,9 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo la vista de entregables.",
     uiMode: "react",
     actions: [
-      createTextAction("Export deliverable", "talend_deliverables_export_job", "Prepara un paquete de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob", requiresConfirmation: true }),
-      createTextAction("Collect files", "talend_deliverables_collect", "Recolecta archivos asociados.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Validate checklist", "talend_deliverables_validate", "Valida requisitos de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Export deliverable", TOOL_NAMES.DELIVERABLES.EXPORT_JOB, "Prepara un paquete de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob", requiresConfirmation: true }),
+      createTextAction("Collect files", TOOL_NAMES.DELIVERABLES.COLLECT, "Recolecta archivos asociados.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate checklist", TOOL_NAMES.DELIVERABLES.VALIDATE, "Valida requisitos de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
   {
@@ -38,9 +39,9 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el catálogo de componentes.",
     uiMode: "react",
     actions: [
-      createTextAction("Scan installed", "talend_components_scan_installed", "Escanea componentes instalados.", "pluginsDir", { inputLabel: "Plugins dir", inputPlaceholder: "Ruta a plugins de Talend Studio" }),
-      createTextAction("Search component", "talend_components_search", "Busca componentes en el catálogo.", "query", { inputLabel: "Query", inputPlaceholder: "mysql" }),
-      createTextAction("Inspect component", "talend_components_inspect", "Inspecciona un componente.", "componentName", { inputLabel: "Component name", inputPlaceholder: "tMysqlInput" }),
+      createTextAction("Scan installed", TOOL_NAMES.COMPONENTS.SCAN_INSTALLED, "Escanea componentes instalados.", "pluginsDir", { inputLabel: "Plugins dir", inputPlaceholder: "Ruta a plugins de Talend Studio" }),
+      createTextAction("Search component", TOOL_NAMES.COMPONENTS.SEARCH, "Busca componentes en el catálogo.", "query", { inputLabel: "Query", inputPlaceholder: "mysql" }),
+      createTextAction("Inspect component", TOOL_NAMES.COMPONENTS.INSPECT, "Inspecciona un componente.", "componentName", { inputLabel: "Component name", inputPlaceholder: "tMysqlInput" }),
     ],
   },
   {
@@ -51,9 +52,9 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_command_center",
     launchMessage: "Abriendo el centro de comando.",
     actions: [
-      createNoInputAction("Bridge commands", "talend_bridge_commands", "Lista comandos del bridge."),
-      createNoInputAction("Launch configs", "talend_bridge_launch_configs", "Lista launch configs."),
-      createNoInputAction("Recent events", "talend_bridge_events_recent", "Muestra eventos recientes."),
+      createNoInputAction("Bridge commands", TOOL_NAMES.BRIDGE.COMMANDS, "Lista comandos del bridge."),
+      createNoInputAction("Launch configs", TOOL_NAMES.BRIDGE.LAUNCH_CONFIGS, "Lista launch configs."),
+      createNoInputAction("Recent events", TOOL_NAMES.BRIDGE.EVENTS_RECENT, "Muestra eventos recientes."),
     ],
   },
   {
@@ -65,8 +66,8 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo la pantalla de inicio.",
     uiMode: "react",
     actions: [
-      createNoInputAction("Bridge ping", "talend_bridge_ping", "Verifica el bridge."),
-      createNoInputAction("List jobs", "talend_jobs_list", "Lista los jobs del proyecto."),
+      createNoInputAction("Bridge ping", TOOL_NAMES.BRIDGE.PING, "Verifica el bridge."),
+      createNoInputAction("List jobs", TOOL_NAMES.JOBS.LIST, "Lista los jobs del proyecto."),
       createNoInputAction("Coverage report", "talend_coverage_report", "Muestra cobertura y gaps."),
     ],
   },
@@ -78,9 +79,9 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_workspace_explorer",
     launchMessage: "Abriendo el explorador de workspace.",
     actions: [
-      createNoInputAction("Workbench state", "talend_bridge_workbench_state", "Obtiene el estado del workbench."),
-      createNoInputAction("Active job", "talend_get_probable_active_job", "Detecta el job activo probable."),
-      createNoInputAction("Open editors", "talend_list_open_editors", "Lista editores abiertos."),
+      createNoInputAction("Workbench state", TOOL_NAMES.BRIDGE.WORKBENCH_STATE, "Obtiene el estado del workbench."),
+      createNoInputAction("Active job", TOOL_NAMES.STUDIO.PROBABLE_ACTIVE_JOB, "Detecta el job activo probable."),
+      createNoInputAction("Open editors", TOOL_NAMES.STUDIO.LIST_OPEN_EDITORS, "Lista editores abiertos."),
     ],
   },
   {
@@ -91,10 +92,10 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_context_profiles",
     launchMessage: "Abriendo los perfiles de contexto.",
     actions: [
-      createNoInputAction("List project contexts", "talend_list_project_contexts", "Lista contextos del proyecto."),
-      createNoInputAction("List context profiles", "talend_context_profile_list", "Lista perfiles de contexto."),
-      createTextAction("Get profile", "talend_context_profile_get", "Obtiene un perfil de contexto.", "profileName", { inputLabel: "Profile name", inputPlaceholder: "Default" }),
-      createJsonAction("Apply to job", "talend_context_profile_apply_to_job", "Aplica un perfil a una spec de job.", { profileName: "Default", jobSpec: {} }),
+      createNoInputAction("List project contexts", TOOL_NAMES.CONTEXTS.LIST_PROJECT, "Lista contextos del proyecto."),
+      createNoInputAction("List context profiles", TOOL_NAMES.CONTEXTS.PROFILE_LIST, "Lista perfiles de contexto."),
+      createTextAction("Get profile", TOOL_NAMES.CONTEXTS.PROFILE_GET, "Obtiene un perfil de contexto.", "profileName", { inputLabel: "Profile name", inputPlaceholder: "Default" }),
+      createJsonAction("Apply to job", TOOL_NAMES.CONTEXTS.PROFILE_APPLY_TO_JOB, "Aplica un perfil a una spec de job.", { profileName: "Default", jobSpec: {} }),
     ],
   },
   {
@@ -119,9 +120,9 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el scanner de secretos.",
     uiMode: "react",
     actions: [
-      createNoInputAction("Scan project", "talend_secrets_scan_project", "Escanea todo el proyecto en busca de secretos expuestos."),
-      createTextAction("Scan job", "talend_secrets_scan_job", "Escanea un job específico.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Suggest context migration", "talend_secrets_suggest_context_migration", "Sugiere cómo migrar secretos a context profiles.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createNoInputAction("Scan project", TOOL_NAMES.SECRETS.SCAN_PROJECT, "Escanea todo el proyecto en busca de secretos expuestos."),
+      createTextAction("Scan job", TOOL_NAMES.SECRETS.SCAN_JOB, "Escanea un job específico.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Suggest context migration", TOOL_NAMES.SECRETS.SUGGEST_CONTEXT_MIGRATION, "Sugiere cómo migrar secretos a context profiles.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
   {
@@ -133,8 +134,8 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el checklist de requisitos.",
     uiMode: "react",
     actions: [
-      createTextAction("Analyze requirements", "talend_task_analyze_requirements", "Analiza requisitos del proyecto.", "projectPath", { inputLabel: "Project path", inputPlaceholder: "/path/to/project" }),
-      createJsonAction("Build checklist", "talend_task_build_execution_plan", "Construye checklist de requisitos.", { requirements: [] }),
+      createTextAction("Analyze requirements", TOOL_NAMES.REQUIREMENTS.ANALYZE, "Analiza requisitos del proyecto.", "projectPath", { inputLabel: "Project path", inputPlaceholder: "/path/to/project" }),
+      createJsonAction("Build checklist", TOOL_NAMES.REQUIREMENTS.BUILD_CHECKLIST, "Construye checklist de requisitos.", { requirements: [] }),
     ],
   },
   {
@@ -146,8 +147,8 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el progreso de workshop.",
     uiMode: "react",
     actions: [
-      createNoInputAction("List workshops", "talend_jobs_list", "Lista workshops disponibles."),
-      createTextAction("Get progress", "talend_runs_list", "Obtiene progreso de un workshop.", "workshopId", { inputLabel: "Workshop id", inputPlaceholder: "workshop_001" }),
+      createNoInputAction("List workshops", TOOL_NAMES.JOBS.LIST, "Lista workshops disponibles."),
+      createTextAction("Get progress", TOOL_NAMES.RUNS.LIST, "Obtiene progreso de un workshop.", "workshopId", { inputLabel: "Workshop id", inputPlaceholder: "workshop_001" }),
     ],
   },
   {
@@ -159,8 +160,8 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el detector de antipatrones.",
     uiMode: "react",
     actions: [
-      createTextAction("Detect antipatterns", "talend_jobs_detect_antipatterns", "Detecta antipatrones en jobs.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createNoInputAction("Scan project", "talend_jobs_detect_antipatterns", "Escanea todo el proyecto."),
+      createTextAction("Detect antipatterns", TOOL_NAMES.JOBS.DETECT_ANTIPATTERNS, "Detecta antipatrones en jobs.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createNoInputAction("Scan project", TOOL_NAMES.JOBS.DETECT_ANTIPATTERNS, "Escanea todo el proyecto."),
     ],
   },
   {
@@ -172,8 +173,8 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el asistente de fixes.",
     uiMode: "react",
     actions: [
-      createTextAction("Explain error", "talend_errors_explain", "Sugiere un fix para un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
-      createTextAction("Apply fix", "talend_jobs_patch_component", "Aplica un fix sugerido.", "fixId", { inputLabel: "Fix id", inputPlaceholder: "fix_001", requiresConfirmation: true }),
+      createTextAction("Explain error", TOOL_NAMES.ERRORS.EXPLAIN, "Sugiere un fix para un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
+      createTextAction("Apply fix", TOOL_NAMES.JOBS.PATCH_COMPONENT, "Aplica un fix sugerido.", "fixId", { inputLabel: "Fix id", inputPlaceholder: "fix_001", requiresConfirmation: true }),
     ],
   },
   {
@@ -185,8 +186,8 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el generador de evidence pack.",
     uiMode: "react",
     actions: [
-      createTextAction("Build evidence pack", "talend_evidence_pack_build", "Construye un paquete de evidencia.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Export evidence", "talend_evidence_pack_build", "Exporta el evidence pack.", "packId", { inputLabel: "Pack id", inputPlaceholder: "pack_001" }),
+      createTextAction("Build evidence pack", TOOL_NAMES.EVIDENCE.PACK_BUILD, "Construye un paquete de evidencia.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Export evidence", TOOL_NAMES.EVIDENCE.PACK_BUILD, "Exporta el evidence pack.", "packId", { inputLabel: "Pack id", inputPlaceholder: "pack_001" }),
     ],
   },
   {
@@ -198,8 +199,8 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el gestor de snippets de reporte.",
     uiMode: "react",
     actions: [
-      createTextAction("Get snippet", "talend_report_generate_snippets", "Obtiene un snippet de reporte.", "snippetId", { inputLabel: "Snippet id", inputPlaceholder: "snippet_001" }),
-      createTextAction("List snippets", "talend_report_generate_snippets", "Lista snippets disponibles.", "category", { inputLabel: "Category", inputPlaceholder: "validation" }),
+      createTextAction("Get snippet", TOOL_NAMES.REPORT.SNIPPETS_GENERATE, "Obtiene un snippet de reporte.", "snippetId", { inputLabel: "Snippet id", inputPlaceholder: "snippet_001" }),
+      createTextAction("List snippets", TOOL_NAMES.REPORT.SNIPPETS_GENERATE, "Lista snippets disponibles.", "category", { inputLabel: "Category", inputPlaceholder: "validation" }),
     ],
   },
 ];

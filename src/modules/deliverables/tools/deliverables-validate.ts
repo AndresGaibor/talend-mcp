@@ -34,13 +34,17 @@ export function createDeliverablesValidateTool() {
           checklistId: input.checklistId,
           items: input.items,
         });
+        const result = okResult(checklist, "talend_deliverables_validate");
         return {
-          content: [{ type: "text", text: JSON.stringify(checklist, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result,
           isError: false,
         };
       } catch (err) {
+        const result = errorResult("talend_deliverables_validate", "VALIDATE_ERROR", `Error validando checklist: ${err}`);
         return {
-          content: [{ type: "text", text: `Error validando checklist: ${err}` }],
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result,
           isError: true,
         };
       }

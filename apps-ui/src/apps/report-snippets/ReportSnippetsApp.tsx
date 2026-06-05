@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { AppHeader, ErrorBanner } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -14,20 +15,20 @@ interface GeneratedSnippet {
 }
 
 const SECTION_LABELS: Record<SnippetSection, string> = {
-  diseno: "Diseño del Job",
+  diseno: "Diseno del Job",
   contextos: "Contextos Usados",
   validaciones: "Validaciones Realizadas",
   errores: "Errores y Soluciones",
-  tiempo: "Tiempo de Ejecución",
+  tiempo: "Tiempo de Ejecucion",
   evidencias: "Evidencias Generadas",
 };
 
 const SECTION_DESCRIPTIONS: Record<SnippetSection, string> = {
-  diseno: "Descripción de la arquitectura y componentes",
-  contextos: "Parámetros de configuración por entorno",
+  diseno: "Descripcion de la arquitectura y componentes",
+  contextos: "Parametros de configuracion por entorno",
   validaciones: "Pruebas y verificaciones realizadas",
   errores: "Problemas encontrados y soluciones aplicadas",
-  tiempo: "Métricas de rendimiento y optimización",
+  tiempo: "Metricas de rendimiento y optimizacion",
   evidencias: "Archivos y logs generados",
 };
 
@@ -109,15 +110,13 @@ export function ReportSnippetsApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Generador de Snippets para Reportes</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Genera texto listo para pegar en reportes académicos sobre jobs de Talend
-          </p>
-        </div>
-        <Badge variant="info">v1.0</Badge>
-      </div>
+      <AppHeader
+        title="Generador de Snippets para Reportes"
+        subtitle="Genera texto listo para pegar en reportes academicos sobre jobs de Talend"
+        actions={<Badge variant="info">v1.0</Badge>}
+      />
+
+      <ErrorBanner message={error} />
 
       <Card className="p-4">
         <div className="flex gap-4 items-end">
@@ -145,12 +144,6 @@ export function ReportSnippetsApp() {
         </div>
       </Card>
 
-      {error && (
-        <Card className="p-4 border-red-300 bg-red-50">
-          <p className="text-red-700 text-sm">{error}</p>
-        </Card>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {secciones.map((section) => {
           const snippet = generatedSnippets.find((s) => s.section === section);
@@ -173,7 +166,7 @@ export function ReportSnippetsApp() {
       {generatedSnippets.length === 0 && !isLoading && (
         <Card className="p-8 text-center">
           <p className="text-gray-500">
-            Seleccione una sección para generar el snippet o use "Generar Todos"
+            Seleccione una seccion para generar el snippet o use "Generar Todos"
           </p>
         </Card>
       )}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AppHeader } from "../../design-system";
 import { ComponentSearch } from "./ComponentSearch";
 import { ComponentDetails } from "./ComponentDetails";
 import { ComponentTemplatePanel } from "./ComponentTemplatePanel";
@@ -9,12 +10,10 @@ export function ComponentCatalogApp() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Component Catalog</h2>
-        <p className="text-gray-500 mt-1">
-          Busca, inspecciona y genera templates de componentes Talend
-        </p>
-      </div>
+      <AppHeader
+        title="Component Catalog"
+        subtitle="Busca, inspecciona y genera templates de componentes Talend"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">

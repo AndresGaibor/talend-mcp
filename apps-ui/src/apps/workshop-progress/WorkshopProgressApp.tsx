@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAppSession } from "../../openai/useAppSession";
+import { AppHeader } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { TaskCard, type WorkshopTask, type TaskStatus } from "./TaskCard";
@@ -80,15 +81,15 @@ export function WorkshopProgressApp() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Workshop Progress</h2>
-          <p className="text-gray-500 mt-1">Gestionar progreso de tareas del workshop</p>
-        </div>
-        <Button onClick={() => setShowAddForm(!showAddForm)}>
-          {showAddForm ? "Cancelar" : "+ Nueva Tarea"}
-        </Button>
-      </div>
+      <AppHeader
+        title="Workshop Progress"
+        subtitle="Gestionar progreso de tareas del workshop"
+        actions={
+          <Button onClick={() => setShowAddForm(!showAddForm)} size="sm">
+            {showAddForm ? "Cancelar" : "Nueva Tarea"}
+          </Button>
+        }
+      />
 
       {showAddForm && (
         <Card className="p-4">

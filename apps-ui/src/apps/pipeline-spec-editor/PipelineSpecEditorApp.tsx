@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useCallTool } from "../../openai/useCallTool";
 import { useAppSession } from "../../openai/useAppSession";
+import { AppHeader, ErrorBanner } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -25,6 +26,13 @@ export interface PipelineSpec {
   connections?: unknown[];
   [key: string]: unknown;
 }
+
+const stepLabels: Record<Step, string> = {
+  select: "Select a pattern to get started",
+  edit: "Edit the pipeline specification",
+  preview: "Preview the pipeline",
+  apply: "Apply the pipeline",
+};
 
 export function PipelineSpecEditorApp() {
   const { execute: callTool, isLoading } = useCallTool();
@@ -164,32 +172,23 @@ export function PipelineSpecEditorApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Pipeline Spec Editor</h2>
-          <p className="text-gray-500 mt-1">
-            {step === "select" && "Select a pattern to get started"}
-            {step === "edit" && "Edit the pipeline specification"}
-            {step === "preview" && "Preview the pipeline"}
-            {step === "apply" && "Apply the pipeline"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={step === "select" ? "default" : "success"}>1. Select</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={step === "edit" ? "default" : step === "select" ? "muted" : "success"}>2. Edit</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={step === "preview" ? "default" : step === "apply" ? "success" : "muted"}>3. Preview</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={step === "apply" ? "default" : "muted"}>4. Apply</Badge>
-        </div>
-      </div>
+      <AppHeader
+        title="Pipeline Spec Editor"
+        subtitle={stepLabels[step]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant={step === "select" ? "default" : "success"}>1. Select</Badge>
+            <span className="text-gray-400">-</span>
+            <Badge variant={step === "edit" ? "default" : step === "select" ? "muted" : "success"}>2. Edit</Badge>
+            <span className="text-gray-400">-</span>
+            <Badge variant={step === "preview" ? "default" : step === "apply" ? "success" : "muted"}>3. Preview</Badge>
+            <span className="text-gray-400">-</span>
+            <Badge variant={step === "apply" ? "default" : "muted"}>4. Apply</Badge>
+          </div>
+        }
+      />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
       {step === "select" && (
         <Card className="p-6">

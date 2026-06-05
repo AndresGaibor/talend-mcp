@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { AppHeader, ErrorBanner } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -8,6 +9,14 @@ import { OptionsPanel, type FixOption } from "./OptionsPanel";
 import { DiffPreview } from "./DiffPreview";
 
 type Step = "input" | "cause" | "options" | "preview" | "apply";
+
+const stepLabels: Record<Step, string> = {
+  input: "Enter the error to analyze",
+  cause: "Analyzing probable cause...",
+  options: "Select a fix option",
+  preview: "Review the changes",
+  apply: "Fix applied - revalidate",
+};
 
 export function FixWizardApp() {
   const { execute: callTool, isLoading } = useCallTool();
@@ -124,7 +133,6 @@ export function FixWizardApp() {
       } else {
         setError(null);
         
-        // Post snapshot and diff flow
         const snapshotResultAfter = await callTool("talend_snapshots_create", {
           name: `fix-post-${Date.now()}`,
           sourcePath: ".",
@@ -211,35 +219,25 @@ export function FixWizardApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Fix Wizard</h2>
-          <p className="text-gray-500 mt-1">
-            {step === "input" && "Enter the error to analyze"}
-            {step === "cause" && "Analyzing probable cause..."}
-            {step === "options" && "Select a fix option"}
-            {step === "preview" && "Review the changes"}
-            {step === "apply" && "Fix applied - revalidate"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={step === "input" ? "default" : "success"}>1. Input</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={step === "cause" ? "default" : step === "input" ? "muted" : "success"}>2. Cause</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={step === "options" ? "default" : ["input", "cause"].includes(step) ? "muted" : "success"}>3. Options</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={step === "preview" ? "default" : ["input", "cause", "options"].includes(step) ? "muted" : "success"}>4. Preview</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={step === "apply" ? "default" : "muted"}>5. Apply</Badge>
-        </div>
-      </div>
+      <AppHeader
+        title="Fix Wizard"
+        subtitle={stepLabels[step]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant={step === "input" ? "default" : "success"}>1. Input</Badge>
+            <span className="text-gray-400">-</span>
+            <Badge variant={step === "cause" ? "default" : step === "input" ? "muted" : "success"}>2. Cause</Badge>
+            <span className="text-gray-400">-</span>
+            <Badge variant={step === "options" ? "default" : ["input", "cause"].includes(step) ? "muted" : "success"}>3. Options</Badge>
+            <span className="text-gray-400">-</span>
+            <Badge variant={step === "preview" ? "default" : ["input", "cause", "options"].includes(step) ? "muted" : "success"}>4. Preview</Badge>
+            <span className="text-gray-400">-</span>
+            <Badge variant={step === "apply" ? "default" : "muted"}>5. Apply</Badge>
+          </div>
+        }
+      />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
       {step === "input" && (
         <Card className="p-6">

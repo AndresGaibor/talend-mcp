@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import type { CallToolResult } from "@modelcontextprotocol/server";
+import { okResult, errorResult } from "../../../presentation/tools/common/result";
 
 export function createErrorsExplainTool() {
   return {
@@ -22,25 +23,32 @@ export function createErrorsExplainTool() {
         }
 
         if (!msg) {
+          const result = errorResult("talend_errors_explain", "NO_ERROR", "No se pudo obtener el mensaje de error ni leer los logs de ejecución.");
           return {
-            content: [{ type: "text", text: "No se pudo obtener el mensaje de error ni leer los logs de ejecución." }],
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            structuredContent: result,
             isError: true,
           };
         }
 
         const { analyzeError } = await import("../../../talend/diagnostics/error-knowledge-base");
         const explanation = analyzeError(msg);
+        const result = explanation
+          ? okResult({ id: explanation.id, category: explanation.category, cause: explanation.cause, suggestedFix: explanation.suggestedFix }, "talend_errors_explain")
+          : okResult({ message: "No se encontró explicación para el error." }, "talend_errors_explain", "low");
         const text = explanation
           ? `Error detectado: ${explanation.id}\nCategoría: ${explanation.category}\nCausa: ${explanation.cause}\nSolución sugerida: ${explanation.suggestedFix}`
           : "No se encontró explicación para el error.";
         return {
           content: [{ type: "text", text }],
-          structuredContent: { explanation } as any,
+          structuredContent: result,
           isError: false,
         };
       } catch (err) {
+        const result = errorResult("talend_errors_explain", "EXPLAIN_ERROR", `Error explicando error: ${err}`);
         return {
-          content: [{ type: "text", text: `Error explicando error: ${err}` }],
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result,
           isError: true,
         };
       }

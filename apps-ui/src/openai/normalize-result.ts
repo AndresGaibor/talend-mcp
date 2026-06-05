@@ -1,129 +1,89 @@
-/**
- * Representa un resultado de herramienta normalizado.
- */
 export interface NormalizedResult<T = unknown> {
   ok: boolean;
+  success: boolean;
   data?: T;
   text?: string;
+  result?: string;
   error?: string;
   raw?: unknown;
-  // Compatibilidad hacia atrás para facilitar la migración
-  success: boolean;
-  result?: string;
+  warnings?: string[];
+  nextActions?: Array<{ label: string; toolName: string; input?: Record<string, unknown> }>;
 }
 
-/**
- * Normaliza los resultados de las herramientas desde diferentes formatos (legado y MCP).
- * 
- * @param raw El resultado crudo de la herramienta.
- * @returns El resultado normalizado.
- */
 export function normalizeToolResult<T = unknown>(raw: unknown): NormalizedResult<T> {
+  const err = (msg: string): NormalizedResult<T> => ({
+    ok: false, success: false, error: msg, raw,
+  });
+
   if (!raw || typeof raw !== "object") {
-    return {
-      ok: false,
-      success: false,
-      error: "Resultado inválido o vacío",
-      raw
-    };
+    return err("Resultado inválido o vacío");
   }
 
-  const anyRaw = raw as any;
-  let normalized: Partial<NormalizedResult<T>> = { raw };
+  const anyRaw = raw as Record<string, unknown>;
 
-  // 1. Manejar formato MCP { content, structuredContent? }
+  // 1. Formato MCP { content, structuredContent? }
   if (Array.isArray(anyRaw.content)) {
-    const textContent = anyRaw.content
-      .filter((c: any) => c.type === "text")
-      .map((c: any) => c.text)
+    const textContent = (anyRaw.content as Array<{ type: string; text: string }>)
+      .filter((c) => c.type === "text")
+      .map((c) => c.text)
       .join("\n");
 
-    let parsedData: T | undefined;
-    try {
-      parsedData = JSON.parse(textContent);
-    } catch {
-      parsedData = undefined;
-    }
-
+    const sc = anyRaw.structuredContent as Record<string, unknown> | undefined;
     const isOk = anyRaw.isError !== true;
-    let errorMsg: string | undefined = undefined;
-    if (!isOk) {
-      errorMsg = anyRaw.error || textContent || "Error en la herramienta";
-    } else if (anyRaw.structuredContent?.errors && Array.isArray(anyRaw.structuredContent.errors)) {
-      errorMsg = anyRaw.structuredContent.errors.join("\n");
-    }
 
-    normalized = {
-      ...normalized,
+    return {
       ok: isOk,
       success: isOk,
-      data: (anyRaw.structuredContent !== undefined ? anyRaw.structuredContent : parsedData) as T,
+      data: (sc ?? tryParseJson<T>(textContent)) as T,
       text: textContent,
       result: textContent,
-      error: errorMsg,
+      error: isOk ? undefined : ((sc?.errors as string) ?? textContent),
+      raw,
+      warnings: (sc?.warnings as string[]) ?? undefined,
+      nextActions: (sc?.nextActions as NormalizedResult["nextActions"]) ?? undefined,
     };
   }
-  // 2. Manejar formato TalendToolResult { ok, data?, error? }
-  else if ("ok" in anyRaw) {
+
+  // 2. TalendResult unificado { ok, data?, errors?, warnings? }
+  if (typeof anyRaw.ok === "boolean") {
     if (anyRaw.ok) {
-      normalized = {
-        ...normalized,
-        ok: true,
-        success: true,
-        data: anyRaw.data as T,
-        text: typeof anyRaw.data === "string" ? anyRaw.data : JSON.stringify(anyRaw.data),
-        result: typeof anyRaw.data === "string" ? anyRaw.data : JSON.stringify(anyRaw.data)
-      };
-    } else {
-      normalized = {
-        ...normalized,
-        ok: false,
-        success: false,
-        error: anyRaw.error?.message || anyRaw.error || "Error en la herramienta"
+      const data = anyRaw.data as T;
+      const text = typeof data === "string" ? data : JSON.stringify(data);
+      return {
+        ok: true, success: true, data, text, result: text, raw,
+        warnings: (anyRaw.warnings as string[]) ?? undefined,
+        nextActions: (anyRaw.nextActions as NormalizedResult["nextActions"]) ?? undefined,
       };
     }
-  }
-  // 3. Manejar formato legado { success, result?, error? }
-  else if ("success" in anyRaw) {
-    if (anyRaw.success) {
-      let data: T | undefined;
-      try {
-        if (typeof anyRaw.result === "string") {
-          data = JSON.parse(anyRaw.result);
-        } else {
-          data = anyRaw.result;
-        }
-      } catch {
-        data = anyRaw.result;
-      }
-
-      const textValue = typeof anyRaw.result === "string" ? anyRaw.result : JSON.stringify(anyRaw.result);
-      normalized = {
-        ...normalized,
-        ok: true,
-        success: true,
-        data,
-        text: textValue,
-        result: textValue
-      };
-    } else {
-      normalized = {
-        ...normalized,
-        ok: false,
-        success: false,
-        error: anyRaw.error || "Error desconocido en la herramienta (legado)"
-      };
-    }
-  }
-  // 3. Formato desconocido
-  else {
-    normalized = {
-      ...normalized,
-      ok: false,
-      success: false,
-      error: "Formato de resultado desconocido de la herramienta"
+    return {
+      ok: false, success: false, error: extractErrorMessage(anyRaw), raw,
     };
   }
 
-  return normalized as NormalizedResult<T>;
+  // 3. Formato legacy { success, result? }
+  if (typeof anyRaw.success === "boolean") {
+    if (anyRaw.success) {
+      const data: T = tryParseJson<T>(anyRaw.result as string) ?? (anyRaw.result as T);
+      const text = typeof anyRaw.result === "string" ? anyRaw.result : JSON.stringify(anyRaw.result);
+      return { ok: true, success: true, data, text, result: text, raw };
+    }
+    return {
+      ok: false, success: false, error: (anyRaw.error as string) ?? "Error desconocido", raw,
+    };
+  }
+
+  // 4. Desconocido
+  return err("Formato de resultado desconocido");
+}
+
+function tryParseJson<T>(text: unknown): T | undefined {
+  if (typeof text !== "string") return undefined;
+  try { return JSON.parse(text) as T; }
+  catch { return undefined; }
+}
+
+function extractErrorMessage(obj: Record<string, unknown>): string {
+  const err = obj.errors as Array<{ message: string }> | undefined;
+  if (err?.[0]?.message) return err[0].message;
+  return (obj.error as string) ?? "Error en la herramienta";
 }

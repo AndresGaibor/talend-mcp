@@ -14,21 +14,21 @@ interface RunStatusCardProps {
 
 export function RunStatusCard({ status }: RunStatusCardProps) {
   const statusConfig = {
-    STARTING: { color: "bg-yellow-100 text-yellow-800", icon: "⏳", label: "Iniciando" },
-    RUNNING: { color: "bg-blue-100 text-blue-800", icon: "🔄", label: "Ejecutando" },
-    SUCCEEDED: { color: "bg-green-100 text-green-800", icon: "✅", label: "Exitoso" },
-    FAILED: { color: "bg-red-100 text-red-800", icon: "❌", label: "Fallido" },
-    UNKNOWN: { color: "bg-gray-100 text-gray-800", icon: "❓", label: "Desconocido" },
+    STARTING: { bg: "bg-amber-50 border-amber-200", dotColor: "bg-amber-400", label: "Iniciando" },
+    RUNNING: { bg: "bg-blue-50 border-blue-200", dotColor: "bg-blue-400", label: "Ejecutando" },
+    SUCCEEDED: { bg: "bg-emerald-50 border-emerald-200", dotColor: "bg-emerald-400", label: "Exitoso" },
+    FAILED: { bg: "bg-red-50 border-red-200", dotColor: "bg-red-400", label: "Fallido" },
+    UNKNOWN: { bg: "bg-gray-50 border-gray-200", dotColor: "bg-gray-400", label: "Desconocido" },
   };
 
   const config = statusConfig[status.status] || statusConfig.UNKNOWN;
 
   return (
-    <div className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg ${config.color}`}>
-      <span className="text-2xl">{config.icon}</span>
+    <div className={`inline-flex items-center gap-3 px-4 py-3 rounded-lg border ${config.bg}`}>
+      <span className={`w-3 h-3 rounded-full ${config.dotColor}`} />
       <div>
-        <p className="font-semibold">{config.label}</p>
-        <p className="text-sm opacity-75">Run ID: {status.runId}</p>
+        <p className="font-semibold text-gray-900">{config.label}</p>
+        <p className="text-sm text-gray-500">Run ID: {status.runId}</p>
       </div>
     </div>
   );

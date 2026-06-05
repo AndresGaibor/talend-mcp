@@ -271,8 +271,29 @@ async function main() {
   info("Iniciando servidor MCP...");
 
   const mcpPort = process.env.TALEND_MCP_PORT || 3927;
+  // Default filter. Set TALEND_MCP_FILTER before running to customize:
+  //   canonical   → 214 unique tools (no duplicate aliases) + UI apps  [default]
+  //   all         → 252 tools including legacy aliases
+  //   core        → 21 essential tools only (~10KB)
+  //   core,apps   → 21 essentials + UI launchers
+  const mcpFilter = process.env.TALEND_MCP_FILTER || "canonical";
+
+  // Kill any stale process on the MCP port so we always bind to the right port.
+  // (The tunnel-client profile points to 127.0.0.1:3927 — if we bind elsewhere, everything breaks.)
+  try {
+    if (!IS_WIN) {
+      const lsof = Bun.spawnSync(["lsof", "-ti", `tcp:${mcpPort}`], { stdio: ["ignore", "pipe", "pipe"] });
+      const pids = lsof.stdout.toString().trim().split("\n").filter(Boolean);
+      for (const pid of pids) {
+        info(`Puerto ${mcpPort} ocupado por PID ${pid} — terminando proceso anterior...`);
+        Bun.spawnSync(["kill", "-9", pid], { stdio: "ignore" });
+      }
+    }
+  } catch {}
+
+  info(`Filtro de tools: ${c(mcpFilter, C.cyan)}`);
   const mcpServer = Bun.spawn(["bun", "run", join(import.meta.dir, "..", "index.ts")], {
-    env: { ...process.env, TALEND_MCP_FUNNEL: "false" },
+    env: { ...process.env, TALEND_MCP_FUNNEL: "false", TALEND_MCP_FILTER: mcpFilter },
     stdio: ["ignore", "inherit", "pipe"],
   });
 
@@ -284,7 +305,7 @@ async function main() {
   info("Esperando al servidor MCP...");
   try {
     await waitForHealth(mcpUrl);
-    ok("Servidor MCP listo");
+    ok(`Servidor MCP listo en puerto ${mcpPort} (${mcpFilter} tools)`);
     mcpReady = true;
   } catch {
     warn("Servidor MCP no responde");

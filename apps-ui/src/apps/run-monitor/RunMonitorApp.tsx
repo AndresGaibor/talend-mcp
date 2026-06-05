@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useCallTool } from "../../openai/useCallTool";
 import { useAppSession } from "../../openai/useAppSession";
+import { AppHeader, ErrorBanner, LoadingState } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { RunStatusCard } from "./RunStatusCard";
@@ -172,7 +173,7 @@ export function RunMonitorApp() {
         setErrorInfo({ errorMessage: result.result });
       }
     } else {
-      setErrorInfo({ errorMessage: result.error || "No se pudo obtener explicación" });
+      setErrorInfo({ errorMessage: result.error || "No se pudo obtener explicacion" });
     }
   }, [runResult, callTool]);
 
@@ -219,25 +220,18 @@ export function RunMonitorApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Run Monitor Pro</h2>
-          <p className="text-gray-500 mt-1">Ejecuta y monitorea jobs de Talend</p>
-        </div>
-        {step !== "select" && step !== "running" && (
-          <Button variant="ghost" size="sm" onClick={goBack}>
-            ← Nuevo Job
-          </Button>
-        )}
-      </div>
+      <AppHeader
+        title="Run Monitor"
+        subtitle="Ejecuta y monitorea jobs de Talend"
+      />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
+
+      {step === "running" && (
+        <LoadingState message={`Ejecutando ${selectedJob?.name ?? "job"}...`} />
       )}
 
-      {step === "select" && (
+      {step === "select" && !showConfirmModal && (
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Job</h3>
           {jobs.length === 0 ? (
@@ -262,9 +256,9 @@ export function RunMonitorApp() {
       {showConfirmModal && selectedJob && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <Card className="p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirmar Ejecución</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirmar Ejecucion</h3>
             <p className="text-gray-600 mb-6">
-              ¿Estás seguro de que deseas ejecutar el job <strong>{selectedJob.name}</strong>?
+              Esta seguro de que desea ejecutar el job <strong>{selectedJob.name}</strong>?
             </p>
             <div className="flex gap-3 justify-end">
               <Button variant="outline" onClick={() => setShowConfirmModal(false)}>
@@ -278,21 +272,16 @@ export function RunMonitorApp() {
         </div>
       )}
 
-      {step === "running" && (
-        <Card className="p-6 text-center">
-          <div className="animate-pulse">
-            <div className="text-4xl mb-4">⏳</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Ejecutando Job...</h3>
-            <p className="text-gray-500">
-              {selectedJob?.name} está en ejecución
-            </p>
-          </div>
-        </Card>
-      )}
-
       {(step === "status" || step === "duration" || step === "problems" || step === "explanation" || step === "export") && runResult && (
         <>
-          <RunStatusCard status={runResult.status} />
+          <div className="flex items-center justify-between">
+            <RunStatusCard status={runResult.status} />
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={goBack}>
+                Nuevo Job
+              </Button>
+            </div>
+          </div>
 
           {step === "status" && (
             <div className="space-y-4">
@@ -300,7 +289,7 @@ export function RunMonitorApp() {
               <RunLogsPanel logs={runResult.logs} />
               <div className="flex gap-3 flex-wrap">
                 <Button variant="secondary" onClick={viewDuration}>
-                  Ver Duración
+                  Ver Duracion
                 </Button>
                 <Button variant="secondary" onClick={viewProblems}>
                   Ver Problemas
@@ -317,7 +306,7 @@ export function RunMonitorApp() {
 
           {step === "duration" && (
             <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Duración de Ejecución</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Duracion de Ejecucion</h3>
               <div className="text-3xl font-bold text-blue-600">
                 {runResult.status.duration ? `${(runResult.status.duration / 1000).toFixed(2)}s` : "N/A"}
               </div>
@@ -328,7 +317,7 @@ export function RunMonitorApp() {
                 Fin: {runResult.status.endTime ? new Date(runResult.status.endTime).toLocaleString() : "N/A"}
               </p>
               <Button variant="outline" className="mt-4" onClick={() => setStep("status")}>
-                ← Volver
+                Volver
               </Button>
             </Card>
           )}
@@ -336,12 +325,12 @@ export function RunMonitorApp() {
           {step === "problems" && (
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Problemas Detectados</h3>
-              <div className="text-2xl font-bold text-orange-600">
+              <div className="text-2xl font-bold text-orange-600 mb-4">
                 {runResult.status.errorCount || 0} errores, {runResult.status.warningCount || 0} warnings
               </div>
               <RunLogsPanel logs={runResult.logs.filter(l => l.level === "ERROR" || l.level === "WARN")} />
               <Button variant="outline" className="mt-4" onClick={() => setStep("status")}>
-                ← Volver
+                Volver
               </Button>
             </Card>
           )}

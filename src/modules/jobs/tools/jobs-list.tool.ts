@@ -24,22 +24,26 @@ export function createJobsListTool() {
     },
     handler: async (input: z.infer<typeof ListJobsSchema>): Promise<CallToolResult> => {
       try {
-        const jobs = await listJobsUseCase.execute({
-          path: input.path,
-          status: input.status,
-          limit: input.limit ?? 50,
-          offset: input.offset ?? 0,
-        });
-        return {
-          content: [{ type: "text", text: JSON.stringify(jobs, null, 2) }],
-          isError: false,
-        };
-      } catch (err) {
-        return {
-          content: [{ type: "text", text: `Error listando jobs: ${err}` }],
-          isError: true,
-        };
-      }
+          const jobs = await listJobsUseCase.execute({
+            path: input.path,
+            status: input.status,
+            limit: input.limit ?? 50,
+            offset: input.offset ?? 0,
+          });
+          const result = okResult(jobs, "talend_jobs_list");
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            structuredContent: result,
+            isError: false,
+          };
+        } catch (err) {
+          const result = errorResult("talend_jobs_list", "LIST_ERROR", `Error listando jobs: ${err}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            structuredContent: result,
+            isError: true,
+          };
+        }
     },
   };
 }

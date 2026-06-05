@@ -96,28 +96,49 @@ function isZodSchema(schema: unknown): schema is z.ZodType<unknown> {
   return typeof schema === "object" && schema !== null && "parse" in schema;
 }
 
+function sanitizeSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(sanitizeSchema);
+  }
+  if (schema && typeof schema === "object") {
+    const obj = schema as Record<string, unknown>;
+    const res: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (key === "$schema" || key === "propertyNames") {
+        continue;
+      }
+      res[key] = sanitizeSchema(val);
+    }
+    return res;
+  }
+  return schema;
+}
+
 function convertInputSchema(schema: unknown): unknown {
+  let result: unknown;
   if (isZodSchema(schema)) {
     try {
-      return (schema as z.ZodType<unknown>).toJSONSchema();
+      result = (schema as z.ZodType<unknown>).toJSONSchema();
     } catch {
-      return schema;
+      result = schema;
     }
-  }
-  if (schema && typeof schema === "object" && "~standard" in schema) {
+  } else if (schema && typeof schema === "object" && "~standard" in schema) {
     try {
       const std = (schema as any)["~standard"];
       if (std && std.jsonSchema && typeof std.jsonSchema.input === "function") {
-        return std.jsonSchema.input();
+        result = std.jsonSchema.input();
+      } else {
+        result = schema;
       }
     } catch {
-      // fallback
+      result = schema;
     }
+  } else if (isPlainJsonSchema(schema)) {
+    result = schema;
+  } else {
+    result = schema;
   }
-  if (isPlainJsonSchema(schema)) {
-    return schema;
-  }
-  return schema;
+  return sanitizeSchema(result);
 }
 
 function extractAnnotations(tool: unknown): McpToolAnnotation | undefined {

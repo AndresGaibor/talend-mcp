@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { AppHeader, ErrorBanner } from "../../design-system";
+import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Badge } from "../../components/Badge";
 import { SnapshotList } from "./SnapshotList";
@@ -109,25 +111,17 @@ export function SnapshotManagerApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Snapshot Manager</h2>
-          <p className="text-gray-500 mt-1">Manage and restore project snapshots</p>
-        </div>
-        <button
-          onClick={loadSnapshots}
-          disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isLoading ? "Loading..." : "Refresh"}
-        </button>
-      </div>
+      <AppHeader
+        title="Snapshot Manager"
+        subtitle="Manage and restore project snapshots"
+        actions={
+          <Button onClick={loadSnapshots} disabled={isLoading} size="sm">
+            {isLoading ? "Loading..." : "Refresh"}
+          </Button>
+        }
+      />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
+      <ErrorBanner message={error} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-4">

@@ -5,6 +5,18 @@ export interface OpenAiGlobals {
   clipboard: string;
 }
 
+export interface OpenAiBridge {
+  toolOutput?: unknown;
+  toolInput?: unknown;
+  widgetState?: unknown;
+  callTool?: (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
+  setWidgetState?: (state: unknown) => void;
+  requestModal?: (options: { content: string; title?: string; mimeType?: string }) => void;
+  requestDisplayMode?: (mode: "inline" | "fullscreen" | "modal") => void;
+  sendFollowUpMessage?: (message: string) => void;
+  notifyIntrinsicHeight?: (height: number) => void;
+}
+
 export interface ToolResult {
   success: boolean;
   result?: string;
@@ -14,14 +26,6 @@ export interface ToolResult {
 export interface OpenAiToolOutput {
   toolUseId: string;
   output: string;
-}
-
-export interface OpenAiBridge {
-  toolOutput?: unknown;
-  toolInput?: unknown;
-  widgetState?: unknown;
-  callTool?: (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
-  setWidgetState?: (state: unknown) => void;
 }
 
 export interface Window {

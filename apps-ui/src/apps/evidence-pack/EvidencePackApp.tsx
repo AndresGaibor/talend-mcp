@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { AppHeader, ErrorBanner } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -34,19 +35,13 @@ export function EvidencePackApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Evidence Pack</h2>
-          <p className="text-gray-500 mt-1">Generar paquetes de evidencia para auditorías</p>
-        </div>
-        <Badge variant="info">Evidence</Badge>
-      </div>
+      <AppHeader
+        title="Evidence Pack"
+        subtitle="Generar paquetes de evidencia para auditorias"
+        actions={<Badge variant="info">Evidence</Badge>}
+      />
 
-      {error && (
-        <Card className="p-4 border-red-300 bg-red-50 text-red-700">
-          {error}
-        </Card>
-      )}
+      <ErrorBanner message={error} />
 
       <Card className="p-6">
         <div className="space-y-4">
@@ -84,7 +79,7 @@ export function EvidencePackApp() {
                 <ul className="space-y-1">
                   {evidenceFiles.map((file, i) => (
                     <li key={i} className="text-sm text-gray-700 flex items-center gap-2">
-                      <span className="text-gray-400">•</span> {file}
+                      <span className="text-gray-400">-</span> {file}
                     </li>
                   ))}
                 </ul>

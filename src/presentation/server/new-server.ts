@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
 import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
@@ -102,16 +102,141 @@ export async function runNewStdioServer(options?: { live?: boolean }): Promise<v
   await server.connect(transport);
 }
 
+// ─── JSON-RPC helpers ─────────────────────────────────────────────────────────
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk: string) => { body += chunk; });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
+function jsonRpcOk(id: unknown, result: unknown) {
+  return { jsonrpc: "2.0", id: id ?? null, result };
+}
+
+function jsonRpcError(id: unknown, code: number, message: string) {
+  return { jsonrpc: "2.0", id: id ?? null, error: { code, message } };
+}
+
+function sendJson(res: ServerResponse, origin: string | undefined, payload: unknown) {
+  const json = JSON.stringify(payload);
+  res.writeHead(200, {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(json),
+    "access-control-allow-origin": origin ?? "*",
+    "connection": "close",
+  });
+  res.end(json);
+}
+
+function sendAccepted(res: ServerResponse, origin: string | undefined) {
+  res.writeHead(202, {
+    "content-type": "application/json",
+    "access-control-allow-origin": origin ?? "*",
+    "connection": "close",
+  });
+  res.end("{}");
+}
+
+// ─── MCP request dispatcher ───────────────────────────────────────────────────
+// Handles all standard MCP JSON-RPC methods directly, without SSE streaming.
+// This is required for the OpenAI tunnel-client which expects real HTTP responses.
+
+function buildServerCapabilities() {
+  return {
+    tools: { listChanged: false },
+    resources: { listChanged: false },
+    prompts: { listChanged: false },
+  };
+}
+
+function handleMcpRequest(
+  parsed: { jsonrpc?: string; id?: unknown; method?: string; params?: unknown },
+  origin: string | undefined,
+  res: ServerResponse,
+  mcpServer: McpServer,
+): boolean {
+  const { id, method, params } = parsed;
+
+  if (method === "initialize") {
+    sendJson(res, origin, jsonRpcOk(id, {
+      protocolVersion: "2024-11-05",
+      serverInfo: { name: "talend-mcp", version: "1.0.0" },
+      capabilities: buildServerCapabilities(),
+    }));
+    return true;
+  }
+
+  if (method === "notifications/initialized" || method === "ping") {
+    // Notifications have no id, just acknowledge
+    sendAccepted(res, origin);
+    return true;
+  }
+
+  if (method === "tools/list") {
+    const tools = getAllRuntimeTools().map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema ?? { type: "object", properties: {} },
+      ...(t.annotations ? { annotations: t.annotations } : {}),
+    }));
+    sendJson(res, origin, jsonRpcOk(id, { tools }));
+    return true;
+  }
+
+  if (method === "tools/call") {
+    // Tool calls need the full server, handle async below
+    return false;
+  }
+
+  if (method === "resources/list") {
+    sendJson(res, origin, jsonRpcOk(id, { resources: [] }));
+    return true;
+  }
+
+  if (method === "prompts/list") {
+    sendJson(res, origin, jsonRpcOk(id, { prompts: [] }));
+    return true;
+  }
+
+  // Unknown method
+  sendJson(res, origin, jsonRpcError(id, -32601, `Method not found: ${method}`));
+  return true;
+}
+
+// ─── Main HTTP server factory ─────────────────────────────────────────────────
+
 export async function runNewHttpServer(options?: NewServerOptions): Promise<NewServerHandle> {
   const host = options?.host ?? "127.0.0.1";
   const port = options?.port ?? 3927;
   const path = "/mcp";
 
-  const server = createNewMcpServer({ live: options?.live, stderr: process.stderr });
+  // Create one McpServer for stateful tool calls (tools/call), plus one SSE transport
+  // for clients that want full streaming MCP (e.g. Claude Desktop)
+  const mcpServer = createNewMcpServer({ live: options?.live, stderr: process.stderr });
+  const sseTransport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  await mcpServer.connect(sseTransport);
 
-  const httpServer = createServer(async (req, res) => {
+  const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
 
+    // ── CORS preflight ──
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "access-control-allow-origin": req.headers.origin ?? "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-headers": "content-type, accept, authorization",
+        "access-control-max-age": "86400",
+      });
+      res.end();
+      return;
+    }
+
+    // ── Health endpoint ──
     if (requestUrl.pathname === "/healthz") {
       const payload = createHealthPayload();
       res.writeHead(200, { "content-type": "application/json" });
@@ -133,20 +258,95 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     }
 
     const accept = req.headers.accept ?? "";
-    if (req.method === "GET" && !accept.includes("text/event-stream")) {
-      const payload = createHealthPayload();
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify(payload));
+
+    // ── GET /mcp with SSE → delegate to streaming transport (Claude Desktop etc.) ──
+    if (req.method === "GET") {
+      if (accept.includes("text/event-stream")) {
+        await sseTransport.handleRequest(req, res);
+      } else {
+        const payload = createHealthPayload();
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(payload));
+      }
       return;
     }
 
-    if (!accept.includes("text/event-stream")) {
-      req.headers.accept = accept ? `${accept}, text/event-stream` : "application/json, text/event-stream";
+    // ── POST /mcp ──
+    if (req.method !== "POST") {
+      res.writeHead(405, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "method_not_allowed" }));
+      return;
     }
 
-    const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    await server.connect(transport);
-    await transport.handleRequest(req, res);
+    // Read body first so we can inspect the method
+    let body: string;
+    try {
+      body = await readBody(req);
+    } catch {
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "bad_request" }));
+      return;
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      sendJson(res, origin, jsonRpcError(null, -32700, "Parse error"));
+      return;
+    }
+
+    // If client explicitly requests SSE AND it's not a simple method we can handle directly,
+    // delegate to the SSE transport using a reconstructed readable stream
+    const wantsOnlySSE = accept.includes("text/event-stream") && !accept.includes("application/json");
+
+    if (wantsOnlySSE) {
+      // Pass through to SSE transport
+      req.headers.accept = accept;
+      await sseTransport.handleRequest(req, res);
+      return;
+    }
+
+    // ── Direct JSON-RPC dispatch (no SSE) ─────────────────────────────────────
+    // Handles initialize, tools/list, tools/call, notifications, etc.
+    // Responds with Connection: close — required for OpenAI tunnel-client compatibility.
+
+    const method = parsed.method as string | undefined;
+    const id = parsed.id;
+
+    // Handle simple stateless methods synchronously
+    const handled = handleMcpRequest(parsed as any, origin, res, mcpServer);
+    if (handled) return;
+
+    // tools/call — invoke the actual tool handler
+    if (method === "tools/call") {
+      const p = (parsed.params ?? {}) as { name?: string; arguments?: unknown };
+      const toolName = p.name;
+      if (!toolName) {
+        sendJson(res, origin, jsonRpcError(id, -32602, "Missing tool name"));
+        return;
+      }
+      const runtimeTools = getRuntimeTools();
+      const tool = runtimeTools.find((t) => t.definition.name === toolName);
+      if (!tool) {
+        sendJson(res, origin, jsonRpcError(id, -32602, `Tool not found: ${toolName}`));
+        return;
+      }
+      try {
+        const result = await tool.handler(p.arguments ?? {});
+        sendJson(res, origin, jsonRpcOk(id, { content: [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result, null, 2) }] }));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sendJson(res, origin, jsonRpcOk(id, {
+          content: [{ type: "text", text: `Error: ${msg}` }],
+          isError: true,
+        }));
+      }
+      return;
+    }
+
+    // Fallback: unknown method
+    sendJson(res, origin, jsonRpcError(id, -32601, `Method not found: ${method}`));
   });
 
   const listenPort = await new Promise<number>((resolve, reject) => {

@@ -23,21 +23,25 @@ export function createSnapshotsListTool() {
     },
     handler: async (input: z.infer<typeof ListSnapshotsSchema>): Promise<CallToolResult> => {
       try {
-        const snapshots = await listSnapshotsUseCase.execute({
-          sourcePath: input.sourcePath,
-          limit: input.limit ?? 50,
-          offset: input.offset ?? 0,
-        });
-        return {
-          content: [{ type: "text", text: JSON.stringify(snapshots, null, 2) }],
-          isError: false,
-        };
-      } catch (err) {
-        return {
-          content: [{ type: "text", text: `Error listando snapshots: ${err}` }],
-          isError: true,
-        };
-      }
+          const snapshots = await listSnapshotsUseCase.execute({
+            sourcePath: input.sourcePath,
+            limit: input.limit ?? 50,
+            offset: input.offset ?? 0,
+          });
+          const result = okResult(snapshots, "talend_snapshots_list");
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            structuredContent: result,
+            isError: false,
+          };
+        } catch (err) {
+          const result = errorResult("talend_snapshots_list", "LIST_ERROR", `Error listando snapshots: ${err}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            structuredContent: result,
+            isError: true,
+          };
+        }
     },
   };
 }

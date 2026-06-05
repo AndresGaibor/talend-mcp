@@ -207,14 +207,192 @@ export function buildRuntimeToolCache(): void {
   aliasCache = mergedAliases;
 }
 
+
+// ─── Tool Presets ─────────────────────────────────────────────────────────────
+// Available presets (TALEND_MCP_FILTER env var, comma-separated):
+//
+//   all          → All talend_* tools, no non-prefixed legacy aliases (~252 tools)
+//   canonical    → Same as "all" but removes known legacy duplicate names (~215 tools)
+//   core         → 21 curated essential tools (~10KB, safest for limited clients)
+//   apps         → talend_app_* UI launchers only
+//   jobs         → talend_jobs_* + related job tools
+//   snapshots    → talend_snapshots_*
+//   runs         → run-related tools
+//   errors       → talend_errors_*
+//   validation   → talend_validation_*
+//   secrets      → talend_secrets_*
+//   datasets     → talend_datasets_*
+//   deliverables → talend_deliverables_*
+//   components   → talend_components_*
+//   bridge       → talend_bridge_*
+//   requirements → talend_requirements_*
+//   evidence     → talend_evidence_*
+//   reports      → talend_report_snippets_*
+//
+// Presets are additive: TALEND_MCP_FILTER="core,apps"
+// Wildcards work too:  TALEND_MCP_FILTER="talend_bridge_*"
+
+// 21-tool curated safe set
+const PRESET_CORE = new Set([
+  "talend_jobs_list",
+  "talend_jobs_read",
+  "talend_show_flow",
+  "talend_read_contexts",
+  "talend_detect_open_jobs",
+  "talend_summarize_open_job",
+  "talend_diagnose_environment",
+  "talend_bridge_ping",
+  "talend_list_runs",
+  "talend_read_run",
+  "talend_job_run_by_name",
+  "talend_list_project_contexts",
+  "talend_list_repository_contexts",
+  "talend_read_repository_context",
+  "talend_secrets_scan_project",
+  "talend_secrets_scan_job",
+  "talend_validation_validate_design",
+  "talend_validation_validate_context_usage",
+  "talend_errors_stats",
+  "talend_errors_explain",
+  "talend_errors_suggest_fix",
+]);
+
+// Known legacy duplicate aliases within the talend_* namespace.
+// These point to the same handler as their newer canonical counterpart.
+// Excluded from "canonical" to avoid showing duplicate tools in ChatGPT.
+const LEGACY_TALEND_ALIASES = new Set([
+  "talend_secret_scan_project",               // → talend_secrets_scan_project
+  "talend_secret_scan_job",                   // → talend_secrets_scan_job
+  "talend_secret_suggest_context_migration",  // → talend_secrets_suggest_context_migration
+  "talend_snapshot_list",                     // → talend_snapshots_list
+  "talend_snapshot_create",                   // → talend_snapshots_create
+  "talend_snapshot_diff",                     // → talend_snapshots_diff
+  "talend_snapshot_restore",                  // → talend_snapshots_restore
+  "talend_snapshot_read",                     // → talend_snapshots_read
+  "talend_deliverable_export_job",            // → talend_deliverables_export_job
+  "talend_deliverable_collect_files",         // → talend_deliverables_collect
+  "talend_deliverable_create_package",        // → talend_deliverables_create_package
+  "talend_deliverable_validate_checklist",    // → talend_deliverables_validate
+  "talend_dataset_inspect_csv_folder",        // → talend_datasets_inspect_csv_folder
+  "talend_dataset_infer_csv_schema",          // → talend_datasets_infer_csv_schema
+  "talend_dataset_generate_raw_table_mapping",   // → talend_datasets_generate_raw_mappings
+  "talend_dataset_generate_raw_table_mappings",  // → talend_datasets_generate_raw_mappings
+  "talend_error_explain",                     // → talend_errors_explain
+  "talend_error_suggest_fix",                 // → talend_errors_suggest_fix
+  "talend_error_stats",                       // → talend_errors_stats
+  "talend_error_map_to_component",            // old name, no canonical equivalent
+  "talend_job_validate_design",               // → talend_validation_validate_design
+  "talend_job_validate_context_usage",        // → talend_validation_validate_context_usage
+  "talend_job_validate_audit_columns",        // → talend_validation_validate_audit_columns
+  "talend_job_validate_performance_settings", // → talend_validation_validate_performance
+  "talend_job_validate_pipeline_spec",        // → talend_jobs_validate_pipeline_spec
+  "talend_job_apply_pipeline_spec",           // → talend_jobs_apply_pipeline_spec
+  "talend_job_preview_pipeline_spec",         // → talend_jobs_preview_pipeline_spec
+  "talend_report_snippet_get",                // → talend_report_snippets_list
+  "talend_report_snippet_list",               // → talend_report_snippets_list
+  "talend_report_generate_snippets",          // → talend_report_snippets_generate
+  "talend_runs_list",                         // → talend_list_runs
+  "talend_runs_read",                         // → talend_read_run
+  "talend_runs_start",                        // → talend_job_run_by_name
+  "talend_runs_start_exported",               // → talend_run_exported_job
+  "talend_run_job",                           // → talend_job_run_by_name
+  "talend_create_job",                        // → talend_jobs_create
+  "talend_list_jobs",                         // → talend_jobs_list
+  "talend_read_job",                          // → talend_jobs_read
+  "talend_diagnose_job",                      // older name for talend_diagnose_environment
+]);
+
+const KNOWN_PRESETS = new Set([
+  "all", "canonical", "core", "apps", "jobs", "snapshots", "runs", "errors",
+  "validation", "secrets", "datasets", "deliverables", "components", "bridge",
+  "requirements", "evidence", "reports",
+]);
+
+function applyFilter<T extends { name: string } | { definition: { name: string } }>(
+  items: T[],
+  filterStr: string | undefined
+): T[] {
+  if (!filterStr) return items;
+
+  const patterns = filterStr.split(",").map(p => p.trim().toLowerCase());
+
+  const wantsAll          = patterns.includes("all");
+  const wantsCanonical    = patterns.includes("canonical");
+  const wantsCore         = patterns.includes("core");
+  const wantsApps         = patterns.includes("apps");
+  const wantsJobs         = patterns.includes("jobs");
+  const wantsSnapshots    = patterns.includes("snapshots");
+  const wantsRuns         = patterns.includes("runs");
+  const wantsErrors       = patterns.includes("errors");
+  const wantsValidation   = patterns.includes("validation");
+  const wantsSecrets      = patterns.includes("secrets");
+  const wantsDatasets     = patterns.includes("datasets");
+  const wantsDeliverables = patterns.includes("deliverables");
+  const wantsComponents   = patterns.includes("components");
+  const wantsBridge       = patterns.includes("bridge");
+  const wantsRequirements = patterns.includes("requirements");
+  const wantsEvidence     = patterns.includes("evidence");
+  const wantsReports      = patterns.includes("reports");
+
+  const customPatterns = patterns.filter(p => !KNOWN_PRESETS.has(p));
+
+  return items.filter(item => {
+    const name = ("name" in item ? item.name : (item as any).definition.name).toLowerCase();
+
+    // "all": every talend_* tool (drops non-prefixed legacy aliases like "repo_pull")
+    if (wantsAll && name.startsWith("talend_")) return true;
+
+    // "canonical": every talend_* tool that isn't a known legacy duplicate
+    if (wantsCanonical && name.startsWith("talend_") && !LEGACY_TALEND_ALIASES.has(name)) return true;
+
+    // "core": curated 21-tool safe set
+    if (wantsCore && PRESET_CORE.has(name)) return true;
+
+    // Module presets by prefix
+    if (wantsApps         && name.startsWith("talend_app_")) return true;
+    if (wantsBridge       && name.startsWith("talend_bridge_")) return true;
+    if (wantsComponents   && name.startsWith("talend_components_")) return true;
+    if (wantsErrors       && name.startsWith("talend_errors_")) return true;
+    if (wantsValidation   && name.startsWith("talend_validation_")) return true;
+    if (wantsSecrets      && name.startsWith("talend_secrets_")) return true;
+    if (wantsDatasets     && name.startsWith("talend_datasets_")) return true;
+    if (wantsDeliverables && name.startsWith("talend_deliverables_")) return true;
+    if (wantsRequirements && name.startsWith("talend_requirements_")) return true;
+    if (wantsEvidence     && name.startsWith("talend_evidence_")) return true;
+    if (wantsReports      && name.startsWith("talend_report_snippets_")) return true;
+    if (wantsSnapshots    && name.startsWith("talend_snapshots_")) return true;
+    if (wantsRuns && (
+      name === "talend_list_runs"     || name === "talend_read_run"         ||
+      name === "talend_tail_run_output" || name === "talend_read_run_log"   ||
+      name === "talend_job_run_by_name" || name === "talend_job_wait_run"   ||
+      name === "talend_run_exported_job"
+    )) return true;
+    if (wantsJobs && (
+      name.startsWith("talend_jobs_") ||
+      name === "talend_show_flow"           || name === "talend_read_contexts"     ||
+      name === "talend_detect_open_jobs"    || name === "talend_summarize_open_job" ||
+      name === "talend_diagnose_environment"|| name === "talend_can_read_project"  ||
+      name === "talend_can_read_process"    || name === "talend_can_read_metadata"
+    )) return true;
+
+    // Custom exact name or wildcard
+    return customPatterns.some(pattern => {
+      if (pattern.endsWith("*")) return name.startsWith(pattern.slice(0, -1));
+      return name === pattern;
+    });
+  });
+}
+
 export function getAllRuntimeTools(): McpToolDefinition[] {
   buildRuntimeToolCache();
-  return Array.from(toolCache!.values()).map((t) => t.definition);
+  const tools = Array.from(toolCache!.values()).map((t) => t.definition);
+  return applyFilter(tools, process.env.TALEND_MCP_FILTER);
 }
 
 export function getRuntimeTools(): RuntimeTool[] {
   buildRuntimeToolCache();
-  return Array.from(toolCache!.values());
+  const tools = Array.from(toolCache!.values());
+  return applyFilter(tools, process.env.TALEND_MCP_FILTER);
 }
 
 export function getToolByName(name: string): McpToolDefinition | undefined {

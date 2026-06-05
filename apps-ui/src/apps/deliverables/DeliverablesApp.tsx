@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useCallTool } from "../../openai/useCallTool";
 import { useAppSession } from "../../openai/useAppSession";
+import { AppHeader, ErrorBanner } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -72,8 +73,8 @@ const DEFAULT_CHECKLIST_ITEMS: Omit<ChecklistItem, "checked">[] = [
   },
   {
     id: "naming-convention",
-    label: "Convención de nombres",
-    description: "Verificar que los archivos sigan la convención de nombres",
+    label: "Convencion de nombres",
+    description: "Verificar que los archivos sigan la convencion de nombres",
     required: false,
     severity: "info",
   },
@@ -174,7 +175,7 @@ export function DeliverablesApp() {
         setValidationResult({ passed: false, errors: ["Error parseando resultado"] });
       }
     } else {
-      setValidationResult({ passed: false, errors: [result.error ?? "Validación fallida"] });
+      setValidationResult({ passed: false, errors: [result.error ?? "Validacion fallida"] });
     }
   }, [callTool, checklistItems]);
 
@@ -226,10 +227,10 @@ export function DeliverablesApp() {
         const data = JSON.parse(result.result);
         setExportJob(data);
       } catch {
-        setError("Error parseando resultado de exportación");
+        setError("Error parseando resultado de exportacion");
       }
     } else {
-      setError(result.error ?? "Error iniciando exportación");
+      setError(result.error ?? "Error iniciando exportacion");
     }
   }, [callTool, jobId, packageResult]);
 
@@ -257,34 +258,31 @@ export function DeliverablesApp() {
     return "muted";
   };
 
+  const stepLabels: Record<Step, string> = {
+    collect: "Recolectar archivos de evidencia",
+    validate: "Validar checklist de deliverable",
+    create: "Crear paquete",
+    export: "Exportar job",
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Deliverables</h2>
-          <p className="text-gray-500 mt-1">
-            {step === "collect" && "Recolectar archivos de evidencia"}
-            {step === "validate" && "Validar checklist de deliverable"}
-            {step === "create" && "Crear paquete"}
-            {step === "export" && "Exportar job"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={getStepStatus("collect") === "success" ? "success" : "default"}>1. Collect</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={getStepStatus("validate") === "success" ? "success" : step === "validate" ? "default" : "muted"}>2. Validate</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={getStepStatus("create") === "success" ? "success" : step === "create" ? "default" : "muted"}>3. Create</Badge>
-          <span className="text-gray-400">→</span>
-          <Badge variant={step === "export" ? "default" : "muted"}>4. Export</Badge>
-        </div>
-      </div>
+      <AppHeader
+        title="Deliverables"
+        subtitle={stepLabels[step]}
+      />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
+
+      <div className="flex items-center gap-2">
+        <Badge variant={getStepStatus("collect") === "success" ? "success" : "default"}>1. Collect</Badge>
+        <span className="text-gray-400">-</span>
+        <Badge variant={getStepStatus("validate") === "success" ? "success" : step === "validate" ? "default" : "muted"}>2. Validate</Badge>
+        <span className="text-gray-400">-</span>
+        <Badge variant={getStepStatus("create") === "success" ? "success" : step === "create" ? "default" : "muted"}>3. Create</Badge>
+        <span className="text-gray-400">-</span>
+        <Badge variant={step === "export" ? "default" : "muted"}>4. Export</Badge>
+      </div>
 
       {step === "collect" && (
         <Card className="p-6">
@@ -358,16 +356,18 @@ export function DeliverablesApp() {
       {step === "create" && packageResult && (
         <Card className="p-6">
           <div className="text-center">
-            <span className="text-5xl">📦</span>
+            <svg className="w-12 h-12 mx-auto text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
             <h3 className="text-xl font-semibold text-gray-900 mt-4">Paquete creado exitosamente</h3>
             <div className="mt-4 p-4 bg-gray-50 rounded-lg inline-block text-left">
               <p><span className="text-gray-500">Nombre:</span> <span className="font-medium">{packageResult.name}</span></p>
-              <p><span className="text-gray-500">Versión:</span> <span className="font-medium">{packageResult.version}</span></p>
+              <p><span className="text-gray-500">Version:</span> <span className="font-medium">{packageResult.version}</span></p>
               <p><span className="text-gray-500">Archivos:</span> <span className="font-medium">{packageResult.files.length}</span></p>
               <p><span className="text-gray-500">Checksum:</span> <span className="font-mono text-sm">{packageResult.checksum}</span></p>
             </div>
             <div className="mt-6">
-              <Button onClick={() => setStep("export")}>Continuar a exportación</Button>
+              <Button onClick={() => setStep("export")}>Continuar a exportacion</Button>
             </div>
           </div>
         </Card>
@@ -396,7 +396,7 @@ export function DeliverablesApp() {
               </div>
               {exportJob ? (
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Estado de exportación</p>
+                  <p className="text-sm text-gray-500">Estado de exportacion</p>
                   <Badge
                     variant={
                       exportJob.status === "completed"
@@ -422,7 +422,7 @@ export function DeliverablesApp() {
                 </div>
               ) : (
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
-                  La exportación creará un archivo ZIP en ./exports/{packageResult.name}.zip
+                  La exportacion creara un archivo ZIP en ./exports/{packageResult.name}.zip
                 </div>
               )}
             </div>
@@ -432,7 +432,7 @@ export function DeliverablesApp() {
               Back
             </Button>
             <Button onClick={handleExport} disabled={isLoading || !!exportJob}>
-              {isLoading ? "Exportando..." : "Iniciar exportación"}
+              {isLoading ? "Exportando..." : "Iniciar exportacion"}
             </Button>
           </div>
         </Card>

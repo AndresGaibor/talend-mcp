@@ -1,17 +1,7 @@
 import * as z from "zod/v4";
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { diagnoseJob } from "../../../talend/diagnostics/job-diagnostics";
-
-function jsonOk(data: unknown): CallToolResult {
-  return {
-    content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-    structuredContent: data as Record<string, unknown>,
-  };
-}
-
-function err(text: string): CallToolResult {
-  return { content: [{ type: "text", text }], isError: true };
-}
+import { okResult, errorResult } from "../../../presentation/tools/common/result";
 
 export const talendDiagnoseJobTool = {
   name: "talend_diagnose_job",
@@ -21,10 +11,19 @@ export const talendDiagnoseJobTool = {
   }),
   handler: async (input: { jobName?: string }): Promise<CallToolResult> => {
     try {
-      const result = await diagnoseJob(input?.jobName);
-      return jsonOk(result);
+      const data = await diagnoseJob(input?.jobName);
+      const result = okResult(data, "talend_diagnose_job");
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        structuredContent: result,
+      };
     } catch (e) {
-      return err(`Error ejecutando diagnóstico de job: ${e}`);
+      const result = errorResult("talend_diagnose_job", "DIAGNOSE_ERROR", `Error ejecutando diagnóstico de job: ${e}`);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        structuredContent: result,
+        isError: true,
+      };
     }
   },
 };

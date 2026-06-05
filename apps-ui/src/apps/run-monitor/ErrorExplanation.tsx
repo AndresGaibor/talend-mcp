@@ -19,7 +19,6 @@ export function ErrorExplanation({ errorInfo, isLoading }: ErrorExplanationProps
     return (
       <Card className="p-6 text-center">
         <div className="animate-pulse">
-          <div className="text-4xl mb-4">🔍</div>
           <p className="text-gray-500">Analizando error...</p>
         </div>
       </Card>
@@ -29,9 +28,9 @@ export function ErrorExplanation({ errorInfo, isLoading }: ErrorExplanationProps
   if (!errorInfo) {
     return (
       <Card className="p-6">
-        <p className="text-gray-500">No hay información del error disponible</p>
+        <p className="text-gray-500">No hay informacion del error disponible</p>
         <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
-          ← Volver
+          Volver
         </Button>
       </Card>
     );
@@ -40,11 +39,11 @@ export function ErrorExplanation({ errorInfo, isLoading }: ErrorExplanationProps
   return (
     <Card className="p-6">
       <div className="flex items-center gap-3 mb-6">
-        <span className="text-3xl">❌</span>
+        <span className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-sm">!</span>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Análisis de Error</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Analisis de Error</h3>
           {errorInfo.errorCode && (
-            <p className="text-sm text-gray-500">Código: {errorInfo.errorCode}</p>
+            <p className="text-sm text-gray-500">Codigo: {errorInfo.errorCode}</p>
           )}
         </div>
       </div>
@@ -83,14 +82,14 @@ export function ErrorExplanation({ errorInfo, isLoading }: ErrorExplanationProps
           <h4 className="font-semibold text-gray-900 mb-2">Soluciones Sugeridas</h4>
           <ul className="list-disc list-inside space-y-1">
             {errorInfo.suggestedFixes.map((fix, idx) => (
-              <li key={idx} className="text-green-700">{fix}</li>
+              <li key={idx} className="text-emerald-700">{fix}</li>
             ))}
           </ul>
         </div>
       )}
 
       <Button variant="outline" onClick={() => window.location.reload()}>
-        ← Volver al Inicio
+        Volver al Inicio
       </Button>
     </Card>
   );

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
 import { useAppSession } from "../../openai/useAppSession";
+import { AppHeader, ErrorBanner } from "../../design-system";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { CsvFilesTable } from "./CsvFilesTable";
@@ -51,7 +52,7 @@ export function DatasetInspectorApp() {
         setInspection(data.data);
         setStep("files");
       } else {
-        setError(data?.error?.message || "Inspección falló");
+        setError(data?.error?.message || "Inspeccion fallo");
       }
     } else {
       setError(result.error || "Error al llamar a la herramienta");
@@ -81,7 +82,7 @@ export function DatasetInspectorApp() {
         setStep("mappings");
         await updateSession({ datasetMappings: data.data });
       } else {
-        setError(data?.error?.message || "Generación de mappings falló");
+        setError(data?.error?.message || "Generacion de mappings fallo");
       }
     } else {
       setError(result.error || "Error al llamar a la herramienta de mappings");
@@ -108,23 +109,17 @@ export function DatasetInspectorApp() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Dataset Inspector</h2>
-          <p className="text-gray-500 mt-1">Inspect CSV folders and generate raw mappings</p>
-        </div>
-        {step !== "input" && (
+      <AppHeader
+        title="Dataset Inspector"
+        subtitle="Inspect CSV folders and generate raw mappings"
+        actions={step !== "input" ? (
           <Button variant="ghost" size="sm" onClick={goBack}>
-            ← Back
+            Back
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
       {step === "input" && (
         <Card className="p-6">

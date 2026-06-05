@@ -16,34 +16,23 @@ interface DeliverableChecklistProps {
   isValidating: boolean;
 }
 
+function SeverityDot({ severity }: { severity: "error" | "warning" | "info" }) {
+  return (
+    <span
+      className={`inline-block w-2 h-2 rounded-full ${
+        severity === "error" ? "bg-red-400" :
+        severity === "warning" ? "bg-amber-400" : "bg-blue-400"
+      }`}
+    />
+  );
+}
+
 export function DeliverableChecklist({
   items,
   onToggleItem,
   validationResult,
   isValidating,
 }: DeliverableChecklistProps) {
-  const getSeverityIcon = (severity: "error" | "warning" | "info") => {
-    switch (severity) {
-      case "error":
-        return "❌";
-      case "warning":
-        return "⚠️";
-      case "info":
-        return "ℹ️";
-    }
-  };
-
-  const getSeverityColor = (severity: "error" | "warning" | "info") => {
-    switch (severity) {
-      case "error":
-        return "border-red-200 bg-red-50";
-      case "warning":
-        return "border-yellow-200 bg-yellow-50";
-      case "info":
-        return "border-blue-200 bg-blue-50";
-    }
-  };
-
   const requiredItems = items.filter((item) => item.required);
   const optionalItems = items.filter((item) => !item.required);
   const checkedRequiredCount = requiredItems.filter((item) => item.checked).length;
@@ -51,9 +40,9 @@ export function DeliverableChecklist({
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Checklist de Validación</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Checklist de Validacion</h3>
         <div className="text-sm text-gray-500">
-          {checkedRequiredCount}/{requiredItems.length} required completados
+          {checkedRequiredCount}/{requiredItems.length} requeridos completados
         </div>
       </div>
 
@@ -65,7 +54,7 @@ export function DeliverableChecklist({
 
       {validationResult && !validationResult.passed && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="font-medium text-red-700">Validación fallida</p>
+          <p className="font-medium text-red-700">Validacion fallida</p>
           <ul className="mt-2 text-sm text-red-600 list-disc list-inside">
             {validationResult.errors.map((error, idx) => (
               <li key={idx}>{error}</li>
@@ -76,7 +65,7 @@ export function DeliverableChecklist({
 
       {validationResult?.passed && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-          ✓ Todos los items requeridos han sido validados correctamente
+          Todos los items requeridos han sido validados correctamente
         </div>
       )}
 
@@ -89,9 +78,11 @@ export function DeliverableChecklist({
             {requiredItems.map((item) => (
               <div
                 key={item.id}
-                className={`p-3 rounded-lg border ${getSeverityColor(item.severity)} ${
-                  item.checked ? "opacity-60" : ""
-                }`}
+                className={`p-3 rounded-lg border ${
+                  item.severity === "error" ? "border-red-200 bg-red-50" :
+                  item.severity === "warning" ? "border-amber-200 bg-amber-50" :
+                  "border-blue-200 bg-blue-50"
+                } ${item.checked ? "opacity-60" : ""}`}
               >
                 <div className="flex items-start gap-3">
                   <input
@@ -102,7 +93,7 @@ export function DeliverableChecklist({
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span>{getSeverityIcon(item.severity)}</span>
+                      <SeverityDot severity={item.severity} />
                       <p className="font-medium text-gray-900">{item.label}</p>
                       {item.required && (
                         <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
@@ -126,9 +117,11 @@ export function DeliverableChecklist({
             {optionalItems.map((item) => (
               <div
                 key={item.id}
-                className={`p-3 rounded-lg border ${getSeverityColor(item.severity)} ${
-                  item.checked ? "opacity-60" : ""
-                }`}
+                className={`p-3 rounded-lg border ${
+                  item.severity === "error" ? "border-red-200 bg-red-50" :
+                  item.severity === "warning" ? "border-amber-200 bg-amber-50" :
+                  "border-blue-200 bg-blue-50"
+                } ${item.checked ? "opacity-60" : ""}`}
               >
                 <div className="flex items-start gap-3">
                   <input
@@ -139,7 +132,7 @@ export function DeliverableChecklist({
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span>{getSeverityIcon(item.severity)}</span>
+                      <SeverityDot severity={item.severity} />
                       <p className="font-medium text-gray-900">{item.label}</p>
                     </div>
                     <p className="text-sm text-gray-600 mt-1">{item.description}</p>
