@@ -20,7 +20,7 @@ echo "      ✓ Build completado"
 echo ""
 echo "[2/4] Verificando update site..."
 if [ ! -d "$REPO_DIR" ]; then
- echo "ERROR: No se encontró el update site en $REPO_DIR"
+  echo "ERROR: No se encontró el update site en $REPO_DIR"
   exit 1
 fi
 echo "      ✓ Update site encontrado en $REPO_DIR"
@@ -56,7 +56,8 @@ echo "[4/4] Instalando plugin en Talend Studio..."
   -destination "$TALEND_STUDIO_DIR" \
   -profileProperties org.eclipse.update.install.features=true \
   -nosplash \
-  -console
+  -console \
+2>&1 | grep -v "^WARNING:" || true
 
 echo ""
 echo "=== Instalación completada ==="
