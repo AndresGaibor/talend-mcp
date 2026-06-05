@@ -182,6 +182,9 @@ const TOOL_INPUT_SCHEMAS: ToolInputSchemas = {
   talend_live_stop: z.object({}),
   talend_detect_open_jobs: z.object({}),
   talend_latest_changes: z.object({}),
+  talend_jobs_list: z.object({
+    projectPath: z.string().optional(),
+  }),
 };
 
 describe("Tool Schemas", () => {
@@ -276,6 +279,11 @@ describe("Tool Schemas", () => {
       const schema = TOOL_INPUT_SCHEMAS["talend_list_jobs"]!;
       expect(() => schema.parse({})).toThrow();
       expect(() => schema.parse({ projectPath: 123 })).toThrow();
+    });
+
+    test("talend_jobs_list accepts empty input", async () => {
+      const schema = TOOL_INPUT_SCHEMAS["talend_jobs_list"]!;
+      expect(() => schema.parse({})).not.toThrow();
     });
 
     test("all defined schemas parse their own name as valid input", () => {
@@ -392,6 +400,7 @@ function getMinimalInputForTool(toolName: string): Record<string, unknown> {
     talend_live_stop: {},
     talend_detect_open_jobs: {},
     talend_latest_changes: {},
+    talend_jobs_list: {},
   };
 
   return minimalInputs[toolName] ?? {};

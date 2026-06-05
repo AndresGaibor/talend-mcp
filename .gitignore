@@ -28,8 +28,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 *.tsbuildinfo
 
 # talend-mcp runtime
-.talend-mcp/runs/
-.talend-mcp/bin/
+.talend-mcp/
 
 # Gemini/Antigravity local config
 .antigravitycli/

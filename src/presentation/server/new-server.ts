@@ -182,6 +182,7 @@ function handleMcpRequest(
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema ?? { type: "object", properties: {} },
+      outputSchema: t.outputSchema,
       ...(t.annotations ? { annotations: t.annotations } : {}),
     }));
     sendJson(res, origin, jsonRpcOk(id, { tools }));

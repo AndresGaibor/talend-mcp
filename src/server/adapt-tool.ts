@@ -1,4 +1,6 @@
 import type { z } from "zod/v4";
+import { TalendResultSchema } from "../shared/contracts/result.contract";
+import { hasEnrichedDataSchema, getEnrichedOutputSchema } from "./enriched-schemas";
 
 export type McpToolAnnotation = {
   readOnlyHint?: boolean;
@@ -207,13 +209,32 @@ function extractAnnotations(tool: unknown): McpToolAnnotation | undefined {
   return baseAnn;
 }
 
+function resolveOutputSchema(toolName: string, fallbackSchema: unknown): unknown {
+  const normName = toolName.startsWith("talend_") ? toolName : `talend_${toolName}`;
+  if (hasEnrichedDataSchema(normName)) {
+    const isPatternB = normName === "talend_diagnose_environment" ||
+      normName.startsWith("talend_secrets_") ||
+      normName.startsWith("talend_snapshots_") ||
+      normName.startsWith("talend_datasets_") ||
+      normName.startsWith("talend_deliverables_") ||
+      normName.startsWith("talend_errors_") ||
+      normName.startsWith("talend_validation_") ||
+      normName.startsWith("talend_evidence_") ||
+      normName.startsWith("talend_report_snippets_") ||
+      normName.startsWith("talend_runs_") ||
+      normName.startsWith("talend_app_");
+    return convertInputSchema(getEnrichedOutputSchema(normName, isPatternB ? "B" : "A"));
+  }
+  return convertInputSchema(fallbackSchema ?? TalendResultSchema);
+}
+
 export function adaptToolToMcp(tool: unknown): McpToolDefinition {
   if (isTalendToolDef(tool)) {
     return {
       name: tool.name,
       description: tool.description,
       inputSchema: convertInputSchema(tool.inputSchema),
-      outputSchema: convertInputSchema(tool.outputSchema),
+      outputSchema: resolveOutputSchema(tool.name, tool.outputSchema),
       annotations: extractAnnotations(tool),
       _meta: (tool as any)._meta,
     };
@@ -224,7 +245,7 @@ export function adaptToolToMcp(tool: unknown): McpToolDefinition {
       name: tool.name,
       description: tool.description,
       inputSchema: convertInputSchema(tool.inputSchema),
-      outputSchema: tool.outputSchema ? convertInputSchema(tool.outputSchema) : undefined,
+      outputSchema: resolveOutputSchema(tool.name, tool.outputSchema),
       annotations: extractAnnotations(tool),
       _meta: (tool as any)._meta,
     };
@@ -237,7 +258,7 @@ export function adaptToolToMcp(tool: unknown): McpToolDefinition {
         name: t.name,
         description: t.description,
         inputSchema: convertInputSchema(t.inputSchema),
-        outputSchema: t.outputSchema ? convertInputSchema(t.outputSchema) : undefined,
+        outputSchema: resolveOutputSchema(t.name, t.outputSchema),
         annotations: extractAnnotations(t),
         _meta: t._meta,
       };

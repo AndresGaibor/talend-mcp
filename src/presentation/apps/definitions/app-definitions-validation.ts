@@ -49,6 +49,7 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/problems-view.html",
     launcherToolName: "talend_app_problems_view",
     launchMessage: "Abriendo la vista de problemas.",
+    uiMode: "react",
     actions: [
       createNoInputAction("Problems markers", TOOL_NAMES.BRIDGE.PROBLEMS_MARKERS, "Lista markers de problemas."),
     ],

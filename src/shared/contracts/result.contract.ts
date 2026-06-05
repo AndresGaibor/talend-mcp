@@ -1,4 +1,33 @@
+import { z } from "zod/v4";
+
 export type Confidence = "high" | "medium" | "low" | "none";
+
+/**
+ * Zod schema for the standard TalendResult envelope.
+ * Use this as `outputSchema` in tool definitions so MCP clients
+ * (e.g. ChatGPT Actions) know the shape of every tool response.
+ */
+export const TalendResultSchema = z.object({
+  ok: z.boolean().describe("Whether the operation succeeded"),
+  source: z.string().describe("Tool name that produced this result"),
+  confidence: z.enum(["high", "medium", "low", "none"]).describe("Confidence level of the result"),
+  data: z.unknown().optional().describe("The result payload (shape varies per tool)"),
+  warnings: z.array(z.string()).optional().describe("Non-fatal warnings"),
+  errors: z.array(
+    z.object({
+      code: z.string(),
+      message: z.string(),
+      details: z.record(z.string(), z.unknown()).optional(),
+    })
+  ).optional().describe("Errors if ok is false"),
+  nextActions: z.array(
+    z.object({
+      label: z.string(),
+      toolName: z.string(),
+      input: z.record(z.string(), z.unknown()).optional(),
+    })
+  ).optional().describe("Suggested follow-up tool calls"),
+});
 
 export type TalendResult<T = unknown> = {
   ok: boolean;

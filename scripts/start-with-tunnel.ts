@@ -286,7 +286,7 @@ async function main() {
       const pids = lsof.stdout.toString().trim().split("\n").filter(Boolean);
       for (const pid of pids) {
         info(`Puerto ${mcpPort} ocupado por PID ${pid} — terminando proceso anterior...`);
-        Bun.spawnSync(["kill", "-9", pid], { stdio: "ignore" });
+        Bun.spawnSync(["kill", "-9", pid], { stdio: ["ignore", "ignore", "ignore"] });
       }
     }
   } catch {}

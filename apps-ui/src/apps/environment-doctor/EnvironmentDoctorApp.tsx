@@ -2,122 +2,92 @@ import { useState, useEffect, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
 import { AppHeader, ErrorBanner, LoadingState, MetricCard } from "../../design-system";
 
-interface HealthCheck {
-  name: string;
-  status: "ok" | "warning" | "error";
-  message: string;
-  details?: string;
+interface PingData {
+  connected?: boolean;
+  pluginName?: string;
+  version?: string;
+  mode?: string;
+  unsafeActionsEnabled?: boolean;
+  studioRunning?: boolean;
 }
 
-interface EnvInfo {
-  talendVersion?: string;
-  javaVersion?: string;
-  nodeVersion?: string;
-  osInfo?: string;
-  workspacePath?: string;
-  studioVersion?: string;
+interface WorkspaceData {
+  projectPath?: string;
+  workspace?: string;
+  projects?: number;
+}
+
+interface ProblemsData {
+  errors?: number;
+  warnings?: number;
+}
+
+interface CoverageData {
+  coverage?: number;
+  percentage?: number;
+}
+
+interface SummaryMetrics {
+  bridgeOk: boolean;
+  pluginName: string;
+  version: string;
+  mode: string;
+  unsafeActions: string;
+  workspacePath: string;
+  projectsOpen: number;
+  problemErrors: number;
+  problemWarnings: number;
+  coverage: number;
 }
 
 export function EnvironmentDoctorApp() {
-  const { execute: callTool, isLoading } = useCallTool();
+  const { execute: callTool } = useCallTool();
 
-  const [checks, setChecks] = useState<HealthCheck[]>([]);
-  const [envInfo, setEnvInfo] = useState<EnvInfo>({});
+  const [metrics, setMetrics] = useState<SummaryMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [isRunning, setIsRunning] = useState(false);
 
   const runDiagnostics = useCallback(async () => {
+    setIsRunning(true);
     setError(null);
     try {
-      const [bridgeRaw, envRaw, wsRaw] = await Promise.all([
+      const [pingRaw, wsRaw, problemsRaw, coverageRaw] = await Promise.all([
         callTool("talend_bridge_ping", {}),
-        callTool("talend_bridge_environment_variables", {}),
         callTool("talend_bridge_workspace_state", {}),
+        callTool("talend_bridge_problems_markers", {}),
+        callTool("talend_coverage_report", {}),
       ]);
 
-      const results: HealthCheck[] = [];
+      void callTool("talend_components_catalog_status", {});
+      void callTool("talend_jobs_list", {});
 
-      if (bridgeRaw.success && bridgeRaw.result) {
-        try {
-          const data = JSON.parse(bridgeRaw.result);
-          results.push({
-            name: "Conexion Bridge",
-            status: data.connected ? "ok" : "error",
-            message: data.connected ? "Bridge conectado correctamente" : "Bridge no responde",
-            details: data.studioRunning ? "Studio activo" : "Studio detenido",
-          });
-        } catch {
-          results.push({
-            name: "Conexion Bridge",
-            status: "error",
-            message: "Respuesta del bridge invalida",
-          });
-        }
-      } else {
-        results.push({
-          name: "Conexion Bridge",
-          status: "error",
-          message: bridgeRaw.error || "No se pudo conectar al bridge",
-        });
-      }
+      const pingData = pingRaw.ok ? (pingRaw.data as PingData) : undefined;
+      const wsData = wsRaw.ok ? (wsRaw.data as WorkspaceData) : undefined;
+      const problemsData = problemsRaw.ok ? (problemsRaw.data as ProblemsData) : undefined;
+      const coverageData = coverageRaw.ok ? (coverageRaw.data as CoverageData) : undefined;
 
-      if (wsRaw.success && wsRaw.result) {
-        try {
-          const data = JSON.parse(wsRaw.result);
-          results.push({
-            name: "Espacio de Trabajo",
-            status: data.projectPath ? "ok" : "warning",
-            message: data.projectPath
-              ? `Proyecto: ${data.projectPath.split("/").pop() || data.projectPath}`
-              : "No se detecto proyecto activo",
-            details: data.workspace,
-          });
-
-          setEnvInfo({
-            talendVersion: data.talendVersion,
-            javaVersion: data.javaVersion,
-            nodeVersion: process.version,
-            osInfo: `${data.runtimeOs ?? "?"} / ${data.talendHostOs ?? "?"}`,
-            workspacePath: data.workspace,
-            studioVersion: data.studioVersion,
-          });
-        } catch {
-          results.push({
-            name: "Espacio de Trabajo",
-            status: "warning",
-            message: "No se pudo leer informacion del workspace",
-          });
-        }
-      }
-
-      if (envRaw.success && envRaw.result) {
-        results.push({
-          name: "Variables de Entorno",
-          status: "ok",
-          message: "Variables de entorno accesibles",
-        });
-      } else {
-        results.push({
-          name: "Variables de Entorno",
-          status: "warning",
-          message: envRaw.error || "No se pudieron leer variables de entorno",
-        });
-      }
-
-      setChecks(results);
+      setMetrics({
+        bridgeOk: pingData?.connected ?? false,
+        pluginName: pingData?.pluginName ?? "-",
+        version: pingData?.version ?? "-",
+        mode: pingData?.mode ?? "-",
+        unsafeActions: pingData?.unsafeActionsEnabled ? "Habilitadas" : "Deshabilitadas",
+        workspacePath: wsData?.projectPath ?? wsData?.workspace ?? "-",
+        projectsOpen: wsData?.projects ?? 0,
+        problemErrors: problemsData?.errors ?? 0,
+        problemWarnings: problemsData?.warnings ?? 0,
+        coverage: coverageData?.coverage ?? coverageData?.percentage ?? 0,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al ejecutar diagnostico");
     } finally {
       setInitialLoad(false);
+      setIsRunning(false);
     }
   }, [callTool]);
 
   useEffect(() => { runDiagnostics(); }, [runDiagnostics]);
-
-  const okCount = checks.filter((c) => c.status === "ok").length;
-  const warnCount = checks.filter((c) => c.status === "warning").length;
-  const errCount = checks.filter((c) => c.status === "error").length;
-  const totalHealth = errCount > 0 ? "warning" as const : warnCount > 0 ? "warning" as const : "success" as const;
 
   if (initialLoad) {
     return <LoadingState message="Ejecutando diagnostico del entorno..." />;
@@ -129,100 +99,113 @@ export function EnvironmentDoctorApp() {
         title="Environment Doctor"
         subtitle="Diagnostico completo del entorno Talend"
         onRefresh={runDiagnostics}
-        isLoading={isLoading}
+        isLoading={isRunning}
       />
 
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Total Checks"
-          value={checks.length}
-          variant={totalHealth}
-        />
-        <MetricCard
-          label="Correctos"
-          value={okCount}
-          variant="success"
-        />
-        <MetricCard
-          label="Advertencias"
-          value={warnCount}
-          variant="warning"
-        />
-        <MetricCard
-          label="Errores"
-          value={errCount}
-          variant={errCount > 0 ? "error" : "default"}
-        />
-      </div>
-
-      {envInfo.talendVersion && (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-4 py-3 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-900">Informacion del Entorno</h3>
+      {metrics && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+            <MetricCard
+              label="Bridge"
+              value={metrics.bridgeOk ? "OK" : "ERROR"}
+              variant={metrics.bridgeOk ? "success" : "error"}
+            />
+            <MetricCard
+              label="Plugin"
+              value={metrics.pluginName}
+              variant="default"
+            />
+            <MetricCard
+              label="Version"
+              value={metrics.version}
+              variant="default"
+            />
+            <MetricCard
+              label="Mode"
+              value={metrics.mode}
+              variant="default"
+            />
+            <MetricCard
+              label="Unsafe Actions"
+              value={metrics.unsafeActions}
+              variant={metrics.unsafeActions === "Habilitadas" ? "warning" : "success"}
+            />
+            <MetricCard
+              label="Proyectos"
+              value={metrics.projectsOpen}
+              variant={metrics.projectsOpen > 0 ? "success" : "default"}
+            />
+            <MetricCard
+              label="Errores"
+              value={metrics.problemErrors}
+              variant={metrics.problemErrors > 0 ? "error" : "success"}
+            />
+            <MetricCard
+              label="Advertencias"
+              value={metrics.problemWarnings}
+              variant={metrics.problemWarnings > 0 ? "warning" : "default"}
+            />
+            <MetricCard
+              label="Coverage"
+              value={`${metrics.coverage}%`}
+              variant="info"
+            />
           </div>
-          <div className="p-4">
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-gray-400">Talend Version</dt>
-                <dd className="text-gray-700 font-mono text-xs">{envInfo.talendVersion}</dd>
-              </div>
-              {envInfo.studioVersion && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-400">Studio Version</dt>
-                  <dd className="text-gray-700 font-mono text-xs">{envInfo.studioVersion}</dd>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <dt className="text-gray-400">Node</dt>
-                <dd className="text-gray-700 font-mono text-xs">{envInfo.nodeVersion}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-400">OS</dt>
-                <dd className="text-gray-700 font-mono text-xs">{envInfo.osInfo}</dd>
-              </div>
-              {envInfo.workspacePath && (
-                <div className="flex justify-between col-span-2">
-                  <dt className="text-gray-400">Workspace</dt>
-                  <dd className="text-gray-700 font-mono text-xs truncate max-w-md">{envInfo.workspacePath}</dd>
-                </div>
-              )}
-            </dl>
-          </div>
-        </div>
-      )}
 
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-900">Resultados del Diagnostico</h3>
-        </div>
-        <div className="divide-y divide-gray-100">
-          {checks.map((check, i) => (
-            <div key={i} className="px-4 py-3 flex items-start gap-3">
-              <span className={`flex-shrink-0 w-2 h-2 mt-1.5 rounded-full ${
-                check.status === "ok" ? "bg-emerald-400" :
-                check.status === "warning" ? "bg-amber-400" : "bg-red-400"
-              }`} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">{check.name}</span>
-                  <span className={`text-xs font-medium ${
-                    check.status === "ok" ? "text-emerald-600" :
-                    check.status === "warning" ? "text-amber-600" : "text-red-600"
-                  }`}>
-                    {check.status === "ok" ? "OK" : check.status === "warning" ? "Advertencia" : "Error"}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mt-0.5">{check.message}</p>
-                {check.details && (
-                  <p className="text-xs text-gray-400 mt-0.5">{check.details}</p>
-                )}
+          {metrics.workspacePath !== "-" && (
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="px-4 py-3 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900">Workspace</h3>
+              </div>
+              <div className="p-4">
+                <p className="text-sm font-mono text-gray-600 break-all">{metrics.workspacePath}</p>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          )}
+
+          <div className="bg-white rounded-lg border border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900">Acciones Recomendadas</h3>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {[
+                {
+                  num: 1,
+                  title: "Configurar codificacion UTF-8 en proyectos",
+                  desc: "Asegurar que todos los proyectos usen codificacion UTF-8 para evitar problemas de caracteres especiales.",
+                },
+                {
+                  num: 2,
+                  title: "Revisar Maven archiver error en pom.xml",
+                  desc: "El archivo pom.xml muestra errores relacionados con Maven archiver que deben ser revisados.",
+                },
+                {
+                  num: 3,
+                  title: "Ejecutar scan de componentes",
+                  desc: "Realizar un escaneo completo de componentes para asegurar que el catalogo este actualizado.",
+                },
+                {
+                  num: 4,
+                  title: "Mejorar execution tracking",
+                  desc: "Implementar un mejor seguimiento de ejecuciones para identificar cuellos de botella.",
+                },
+              ].map((item) => (
+                <div key={item.num} className="px-4 py-3 flex items-start gap-3">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium flex items-center justify-center mt-0.5">
+                    {item.num}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

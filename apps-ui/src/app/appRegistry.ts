@@ -16,6 +16,7 @@ import { AntiPatternDetectorApp } from "../apps/antipattern-detector/AntiPattern
 import { ReportSnippetsApp } from "../apps/report-snippets/ReportSnippetsApp";
 import { EvidencePackApp } from "../apps/evidence-pack/EvidencePackApp";
 import { RequirementChecklistApp } from "../apps/requirement-checklist/RequirementChecklistApp";
+import { ProblemsViewApp } from "../apps/problems-view/ProblemsViewApp";
 
 export const APP_ROUTES: AppRoute[] = [
   { id: "home", component: HomeApp, title: "Home" },
@@ -36,4 +37,5 @@ export const APP_ROUTES: AppRoute[] = [
   { id: "report-snippets", component: ReportSnippetsApp, title: "Report Snippets" },
   { id: "evidence-pack", component: EvidencePackApp, title: "Evidence Pack" },
   { id: "requirement-checklist", component: RequirementChecklistApp, title: "Requirement Checklist" },
+  { id: "problems-view", component: ProblemsViewApp, title: "Problems View" },
 ];
