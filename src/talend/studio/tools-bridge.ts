@@ -309,4 +309,87 @@ export const bridgeTools = [
       return bridgeOk(bridgeResultToEnvelope(result, "/workbench/show-view"));
     },
   },
+  {
+    name: "talend_bridge_active_job_details",
+    description: "Obtiene los detalles profundos del job activo en Talend Studio (componentes con posiciones, conexiones).",
+    inputSchema: z.object({}),
+    handler: async () => {
+      const bridge = await loadBridge();
+      const result = await bridge.activeJobDetails();
+      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-job/details"));
+    },
+  },
+  {
+    name: "talend_bridge_active_component_details",
+    description: "Obtiene los detalles completos de un componente del job activo en Talend Studio (parámetros, schemas, conexiones).",
+    inputSchema: z.object({
+      uniqueName: z.string().describe("UNIQUE_NAME del componente"),
+      includeRaw: z.boolean().optional().describe("Incluir metadatos raw"),
+    }),
+    handler: async ({ uniqueName, includeRaw }: { uniqueName: string; includeRaw?: boolean }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.activeComponentDetails(uniqueName, includeRaw);
+      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-component/details"));
+    },
+  },
+  {
+    name: "talend_bridge_active_component_parameters",
+    description: "Obtiene todos los parámetros de configuración de un componente activo.",
+    inputSchema: z.object({
+      uniqueName: z.string().describe("UNIQUE_NAME del componente"),
+    }),
+    handler: async ({ uniqueName }: { uniqueName: string }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.activeComponentDetails(uniqueName, false);
+      if (result.ok && result.data?.component) {
+        result.data = { parameters: result.data.component.parameters };
+      }
+      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-component/parameters"));
+    },
+  },
+  {
+    name: "talend_bridge_active_component_schemas",
+    description: "Obtiene los schemas y columnas de un componente activo.",
+    inputSchema: z.object({
+      uniqueName: z.string().describe("UNIQUE_NAME del componente"),
+    }),
+    handler: async ({ uniqueName }: { uniqueName: string }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.activeComponentDetails(uniqueName, false);
+      if (result.ok && result.data?.component) {
+        result.data = { schemas: result.data.component.schemas };
+      }
+      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-component/schemas"));
+    },
+  },
+  {
+    name: "talend_bridge_active_component_connections",
+    description: "Obtiene las conexiones entrantes y salientes de un componente activo.",
+    inputSchema: z.object({
+      uniqueName: z.string().describe("UNIQUE_NAME del componente"),
+    }),
+    handler: async ({ uniqueName }: { uniqueName: string }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.activeComponentDetails(uniqueName, false);
+      if (result.ok && result.data?.component) {
+        result.data = {
+          incomingConnections: result.data.component.incomingConnections,
+          outgoingConnections: result.data.component.outgoingConnections,
+        };
+      }
+      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-component/connections"));
+    },
+  },
+  {
+    name: "talend_bridge_select_component",
+    description: "Selecciona y revela un componente en el editor activo de Talend Studio.",
+    inputSchema: z.object({
+      uniqueName: z.string().describe("UNIQUE_NAME del componente a seleccionar"),
+    }),
+    handler: async ({ uniqueName }: { uniqueName: string }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.selectComponent(uniqueName);
+      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-job/select-component"));
+    },
+  },
 ];

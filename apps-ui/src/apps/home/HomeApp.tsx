@@ -11,11 +11,13 @@ interface BridgeStatus {
 }
 
 interface WorkspaceState {
-  runtimeOs?: string;
-  talendHostOs?: string;
-  pathMode?: string;
-  projectPath?: string;
-  workspace?: string;
+  workspaceRoot?: string;
+  projects?: Array<{ name: string; path: string; open: boolean }>;
+}
+
+interface WorkspaceState {
+  workspaceRoot?: string;
+  projects?: Array<{ name: string; path: string; open: boolean }>;
 }
 
 interface JobsInfo {
@@ -44,53 +46,40 @@ export function HomeApp() {
       const [bridgeRaw, wsRaw, jobsRaw, problemsRaw] = await Promise.all([
         callTool("talend_bridge_ping", {}),
         callTool("talend_bridge_workspace_state", {}),
-        callTool("talend_jobs_list", { limit: 100 }),
+        callTool("talend_jobs_list", { limit: 100, offset: 0 }),
         callTool("talend_bridge_problems_markers", {}),
       ]);
 
-      if (bridgeRaw.success && bridgeRaw.result) {
-        try {
-          const data = JSON.parse(bridgeRaw.result);
-          setBridgeStatus({
-            connected: true,
-            studioRunning: data.studioRunning ?? false,
-            lastPing: new Date().toISOString(),
-          });
-        } catch {
-          setBridgeStatus({ connected: true, studioRunning: false });
-        }
+      if (bridgeRaw.ok && bridgeRaw.data) {
+        const data = bridgeRaw.data as Record<string, unknown>;
+        setBridgeStatus({
+          connected: data?.ok === true,
+          studioRunning: data?.ok === true,
+          lastPing: new Date().toISOString(),
+        });
       } else {
         setBridgeStatus({ connected: false, studioRunning: false });
         setError("No se pudo conectar al bridge de Talend Studio");
       }
 
-      if (wsRaw.success && wsRaw.result) {
-        try {
-          const data = JSON.parse(wsRaw.result);
-          setWorkspace({
-            runtimeOs: data.runtimeOs,
-            talendHostOs: data.talendHostOs,
-            pathMode: data.pathMode,
-            projectPath: data.projectPath,
-            workspace: data.workspace,
-          });
-        } catch { /* ignore parse errors */ }
+      if (wsRaw.ok && wsRaw.data) {
+        const data = wsRaw.data as WorkspaceState;
+        setWorkspace({
+          projects: data.projects,
+          workspaceRoot: data.workspaceRoot,
+        });
       }
 
-      if (jobsRaw.success && jobsRaw.result) {
-        try {
-          const data = JSON.parse(jobsRaw.result);
-          const jobs = Array.isArray(data) ? data : data.jobs ?? [];
-          setJobsInfo({ count: jobs.length, jobs: jobs.slice(0, 10) });
-        } catch { setJobsInfo({ count: 0, jobs: [] }); }
+      if (jobsRaw.ok && jobsRaw.data) {
+        const data = jobsRaw.data as Array<{ name: string; status: string }> | { jobs: Array<{ name: string; status: string }> };
+        const jobs = Array.isArray(data) ? data : data.jobs ?? [];
+        setJobsInfo({ count: jobs.length, jobs: jobs.slice(0, 10) });
       }
 
-      if (problemsRaw.success && problemsRaw.result) {
-        try {
-          const data = JSON.parse(problemsRaw.result);
-          const problems = Array.isArray(data) ? data : data.problems ?? [];
-          setProblemsInfo({ count: problems.length, problems: problems.slice(0, 10) });
-        } catch { setProblemsInfo({ count: 0, problems: [] }); }
+      if (problemsRaw.ok && problemsRaw.data) {
+        const data = problemsRaw.data as { markers: Array<{ severity: string; message: string }> };
+        const problems = Array.isArray(data.markers) ? data.markers : [];
+        setProblemsInfo({ count: problems.length, problems: problems.slice(0, 10) });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar datos");
@@ -135,16 +124,16 @@ export function HomeApp() {
         problemsCount={problemsInfo.count}
       />
 
-      {workspace.projectPath && (
+      {workspace.workspaceRoot && (
         <div className="bg-white rounded-lg border border-gray-200 px-4 py-3">
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-400 font-medium">Proyecto:</span>
-            <code className="text-gray-700 font-mono text-xs">{workspace.projectPath}</code>
-            {workspace.workspace && (
+            <span className="text-gray-400 font-medium">Workspace:</span>
+            <code className="text-gray-700 font-mono text-xs">{workspace.workspaceRoot}</code>
+            {Array.isArray(workspace.projects) && workspace.projects.length > 0 && (
               <>
                 <span className="text-gray-300 mx-1">|</span>
-                <span className="text-gray-400 font-medium">Workspace:</span>
-                <code className="text-gray-700 font-mono text-xs">{workspace.workspace}</code>
+                <span className="text-gray-400 font-medium">Proyectos:</span>
+                <code className="text-gray-700 font-mono text-xs">{workspace.projects.filter(p => p.open).length} abiertos</code>
               </>
             )}
           </div>

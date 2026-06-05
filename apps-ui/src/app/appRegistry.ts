@@ -17,6 +17,7 @@ import { ReportSnippetsApp } from "../apps/report-snippets/ReportSnippetsApp";
 import { EvidencePackApp } from "../apps/evidence-pack/EvidencePackApp";
 import { RequirementChecklistApp } from "../apps/requirement-checklist/RequirementChecklistApp";
 import { ProblemsViewApp } from "../apps/problems-view/ProblemsViewApp";
+import { JobComponentStudioApp } from "../apps/job-component-studio/JobComponentStudioApp";
 
 export const APP_ROUTES: AppRoute[] = [
   { id: "home", component: HomeApp, title: "Home" },
@@ -38,4 +39,6 @@ export const APP_ROUTES: AppRoute[] = [
   { id: "evidence-pack", component: EvidencePackApp, title: "Evidence Pack" },
   { id: "requirement-checklist", component: RequirementChecklistApp, title: "Requirement Checklist" },
   { id: "problems-view", component: ProblemsViewApp, title: "Problems View" },
+  { id: "job-component-studio", component: JobComponentStudioApp, title: "Job Component Studio" },
+  { id: "component-inspector", component: JobComponentStudioApp, title: "Component Inspector Pro" },
 ];

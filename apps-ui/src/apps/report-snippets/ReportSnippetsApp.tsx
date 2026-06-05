@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
 import { AppHeader, ErrorBanner } from "../../design-system";
+import { TOOL_NAMES } from "../../openai/tool-names";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -42,45 +43,29 @@ export function ReportSnippetsApp() {
 
   const generarSnippet = useCallback(
     async (section: SnippetSection) => {
-      const toolResult = await execute("talend_report_generate_snippets", {
+      const toolResult = await execute(TOOL_NAMES.REPORT.SNIPPETS_GENERATE, {
         jobName,
         section,
+        mode: "single",
       });
 
-      if (toolResult.success && toolResult.result) {
-        try {
-          const parsed = JSON.parse(toolResult.result);
-          const newSnippet: GeneratedSnippet = {
-            section,
-            content: parsed.snippet || parsed.data?.snippet || String(parsed),
-            timestamp: new Date(),
-          };
+      if (toolResult.ok && toolResult.data) {
+        const data = toolResult.data as Record<string, unknown>;
+        const newSnippet: GeneratedSnippet = {
+          section,
+          content: String(data.snippet ?? data.content ?? ""),
+          timestamp: new Date(),
+        };
 
-          setGeneratedSnippets((prev) => {
-            const existing = prev.findIndex((s) => s.section === section);
-            if (existing >= 0) {
-              const updated = [...prev];
-              updated[existing] = newSnippet;
-              return updated;
-            }
-            return [...prev, newSnippet];
-          });
-        } catch {
-          const newSnippet: GeneratedSnippet = {
-            section,
-            content: toolResult.result,
-            timestamp: new Date(),
-          };
-          setGeneratedSnippets((prev) => {
-            const existing = prev.findIndex((s) => s.section === section);
-            if (existing >= 0) {
-              const updated = [...prev];
-              updated[existing] = newSnippet;
-              return updated;
-            }
-            return [...prev, newSnippet];
-          });
-        }
+        setGeneratedSnippets((prev) => {
+          const existing = prev.findIndex((s) => s.section === section);
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = newSnippet;
+            return updated;
+          }
+          return [...prev, newSnippet];
+        });
       }
     },
     [execute, jobName]

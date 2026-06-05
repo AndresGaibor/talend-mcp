@@ -3,28 +3,25 @@ import { useCallTool } from "../../openai/useCallTool";
 import { AppHeader, ErrorBanner, LoadingState, MetricCard } from "../../design-system";
 
 interface PingData {
-  connected?: boolean;
-  pluginName?: string;
+  ok?: boolean;
+  plugin?: string;
   version?: string;
   mode?: string;
-  unsafeActionsEnabled?: boolean;
-  studioRunning?: boolean;
+  unsafeActions?: boolean;
 }
 
 interface WorkspaceData {
-  projectPath?: string;
-  workspace?: string;
-  projects?: number;
+  workspaceRoot?: string;
+  projects?: Array<{ name: string; path: string; open: boolean }>;
 }
 
 interface ProblemsData {
-  errors?: number;
-  warnings?: number;
+  markers?: Array<{ severity: string; message: string }>;
 }
 
 interface CoverageData {
-  coverage?: number;
-  percentage?: number;
+  overall?: number;
+  areas?: Array<{ name: string; coverage: number }>;
 }
 
 interface SummaryMetrics {
@@ -60,24 +57,30 @@ export function EnvironmentDoctorApp() {
       ]);
 
       void callTool("talend_components_catalog_status", {});
-      void callTool("talend_jobs_list", {});
+      void callTool("talend_jobs_list", { limit: 50, offset: 0 });
 
       const pingData = pingRaw.ok ? (pingRaw.data as PingData) : undefined;
       const wsData = wsRaw.ok ? (wsRaw.data as WorkspaceData) : undefined;
       const problemsData = problemsRaw.ok ? (problemsRaw.data as ProblemsData) : undefined;
       const coverageData = coverageRaw.ok ? (coverageRaw.data as CoverageData) : undefined;
 
+      const markers = Array.isArray(problemsData?.markers)
+        ? problemsData.markers
+        : [];
+
       setMetrics({
-        bridgeOk: pingData?.connected ?? false,
-        pluginName: pingData?.pluginName ?? "-",
+        bridgeOk: pingData?.ok === true,
+        pluginName: pingData?.plugin ?? "-",
         version: pingData?.version ?? "-",
         mode: pingData?.mode ?? "-",
-        unsafeActions: pingData?.unsafeActionsEnabled ? "Habilitadas" : "Deshabilitadas",
-        workspacePath: wsData?.projectPath ?? wsData?.workspace ?? "-",
-        projectsOpen: wsData?.projects ?? 0,
-        problemErrors: problemsData?.errors ?? 0,
-        problemWarnings: problemsData?.warnings ?? 0,
-        coverage: coverageData?.coverage ?? coverageData?.percentage ?? 0,
+        unsafeActions: pingData?.unsafeActions ? "Habilitadas" : "Deshabilitadas",
+        workspacePath: wsData?.workspaceRoot ?? "-",
+        projectsOpen: Array.isArray(wsData?.projects)
+          ? wsData.projects.filter((p) => p.open).length
+          : 0,
+        problemErrors: markers.filter((m) => m.severity === "ERROR").length,
+        problemWarnings: markers.filter((m) => m.severity === "WARNING").length,
+        coverage: coverageData?.overall ?? 0,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al ejecutar diagnostico");

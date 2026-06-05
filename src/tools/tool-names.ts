@@ -131,6 +131,10 @@ export const TOOL_NAMES = {
     CLEAR: "talend_app_session_clear",
   } as const,
 
+  COVERAGE: {
+    REPORT: "talend_coverage_report",
+  } as const,
+
   DIAGNOSE: {
     JOB: "talend_diagnose_job",
     ENVIRONMENT: "talend_diagnose_environment",

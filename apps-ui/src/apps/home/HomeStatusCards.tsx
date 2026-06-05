@@ -7,11 +7,8 @@ interface BridgeStatus {
 }
 
 interface WorkspaceState {
-  runtimeOs?: string;
-  talendHostOs?: string;
-  pathMode?: string;
-  projectPath?: string;
-  workspace?: string;
+  workspaceRoot?: string;
+  projects?: Array<{ name: string; path: string; open: boolean }>;
 }
 
 interface HomeStatusCardsProps {
@@ -54,15 +51,16 @@ export function HomeStatusCards({
         sublabel={problemsCount > 0 ? "Requieren atencion" : "Sin problemas"}
       />
       <MetricCard
-        label="Runtime OS"
-        value={workspace.runtimeOs ?? "—"}
-        variant="default"
+        label="Workspace"
+        value={workspace.workspaceRoot ? "Configurado" : "—"}
+        variant={workspace.workspaceRoot ? "success" : "default"}
+        sublabel={workspace.workspaceRoot?.split("/").pop() ?? ""}
       />
       <MetricCard
-        label="Path Mode"
-        value={workspace.pathMode ?? "—"}
+        label="Proyectos"
+        value={Array.isArray(workspace.projects) ? workspace.projects.length : 0}
         variant="default"
-        sublabel={workspace.talendHostOs ?? ""}
+        sublabel={workspace.projects ? `${workspace.projects.filter(p => p.open).length} abiertos` : ""}
       />
     </div>
   );

@@ -306,6 +306,24 @@ export class TalendStudioBridgeClient {
     return await this.request<BridgeActiveJobModel>("/talend/active-job/model");
   }
 
+  async activeJobDetails(): Promise<BridgeResult<any>> {
+    return await this.request<any>("/talend/active-job/details");
+  }
+
+  async activeComponentDetails(uniqueName: string, includeRaw?: boolean): Promise<BridgeResult<any>> {
+    return await this.request<any>("/talend/active-component/details", {
+      method: "POST",
+      body: { uniqueName, includeRaw },
+    });
+  }
+
+  async selectComponent(uniqueName: string): Promise<BridgeResult<any>> {
+    return await this.request<any>("/talend/active-job/select-component", {
+      method: "POST",
+      body: { uniqueName },
+    });
+  }
+
   async commandsList(): Promise<BridgeResult<{ commands?: BridgeCommand[] }>> {
     return await this.request<{ commands?: BridgeCommand[] }>("/commands/list");
   }

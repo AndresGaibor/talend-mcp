@@ -67,6 +67,9 @@ final class BridgeServer {
       server.createContext("/talend/probe/classes", exchange -> guarded(exchange, () -> respond(exchange, 200, TalendClassProbeService.probe(bundleContext))));
       server.createContext("/talend/active-editor/introspect", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeEditorIntrospect))));
       server.createContext("/talend/active-job/model", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeJobModel))));
+      server.createContext("/talend/active-job/details", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeJobDetails))));
+      server.createContext("/talend/active-component/details", exchange -> guarded(exchange, () -> handleActiveComponentDetails(exchange)));
+      server.createContext("/talend/active-job/select-component", exchange -> guarded(exchange, () -> handleSelectComponent(exchange)));
       server.createContext("/commands/list", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(CommandAuditService::listCommands))));
       server.createContext("/commands/execute", exchange -> guarded(exchange, () -> handleExecuteCommand(exchange)));
       server.createContext("/launch/configs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchConfigService.listConfigs())));
@@ -170,6 +173,28 @@ final class BridgeServer {
     respond(exchange, 200, UiThread.sync(() -> WorkbenchService.showView(viewId)));
   }
 
+  private void handleActiveComponentDetails(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    String uniqueName = asString(body.get("uniqueName"));
+    if (uniqueName == null || uniqueName.trim().isEmpty()) {
+      uniqueName = queryParam(exchange, "uniqueName");
+    }
+    boolean includeRaw = asBoolean(body.get("includeRaw"), false);
+    final String finalUniqueName = uniqueName;
+    final boolean finalIncludeRaw = includeRaw;
+    respond(exchange, 200, UiThread.sync(() -> TalendIntrospectionService.activeComponentDetails(finalUniqueName, finalIncludeRaw)));
+  }
+
+  private void handleSelectComponent(HttpExchange exchange) throws IOException {
+    Map<String, Object> body = readJsonBody(exchange);
+    String uniqueName = asString(body.get("uniqueName"));
+    if (uniqueName == null || uniqueName.trim().isEmpty()) {
+      uniqueName = queryParam(exchange, "uniqueName");
+    }
+    final String finalUniqueName = uniqueName;
+    respond(exchange, 200, UiThread.sync(() -> TalendIntrospectionService.selectComponent(finalUniqueName)));
+  }
+
   private void handleAutomationRunActiveJob(HttpExchange exchange) throws IOException {
     Map<String, Object> body = readJsonBody(exchange);
     boolean dryRun = asBoolean(body.get("dryRun"), true);
@@ -249,6 +274,10 @@ final class BridgeServer {
       if (mode != null) payload.put("mode", mode);
       String path = extractString(body, "path");
       if (path != null) payload.put("path", path);
+      String uniqueName = extractString(body, "uniqueName");
+      if (uniqueName != null) payload.put("uniqueName", uniqueName);
+      if (body.contains("\"includeRaw\":true")) payload.put("includeRaw", Boolean.TRUE);
+      if (body.contains("\"includeRaw\":false")) payload.put("includeRaw", Boolean.FALSE);
       if (body.contains("\"dryRun\":true")) payload.put("dryRun", Boolean.TRUE);
       if (body.contains("\"dryRun\":false")) payload.put("dryRun", Boolean.FALSE);
       if (body.contains("\"saveBefore\":true")) payload.put("saveBefore", Boolean.TRUE);

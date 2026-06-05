@@ -116,7 +116,40 @@ function sanitizeSchema(schema: unknown): unknown {
   return schema;
 }
 
-function convertInputSchema(schema: unknown): unknown {
+function removeDefaultedRequiredFields(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(removeDefaultedRequiredFields);
+  }
+
+  if (!schema || typeof schema !== "object") {
+    return schema;
+  }
+
+  const obj = schema as Record<string, unknown>;
+  const cloned: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    cloned[key] = removeDefaultedRequiredFields(value);
+  }
+
+  if (
+    cloned.type === "object" &&
+    cloned.properties &&
+    typeof cloned.properties === "object" &&
+    Array.isArray(cloned.required)
+  ) {
+    const properties = cloned.properties as Record<string, Record<string, unknown>>;
+
+    cloned.required = cloned.required.filter((field) => {
+      const prop = properties[String(field)];
+      return prop?.default === undefined;
+    });
+  }
+
+  return cloned;
+}
+
+export function convertInputSchema(schema: unknown): unknown {
   let result: unknown;
   if (isZodSchema(schema)) {
     try {
@@ -140,7 +173,7 @@ function convertInputSchema(schema: unknown): unknown {
   } else {
     result = schema;
   }
-  return sanitizeSchema(result);
+  return removeDefaultedRequiredFields(sanitizeSchema(result));
 }
 
 function extractAnnotations(tool: unknown): McpToolAnnotation | undefined {

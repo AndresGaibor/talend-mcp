@@ -31,6 +31,22 @@ export function normalizeToolResult<T = unknown>(raw: unknown): NormalizedResult
     const sc = anyRaw.structuredContent as Record<string, unknown> | undefined;
     const isOk = anyRaw.isError !== true;
 
+    if (sc && typeof sc.ok === "boolean") {
+      const talendOk = sc.ok === true && isOk;
+
+      return {
+        ok: talendOk,
+        success: talendOk,
+        data: sc.data as T,
+        text: textContent,
+        result: textContent,
+        error: talendOk ? undefined : extractErrorMessage(sc),
+        raw,
+        warnings: sc.warnings as string[] | undefined,
+        nextActions: sc.nextActions as NormalizedResult["nextActions"] | undefined,
+      };
+    }
+
     return {
       ok: isOk,
       success: isOk,
