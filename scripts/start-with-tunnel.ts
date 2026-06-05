@@ -57,13 +57,57 @@ function separador(): void {
   console.error(`  ${c("─".repeat(40), C.dim)}`);
 }
 
+function formatTunnelLine(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+
+  let entry: Record<string, any>;
+  try { entry = JSON.parse(t); } catch { return t; }
+
+  const level = (entry.level || "").toUpperCase();
+  const msg = entry.msg || "";
+  const tunnelId = entry.tunnel_id || "";
+  const component = entry.component || entry.module || "";
+  const time = entry.time || "";
+
+  const levelColor = level === "ERROR" ? C.red : level === "WARN" ? C.yellow : C.reset;
+  const badge = level === "ERROR" ? "✖" : level === "WARN" ? "⚠" : "▸";
+
+  let extra = "";
+  const extraParts: string[] = [];
+
+  if (component) extraParts.push(component);
+  if (entry.request_id) extraParts.push(`req:${entry.request_id}`);
+  if (entry.rpc_request_id !== undefined) extraParts.push(`rpc:${entry.rpc_request_id}`);
+  if (entry.transport) extraParts.push(entry.transport);
+  if (entry.target) extraParts.push(entry.target);
+  if (entry.route_mode) extraParts.push(entry.route_mode);
+  if (entry.connectorName) extraParts.push(entry.connectorName);
+  if (entry.tunnel_url) extraParts.push(entry.tunnel_url);
+  if (entry.ui_url) extraParts.push(entry.ui_url);
+  if (entry.health_url) extraParts.push(entry.health_url);
+  if (entry.addr) extraParts.push(entry.addr);
+  if (entry.name && entry.name !== "Talend  MCP tunnel") extraParts.push(entry.name);
+  if (entry.function) extraParts.push(entry.function);
+  if (entry.callee) extraParts.push(entry.callee);
+  if (entry.error) extraParts.push(`error:${entry.error}`);
+  if (entry.runtime) extraParts.push(entry.runtime);
+  if (entry.kind === "provide") extraParts.push(`provide:${entry.constructor || entry.name || ""}`);
+  if (entry.kind === "supply") extraParts.push(`supply:${entry.name || ""}`);
+
+  if (extraParts.length > 0) {
+    extra = ` ${c(extraParts.join(" · "), C.dim)}`;
+  }
+
+  return `  ${c(badge, levelColor)} ${c(level, levelColor)} ${c(msg, C.bold)}${extra}`;
+}
+
 function processTunnelOutput(stream: any): void {
   if (!stream) return;
   const rl = createInterface({ input: stream });
   rl.on("line", (line: string) => {
-    const t = line.trim();
-    if (!t) return;
-    console.error(`  ${c("[tunnel]", C.magenta)} ${t}`);
+    const f = formatTunnelLine(line);
+    if (f) console.error(f);
   });
 }
 
