@@ -10,6 +10,7 @@
     "typescript": "^5"
   },
   "scripts": {
+    "clean:artifacts": "bun run scripts/clean-artifacts.ts",
     "start": "bun run scripts/start-with-tunnel.ts",
     "start:server": "bun run index.ts",
     "detect:talend-project": "bun run scripts/detect-talend-project.ts",

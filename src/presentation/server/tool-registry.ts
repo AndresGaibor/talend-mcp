@@ -40,7 +40,7 @@ type ToolSafetyAnnotation = {
   openWorldHint: boolean;
 };
 
-const TOOL_NAME_ALIASES: Record<string, string> = {
+export const TOOL_NAME_ALIASES: Record<string, string> = {
   analyze_logs: "talend_analyze_logs",
   analyze_tdboutput: "talend_analyze_tdboutput",
   duplicate_analysis: "talend_duplicate_analysis",

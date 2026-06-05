@@ -4,7 +4,8 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { listPresentationAppIds, registerPresentationApps } from "../apps";
-import { getRegisteredServerToolAnnotations, getRegisteredServerToolCount, getRegisteredServerTools, GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
+import { getAllRuntimeTools, getRuntimeTools } from "../../server/registered-tools";
+import { GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
 import { resolvePublicUrl } from "../../tailscale/resolve-public-url";
 
 export interface NewServerOptions {
@@ -25,7 +26,7 @@ function createHealthPayload() {
     ok: true,
     service: "talend-mcp",
     version: "1.0.0",
-    toolCount: getRegisteredServerToolCount() + listPresentationAppIds().length,
+    toolCount: getAllRuntimeTools().length + listPresentationAppIds().length,
   };
 }
 
@@ -73,15 +74,16 @@ async function runProcess(command: string, args: string[], timeoutMs = 10_000): 
 
 export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.WritableStream }) {
   const server = new McpServer({ name: "talend-mcp", version: "1.0.0" });
+  const allTools = getRuntimeTools();
 
-  for (const tool of getRegisteredServerTools()) {
+  for (const tool of allTools) {
     server.registerTool(
-      tool.name,
+      tool.definition.name,
       {
-        description: tool.description,
-        inputSchema: tool.inputSchema as Parameters<typeof server.registerTool>[1]["inputSchema"],
-        outputSchema: (tool.outputSchema ?? GENERIC_TOOL_OUTPUT_SCHEMA) as Parameters<typeof server.registerTool>[1]["outputSchema"],
-        annotations: getRegisteredServerToolAnnotations(tool.name),
+        description: tool.definition.description,
+        inputSchema: tool.definition.inputSchema as Parameters<typeof server.registerTool>[1]["inputSchema"],
+        outputSchema: (tool.definition.outputSchema ?? GENERIC_TOOL_OUTPUT_SCHEMA) as Parameters<typeof server.registerTool>[1]["outputSchema"],
+        annotations: tool.definition.annotations as Parameters<typeof server.registerTool>[1]["annotations"],
       },
       tool.handler as never,
     );

@@ -1,23 +1,26 @@
-import { test, expect, describe } from "bun:test";
+import type { McpServer } from "@modelcontextprotocol/server";
+import { test, expect, describe, beforeEach } from "bun:test";
+import { createTalendMcpServer } from "../../src/presentation/server/new-server";
 import { PRESENTATION_APP_DEFINITIONS } from "../../src/presentation/apps/app-registry";
-import { allTools } from "../../src/presentation/tools/registry";
+import { getRegisteredServerTools } from "../../src/presentation/server/tool-registry";
 
-const APP_MIME_TYPE = "text/html;profile=mcp-app";
+let server: McpServer;
+let registeredToolNames: Set<string>;
+
+beforeEach(() => {
+  server = createTalendMcpServer();
+  const serverTools = getRegisteredServerTools().map((t) => t.name);
+  registeredToolNames = new Set(serverTools);
+});
 
 describe("PRESENTATION_APP_DEFINITIONS", () => {
-  const registeredToolNames = new Set(allTools.map((t: { name: string }) => t.name));
-
-  describe("1. Cada app tiene un launcher en PRESENTATION_APP_DEFINITIONS", () => {
-    test("todas las apps tienen launcherToolName definido", () => {
+  describe("1. Cada launcher tiene tool registrada en el servidor", () => {
+    test("todas las apps tienen launcherToolName registrado", () => {
       for (const app of PRESENTATION_APP_DEFINITIONS) {
         expect(
-          app.launcherToolName,
-          `${app.id} debe tener launcherToolName`,
-        ).toBeTruthy();
-        expect(
-          typeof app.launcherToolName,
-          `${app.id} launcherToolName debe ser string`,
-        ).toBe("string");
+          registeredToolNames.has(app.launcherToolName),
+          `${app.id} launcherToolName "${app.launcherToolName}" no está registrado`,
+        ).toBe(true);
       }
     });
 
@@ -61,7 +64,7 @@ describe("PRESENTATION_APP_DEFINITIONS", () => {
     });
   });
 
-  describe("4. Cada resource usa text/html;profile=mcp-app mimeType", () => {
+  describe("4. Cada resource tiene mimeType text/html;profile=mcp-app", () => {
     test("los resourceUri usan el formato ui://talend/{app}.html", () => {
       for (const app of PRESENTATION_APP_DEFINITIONS) {
         expect(
@@ -81,7 +84,7 @@ describe("PRESENTATION_APP_DEFINITIONS", () => {
     });
   });
 
-  describe("5. Cada action.toolName existe", () => {
+  describe("5. Cada action.toolName existe en herramientas del servidor", () => {
     test("todas las actions tienen toolName definido", () => {
       for (const app of PRESENTATION_APP_DEFINITIONS) {
         for (const action of app.actions) {

@@ -28,11 +28,11 @@ export function useToolOutput() {
   );
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.openai) return;
+    if (typeof window === "undefined" || !(window as any).openai?.toolOutput) return;
 
-    const originalToolOutput = window.openai.toolOutput;
+    const originalToolOutput = (window as any).openai.toolOutput;
 
-    window.openai.toolOutput = (toolUseId: string, output: string) => {
+    (window as any).openai.toolOutput = (toolUseId: string, output: string) => {
       const resolver = pendingOutputsRef.current.get(toolUseId);
       if (resolver) {
         resolver(output);
@@ -48,8 +48,8 @@ export function useToolOutput() {
     };
 
     return () => {
-      if (window.openai) {
-        window.openai.toolOutput = originalToolOutput;
+      if ((window as any).openai) {
+        (window as any).openai.toolOutput = originalToolOutput;
       }
     };
   }, []);

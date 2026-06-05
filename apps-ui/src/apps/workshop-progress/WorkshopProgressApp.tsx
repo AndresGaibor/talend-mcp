@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useCallTool } from "../../openai/useCallTool";
+import { useAppSession } from "../../openai/useAppSession";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { TaskCard, type WorkshopTask, type TaskStatus } from "./TaskCard";
@@ -15,34 +15,15 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
 const STORAGE_KEY = "workshop_progress_tasks";
 
 export function WorkshopProgressApp() {
-  const { execute: callTool } = useCallTool();
+  const { session, updateSession } = useAppSession();
   const [tasks, setTasks] = useState<WorkshopTask[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
 
   useEffect(() => {
-    loadTasks();
-  }, []);
-
-  const loadTasks = async () => {
-    const result = await callTool("talend_app_session_get", {});
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        if (data.workshopTasks && Array.isArray(data.workshopTasks)) {
-          setTasks(data.workshopTasks);
-        }
-      } catch {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          try {
-            setTasks(JSON.parse(stored));
-          } catch {
-            setTasks([]);
-          }
-        }
-      }
+    if (session?.workshopTasks && Array.isArray(session.workshopTasks)) {
+      setTasks(session.workshopTasks as WorkshopTask[]);
     } else {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -53,14 +34,12 @@ export function WorkshopProgressApp() {
         }
       }
     }
-  };
+  }, [session]);
 
   const saveTasks = useCallback(async (updatedTasks: WorkshopTask[]) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedTasks));
-    await callTool("talend_app_session_update", {
-      workshopTasks: updatedTasks,
-    });
-  }, [callTool]);
+    await updateSession({ workshopTasks: updatedTasks });
+  }, [updateSession]);
 
   const handleAddTask = useCallback(() => {
     if (!newTaskTitle.trim()) return;

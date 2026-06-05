@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { useAppSession } from "../../openai/useAppSession";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { RunStatusCard } from "./RunStatusCard";
@@ -54,6 +55,7 @@ interface ErrorInfo {
 
 export function RunMonitorApp() {
   const { execute: callTool, isLoading } = useCallTool();
+  const { updateSession } = useAppSession();
 
   const [step, setStep] = useState<AppStep>("select");
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -135,6 +137,7 @@ export function RunMonitorApp() {
             });
             setIsRunning(false);
             setStep("status");
+            await updateSession({ lastRunId: runId });
           }
         } catch {
           // Continue polling

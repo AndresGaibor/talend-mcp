@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { useAppSession } from "../../openai/useAppSession";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { CsvFilesTable } from "./CsvFilesTable";
@@ -27,6 +28,7 @@ interface CsvFileInfo {
 
 export function DatasetInspectorApp() {
   const { execute: callTool, isLoading } = useCallTool();
+  const { updateSession } = useAppSession();
 
   const [step, setStep] = useState<AppStep>("input");
   const [folderPath, setFolderPath] = useState("");
@@ -82,6 +84,7 @@ export function DatasetInspectorApp() {
         if (data.ok) {
           setMappings(data.data);
           setStep("mappings");
+          await updateSession({ datasetMappings: data.data });
         } else {
           setError(data.error?.message || "Generación de mappings falló");
         }

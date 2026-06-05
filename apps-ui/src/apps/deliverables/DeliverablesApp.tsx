@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { useAppSession } from "../../openai/useAppSession";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -80,6 +81,7 @@ const DEFAULT_CHECKLIST_ITEMS: Omit<ChecklistItem, "checked">[] = [
 
 export function DeliverablesApp() {
   const { execute: callTool, isLoading } = useCallTool();
+  const { session, updateSession } = useAppSession();
 
   const [step, setStep] = useState<Step>("collect");
   const [files, setFiles] = useState<DeliverableFile[]>([]);
@@ -95,6 +97,15 @@ export function DeliverablesApp() {
 
   const [jobId, setJobId] = useState("");
   const [sourcePath, setSourcePath] = useState("");
+
+  useEffect(() => {
+    if (session?.evidenceFiles && session.evidenceFiles.length > 0) {
+      setSelectedFiles(new Set(session.evidenceFiles));
+    }
+    if (session?.lastRunId) {
+      setJobId(session.lastRunId);
+    }
+  }, [session]);
 
   const handleCollectFiles = useCallback(async () => {
     if (!jobId.trim() || !sourcePath.trim()) {
@@ -132,7 +143,10 @@ export function DeliverablesApp() {
       }
       return next;
     });
-  }, []);
+    const updatedFiles = files.filter((f) => selectedFiles.has(f.path) || f.path === path);
+    const evidenceFilePaths = updatedFiles.map((f) => f.path);
+    updateSession({ evidenceFiles: evidenceFilePaths });
+  }, [files, selectedFiles, updateSession]);
 
   const handleToggleChecklistItem = useCallback((id: string) => {
     setChecklistItems((prev) =>

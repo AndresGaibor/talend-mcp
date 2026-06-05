@@ -30,6 +30,12 @@ export const PRESENTATION_APP_IDS = [
   "error-explorer",
   "validation-timeline",
   "snapshot-manager",
+  "requirement-checklist",
+  "workshop-progress",
+  "antipattern-detector",
+  "fix-wizard",
+  "evidence-pack",
+  "report-snippets",
 ] as const;
 
 export type PresentationAppId = (typeof PRESENTATION_APP_IDS)[number];
@@ -56,6 +62,7 @@ export interface PresentationAppDefinition {
   launcherToolName: string;
   launchMessage: string;
   actions: PresentationAppAction[];
+  uiMode?: "react" | "legacy";
 }
 
 export interface PresentationAppLaunchResult {

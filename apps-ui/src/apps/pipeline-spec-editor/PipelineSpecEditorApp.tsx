@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { useAppSession } from "../../openai/useAppSession";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -26,6 +27,7 @@ export interface PipelineSpec {
 
 export function PipelineSpecEditorApp() {
   const { execute: callTool, isLoading } = useCallTool();
+  const { session, updateSession } = useAppSession();
 
   const [step, setStep] = useState<Step>("select");
   const [patterns, setPatterns] = useState<Pattern[]>([]);
@@ -50,18 +52,13 @@ export function PipelineSpecEditorApp() {
   }, [callTool]);
 
   const loadSessionMappings = useCallback(async () => {
-    const result = await callTool("talend_sessions_get", { key: "pipeline_mappings" });
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        if (data && typeof data === "object") {
-          setSessionMappings(data as Record<string, unknown>);
-        }
-      } catch {
-        setSessionMappings(null);
+    if (session?.datasetMappings) {
+      const mappings = session.datasetMappings as unknown[];
+      if (Array.isArray(mappings) && mappings.length > 0) {
+        setSessionMappings(mappings[0] as Record<string, unknown>);
       }
     }
-  }, [callTool]);
+  }, [session]);
 
   useEffect(() => {
     loadPatterns();
@@ -120,6 +117,7 @@ export function PipelineSpecEditorApp() {
     setError(null);
     const result = await callTool("talend_jobs_apply_pipeline_spec", { spec: JSON.stringify(specDraft) });
     if (result.success) {
+      await updateSession({ pipelineSpec: specDraft });
       const snapshotResult = await callTool("talend_snapshots_create", {
         name: `pipeline-${Date.now()}`,
         description: `Snapshot for ${specDraft.name ?? "pipeline"}`,
@@ -130,7 +128,7 @@ export function PipelineSpecEditorApp() {
     } else {
       setError(result.error ?? "Apply failed");
     }
-  }, [callTool, specDraft, showConfirmation]);
+  }, [callTool, specDraft, showConfirmation, updateSession]);
 
   const handleOpenInStudio = useCallback(async () => {
     const result = await callTool("talend_bridge_open_resource", { path: specDraft.name ?? "" });

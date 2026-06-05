@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useCallTool } from "../../openai/useCallTool";
+import { useAppSession } from "../../openai/useAppSession";
 import { Card } from "../../components/Card";
 import { Badge } from "../../components/Badge";
 import { ScoreCard } from "./ScoreCard";
@@ -24,6 +25,7 @@ interface ValidationReportState {
 
 export function ValidationReportApp() {
   const { execute: callTool, isLoading } = useCallTool();
+  const { updateSession } = useAppSession();
 
   const [state, setState] = useState<ValidationReportState>({
     score: 0,
@@ -236,7 +238,23 @@ export function ValidationReportApp() {
       dbOutputs: [],
       performanceSettings,
     });
-  }, [callTool]);
+    await updateSession({ 
+      validationReport: { 
+        score, 
+        totalChecks, 
+        passedChecks: okChecks, 
+        warningsCount: warningChecks, 
+        errorsCount: errorChecks, 
+        checks, 
+        problems, 
+        suggestedFixes, 
+        missingContexts, 
+        auditColumns, 
+        dbOutputs: [], 
+        performanceSettings 
+      } 
+    });
+  }, [callTool, updateSession]);
 
   const hasData = state.totalChecks > 0;
 
