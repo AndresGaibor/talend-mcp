@@ -71,4 +71,22 @@ export const JOB_APP_DEFINITIONS: PresentationAppDefinition[] = [
       createJsonAction("Apply pipeline spec", TOOL_NAMES.JOBS.APPLY_PIPELINE_SPEC, "Genera y escribe archivos .item/.properties en el proyecto.", { pattern: "multi_csv_raw_loader", name: "new_job", folderPath: "Process" }, { requiresConfirmation: true }),
     ],
   },
+  {
+    id: "job-component-studio",
+    title: "Talend Job Component Studio",
+    description: "Inspecciona y edita componentes del job activo en Talend Studio.",
+    resourceUri: "ui://talend/job-component-studio.html",
+    launcherToolName: "talend_app_job_component_studio",
+    launchMessage: "Abriendo Job Component Studio.",
+    uiMode: "react",
+    actions: [
+      createNoInputAction("Active job details", "talend_bridge_active_job_details", "Obtiene detalles profundos del job activo."),
+      createJsonAction("Component details", "talend_bridge_active_component_details", "Obtiene detalles completos de un componente.", { uniqueName: "tFileInputDelimited_1", includeRaw: false }),
+      createNoInputAction("Select component", "talend_bridge_select_component", "Selecciona y revela un componente en el editor."),
+      createJsonAction("Rename label", "talend_components_rename_label", "Cambia el nombre visible del componente.", { jobName: "myJob", uniqueName: "tFileInputDelimited_1", newLabel: "input_orders" }, { requiresConfirmation: true }),
+      createJsonAction("Preview patch", "talend_components_preview_patch", "Previsualiza cambios en un componente.", { jobName: "myJob", uniqueName: "tMap_1", patch: { LABEL: "Nuevo valor" } }),
+      createJsonAction("Apply patch", "talend_components_apply_patch", "Aplica cambios a un componente.", { jobName: "myJob", uniqueName: "tMap_1", patch: { LABEL: "Nuevo valor" } }, { requiresConfirmation: true }),
+      createJsonAction("Update position", "talend_components_update_position", "Actualiza la posicion de un componente.", { jobName: "myJob", uniqueName: "tMap_1", posX: 100, posY: 200 }, { requiresConfirmation: true }),
+    ],
+  },
 ];

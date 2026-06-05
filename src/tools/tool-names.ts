@@ -89,6 +89,12 @@ export const TOOL_NAMES = {
     SEARCH: "talend_components_search",
     INSPECT: "talend_components_inspect",
     GENERATE_TEMPLATE: "talend_components_generate_template",
+    RENAME_LABEL: "talend_components_rename_label",
+    PREVIEW_PATCH: "talend_components_preview_patch",
+    APPLY_PATCH: "talend_components_apply_patch",
+    RENAME_UNIQUE_NAME_PREVIEW: "talend_components_rename_unique_name_preview",
+    RENAME_UNIQUE_NAME_APPLY: "talend_components_rename_unique_name_apply",
+    UPDATE_POSITION: "talend_components_update_position",
   } as const,
 
   CONTEXTS: {

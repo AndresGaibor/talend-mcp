@@ -36,6 +36,7 @@ export const PRESENTATION_APP_IDS = [
   "fix-wizard",
   "evidence-pack",
   "report-snippets",
+  "job-component-studio",
 ] as const;
 
 export type PresentationAppId = (typeof PRESENTATION_APP_IDS)[number];
