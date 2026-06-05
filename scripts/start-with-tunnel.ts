@@ -70,6 +70,11 @@ function formatTunnelLine(raw: string): string {
   const component = entry.component || entry.module || "";
   const time = entry.time || "";
 
+  // OAuth discovery es esperado con autenticación local (no_auth)
+  if (level === "WARN" && entry.msg && entry.msg.toLowerCase().includes("oauth")) {
+    return `  ${c("○", C.dim)} ${c("OAuth discovery no aplica (modo no_auth) ✓", C.dim)}`;
+  }
+
   const levelColor = level === "ERROR" ? C.red : level === "WARN" ? C.yellow : C.reset;
   const badge = level === "ERROR" ? "✖" : level === "WARN" ? "⚠" : "▸";
 
