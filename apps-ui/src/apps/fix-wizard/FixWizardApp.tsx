@@ -30,7 +30,7 @@ export function FixWizardApp() {
     setCause(null);
     setStep("cause");
 
-    const result = await callTool("talend_errors_explain", { error: errorInput });
+    const result = await callTool("talend_error_explain", { error: errorInput });
     if (result.success && result.result) {
       try {
         const data = JSON.parse(result.result);
@@ -48,7 +48,7 @@ export function FixWizardApp() {
     setOptions([]);
     setStep("options");
 
-    const result = await callTool("talend_errors_suggest_fix", {
+    const result = await callTool("talend_error_suggest_fix", {
       error: errorInput,
       jobId: jobId || undefined,
       componentId: componentId || undefined,
@@ -152,7 +152,7 @@ export function FixWizardApp() {
 
   const handleRevalidate = useCallback(async () => {
     setError(null);
-    const result = await callTool("talend_errors_explain", { error: errorInput });
+    const result = await callTool("talend_error_explain", { error: errorInput });
     if (result.success && result.result) {
       try {
         const data = JSON.parse(result.result);

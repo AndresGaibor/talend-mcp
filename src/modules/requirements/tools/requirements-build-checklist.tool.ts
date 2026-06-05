@@ -16,7 +16,7 @@ export type BuildChecklistInput = z.infer<typeof BuildChecklistSchema>;
 
 export function createRequirementsBuildChecklistTool() {
   return {
-    name: "talend_requirements_build_checklist",
+    name: "talend_task_build_execution_plan",
     description: "Construye un checklist de requisitos técnicos con items auditables.",
     inputSchema: BuildChecklistSchema,
     annotations: {

@@ -3,7 +3,7 @@ import { okResult, errorResult } from "../common/result";
 
 export function createListJobsTool(listJobsUseCase: ListJobsUseCase) {
   return {
-    name: "talend_list_jobs",
+    name: "talend_jobs_list",
     description: "Lista todos los jobs en un proyecto Talend.",
     inputSchema: {
       type: "object",

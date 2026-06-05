@@ -45,20 +45,16 @@ export function DatasetInspectorApp() {
     setMappings(null);
 
     const result = await callTool("talend_datasets_inspect_csv_folder", { folderPath });
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        if (data.ok) {
-          setInspection(data.data);
-          setStep("files");
-        } else {
-          setError(data.error?.message || "Inspección falló");
-        }
-      } catch {
-        setError("Error parseando respuesta");
+    if (result.ok) {
+      const data = result.data as any;
+      if (data?.ok) {
+        setInspection(data.data);
+        setStep("files");
+      } else {
+        setError(data?.error?.message || "Inspección falló");
       }
     } else {
-      setError(result.error || "Error chiamando tool");
+      setError(result.error || "Error al llamar a la herramienta");
     }
   }, [folderPath, callTool]);
 
@@ -78,21 +74,17 @@ export function DatasetInspectorApp() {
       addTechnicalColumns: true,
     });
 
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        if (data.ok) {
-          setMappings(data.data);
-          setStep("mappings");
-          await updateSession({ datasetMappings: data.data });
-        } else {
-          setError(data.error?.message || "Generación de mappings falló");
-        }
-      } catch {
-        setError("Error parseando respuesta de mappings");
+    if (result.ok) {
+      const data = result.data as any;
+      if (data?.ok) {
+        setMappings(data.data);
+        setStep("mappings");
+        await updateSession({ datasetMappings: data.data });
+      } else {
+        setError(data?.error?.message || "Generación de mappings falló");
       }
     } else {
-      setError(result.error || "Error chiamando tool de mappings");
+      setError(result.error || "Error al llamar a la herramienta de mappings");
     }
   }, [inspection, callTool]);
 
@@ -110,8 +102,8 @@ export function DatasetInspectorApp() {
   }, [step]);
 
   const sendToPipelineEditor = useCallback(() => {
-    if (!mappings) return;
-    window.openai?.toolOutput?.("dataset-inspector-output", JSON.stringify(mappings));
+    if (!mappings || !window.openai) return;
+    window.openai.toolOutput = mappings;
   }, [mappings]);
 
   return (

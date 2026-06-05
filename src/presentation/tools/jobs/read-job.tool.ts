@@ -9,7 +9,7 @@ const ReadJobSchema = z.object({
 
 export function createReadJobTool() {
   return {
-    name: "talend_read_job",
+    name: "talend_jobs_read",
     description: "Lee y retorna el contenido XML de un job Talend.",
     inputSchema: ReadJobSchema,
     handler: async (input: z.infer<typeof ReadJobSchema>) => {

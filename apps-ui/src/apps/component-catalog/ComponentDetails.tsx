@@ -23,16 +23,12 @@ export function ComponentDetails({ component }: ComponentDetailsPanelProps) {
       name: component.name,
     });
 
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        if (data.ok) {
-          setDetails(data.component || data);
-        } else {
-          setError(data.error?.message || "Inspección falló");
-        }
-      } catch {
-        setError("Error parseando respuesta");
+    if (result.ok && result.data) {
+      const data = result.data as any;
+      if (data.ok) {
+        setDetails(data.component || data);
+      } else {
+        setError(data.error?.message || "Inspección falló");
       }
     } else {
       setError(result.error || "Error en inspección");

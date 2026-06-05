@@ -69,7 +69,7 @@ export function RunMonitorApp() {
 
   const loadJobs = useCallback(async () => {
     setError(null);
-    const result = await callTool("talend_runs_list", { limit: 100 });
+    const result = await callTool("talend_list_runs", { limit: 100 });
     if (result.success && result.result) {
       try {
         const data = JSON.parse(result.result);
@@ -107,7 +107,7 @@ export function RunMonitorApp() {
     setStep("running");
     setError(null);
 
-    const startResult = await callTool("talend_runs_start", { jobId: selectedJob.id });
+    const startResult = await callTool("talend_run_job", { jobId: selectedJob.id });
     if (!startResult.success || !startResult.result) {
       setError(startResult.error || "Error iniciando job");
       setIsRunning(false);
@@ -124,7 +124,7 @@ export function RunMonitorApp() {
     }
 
     const pollStatus = async () => {
-      const statusResult = await callTool("talend_runs_read", { runId });
+      const statusResult = await callTool("talend_read_run", { runId });
       if (statusResult.success && statusResult.result) {
         try {
           const data = JSON.parse(statusResult.result);
@@ -163,7 +163,7 @@ export function RunMonitorApp() {
     setStep("explanation");
     setError(null);
 
-    const result = await callTool("talend_errors_explain", { runId: runResult.status.runId });
+    const result = await callTool("talend_error_explain", { runId: runResult.status.runId });
     if (result.success && result.result) {
       try {
         const data = JSON.parse(result.result);

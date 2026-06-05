@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
-import { listPresentationAppIds, registerPresentationApps } from "../apps";
+import { listPresentationAppIds, registerPresentationAppResources } from "../apps";
 import { getAllRuntimeTools, getRuntimeTools } from "../../server/registered-tools";
 import { GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
 import { resolvePublicUrl } from "../../tailscale/resolve-public-url";
@@ -89,7 +89,7 @@ export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.W
     );
   }
 
-  registerPresentationApps(server);
+  registerPresentationAppResources(server);
 
   return server;
 }

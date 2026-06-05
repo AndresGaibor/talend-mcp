@@ -1,44 +1,61 @@
-import type { OpenAiGlobals, ToolResult } from "./openai-types";
+import type { OpenAiBridge } from "./openai-types";
 
+// Extender Window globalmente para TypeScript
+declare global {
+  interface Window {
+    openai?: OpenAiBridge;
+  }
+}
+
+/**
+ * Obtiene la salida inicial de la herramienta (toolOutput) desde la bridge de OpenAI.
+ */
 export function getInitialToolOutput<T>(): T | null {
-  if (typeof window !== "undefined" && (window as any).openai?.toolOutput) {
-    return (window as any).openai.toolOutput as T;
+  if (typeof window !== "undefined" && window.openai?.toolOutput) {
+    return window.openai.toolOutput as T;
   }
   return null;
 }
 
+/**
+ * Obtiene la entrada de la herramienta (toolInput) desde la bridge de OpenAI.
+ */
+export function getToolInput<T>(): T | null {
+  if (typeof window !== "undefined" && window.openai?.toolInput) {
+    return window.openai.toolInput as T;
+  }
+  return null;
+}
+
+/**
+ * Llama a una herramienta de MCP a través de la bridge de OpenAI.
+ */
 export async function callTool(
   toolName: string,
-  input: unknown
-): Promise<ToolResult> {
-  if (typeof window !== "undefined" && (window as any).openai?.callTool) {
-    return await (window as any).openai.callTool(toolName, input);
+  input: Record<string, unknown>
+): Promise<unknown> {
+  if (typeof window !== "undefined" && window.openai?.callTool) {
+    return await window.openai.callTool(toolName, input);
   }
-  console.warn("window.openai.callTool not available, using mock");
-  return { success: false, error: "Not connected to ChatGPT" };
+  console.warn("window.openai.callTool no disponible");
+  return { success: false, error: "No conectado a ChatGPT" };
 }
 
+/**
+ * Obtiene el estado actual del widget desde la bridge de OpenAI.
+ */
 export function getWidgetState<T>(): T | null {
-  if (typeof window !== "undefined" && (window as any).openai?.widgetState) {
-    return (window as any).openai.widgetState as T;
+  if (typeof window !== "undefined" && window.openai?.widgetState) {
+    return window.openai.widgetState as T;
   }
   return null;
 }
 
+/**
+ * Actualiza el estado del widget a través de la bridge de OpenAI.
+ */
 export function setWidgetState<T>(state: T): void {
-  if (typeof window !== "undefined" && (window as any).openai?.setWidgetState) {
-    (window as any).openai.setWidgetState(state);
-  }
-}
-
-export function toolOutput(toolUseId: string, output: string): void {
-  if (window.openai?.toolOutput) {
-    window.openai.toolOutput(toolUseId, output);
-  }
-}
-
-export function setGlobals(globals: OpenAiGlobals): void {
-  if (window.openai?.setGlobals) {
-    window.openai.setGlobals(globals);
+  if (typeof window !== "undefined" && window.openai?.setWidgetState) {
+    window.openai.setWidgetState(state);
   }
 }

@@ -1,11 +1,15 @@
-import { getRegisteredServerTools, TOOL_NAME_ALIASES } from "../presentation/server/tool-registry";
+import { getRegisteredServerTools, TOOL_NAME_ALIASES, GENERIC_TOOL_OUTPUT_SCHEMA } from "../presentation/server/tool-registry";
 import type { McpToolDefinition } from "./adapt-tool";
 import { adaptToolToMcp } from "./adapt-tool";
+import { LEGACY_TO_CANONICAL } from "../modules/legacy/legacy-aliases";
+import { createLegacyAliasTool } from "../modules/legacy/create-legacy-alias-tool";
+import { getPresentationAppLauncherTools } from "../presentation/apps/app-registry";
 
 import { createSnapshotsListTool } from "../modules/snapshots/tools/snapshots-list.tool";
 import { createSnapshotsCreateTool } from "../modules/snapshots/tools/snapshots-create.tool";
 import { createSnapshotsDiffTool } from "../modules/snapshots/tools/snapshots-diff.tool";
 import { createSnapshotsRestoreTool } from "../modules/snapshots/tools/snapshots-restore.tool";
+import { createSnapshotsReadTool } from "../modules/snapshots/tools/snapshots-read.tool";
 
 import { createSecretsSuggestContextMigrationTool } from "../modules/secrets/tools/secrets-suggest-context-migration.tool";
 import { createSecretsScanProjectTool } from "../modules/secrets/tools/secrets-scan-project.tool";
@@ -38,6 +42,8 @@ import { createRequirementsAnalyzeTool } from "../modules/requirements/tools/req
 import { createRequirementsBuildChecklistTool } from "../modules/requirements/tools/requirements-build-checklist.tool";
 import { createJobsDetectAntipatternsTool } from "../modules/jobs/tools/jobs-detect-antipatterns.tool";
 import { createEvidencePackBuildTool } from "../modules/evidence-pack/tools/evidence-pack-build.tool";
+import { talendCanReadProjectTool, talendCanReadProcessTool, talendCanReadMetadataTool } from "../modules/jobs/tools/doctor-can-read.tool";
+import { talendJobsListPatternsTool } from "../modules/jobs/tools/jobs-list-patterns.tool";
 
 import { createListRunsTool } from "../presentation/tools/execution/list-runs.tool";
 import { createReadRunTool } from "../presentation/tools/execution/read-run.tool";
@@ -49,12 +55,16 @@ export type RuntimeTool = {
   handler: (input: unknown) => Promise<unknown>;
 };
 
+let toolCache: Map<string, RuntimeTool> | null = null;
+let aliasCache: Map<string, string> | null = null;
+
 function getModuleTools(): RuntimeTool[] {
   const rawTools = [
     createSnapshotsListTool(),
     createSnapshotsCreateTool(),
     createSnapshotsDiffTool(),
     createSnapshotsRestoreTool(),
+    createSnapshotsReadTool(),
     createSecretsScanProjectTool(),
     createSecretsScanJobTool(),
     createSecretsSuggestContextMigrationTool(),
@@ -82,6 +92,10 @@ function getModuleTools(): RuntimeTool[] {
     createRequirementsBuildChecklistTool(),
     createJobsDetectAntipatternsTool(),
     createEvidencePackBuildTool(),
+    talendCanReadProjectTool,
+    talendCanReadProcessTool,
+    talendCanReadMetadataTool,
+    talendJobsListPatternsTool,
     createListRunsTool(),
     createReadRunTool(),
     createRunJobTool(),
@@ -94,49 +108,78 @@ function getModuleTools(): RuntimeTool[] {
   }));
 }
 
-let cachedTools: McpToolDefinition[] | null = null;
-let cachedAliases: Map<string, string> | null = null;
+export function buildRuntimeToolCache(): void {
+  if (toolCache !== null) return;
 
-function buildCache(): void {
-  if (cachedTools !== null) return;
+  const cache = new Map<string, RuntimeTool>();
 
-  const legacyTools = getRegisteredServerTools().map((tool) =>
-    adaptToolToMcp(tool as any)
-  );
-  const moduleTools = getModuleTools();
+  // 1. Herramientas legacy (incluyendo alias configurados en tool-registry)
+  const legacyTools = getRegisteredServerTools();
+  for (const tool of legacyTools) {
+    const definition = adaptToolToMcp(tool);
+    cache.set(definition.name, {
+      definition,
+      handler: tool.handler,
+    });
+  }
 
-  const combined = [...legacyTools, ...moduleTools];
-  const seen = new Set<string>();
-  const deduplicated: McpToolDefinition[] = [];
+  // 2. Herramientas de módulo (Canónicas)
+  // Estas tienen prioridad y sobrescriben a las legacy si hay colisión de nombres
+  const modules = getModuleTools();
+  for (const tool of modules) {
+    if (!tool.definition.outputSchema) {
+      (tool.definition as any).outputSchema = GENERIC_TOOL_OUTPUT_SCHEMA;
+    }
+    cache.set(tool.definition.name, tool);
+  }
 
-  for (const tool of combined) {
-    const toolName = "definition" in tool ? tool.definition.name : (tool as McpToolDefinition).name;
-    if (!seen.has(toolName)) {
-      seen.add(toolName);
-      deduplicated.push(tool as McpToolDefinition);
+  // 3. Lanzadores de Apps (Presentation Apps)
+  const appLaunchers = getPresentationAppLauncherTools();
+  for (const launcher of appLaunchers) {
+    if (!launcher.definition.outputSchema) {
+      (launcher.definition as any).outputSchema = GENERIC_TOOL_OUTPUT_SCHEMA;
+    }
+    cache.set(launcher.definition.name, launcher as RuntimeTool);
+  }
+
+  // 4. Alias adicionales (LEGACY_TO_CANONICAL)
+  // Si una herramienta canónica existe, creamos el alias legacy apuntando a su handler con advertencia
+  for (const [legacyName, canonicalName] of LEGACY_TO_CANONICAL) {
+    const canonicalTool = cache.get(canonicalName);
+    if (canonicalTool) {
+      cache.set(legacyName, createLegacyAliasTool(legacyName, canonicalTool));
     }
   }
 
-  cachedTools = deduplicated;
-  cachedAliases = new Map(Object.entries(TOOL_NAME_ALIASES));
+  // 5. Alias de la presentación (TOOL_NAME_ALIASES)
+  // Envolvemos los alias existentes con advertencias de deprecación
+  for (const [sourceName, aliasName] of Object.entries(TOOL_NAME_ALIASES)) {
+    const canonicalTool = cache.get(sourceName);
+    if (canonicalTool && cache.has(aliasName)) {
+      cache.set(aliasName, createLegacyAliasTool(aliasName, canonicalTool));
+    }
+  }
+
+  toolCache = cache;
+  aliasCache = new Map(Object.entries(TOOL_NAME_ALIASES));
 }
 
 export function getAllRuntimeTools(): McpToolDefinition[] {
-  buildCache();
-  return cachedTools!;
+  buildRuntimeToolCache();
+  return Array.from(toolCache!.values()).map((t) => t.definition);
 }
 
 export function getRuntimeTools(): RuntimeTool[] {
-  buildCache();
-  return getModuleTools();
+  buildRuntimeToolCache();
+  return Array.from(toolCache!.values());
 }
 
 export function getToolByName(name: string): McpToolDefinition | undefined {
-  buildCache();
-  return cachedTools!.find((tool) => tool.name === name);
+  buildRuntimeToolCache();
+  return toolCache!.get(name)?.definition;
 }
 
 export function getLegacyAliases(): Map<string, string> {
-  buildCache();
-  return cachedAliases!;
+  buildRuntimeToolCache();
+  return aliasCache!;
 }

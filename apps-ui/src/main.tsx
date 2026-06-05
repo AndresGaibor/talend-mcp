@@ -11,6 +11,12 @@ import { SnapshotManagerApp } from './apps/snapshot-manager/SnapshotManagerApp';
 import { SecretSafetyApp } from './apps/secret-safety/SecretSafetyApp';
 import { DeliverablesApp } from './apps/deliverables/DeliverablesApp';
 import { ComponentCatalogApp } from './apps/component-catalog/ComponentCatalogApp';
+import { WorkshopProgressApp } from './apps/workshop-progress/WorkshopProgressApp';
+import { FixWizardApp } from './apps/fix-wizard/FixWizardApp';
+import { AntiPatternDetectorApp } from './apps/antipattern-detector/AntiPatternDetectorApp';
+import { ReportSnippetsApp } from './apps/report-snippets/ReportSnippetsApp';
+import { EvidencePackApp } from './apps/evidence-pack/EvidencePackApp';
+import { RequirementChecklistApp } from './apps/requirement-checklist/RequirementChecklistApp';
 
 function AppRouter() {
   const [appId, setAppId] = useState<string>('home');
@@ -34,6 +40,12 @@ function AppRouter() {
     case 'secret-safety': return <SecretSafetyApp />;
     case 'deliverables': return <DeliverablesApp />;
     case 'component-catalog': return <ComponentCatalogApp />;
+    case 'workshop-progress': return <WorkshopProgressApp />;
+    case 'fix-wizard': return <FixWizardApp />;
+    case 'antipattern-detector': return <AntiPatternDetectorApp />;
+    case 'report-snippets': return <ReportSnippetsApp />;
+    case 'evidence-pack': return <EvidencePackApp />;
+    case 'requirement-checklist': return <RequirementChecklistApp />;
     default: return <HomeApp />;
   }
 }

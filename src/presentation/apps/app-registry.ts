@@ -15,7 +15,7 @@ import {
 
 const APP_MIME_TYPE = "text/html;profile=mcp-app";
 
-const LAUNCHER_OUTPUT_SCHEMA = z.object({
+export const LAUNCHER_OUTPUT_SCHEMA = z.object({
   ok: z.literal(true),
   source: z.literal("launcher"),
   confidence: z.number(),
@@ -83,7 +83,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el dashboard de Talend.",
     actions: [
       createNoInputAction("Bridge ping", "talend_bridge_ping", "Verifica el bridge."),
-      createNoInputAction("List jobs", "talend_list_jobs", "Lista los jobs disponibles."),
+      createNoInputAction("List jobs", "talend_jobs_list", "Lista los jobs disponibles."),
       createNoInputAction("Coverage report", "talend_coverage_report", "Muestra cobertura y gaps."),
     ],
   },
@@ -96,9 +96,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el inspector de datasets.",
     uiMode: "react",
     actions: [
-      createTextAction("Inspect CSV folder", "talend_dataset_inspect_csv_folder", "Inspecciona una carpeta de CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
-      createJsonAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere schema para una carpeta.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
-      createTextAction("Generate raw mappings", "talend_dataset_generate_raw_table_mappings", "Genera mappings raw por archivo.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createTextAction("Inspect CSV folder", "talend_datasets_inspect_csv_folder", "Inspecciona una carpeta de CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createJsonAction("Infer CSV schema", "talend_datasets_infer_csv_schema", "Infiere schema para una carpeta.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
+      createTextAction("Generate raw mappings", "talend_datasets_generate_raw_mappings", "Genera mappings raw por archivo.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
     ],
   },
   {
@@ -110,7 +110,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el diseñador de jobs.",
     actions: [
       createJsonAction("Create job", "talend_create_job", "Crea un job nuevo.", { jobName: "new_job" }, { requiresConfirmation: true }),
-      createTextAction("Read job", "talend_read_job", "Lee un job existente.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Read job", "talend_jobs_read", "Lee un job existente.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
       createTextAction("Show flow", "talend_show_flow", "Muestra el flujo entre componentes.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
       createJsonAction("Apply pipeline spec", "talend_job_apply_pipeline_spec", "Genera y escribe archivos .item/.properties.", { pattern: "multi_csv_raw_loader", name: "new_job", folderPath: "Process" }, { requiresConfirmation: true }),
     ],
@@ -151,9 +151,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_snapshot_diff",
     launchMessage: "Abriendo la vista de diff de snapshots.",
     actions: [
-      createNoInputAction("List snapshots", "talend_snapshot_list", "Lista snapshots disponibles."),
-      createTextAction("Read snapshot", "talend_snapshot_read", "Lee un snapshot.", "snapshotId", { inputLabel: "Snapshot id", inputPlaceholder: "snapshot_001" }),
-      createTextAction("Diff snapshot", "talend_snapshot_diff", "Compara un snapshot con el estado actual.", "snapshotId", { inputLabel: "Snapshot id", inputPlaceholder: "snapshot_001" }),
+      createNoInputAction("List snapshots", "talend_snapshots_list", "Lista snapshots disponibles."),
+      createTextAction("Read snapshot", "talend_snapshots_read", "Lee un snapshot.", "snapshotId", { inputLabel: "Snapshot id", inputPlaceholder: "snapshot_001" }),
+      createTextAction("Diff snapshot", "talend_snapshots_diff", "Compara un snapshot con el estado actual.", "snapshotId", { inputLabel: "Snapshot id", inputPlaceholder: "snapshot_001" }),
     ],
   },
   {
@@ -165,9 +165,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo la vista de entregables.",
     uiMode: "react",
     actions: [
-      createTextAction("Export deliverable", "talend_deliverable_export_job", "Prepara un paquete de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob", requiresConfirmation: true }),
-      createTextAction("Collect files", "talend_deliverable_collect_files", "Recolecta archivos asociados.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Validate checklist", "talend_deliverable_validate_checklist", "Valida requisitos de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Export deliverable", "talend_deliverables_export_job", "Prepara un paquete de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob", requiresConfirmation: true }),
+      createTextAction("Collect files", "talend_deliverables_collect", "Recolecta archivos asociados.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate checklist", "talend_deliverables_validate", "Valida requisitos de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
   {
@@ -207,7 +207,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     uiMode: "react",
     actions: [
       createNoInputAction("Bridge ping", "talend_bridge_ping", "Verifica el bridge."),
-      createNoInputAction("List jobs", "talend_list_jobs", "Lista los jobs del proyecto."),
+      createNoInputAction("List jobs", "talend_jobs_list", "Lista los jobs del proyecto."),
       createNoInputAction("Coverage report", "talend_coverage_report", "Muestra cobertura y gaps."),
     ],
   },
@@ -246,8 +246,8 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_job_browser",
     launchMessage: "Abriendo el navegador de jobs.",
     actions: [
-      createNoInputAction("List jobs", "talend_list_jobs", "Lista los jobs disponibles."),
-      createTextAction("Read job", "talend_read_job", "Lee un job por nombre.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createNoInputAction("List jobs", "talend_jobs_list", "Lista los jobs disponibles."),
+      createTextAction("Read job", "talend_jobs_read", "Lee un job por nombre.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
       createTextAction("Read contexts", "talend_read_contexts", "Lee los contextos de un job.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
@@ -327,9 +327,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el inspector pro de datasets.",
     uiMode: "react",
     actions: [
-      createTextAction("Inspect CSV folder", "talend_dataset_inspect_csv_folder", "Inspecciona CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
-      createJsonAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere el schema de CSVs.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
-      createTextAction("Generate raw mappings", "talend_dataset_generate_raw_table_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createTextAction("Inspect CSV folder", "talend_datasets_inspect_csv_folder", "Inspecciona CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createJsonAction("Infer CSV schema", "talend_datasets_infer_csv_schema", "Infiere el schema de CSVs.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
+      createTextAction("Generate raw mappings", "talend_datasets_generate_raw_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
     ],
   },
   {
@@ -340,9 +340,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_csv_preview",
     launchMessage: "Abriendo la vista previa de CSV.",
     actions: [
-      createTextAction("Inspect CSV folder", "talend_dataset_inspect_csv_folder", "Inspecciona CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
-      createTextAction("Generate raw mappings", "talend_dataset_generate_raw_table_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
-      createJsonAction("Infer CSV schema", "talend_dataset_infer_csv_schema", "Infiere schema para raw tables.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
+      createTextAction("Inspect CSV folder", "talend_datasets_inspect_csv_folder", "Inspecciona CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createTextAction("Generate raw mappings", "talend_datasets_generate_raw_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createJsonAction("Infer CSV schema", "talend_datasets_infer_csv_schema", "Infiere schema para raw tables.", { folderPath: "/data/csvs", tableName: "raw_my_table" }),
     ],
   },
   {
@@ -355,7 +355,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     actions: [
       createNoInputAction("Analyze tDBOutput", "talend_analyze_tdboutput", "Analiza salidas a base de datos."),
       createJsonAction("Preview pipeline", "talend_job_preview_pipeline_spec", "Previsualiza la spec.", { pattern: "multi_csv_raw_loader", name: "myJob" }),
-      createTextAction("Generate raw mappings", "talend_dataset_generate_raw_table_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
+      createTextAction("Generate raw mappings", "talend_datasets_generate_raw_mappings", "Genera mappings raw.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/data/csvs" }),
     ],
   },
   {
@@ -394,9 +394,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el scanner de secretos.",
     uiMode: "react",
     actions: [
-      createNoInputAction("Scan project", "talend_secret_scan_project", "Escanea todo el proyecto en busca de secretos expuestos."),
-      createTextAction("Scan job", "talend_secret_scan_job", "Escanea un job específico.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Suggest context migration", "talend_secret_suggest_context_migration", "Sugiere cómo migrar secretos a context profiles.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createNoInputAction("Scan project", "talend_secrets_scan_project", "Escanea todo el proyecto en busca de secretos expuestos."),
+      createTextAction("Scan job", "talend_secrets_scan_job", "Escanea un job específico.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Suggest context migration", "talend_secrets_suggest_context_migration", "Sugiere cómo migrar secretos a context profiles.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
   {
@@ -487,8 +487,8 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el checklist de requisitos.",
     uiMode: "react",
     actions: [
-      createTextAction("Analyze requirements", "talend_requirements_analyze", "Analiza requisitos del proyecto.", "projectPath", { inputLabel: "Project path", inputPlaceholder: "/path/to/project" }),
-      createJsonAction("Build checklist", "talend_requirements_build_checklist", "Construye checklist de requisitos.", { requirements: [] }),
+      createTextAction("Analyze requirements", "talend_task_analyze_requirements", "Analiza requisitos del proyecto.", "projectPath", { inputLabel: "Project path", inputPlaceholder: "/path/to/project" }),
+      createJsonAction("Build checklist", "talend_task_build_execution_plan", "Construye checklist de requisitos.", { requirements: [] }),
     ],
   },
   {
@@ -500,8 +500,8 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el progreso de workshop.",
     uiMode: "react",
     actions: [
-      createNoInputAction("List workshops", "talend_workshop_list", "Lista workshops disponibles."),
-      createTextAction("Get progress", "talend_workshop_progress", "Obtiene progreso de un workshop.", "workshopId", { inputLabel: "Workshop id", inputPlaceholder: "workshop_001" }),
+      createNoInputAction("List workshops", "talend_jobs_list", "Lista workshops disponibles."),
+      createTextAction("Get progress", "talend_list_runs", "Obtiene progreso de un workshop.", "workshopId", { inputLabel: "Workshop id", inputPlaceholder: "workshop_001" }),
     ],
   },
   {
@@ -514,7 +514,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     uiMode: "react",
     actions: [
       createTextAction("Detect antipatterns", "talend_jobs_detect_antipatterns", "Detecta antipatrones en jobs.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createNoInputAction("Scan project", "talend_antipattern_scan_project", "Escanea todo el proyecto."),
+      createNoInputAction("Scan project", "talend_jobs_detect_antipatterns", "Escanea todo el proyecto."),
     ],
   },
   {
@@ -526,8 +526,8 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el asistente de fixes.",
     uiMode: "react",
     actions: [
-      createTextAction("Suggest fix", "talend_fix_suggest", "Sugiere un fix para un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
-      createTextAction("Apply fix", "talend_fix_apply", "Aplica un fix sugerido.", "fixId", { inputLabel: "Fix id", inputPlaceholder: "fix_001", requiresConfirmation: true }),
+      createTextAction("Explain error", "talend_error_explain", "Sugiere un fix para un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
+      createTextAction("Apply fix", "talend_jobs_patch_component", "Aplica un fix sugerido.", "fixId", { inputLabel: "Fix id", inputPlaceholder: "fix_001", requiresConfirmation: true }),
     ],
   },
   {
@@ -540,7 +540,7 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     uiMode: "react",
     actions: [
       createTextAction("Build evidence pack", "talend_evidence_pack_build", "Construye un paquete de evidencia.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Export evidence", "talend_evidence_pack_export", "Exporta el evidence pack.", "packId", { inputLabel: "Pack id", inputPlaceholder: "pack_001" }),
+      createTextAction("Export evidence", "talend_evidence_pack_build", "Exporta el evidence pack.", "packId", { inputLabel: "Pack id", inputPlaceholder: "pack_001" }),
     ],
   },
   {
@@ -552,8 +552,8 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el gestor de snippets de reporte.",
     uiMode: "react",
     actions: [
-      createTextAction("Get snippet", "talend_report_snippet_get", "Obtiene un snippet de reporte.", "snippetId", { inputLabel: "Snippet id", inputPlaceholder: "snippet_001" }),
-      createTextAction("List snippets", "talend_report_snippet_list", "Lista snippets disponibles.", "category", { inputLabel: "Category", inputPlaceholder: "validation" }),
+      createTextAction("Get snippet", "talend_report_generate_snippets", "Obtiene un snippet de reporte.", "snippetId", { inputLabel: "Snippet id", inputPlaceholder: "snippet_001" }),
+      createTextAction("List snippets", "talend_report_generate_snippets", "Lista snippets disponibles.", "category", { inputLabel: "Category", inputPlaceholder: "validation" }),
     ],
   },
   {
@@ -565,9 +565,9 @@ export const PRESENTATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el gestor de snapshots.",
     uiMode: "react",
     actions: [
-      createNoInputAction("List snapshots", "talend_snapshot_list", "Lista snapshots disponibles."),
-      createTextAction("Read snapshot", "talend_snapshot_read", "Lee un snapshot.", "snapshotId", { inputLabel: "Snapshot id", inputPlaceholder: "snapshot_001" }),
-      createTextAction("Restore snapshot", "talend_snapshot_restore", "Restaura un snapshot.", "snapshotId", { inputLabel: "Snapshot id", inputPlaceholder: "snapshot_001", requiresConfirmation: true }),
+      createNoInputAction("List snapshots", "talend_snapshots_list", "Lista snapshots disponibles."),
+      createTextAction("Read snapshot", "talend_snapshots_read", "Lee un snapshot.", "snapshotId", { inputLabel: "Snapshot id", inputPlaceholder: "snapshot_001" }),
+      createTextAction("Restore snapshot", "talend_snapshots_restore", "Restaura un snapshot.", "snapshotId", { inputLabel: "Snapshot id", inputPlaceholder: "snapshot_001", requiresConfirmation: true }),
     ],
   },
 ];
@@ -641,10 +641,10 @@ export function registerPresentationAppResources(server: McpServer): void {
   }
 }
 
-export function registerPresentationAppLaunchers(server: McpServer): void {
-  for (const app of PRESENTATION_APP_DEFINITIONS) {
-    server.registerTool(app.launcherToolName, {
-      title: app.title,
+export function getPresentationAppLauncherTools() {
+  return PRESENTATION_APP_DEFINITIONS.map((app) => ({
+    definition: {
+      name: app.launcherToolName,
       description: app.launchMessage,
       inputSchema: z.object({
         seed: z.string().optional().describe("Contexto opcional para abrir la app"),
@@ -664,10 +664,27 @@ export function registerPresentationAppLaunchers(server: McpServer): void {
         "openai/toolInvocation/invoking": app.launchMessage,
         "openai/toolInvocation/invoked": `${app.title} lista`,
       },
-    }, async (input: { seed?: string }) => {
+    },
+    handler: async (input: { seed?: string }) => {
       const initialState = await buildLauncherInitialStateForApp(app.id);
       return buildLauncherToolResult(app, initialState, input.seed);
-    });
+    },
+  }));
+}
+
+export function registerPresentationAppLaunchers(server: McpServer): void {
+  const launchers = getPresentationAppLauncherTools();
+  for (const launcher of launchers) {
+    server.registerTool(
+      launcher.definition.name,
+      {
+        description: launcher.definition.description,
+        inputSchema: launcher.definition.inputSchema as any,
+        outputSchema: launcher.definition.outputSchema as any,
+        annotations: launcher.definition.annotations as any,
+      },
+      launcher.handler as any,
+    );
   }
 }
 

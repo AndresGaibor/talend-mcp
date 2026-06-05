@@ -17,9 +17,11 @@ export interface OpenAiToolOutput {
 }
 
 export interface OpenAiBridge {
-  toolOutput: (toolUseId: string, output: string) => void;
-  callTool: (toolName: string, args: Record<string, unknown>) => Promise<ToolResult>;
-  setGlobals: (globals: OpenAiGlobals) => void;
+  toolOutput?: unknown;
+  toolInput?: unknown;
+  widgetState?: unknown;
+  callTool?: (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
+  setWidgetState?: (state: unknown) => void;
 }
 
 export interface Window {

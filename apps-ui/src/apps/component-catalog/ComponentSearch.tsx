@@ -22,16 +22,12 @@ export function ComponentSearch({ onSelectComponent, selectedComponent }: Compon
     setHasSearched(false);
 
     const result = await callTool("talend_components_search", { query });
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        if (data.ok) {
-          setResults(data.components || []);
-        } else {
-          setError(data.error?.message || "Búsqueda falló");
-        }
-      } catch {
-        setError("Error parseando respuesta");
+    if (result.ok && result.data) {
+      const data = result.data as any;
+      if (data.ok) {
+        setResults(data.components || []);
+      } else {
+        setError(data.error?.message || "Búsqueda falló");
       }
     } else {
       setError(result.error || "Error en búsqueda");
@@ -45,16 +41,12 @@ export function ComponentSearch({ onSelectComponent, selectedComponent }: Compon
     setHasSearched(false);
 
     const result = await callTool("talend_components_scan_installed", {});
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        if (data.ok) {
-          setResults(data.components || []);
-        } else {
-          setError(data.error?.message || "Scan falló");
-        }
-      } catch {
-        setError("Error parseando respuesta");
+    if (result.ok && result.data) {
+      const data = result.data as any;
+      if (data.ok) {
+        setResults(data.components || []);
+      } else {
+        setError(data.error?.message || "Scan falló");
       }
     } else {
       setError(result.error || "Error en scan");

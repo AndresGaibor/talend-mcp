@@ -41,13 +41,8 @@ export function PipelineSpecEditorApp() {
 
   const loadPatterns = useCallback(async () => {
     const result = await callTool("talend_jobs_list_patterns", {});
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        setPatterns(Array.isArray(data) ? data : []);
-      } catch {
-        setPatterns([]);
-      }
+    if (result.ok && result.data) {
+      setPatterns(Array.isArray(result.data) ? (result.data as Pattern[]) : []);
     }
   }, [callTool]);
 
@@ -81,17 +76,13 @@ export function PipelineSpecEditorApp() {
 
   const handleValidate = useCallback(async () => {
     setError(null);
-    const result = await callTool("talend_jobs_validate_pipeline_spec", { spec: JSON.stringify(specDraft) });
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        setValidationResult({
-          valid: data.valid ?? false,
-          errors: data.errors ?? [],
-        });
-      } catch {
-        setValidationResult({ valid: false, errors: ["Failed to parse validation result"] });
-      }
+    const result = await callTool("talend_jobs_validate_pipeline_spec", { spec: specDraft });
+    if (result.ok && result.data) {
+      const data = result.data as any;
+      setValidationResult({
+        valid: data.valid ?? false,
+        errors: data.errors ?? [],
+      });
     } else {
       setValidationResult({ valid: false, errors: [result.error ?? "Validation failed"] });
     }
@@ -99,9 +90,9 @@ export function PipelineSpecEditorApp() {
 
   const handlePreview = useCallback(async () => {
     setError(null);
-    const result = await callTool("talend_jobs_preview_pipeline_spec", { spec: JSON.stringify(specDraft) });
-    if (result.success && result.result) {
-      setPreviewResult(result.result);
+    const result = await callTool("talend_jobs_preview_pipeline_spec", { spec: specDraft });
+    if (result.ok) {
+      setPreviewResult(result.text ?? result.data?.toString() ?? "");
       setStep("preview");
     } else {
       setError(result.error ?? "Preview failed");
@@ -115,14 +106,20 @@ export function PipelineSpecEditorApp() {
     }
     setShowConfirmation(false);
     setError(null);
-    const result = await callTool("talend_jobs_apply_pipeline_spec", { spec: JSON.stringify(specDraft) });
-    if (result.success) {
+    setStep("apply");
+    const result = await callTool("talend_jobs_apply_pipeline_spec", { 
+      jobId: specDraft.name ?? "new-pipeline",
+      spec: specDraft,
+      overwrite: true 
+    });
+    if (result.ok) {
       await updateSession({ pipelineSpec: specDraft });
       const snapshotResult = await callTool("talend_snapshots_create", {
         name: `pipeline-${Date.now()}`,
+        sourcePath: ".", // Requerido por el esquema
         description: `Snapshot for ${specDraft.name ?? "pipeline"}`,
       });
-      if (!snapshotResult.success) {
+      if (!snapshotResult.ok) {
         setError("Pipeline applied but snapshot creation failed");
       }
     } else {
@@ -132,7 +129,7 @@ export function PipelineSpecEditorApp() {
 
   const handleOpenInStudio = useCallback(async () => {
     const result = await callTool("talend_bridge_open_resource", { path: specDraft.name ?? "" });
-    if (!result.success) {
+    if (!result.ok) {
       setError(result.error ?? "Failed to open in Studio");
     }
   }, [callTool, specDraft]);

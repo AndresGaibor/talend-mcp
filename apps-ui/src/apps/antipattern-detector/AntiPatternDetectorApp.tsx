@@ -22,18 +22,14 @@ export function AntiPatternDetectorApp() {
     setScanResult(null);
 
     const result = await callTool("talend_jobs_detect_antipatterns", {});
-    if (result.success && result.result) {
-      try {
-        const data = JSON.parse(result.result);
-        setScanResult({
-          projectPath: data.projectPath ?? "",
-          scannedJobs: data.scannedJobs ?? 0,
-          patternsFound: data.patternsFound ?? 0,
-          patterns: data.patterns ?? [],
-        });
-      } catch {
-        setError("Failed to parse scan results");
-      }
+    if (result.ok && result.data) {
+      const data = result.data as any;
+      setScanResult({
+        projectPath: data.projectPath ?? "",
+        scannedJobs: data.scannedJobs ?? 0,
+        patternsFound: data.patternsFound ?? 0,
+        patterns: data.patterns ?? [],
+      });
     } else {
       setError(result.error ?? "Scan failed");
     }

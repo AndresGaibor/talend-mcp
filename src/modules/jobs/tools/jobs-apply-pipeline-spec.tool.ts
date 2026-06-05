@@ -61,6 +61,7 @@ export function createJobsApplyPipelineSpecTool() {
         });
         return {
           content: [{ type: "text", text: JSON.stringify(job, null, 2) }],
+          structuredContent: job as any,
           isError: false,
         };
       } catch (err) {

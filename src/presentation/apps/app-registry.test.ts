@@ -1,7 +1,8 @@
 import { test, expect, describe, beforeEach } from "bun:test";
 import { createTalendMcpServer } from "../server/new-server";
 import { PRESENTATION_APP_DEFINITIONS } from "./app-registry";
-import { getRegisteredServerTools, getRegisteredServerToolAnnotations } from "../server/tool-registry";
+import { getRegisteredServerToolAnnotations } from "../server/tool-registry";
+import { getAllRuntimeTools } from "../../server/registered-tools";
 
 const DANGEROUS_TOOLS = [
   "talend_create_job",
@@ -25,7 +26,7 @@ let registeredToolNames: Set<string>;
 
 beforeEach(() => {
   server = createTalendMcpServer();
-  const serverTools = getRegisteredServerTools().map((t) => t.name);
+  const serverTools = getAllRuntimeTools().map((t) => t.name);
   const launcherTools = PRESENTATION_APP_DEFINITIONS.map((a) => a.launcherToolName);
   registeredToolNames = new Set([...serverTools, ...launcherTools]);
 });
@@ -103,7 +104,7 @@ describe("MCP Apps Registry", () => {
 
   describe("tools", () => {
     test("todas las tools tienen outputSchema definido", () => {
-      const tools = getRegisteredServerTools();
+      const tools = getAllRuntimeTools();
       for (const tool of tools) {
         expect(
           tool.outputSchema,
@@ -113,7 +114,7 @@ describe("MCP Apps Registry", () => {
     });
 
     test("todas las tools de presentación (talend_*) tienen annotations", () => {
-      const tools = getRegisteredServerTools().filter((t) => t.name.startsWith("talend_"));
+      const tools = getAllRuntimeTools().filter((t) => t.name.startsWith("talend_"));
       for (const tool of tools) {
         const annotations = getRegisteredServerToolAnnotations(tool.name);
         expect(annotations).toBeDefined();
@@ -138,7 +139,7 @@ describe("MCP Apps Registry", () => {
     });
 
     test("tools readOnly son también idempotent", () => {
-      const tools = getRegisteredServerTools();
+      const tools = getAllRuntimeTools();
       for (const tool of tools) {
         const annotations = getRegisteredServerToolAnnotations(tool.name);
         if (annotations.readOnlyHint) {
@@ -151,7 +152,7 @@ describe("MCP Apps Registry", () => {
     });
 
     test("herramientas de solo lectura no son destructive", () => {
-      const tools = getRegisteredServerTools();
+      const tools = getAllRuntimeTools();
       for (const tool of tools) {
         const annotations = getRegisteredServerToolAnnotations(tool.name);
         if (annotations.readOnlyHint) {

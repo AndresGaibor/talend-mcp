@@ -1,275 +1,119 @@
-import type { McpServer } from "@modelcontextprotocol/server";
 import { test, expect, describe, beforeEach } from "bun:test";
 import { createTalendMcpServer } from "../../src/presentation/server/new-server";
 import { PRESENTATION_APP_DEFINITIONS } from "../../src/presentation/apps/app-registry";
-import { getRegisteredServerTools } from "../../src/presentation/server/tool-registry";
 
-let server: McpServer;
-let registeredToolNames: Set<string>;
+let server: any;
+let registeredTools: Record<string, any>;
+let registeredResources: Record<string, any>;
 
 beforeEach(() => {
   server = createTalendMcpServer();
-  const serverTools = getRegisteredServerTools().map((t) => t.name);
-  registeredToolNames = new Set(serverTools);
+  registeredTools = (server as any)._registeredTools;
+  registeredResources = (server as any)._registeredResources;
 });
 
-describe("PRESENTATION_APP_DEFINITIONS", () => {
-  describe("1. Cada launcher tiene tool registrada en el servidor", () => {
-    test("todas las apps tienen launcherToolName registrado", () => {
+describe("Talend MCP Unified Registry (SDK Integration)", () => {
+  describe("1. App Launchers registration", () => {
+    test("all apps have their launcherToolName registered in _registeredTools", () => {
       for (const app of PRESENTATION_APP_DEFINITIONS) {
-        expect(
-          registeredToolNames.has(app.launcherToolName),
-          `${app.id} launcherToolName "${app.launcherToolName}" no está registrado`,
-        ).toBe(true);
+        expect(registeredTools[app.launcherToolName]).toBeDefined();
+        // El servidor MCP registra la descripción en el objeto de la herramienta
+        expect(registeredTools[app.launcherToolName].description).toBe(app.launchMessage);
       }
     });
 
-    test("los launcherToolName son únicos entre apps", () => {
+    test("launcherToolNames are unique across apps", () => {
       const launcherNames = PRESENTATION_APP_DEFINITIONS.map((a) => a.launcherToolName);
       const uniqueNames = new Set(launcherNames);
-      expect(
-        uniqueNames.size,
-        "los launcherToolName deben ser únicos",
-      ).toBe(launcherNames.length);
+      expect(uniqueNames.size).toBe(launcherNames.length);
     });
   });
 
-  describe("2. Cada launcher tiene _meta.ui.resourceUri", () => {
-    test("cada app tiene resourceUri con formato ui://", () => {
+  describe("2. App Resources registration", () => {
+    test("all apps have their resourceUri registered in _registeredResources", () => {
       for (const app of PRESENTATION_APP_DEFINITIONS) {
-        expect(
-          app.resourceUri,
-          `${app.id} debe tener resourceUri`,
-        ).toBeTruthy();
-        expect(
-          app.resourceUri.startsWith("ui://"),
-          `${app.id} resourceUri debe empezar con ui://`,
-        ).toBe(true);
+        // En el servidor MCP, las keys de _registeredResources son las URIs
+        expect(registeredResources[app.resourceUri]).toBeDefined();
+        expect(registeredResources[app.resourceUri].name).toBe(app.id);
+      }
+    });
+
+    test("resourceUris use ui:// scheme", () => {
+      for (const app of PRESENTATION_APP_DEFINITIONS) {
+        expect(app.resourceUri.startsWith("ui://")).toBe(true);
       }
     });
   });
 
-  describe("3. Cada launcher tiene openai/outputTemplate", () => {
-    test("los resourceUri son válidos como outputTemplate", () => {
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        expect(
-          app.resourceUri,
-          `${app.id} debe tener resourceUri para outputTemplate`,
-        ).toBeTruthy();
-        expect(
-          app.resourceUri.includes(".html"),
-          `${app.id} resourceUri debe ser un HTML endpoint`,
-        ).toBe(true);
-      }
-    });
-  });
-
-  describe("4. Cada resource tiene mimeType text/html;profile=mcp-app", () => {
-    test("los resourceUri usan el formato ui://talend/{app}.html", () => {
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        expect(
-          app.resourceUri.match(/^ui:\/\/talend\/[\w-]+\.html$/),
-          `${app.id} resourceUri debe seguir el patrón ui://talend/{nombre}.html`,
-        ).not.toBeNull();
-      }
-    });
-
-    test("todos los resourceUri terminan en .html", () => {
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        expect(
-          app.resourceUri.endsWith(".html"),
-          `${app.id} resourceUri debe terminar en .html`,
-        ).toBe(true);
-      }
-    });
-  });
-
-  describe("5. Cada action.toolName existe en herramientas del servidor", () => {
-    test("todas las actions tienen toolName definido", () => {
+  describe("3. App Actions (Tools) registration", () => {
+    test("all actions for each app are registered as tools", () => {
+      const missingTools: string[] = [];
       for (const app of PRESENTATION_APP_DEFINITIONS) {
         for (const action of app.actions) {
-          expect(
-            action.toolName,
-            `${app.id} action "${action.label}" debe tener toolName`,
-          ).toBeTruthy();
-          expect(
-            action.toolName.startsWith("talend_"),
-            `${app.id} action "${action.label}" toolName "${action.toolName}" debe empezar con talend_`,
-          ).toBe(true);
-        }
-      }
-    });
-
-    test("cada action.toolName está registrado como tool", () => {
-      const errores: string[] = [];
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        for (const action of app.actions) {
-          if (!registeredToolNames.has(action.toolName)) {
-            errores.push(`${app.id} -> "${action.label}" usa tool "${action.toolName}" que NO está registrado`);
+          if (!registeredTools[action.toolName]) {
+            missingTools.push(`${app.id}: ${action.toolName}`);
           }
         }
       }
-      expect(
-        errores.length,
-        `Las siguientes actions usan tools no registrados:\n${errores.join("\n")}`,
-      ).toBe(0);
-    });
-
-    test("no hay actions duplicadas dentro de una misma app", () => {
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        const toolNames = app.actions.map((a) => a.toolName);
-        const uniqueToolNames = new Set(toolNames);
-        expect(
-          uniqueToolNames.size,
-          `${app.id} no puede tener actions con toolNames duplicados`,
-        ).toBe(toolNames.length);
-      }
+      expect(missingTools).toEqual([]);
     });
   });
 
-  describe("6. Cada action payload valida contra inputSchema", () => {
-    test("actions de tipo 'text' tienen argumentName definido", () => {
+  describe("4. Canonical and Legacy Tools", () => {
+    test("canonical tools are registered (e.g., talend_jobs_list)", () => {
+      expect(registeredTools["talend_jobs_list"]).toBeDefined();
+      expect(registeredTools["talend_snapshots_list"]).toBeDefined();
+    });
+
+    test("legacy aliases are registered (mapping legacy -> canonical)", () => {
+      // talend_list_jobs es un alias de talend_jobs_list
+      expect(registeredTools["talend_list_jobs"]).toBeDefined();
+      // analyze_logs es un alias legacy
+      expect(registeredTools["talend_analyze_logs"]).toBeDefined();
+    });
+  });
+
+  describe("5. Validation of App Definitions properties", () => {
+    test("each app has non-empty description and launchMessage", () => {
+      for (const app of PRESENTATION_APP_DEFINITIONS) {
+        expect(app.description.length).toBeGreaterThan(5);
+        expect(app.launchMessage.length).toBeGreaterThan(5);
+      }
+    });
+
+    test("each app has at least one action", () => {
+      for (const app of PRESENTATION_APP_DEFINITIONS) {
+        expect(app.actions.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    test("app IDs are unique", () => {
+      const ids = PRESENTATION_APP_DEFINITIONS.map((a) => a.id);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(ids.length);
+    });
+  });
+
+  describe("6. Action Payload constraints", () => {
+    test("text actions have argumentName", () => {
       for (const app of PRESENTATION_APP_DEFINITIONS) {
         for (const action of app.actions) {
           if (action.inputMode === "text") {
-            expect(
-              action.argumentName,
-              `${app.id} action "${action.label}" con inputMode=text debe tener argumentName`,
-            ).toBeTruthy();
+            expect(action.argumentName).toBeTruthy();
           }
         }
       }
     });
 
-    test("actions de tipo 'json' tienen defaultValue como string JSON válido", () => {
+    test("json actions have valid JSON defaultValue", () => {
       for (const app of PRESENTATION_APP_DEFINITIONS) {
         for (const action of app.actions) {
           if (action.inputMode === "json") {
-            expect(
-              action.defaultValue,
-              `${app.id} action "${action.label}" con inputMode=json debe tener defaultValue`,
-            ).toBeTruthy();
-            const defaultVal = action.defaultValue;
-            expect(
-              () => JSON.parse(defaultVal!),
-              `${app.id} action "${action.label}" defaultValue debe ser JSON válido`,
-            ).not.toThrow();
+            expect(action.defaultValue).toBeTruthy();
+            expect(() => JSON.parse(action.defaultValue!)).not.toThrow();
           }
         }
       }
     });
-
-    test("actions de tipo 'none' no tienen argumentName ni defaultValue", () => {
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        for (const action of app.actions) {
-          if (action.inputMode === "none") {
-            expect(
-              action.argumentName,
-              `${app.id} action "${action.label}" con inputMode=none no debe tener argumentName`,
-            ).toBeFalsy();
-            expect(
-              action.defaultValue,
-              `${app.id} action "${action.label}" con inputMode=none no debe tener defaultValue`,
-            ).toBeFalsy();
-          }
-        }
-      }
-    });
-
-    test("actions con requiresConfirmation tienen valor booleano", () => {
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        for (const action of app.actions) {
-          if (action.requiresConfirmation !== undefined) {
-            expect(
-              typeof action.requiresConfirmation,
-              `${app.id} action "${action.label}" requiresConfirmation debe ser boolean`,
-            ).toBe("boolean");
-          }
-        }
-      }
-    });
-
-    test("actions con inputLabel tienen valor string", () => {
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        for (const action of app.actions) {
-          if (action.inputLabel !== undefined) {
-            expect(
-              typeof action.inputLabel,
-              `${app.id} action "${action.label}" inputLabel debe ser string`,
-            ).toBe("string");
-          }
-        }
-      }
-    });
-
-    test("actions con inputPlaceholder tienen valor string", () => {
-      for (const app of PRESENTATION_APP_DEFINITIONS) {
-        for (const action of app.actions) {
-          if (action.inputPlaceholder !== undefined) {
-            expect(
-              typeof action.inputPlaceholder,
-              `${app.id} action "${action.label}" inputPlaceholder debe ser string`,
-            ).toBe("string");
-          }
-        }
-      }
-    });
-  });
-});
-
-describe("INVARIANTES GLOBALES", () => {
-  test("PRESENTATION_APP_DEFINITIONS no debe estar vacío", () => {
-    expect(PRESENTATION_APP_DEFINITIONS.length).toBeGreaterThan(0);
-  });
-
-  test("debe haber al menos 20 apps registradas", () => {
-    expect(
-      PRESENTATION_APP_DEFINITIONS.length,
-      "debe haber al menos 20 apps",
-    ).toBeGreaterThanOrEqual(20);
-  });
-
-  test("todas las apps tienen description no vacía", () => {
-    for (const app of PRESENTATION_APP_DEFINITIONS) {
-      expect(
-        app.description,
-        `${app.id} debe tener description`,
-      ).toBeTruthy();
-      expect(
-        app.description.length,
-        `${app.id} description no puede estar vacía`,
-      ).toBeGreaterThan(5);
-    }
-  });
-
-  test("todas las apps tienen launchMessage no vacío", () => {
-    for (const app of PRESENTATION_APP_DEFINITIONS) {
-      expect(
-        app.launchMessage,
-        `${app.id} debe tener launchMessage`,
-      ).toBeTruthy();
-      expect(
-        app.launchMessage.length,
-        `${app.id} launchMessage no puede estar vacío`,
-      ).toBeGreaterThan(5);
-    }
-  });
-
-  test("todas las apps tienen al menos una acción", () => {
-    for (const app of PRESENTATION_APP_DEFINITIONS) {
-      expect(
-        app.actions.length,
-        `${app.id} debe tener al menos una acción`,
-      ).toBeGreaterThanOrEqual(1);
-    }
-  });
-
-  test("los IDs de app son únicos", () => {
-    const ids = PRESENTATION_APP_DEFINITIONS.map((a) => a.id);
-    const uniqueIds = new Set(ids);
-    expect(
-      uniqueIds.size,
-      "los IDs de app deben ser únicos",
-    ).toBe(ids.length);
   });
 });

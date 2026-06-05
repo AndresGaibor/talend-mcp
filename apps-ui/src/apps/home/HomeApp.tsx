@@ -87,7 +87,7 @@ export function HomeApp() {
   }, [callTool]);
 
   const loadProblems = useCallback(async () => {
-    const result = await callTool("talend_bridge_problems", {});
+    const result = await callTool("talend_bridge_problems_markers", {});
     if (result.success && result.result) {
       try {
         const data = JSON.parse(result.result);

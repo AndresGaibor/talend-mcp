@@ -242,7 +242,7 @@ function createHomeHtml(): string {
 
       const actions = ${JSON.stringify([
         { label: "Bridge ping", toolName: "talend_bridge_ping", inputMode: "none" },
-        { label: "List jobs", toolName: "talend_list_jobs", inputMode: "none" },
+        { label: "List jobs", toolName: "talend_jobs_list", inputMode: "none" },
         { label: "Coverage report", toolName: "talend_coverage_report", inputMode: "none" },
       ])};
       actions.forEach((action, index) => {
@@ -449,7 +449,7 @@ function createDatasetInspectorProHtml(): string {
       async function inspectFolder() {
         try {
           const folderPath = document.getElementById('folderPath').value;
-          const response = await callTool('talend_dataset_inspect_csv_folder', { folderPath });
+          const response = await callTool('talend_datasets_inspect_csv_folder', { folderPath });
           const data = response?.structuredContent?.data ?? response?.data ?? response;
           setResult(\`Carpeta inspeccionada: \${data?.files?.length ?? 0} archivos CSV encontrados\`, data);
           renderCsvTable(data);
@@ -462,7 +462,7 @@ function createDatasetInspectorProHtml(): string {
       async function inferSchema() {
         try {
           const folderPath = document.getElementById('folderPath').value;
-          const response = await callTool('talend_dataset_infer_csv_schema', { folderPath });
+          const response = await callTool('talend_datasets_infer_csv_schema', { folderPath });
           const data = response?.structuredContent?.data ?? response?.data ?? response;
           document.getElementById('result').textContent = JSON.stringify(data, null, 2);
         } catch (err) {
@@ -477,7 +477,7 @@ function createDatasetInspectorProHtml(): string {
           const namingStrategy = document.getElementById('namingStrategy').value;
           const forceStringTypes = document.getElementById('forceStringTypes').checked;
           const addTechnicalColumns = document.getElementById('addTechnicalColumns').checked;
-          const response = await callTool('talend_dataset_generate_raw_table_mappings', {
+          const response = await callTool('talend_datasets_generate_raw_mappings', {
             folderPath, targetSchema, namingStrategy, forceStringTypes, addTechnicalColumns
           });
           const data = response?.structuredContent?.data ?? response?.data ?? response;

@@ -14,6 +14,7 @@ export type McpToolDefinition = {
   inputSchema: unknown;
   outputSchema?: unknown;
   annotations?: McpToolAnnotation;
+  _meta?: Record<string, unknown>;
 };
 
 type ToolBase = {
@@ -153,6 +154,7 @@ export function adaptToolToMcp(tool: unknown): McpToolDefinition {
       inputSchema: convertInputSchema(tool.inputSchema),
       outputSchema: convertInputSchema(tool.outputSchema),
       annotations: extractAnnotations(tool),
+      _meta: (tool as any)._meta,
     };
   }
 
@@ -162,6 +164,7 @@ export function adaptToolToMcp(tool: unknown): McpToolDefinition {
       description: tool.description,
       inputSchema: tool.inputSchema,
       outputSchema: tool.outputSchema,
+      _meta: (tool as any)._meta,
     };
   }
 
@@ -174,6 +177,7 @@ export function adaptToolToMcp(tool: unknown): McpToolDefinition {
         inputSchema: convertInputSchema(t.inputSchema),
         outputSchema: t.outputSchema ? convertInputSchema(t.outputSchema) : undefined,
         annotations: extractAnnotations(t),
+        _meta: t._meta,
       };
     }
   }

@@ -99,10 +99,10 @@ export function EnvironmentDoctorApp() {
   }, [callTool]);
 
   const loadResources = useCallback(async () => {
-    const openResult = await callTool("talend_open_resource", { path: "/test" });
+    const openResult = await callTool("talend_bridge_open_resource", { path: "/test" });
     const canOpenResource = openResult.success;
 
-    const scanResult = await callTool("talend_scan_plugins", {});
+    const scanResult = await callTool("talend_components_scan_installed", {});
     const canScanPlugins = scanResult.success;
 
     setResources({ canOpenResource, canScanPlugins });

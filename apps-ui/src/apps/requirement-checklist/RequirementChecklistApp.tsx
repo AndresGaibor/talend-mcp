@@ -50,7 +50,7 @@ export function RequirementChecklistApp() {
     setItems([]);
     setAnalysisResult(null);
 
-    const analyzeResult = await callTool("talend_requirements_analyze", {
+    const analyzeResult = await callTool("talend_task_analyze_requirements", {
       requirementText: requirementText.trim(),
     });
 
@@ -63,7 +63,7 @@ export function RequirementChecklistApp() {
       const data = JSON.parse(analyzeResult.result) as RequirementAnalysisResult;
       setAnalysisResult(data);
 
-      const checklistResult = await callTool("talend_requirements_build_checklist", {
+      const checklistResult = await callTool("talend_task_build_execution_plan", {
         requirements: data.requirements,
       });
 

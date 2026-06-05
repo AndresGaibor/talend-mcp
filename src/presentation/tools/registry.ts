@@ -52,7 +52,7 @@ import { createUpsertRepositoryContextParameterTool } from "./contexts/upsert-re
 import { createFindExportedJobsTool } from "./execution/find-exported-jobs.tool";
 import { createJobInfoTool } from "./execution/job-info.tool";
 import { createListRunsTool } from "./execution/list-runs.tool";
-import { createReadRunTool } from "./execution/read-run.tool";
+import { createReadRunTool, createTailRunOutputTool } from "./execution/read-run.tool";
 import { createRunExportedJobTool } from "./execution/run-exported-job.tool";
 import { createRunJobTool } from "./execution/run-job.tool";
 
@@ -73,7 +73,7 @@ import { createRepoSwitchTool } from "./repo/repo-switch.tool";
 import { createDetectProcessTool } from "./studio/detect-process.tool";
 import { createDiagnoseEnvironmentTool } from "./studio/diagnose-environment.tool";
 import { createListLaunchConfigsTool } from "./studio/list-launch-configs.tool";
-import { createListOpenEditorsTool } from "./studio/list-open-editors.tool";
+import { createListOpenEditorsTool, createGetProbableActiveJobTool } from "./studio/list-open-editors.tool";
 
 const jobRepo = new JobXmlRepository();
 const analyzeJobUseCase = new AnalyzeJobUseCase(jobRepo);
@@ -131,6 +131,7 @@ export const allTools = [
   createJobInfoTool(),
   createListRunsTool(),
   createReadRunTool(),
+  createTailRunOutputTool(),
   createRunExportedJobTool(),
   createRunJobTool(),
 
@@ -152,6 +153,7 @@ export const allTools = [
   createDiagnoseEnvironmentTool(),
   createListLaunchConfigsTool(),
   createListOpenEditorsTool(),
+  createGetProbableActiveJobTool(),
 ];
 
 export const toolCount = allTools.length;

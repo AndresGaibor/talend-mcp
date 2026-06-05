@@ -18,19 +18,23 @@ export function createJobsDetectAntipatternsTool() {
       readOnly: true,
     } as McpToolAnnotation,
     handler: async (input: DetectAntipatternsInput) => {
-      const start = Date.now();
       try {
-        return ok(
-          {
-            jobName: input.jobName,
-            antipatterns: [],
-            score: 100,
-            recommendations: [],
-          },
-          { startTime: start }
-        );
+        const data = {
+          jobName: input.jobName,
+          antipatterns: [],
+          score: 100,
+          recommendations: [],
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+          structuredContent: data as any,
+          isError: false,
+        };
       } catch (err) {
-        return fail("ANTIPATTERN_DETECTION_ERROR", `Error detectando antipatrones: ${err}`, { startTime: start });
+        return {
+          content: [{ type: "text", text: `Error detectando antipatrones: ${err}` }],
+          isError: true,
+        };
       }
     },
   };

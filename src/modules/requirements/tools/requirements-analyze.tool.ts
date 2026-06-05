@@ -11,7 +11,7 @@ export type AnalyzeRequirementsInput = z.infer<typeof AnalyzeRequirementsSchema>
 
 export function createRequirementsAnalyzeTool() {
   return {
-    name: "talend_requirements_analyze",
+    name: "talend_task_analyze_requirements",
     description: "Analiza los requisitos técnicos del proyecto y genera un reporte de cumplimiento.",
     inputSchema: AnalyzeRequirementsSchema,
     annotations: {

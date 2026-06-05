@@ -1,11 +1,11 @@
 import { useState, useCallback } from "react";
 import { callTool } from "./openai-client";
-import type { ToolResult } from "./openai-types";
+import { normalizeToolResult, type NormalizedResult } from "./normalize-result";
 
 interface UseCallToolState {
   isLoading: boolean;
   error: string | null;
-  result: ToolResult | null;
+  result: NormalizedResult | null;
 }
 
 export function useCallTool() {
@@ -19,17 +19,25 @@ export function useCallTool() {
     async (
       toolName: string,
       args: Record<string, unknown>
-    ): Promise<ToolResult> => {
+    ): Promise<NormalizedResult> => {
       setState({ isLoading: true, error: null, result: null });
 
       try {
-        const result = await callTool(toolName, args);
-        setState({ isLoading: false, error: null, result });
+        const rawResult = await callTool(toolName, args);
+        const result = normalizeToolResult(rawResult);
+        
+        setState({ 
+          isLoading: false, 
+          error: result.ok ? null : (result.error || "Error al ejecutar herramienta"), 
+          result 
+        });
+        
         return result;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        setState({ isLoading: false, error: errorMessage, result: null });
-        return { success: false, error: errorMessage };
+        const errorMessage = err instanceof Error ? err.message : "Error desconocido";
+        const result: NormalizedResult = { ok: false, success: false, error: errorMessage };
+        setState({ isLoading: false, error: errorMessage, result });
+        return result;
       }
     },
     []
