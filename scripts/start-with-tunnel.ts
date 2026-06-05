@@ -57,89 +57,13 @@ function separador(): void {
   console.error(`  ${c("─".repeat(40), C.dim)}`);
 }
 
-// ─── Filtro de logs del tunnel ────────────────────────────
-const TUNNEL_SKIP = [
-  '"provided"', '"supplied"', '"run"', '"invoking"',
-  'OnStart hook', 'initialized custom',
-];
-
-const TUNNEL_FORMAT_MSG: Record<string, { icon: string; color: string; msg?: string }> = {
-  "tunnel-client startup summary": { icon: "🚀", color: C.green },
-  "🟢 tunnel-client started": { icon: "", color: C.green },
-  "WEB UI:": { icon: "🌐", color: C.cyan },
-  "mcp session initialized": { icon: "🔗", color: C.green, msg: "Conectado al MCP server" },
-  "health server listening": { icon: "💚", color: C.green, msg: "Health check activo" },
-  "Codex detected without": { icon: "ℹ", color: C.dim },
-  "dispatcher forwarded command": { icon: "↦", color: C.reset, msg: "Comando MCP" },
-  "dispatcher acknowledged": { icon: "↤", color: C.reset, msg: "Notificación ACK" },
-  "tunnel metadata fetched": { icon: "↻", color: C.green, msg: "Tunnel sincronizado" },
-  "failed to connect to mcp": { icon: "✖", color: C.red, msg: "MCP server no disponible" },
-  "dispatcher received MCP upstream error": { icon: "✖", color: C.red, msg: "Error MCP — el server no responde" },
-};
-
-function formatTunnelLine(raw: string): string | null {
-  const t = raw.trim();
-  if (!t) return null;
-
-  let entry: Record<string, any>;
-  try { entry = JSON.parse(t); } catch { return t; }
-
-  const level = (entry.level || "").toUpperCase();
-  const msg = entry.msg || "";
-
-  if (level === "ERROR") return `${c("✖", C.red)} ${msg}`;
-  if (level === "WARN" && !msg.includes("OAuth")) return `${c("⚠", C.yellow)} ${msg}`;
-  if (msg.includes("OAuth")) return null;
-
-  const rawJson = JSON.stringify(entry);
-  if (TUNNEL_SKIP.some((s) => rawJson.includes(s))) return null;
-  if (entry.stacktrace || entry.moduletrace) return null;
-  if (entry.constructor || entry.kind === "provide" || entry.kind === "supply") return null;
-
-  // Startup summary → extraer info
-  if (msg === "tunnel-client startup summary") {
-    const items: { label: string; val: string }[] = [];
-    if (entry.tunnel_id) items.push({ label: "Tunnel ID", val: entry.tunnel_id });
-    if (entry.version) items.push({ label: "Versión", val: entry.version });
-    if (entry.tunnel_url) items.push({ label: "URL", val: entry.tunnel_url });
-    if (entry.mcp_target_value) items.push({ label: "MCP target", val: entry.mcp_target_value });
-    if (entry.tunnel_name) items.push({ label: "Nombre", val: entry.tunnel_name });
-    if (entry.config_source === "profile") items.push({ label: "Perfil", val: entry.profile_name || "talend" });
-    const lines = items.map(
-      (i) => `  ${c("▸", C.green)} ${c(i.label + ":", C.dim)} ${c(i.val, C.cyan)}`,
-    );
-    return lines.join("\n");
-  }
-
-  // 🟢
-  if (msg.includes("🟢")) {
-    const out = [`  ${c("Tunnel activo", C.green)}`];
-    if (entry.tunnel_url) out.push(`  ${c(entry.tunnel_url, C.cyan)}`);
-    if (entry.name) out.push(`  ${c("Nombre:", C.dim)} ${c(entry.name, C.cyan)}`);
-    return [
-      ...out,
-      "",
-      c("  ⏎ En espera de comandos...", C.dim),
-      "",
-    ].join("\n");
-  }
-
-  for (const [key, f] of Object.entries(TUNNEL_FORMAT_MSG)) {
-    if (msg.includes(key)) {
-      const text = f.msg || msg;
-      return `${c(f.icon, f.color)} ${c(text, f.color)}`;
-    }
-  }
-
-  return `${c("•", C.dim)} ${msg}`;
-}
-
 function processTunnelOutput(stream: any): void {
   if (!stream) return;
   const rl = createInterface({ input: stream });
   rl.on("line", (line: string) => {
-    const f = formatTunnelLine(line);
-    if (f) console.error(f);
+    const t = line.trim();
+    if (!t) return;
+    console.error(`  ${c("[tunnel]", C.magenta)} ${t}`);
   });
 }
 
