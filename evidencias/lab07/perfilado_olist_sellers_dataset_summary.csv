@@ -1,0 +1,5 @@
+column_name,rows_total,rows_null,pct_null,cardinality,min_val,max_val,avg_len,pattern_top,pct_top
+"seller_id",3095,0,0,3095,"0015a82c2db000af6aaaf3ae2ecb0532","ffff564a4f9085cd26170f4732393726",32,"9999a9999a99aaa9aa999a999aa9aa99",0.03
+"seller_zip_code_prefix",3095,0,0,2246,"01001","99730",5,"99999",100
+"seller_city",3095,0,0,611,"04482255","xaxim",10.17,"aaa aaaaa",23.2
+"seller_state",3095,0,0,23,"AC","SP",2,"AA",100

@@ -1,0 +1,20 @@
+{
+  "jobName": "JOB_dq_olist_pipeline",
+  "files": [
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/process/Process/JOB_dq_olist_pipeline_0.1.item",
+      "type": "job",
+      "sizeBytes": 22532,
+      "description": "JOB_dq_olist_pipeline_0.1.item"
+    },
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/process/Process/JOB_dq_olist_pipeline_0.1.properties",
+      "type": "job",
+      "sizeBytes": 839,
+      "description": "JOB_dq_olist_pipeline_0.1.properties"
+    }
+  ],
+  "createdAt": 1780672312385,
+  "totalSizeBytes": 5163,
+  "zipPath": "/Users/andresgaibor/code/javascript/talend-mcp/entregables/JOB_dq_olist_pipeline_package.zip"
+}

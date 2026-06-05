@@ -1,0 +1,6 @@
+column_name,rows_total,rows_null,pct_null,cardinality,min_val,max_val,avg_len,pattern_top,pct_top
+"geolocation_zip_code_prefix",1000163,0,0,19015,"01001","99990",5,"99999",100
+"geolocation_lat",1000163,0,0,717372,"-0.00004367379244740171","45.06593318269697",18.55,"-99.999999999999999",60.83
+"geolocation_lng",1000163,0,0,717615,"-101.46676644931476","9.341527629906514",18.17,"-99.99999999999999",63.56
+"geolocation_city",1000163,0,0,8010,"* cidade","óleo",10.47,"aaa aaaaa",14.1
+"geolocation_state",1000163,0,0,27,"AC","TO",2,"AA",100

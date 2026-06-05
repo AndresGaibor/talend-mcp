@@ -1,0 +1,6 @@
+column_name,rows_total,rows_null,pct_null,cardinality,min_val,max_val,avg_len,pattern_top,pct_top
+"customer_id",99441,0,0,99441,"00012a2ce6f8dcda20d059ce98491703","ffffe8b65bbe3087b653a978c870db99",32,"9a9a99a9a9a9a9999999a9999a999a99",0
+"customer_unique_id",99441,0,0,96096,"0000366f3b9a7992bf8c76cfdf3221e2","ffffd2657e2aad2907e67c3e9daecbeb",32,"9a99a9aaaa99999aaaaaaaa9a9aa9999",0.02
+"customer_zip_code_prefix",99441,0,0,14994,"01003","99990",5,"99999",100
+"customer_city",99441,0,0,4119,"abadia dos dourados","zortea",10.34,"aaa aaaaa",16.12
+"customer_state",99441,0,0,27,"AC","TO",2,"AA",100

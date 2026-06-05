@@ -30,6 +30,7 @@ function walkDirectory(dir: string): string[] {
 function inferFileType(path: string): DeliverableFile["type"] {
   const lower = path.toLowerCase();
   if (lower.includes("/process/")) return "job";
+  if (lower.includes("/joblets/")) return "joblet";
   if (lower.includes("/contexts/") || lower.includes("_context")) return "context";
   if (lower.includes("_schema") || lower.includes("/schemas/")) return "schema";
   if (lower.includes("_script") || lower.includes("/scripts/")) return "script";
@@ -42,10 +43,11 @@ export function collectJobFiles(jobName: string): DeliverableFile[] {
   if (!projectPath) return [];
 
   const processDir = join(projectPath, "process");
+  const jobletsDir = join(projectPath, "joblets");
   const codeDir = join(projectPath, "code");
   const metadataDir = join(projectPath, "metadata");
 
-  const searchDirs = [processDir, codeDir, metadataDir].filter((d) => existsSync(d));
+  const searchDirs = [processDir, jobletsDir, codeDir, metadataDir].filter((d) => existsSync(d));
 
   const allFiles: string[] = [];
   for (const dir of searchDirs) {

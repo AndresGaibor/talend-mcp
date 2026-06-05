@@ -1,0 +1,38 @@
+{
+  "jobName": "JOB_perfilado_olist",
+  "files": [
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/process/JOB_perfilado_olist_0.1.properties",
+      "type": "job",
+      "sizeBytes": 853,
+      "description": "JOB_perfilado_olist_0.1.properties"
+    },
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/process/JOB_perfilado_olist_agaibor_0.1.properties",
+      "type": "job",
+      "sizeBytes": 1872,
+      "description": "JOB_perfilado_olist_agaibor_0.1.properties"
+    },
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/process/JOB_perfilado_olist_agaibor_0.1.item",
+      "type": "job",
+      "sizeBytes": 58335,
+      "description": "JOB_perfilado_olist_agaibor_0.1.item"
+    },
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/process/JOB_perfilado_olist_0.1.item",
+      "type": "job",
+      "sizeBytes": 6726,
+      "description": "JOB_perfilado_olist_0.1.item"
+    },
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/process/JOB_perfilado_olist_agaibor_0.1.screenshot",
+      "type": "job",
+      "sizeBytes": 205844,
+      "description": "JOB_perfilado_olist_agaibor_0.1.screenshot"
+    }
+  ],
+  "createdAt": 1780671829361,
+  "totalSizeBytes": 158297,
+  "zipPath": "/Users/andresgaibor/code/javascript/talend-mcp/entregables/JOB_perfilado_olist_package.zip"
+}

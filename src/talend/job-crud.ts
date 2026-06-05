@@ -3,6 +3,7 @@ import { basename, join } from "node:path";
 import { readTextFile, writeTextFile } from "./files";
 import { listJobs } from "./repository";
 import type { TalendJobResource } from "./types";
+import { buildJobletItemXml, buildJobletPropertiesXml } from "./job-generator";
 
 export interface CreateJobOptions {
   jobName: string;
@@ -227,4 +228,49 @@ export async function moveTalendJobToFolder(
     newItemPath,
     newPropertiesPath,
   };
+}
+
+function jobletsDir(projectPath: string): string {
+  return join(projectPath, "joblets");
+}
+
+function resolveJobletFolderDir(projectPath: string, folderPath?: string): string {
+  const normalized = normalizeFolderPath(folderPath);
+  return normalized ? join(jobletsDir(projectPath), ...normalized.split("/")) : jobletsDir(projectPath);
+}
+
+export interface CreateJobletOptions {
+  jobletName: string;
+  version: string;
+  defaultContext?: string;
+  label?: string;
+  description?: string;
+  purpose?: string;
+  folderPath?: string;
+}
+
+export async function createTalendJoblet(
+  projectPath: string,
+  options: CreateJobletOptions,
+  jobletSpec: any
+): Promise<{ itemPath: string; propertiesPath: string }> {
+  const version = options.version ?? "0.1";
+  const jobletName = options.jobletName;
+  const folderPath = normalizeFolderPath(options.folderPath);
+  const itemFileName = `${jobletName}_${version}.item`;
+  const propertiesFileName = `${jobletName}_${version}.properties`;
+  const targetDir = resolveJobletFolderDir(projectPath, folderPath);
+
+  mkdirSync(targetDir, { recursive: true });
+
+  const { xml: itemXml, rootId } = buildJobletItemXml(jobletSpec);
+  const propertiesXml = buildJobletPropertiesXml(jobletSpec, rootId);
+
+  const itemPath = join(targetDir, itemFileName);
+  const propertiesPath = join(targetDir, propertiesFileName);
+
+  await writeTextFile(itemPath, itemXml, projectPath);
+  await writeTextFile(propertiesPath, propertiesXml, projectPath);
+
+  return { itemPath, propertiesPath };
 }

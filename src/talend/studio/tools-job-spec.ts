@@ -265,4 +265,182 @@ export const jobSpecTools = [
       }
     },
   },
+  {
+    name: "talend_job_apply_custom_spec",
+    description: "Genera y escribe un job en el proyecto Talend a partir de una especificación custom (componentes, conexiones y variables de contexto).",
+    inputSchema: z.object({
+      jobName: z.string().describe("Nombre del job"),
+      version: z.string().optional().default("0.1").describe("Versión del job"),
+      defaultContext: z.string().optional().default("Default").describe("Contexto por defecto"),
+      folderPath: z.string().optional().default("Process").describe("Carpeta de destino dentro de process/"),
+      description: z.string().optional().describe("Descripción del job"),
+      purpose: z.string().optional().describe("Propósito del job"),
+      components: z.array(z.object({
+        uniqueName: z.string().describe("Nombre único del componente (e.g. tMap_1)"),
+        componentName: z.string().describe("Nombre del tipo de componente (e.g. tMap)"),
+        posX: z.number().optional().describe("Posición X"),
+        posY: z.number().optional().describe("Posición Y"),
+        label: z.string().optional().describe("Etiqueta del componente"),
+        parameters: z.record(z.string(), z.string()).optional().describe("Parámetros del componente"),
+        schema: z.object({
+          name: z.string().describe("Nombre del esquema"),
+          connector: z.string().optional().default("FLOW").describe("Conector de esquema"),
+          columns: z.array(z.object({
+            name: z.string().describe("Nombre de la columna"),
+            type: z.string().optional().default("id_String").describe("Tipo Talend de la columna"),
+            length: z.number().optional().describe("Longitud"),
+            precision: z.number().optional().describe("Precisión"),
+            nullable: z.boolean().optional().default(true).describe("Es nulable"),
+            key: z.boolean().optional().default(false).describe("Es clave"),
+            sourceType: z.string().optional().describe("Tipo origen"),
+            pattern: z.string().optional().describe("Patrón (e.g. fechas)"),
+          })).describe("Columnas de esquema"),
+        }).optional().describe("Esquema del componente"),
+      })).describe("Componentes del job"),
+      connections: z.array(z.object({
+        source: z.string().describe("Componente origen"),
+        target: z.string().describe("Componente destino"),
+        label: z.string().describe("Etiqueta de la conexión (e.g. row1)"),
+        connectorName: z.string().optional().default("FLOW").describe("Nombre del conector"),
+        metaname: z.string().optional().describe("Meta name"),
+        uniqueName: z.string().optional().describe("Nombre único"),
+      })).optional().describe("Conexiones entre componentes"),
+      contexts: z.array(z.object({
+        name: z.string().describe("Nombre del parámetro de contexto"),
+        type: z.string().describe("Tipo Talend del parámetro (e.g. id_String)"),
+        value: z.string().describe("Valor por defecto"),
+        comment: z.string().optional().describe("Comentario del parámetro"),
+      })).optional().describe("Variables de contexto"),
+    }),
+    handler: async (input: {
+      jobName: string;
+      version?: string;
+      defaultContext?: string;
+      folderPath?: string;
+      description?: string;
+      purpose?: string;
+      components: any[];
+      connections?: any[];
+      contexts?: any[];
+    }) => {
+      try {
+        const projectPath = getConfiguredProjectPath();
+        if (!projectPath) {
+          return bridgeFail({
+            ok: false,
+            source: "workspace",
+            confidence: "high",
+            endpoint: "/job/apply-custom-spec",
+            error: { code: "NO_PROJECT_PATH", message: "No se pudo determinar la ruta del proyecto Talend" },
+          });
+        }
+
+        const genSpec = {
+          jobName: input.jobName,
+          version: input.version ?? "0.1",
+          defaultContext: input.defaultContext ?? "Default",
+          label: input.jobName,
+          description: input.description,
+          purpose: input.purpose,
+          folderPath: input.folderPath ?? "Process",
+          components: input.components,
+          connections: input.connections,
+          contexts: input.contexts,
+        };
+
+        const genValidation = validateGeneratorSpec(genSpec);
+        if (!genValidation.valid) {
+          return bridgeFail({
+            ok: false,
+            source: "job-spec",
+            confidence: "high",
+            endpoint: "/job/apply-custom-spec",
+            error: { code: "INVALID_GENERATOR_SPEC", message: genValidation.errors.join("; ") },
+          });
+        }
+
+        const existingJob = await findExistingJob(projectPath, input.jobName);
+        let snapshotCreated = false;
+        let snapshotPath: string | undefined;
+
+        if (existingJob) {
+          try {
+            const content = await readTextFile(existingJob.itemPath, projectPath);
+            snapshotPath = existingJob.itemPath + ".snapshot_" + Date.now();
+            await writeTextFile(snapshotPath, content, projectPath);
+            snapshotCreated = true;
+          } catch {}
+        }
+
+        const version = input.version ?? "0.1";
+        const itemFileName = `${input.jobName}_${version}.item`;
+        const folderParts = (input.folderPath ?? "Process").replace(/\\/g, "/").split("/").filter(Boolean);
+        const jobDir = folderParts.length > 0
+          ? join(projectPath, "process", ...folderParts)
+          : join(projectPath, "process");
+
+        const { mkdirSync } = await import("node:fs");
+        mkdirSync(jobDir, { recursive: true });
+
+        const itemPath = join(jobDir, itemFileName);
+        const propertiesFileName = `${input.jobName}_${version}.properties`;
+        const propertiesPath = join(jobDir, propertiesFileName);
+
+        const { xml: itemXml, rootId } = buildJobItemXml(genSpec);
+        const propertiesXml = buildJobPropertiesXml(genSpec, rootId);
+
+        await writeTextFile(itemPath, itemXml, projectPath);
+        await writeTextFile(propertiesPath, propertiesXml, projectPath);
+
+        let bridgeRefreshed = false;
+        let bridgeOpened = false;
+        let problemsData: unknown = null;
+
+        try {
+          const ctx = createPlatformContext();
+          const bridge = await loadBridge();
+          await bridge.refreshWorkspace();
+
+          const studioPath = toTalendHostPath(itemPath, ctx);
+          const openResult = await bridge.openResource(studioPath);
+          bridgeOpened = openResult.ok;
+
+          const problemsResult = await bridge.problemsMarkers();
+          if (problemsResult.ok && problemsResult.data) {
+            problemsData = problemsResult.data;
+          }
+          bridgeRefreshed = true;
+        } catch {}
+
+        return bridgeOk({
+          ok: true,
+          source: "job-spec",
+          confidence: "high",
+          endpoint: "/job/apply-custom-spec",
+          data: {
+            jobName: input.jobName,
+            version,
+            itemPath,
+            propertiesPath,
+            folderPath: input.folderPath ?? "Process",
+            snapshotCreated,
+            snapshotPath,
+            generatedComponents: genSpec.components.length,
+            connections: genSpec.connections?.length ?? 0,
+            bridgeRefreshed,
+            bridgeOpened,
+            problems: problemsData,
+          },
+        });
+      } catch (err) {
+        return bridgeFail({
+          ok: false,
+          source: "job-spec",
+          confidence: "low",
+          endpoint: "/job/apply-custom-spec",
+          error: { code: "APPLY_FAILED", message: String(err) },
+        });
+      }
+    },
+  },
 ];

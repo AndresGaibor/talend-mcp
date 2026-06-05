@@ -1,0 +1,9 @@
+column_name,rows_total,rows_null,pct_null,cardinality,min_val,max_val,avg_len,pattern_top,pct_top
+"order_id",99441,0,0,99441,"00010242fe8c5a6d1ba2dd792cb16214","fffe41c64501cc87c801fd61db3f6244",32,"99aa99999999a9999999999999a99999",0
+"customer_id",99441,0,0,99441,"00012a2ce6f8dcda20d059ce98491703","ffffe8b65bbe3087b653a978c870db99",32,"99a999a99999a9aa9999a99aaaaaaa9a",0
+"order_status",99441,0,0,8,"approved","unavailable",8.98,"aaaaaaaaa",97.02
+"order_purchase_timestamp",99441,0,0,98875,"2016-09-04 21:15:19","2018-10-17 17:30:18",19,"9999-99-99 99:99:99",100
+"order_approved_at",99441,160,0.16,90733,"2016-09-15 12:16:38","2018-09-03 17:40:06",19,"9999-99-99 99:99:99",100
+"order_delivered_carrier_date",99441,1783,1.79,81018,"2016-10-08 10:34:01","2018-09-11 19:48:28",19,"9999-99-99 99:99:99",100
+"order_delivered_customer_date",99441,2965,2.98,95664,"2016-10-11 13:46:32","2018-10-17 13:22:46",19,"9999-99-99 99:99:99",100
+"order_estimated_delivery_date",99441,0,0,459,"2016-09-30 00:00:00","2018-11-12 00:00:00",19,"9999-99-99 99:99:99",100

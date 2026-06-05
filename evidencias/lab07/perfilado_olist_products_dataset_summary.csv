@@ -1,0 +1,10 @@
+column_name,rows_total,rows_null,pct_null,cardinality,min_val,max_val,avg_len,pattern_top,pct_top
+"product_id",32951,0,0,32951,"00066f42aeeb9f3007548bb9d3f33c38","fffe9eeff12fcbd74a2f2b007dde0c58",32,"9a9a9aa99aaaaa9999aa99999aa999a9",0
+"product_category_name",32951,610,1.85,73,"agro_industria_e_comercio","utilidades_domesticas",14.96,"aaaaaaaaaa",12.92
+"product_name_lenght",32951,610,1.85,66,"10","9",2,"99",99.95
+"product_description_lenght",32951,610,1.85,2960,"100","999",3.22,"999",74.31
+"product_photos_qty",32951,610,1.85,19,"1","9",1.01,"9",99.35
+"product_weight_g",32951,2,0.01,2204,"0","998",3.45,"999",57.96
+"product_length_cm",32951,2,0.01,99,"10","99",2.01,"99",98.97
+"product_height_cm",32951,2,0.01,102,"10","99",1.7,"99",69.91
+"product_width_cm",32951,2,0.01,95,"10","98",2,"99",99.83

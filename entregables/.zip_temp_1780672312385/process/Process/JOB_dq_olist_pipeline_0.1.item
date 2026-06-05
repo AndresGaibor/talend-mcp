@@ -1,0 +1,253 @@
+<talendfile:ProcessType xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:talendfile="platform:/resource/org.talend.model/model/TalendFile.xsd" xmi:id="_HF-s1rv9OSnKz5OeUNO_AC" defaultContext="Default" jobType="Standard">
+  <context confirmationNeeded="false" hide="false" name="Default">
+    <contextParameter xmi:id="_2J2AK5ocYRnvJIelnnt7Nx" name="run_id" type="id_String" value="routines.System.currentTimeMillis().toString()" comment="ID de la corrida actual"></contextParameter>
+    <contextParameter xmi:id="_aMaJORcRr-PfvLEvj67unK" name="env" type="id_String" value="DEV" comment="Entorno"></contextParameter>
+    <contextParameter xmi:id="_rHiPvtBshL3hO7P305o5l1" name="strict_mode" type="id_Boolean" value="false" comment="Modo estricto"></contextParameter>
+    <contextParameter xmi:id="_x-MB3UvrxJclkgISyLxT9A" name="ss_host" type="id_String" value="localhost" comment="Host de SingleStore"></contextParameter>
+    <contextParameter xmi:id="_P_i1zyZCYLeR4TgGDs8RZm" name="ss_port" type="id_String" value="3306" comment="Puerto de SingleStore"></contextParameter>
+    <contextParameter xmi:id="_aH-dF3b7Tv0fSkVEjVOgat" name="ss_db" type="id_String" value="aliware_dq" comment="Base de datos"></contextParameter>
+    <contextParameter xmi:id="_Rc0rCUxXFkbJUXlPLB4zqq" name="ss_user" type="id_String" value="aliware_dev" comment="Usuario de SingleStore"></contextParameter>
+    <contextParameter xmi:id="_BwzbDPQ3fbwOekvIQByrdg" name="ss_password" type="id_Password" value="password" comment="Clave de SingleStore"></contextParameter>
+  </context>
+  <node xmi:id="_OdqsAcxHc-qw4SGYjylWVU" componentName="tPrejob" posX="100" posY="80">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tPrejob_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Inicio de PreJob"></elementParameter>
+  </node>
+  <node xmi:id="_T6sQ1G18uMlsWDolYf8Up-" componentName="tMysqlConnection" posX="250" posY="80">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBConnection_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Abrir Conexión SingleStore"></elementParameter>
+    <elementParameter field="TEXT" name="HOST" value="context.ss_host"></elementParameter>
+    <elementParameter field="TEXT" name="PORT" value="context.ss_port"></elementParameter>
+    <elementParameter field="TEXT" name="DBNAME" value="context.ss_db"></elementParameter>
+    <elementParameter field="TEXT" name="USER" value="context.ss_user"></elementParameter>
+    <elementParameter field="TEXT" name="PASS" value="context.ss_password"></elementParameter>
+    <elementParameter field="TEXT" name="PROPERTIES" value="&quot;noDatetimeStringSync=true&quot;"></elementParameter>
+  </node>
+  <node xmi:id="_e8mRHKhOHVWdKczm4mjfAO" componentName="tFileInputDelimited" posX="420" posY="80">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tFileInputDelimited_2"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Leer reglas_candidatas.yaml"></elementParameter>
+    <elementParameter field="TEXT" name="FILENAME" value="&quot;reglas_candidatas.yaml&quot;"></elementParameter>
+    <elementParameter field="TEXT" name="ROWSEPARATOR" value="&quot;\n&quot;"></elementParameter>
+    <elementParameter field="TEXT" name="FIELDSEPARATOR" value="&quot;;&quot;"></elementParameter>
+    <elementParameter field="TEXT" name="HEADER" value="0"></elementParameter>
+    <elementParameter field="TEXT" name="ENCODING" value="&quot;UTF-8&quot;"></elementParameter>
+    <metadata connector="FLOW" label="tFileInputDelimited_2" name="tFileInputDelimited_2" xmi:id="_PEIgYT3ndfjEUmz0CAODCi">
+      <column name="key" type="id_String"></column>
+      <column name="value" type="id_String"></column>
+    </metadata>
+  </node>
+  <node xmi:id="_jRkwImOfXPM4WPBseOaYkg" componentName="tContextLoad" posX="580" posY="80">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tContextLoad_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Cargar Contextos"></elementParameter>
+  </node>
+  <node xmi:id="_7-BQzG_ESQ_WWGQlw7bSxl" componentName="tFixedFlowInput" posX="100" posY="220">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tFixedFlowInput_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Tablas a evaluar"></elementParameter>
+    <elementParameter field="TEXT" name="NB_ROWS" value="1"></elementParameter>
+    <elementParameter field="TEXT" name="USE_SINGLEMODE" value="false"></elementParameter>
+    <elementParameter field="TEXT" name="USE_INTABLE" value="true"></elementParameter>
+    <elementParameter field="TABLE" name="INTABLE">
+      <elementValue elementRef="dataset" value="&quot;orders&quot;" id="0"></elementValue>
+      <elementValue elementRef="dataset" value="&quot;customers&quot;" id="1"></elementValue>
+      <elementValue elementRef="dataset" value="&quot;order_items&quot;" id="2"></elementValue>
+    </elementParameter>
+    <metadata connector="FLOW" label="tFixedFlowInput_1" name="tFixedFlowInput_1" xmi:id="_f_doTzD8L8ToSIEW_sxEec">
+      <column name="dataset" type="id_String" length="100"></column>
+    </metadata>
+  </node>
+  <node xmi:id="_ock4rY9YKm4jAHS5VmAHWW" componentName="tFlowToIterate" posX="250" posY="220">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tFlowToIterate_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Iterar tablas"></elementParameter>
+  </node>
+  <node xmi:id="_IB6eVVSobBIam3tg6ccDk9" componentName="tMysqlInput" posX="400" posY="220">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBInput_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Leer tabla raw"></elementParameter>
+    <elementParameter field="TEXT" name="USE_EXISTING_CONNECTION" value="true"></elementParameter>
+    <elementParameter field="TEXT" name="CONNECTION" value="tDBConnection_1"></elementParameter>
+    <elementParameter field="TEXT" name="QUERY" value="&quot;SELECT &apos;&quot; + ((String)globalMap.get(&quot;row1.dataset&quot;)) + &quot;&apos; AS dataset, t.* FROM raw.&quot; + ((String)globalMap.get(&quot;row1.dataset&quot;)) + &quot; t&quot;"></elementParameter>
+    <metadata connector="FLOW" label="tDBInput_1" name="tDBInput_1" xmi:id="_TVmr3tHzlq9VVuoSAzwQbQ">
+      <column name="dataset" type="id_String"></column>
+      <column name="row" type="id_Dynamic"></column>
+    </metadata>
+  </node>
+  <node xmi:id="_BIcQbQ4feC9lV3tsEbJX5H" componentName="tMap" posX="550" posY="220">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMap_rules"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Evaluar DQ-001,002,004,005"></elementParameter>
+    <metadata connector="FLOW" label="row_rules" name="row_rules" xmi:id="_bbrTyfcGfL-CkHd0RmOQCG">
+      <column name="run_id" type="id_String"></column>
+      <column name="run_ts" type="id_Date"></column>
+      <column name="dataset" type="id_String"></column>
+      <column name="business_key" type="id_String"></column>
+      <column name="payload_json" type="id_String"></column>
+      <column name="rule_id" type="id_String"></column>
+      <column name="dimension" type="id_String"></column>
+      <column name="severity" type="id_String"></column>
+      <column name="rule_passed" type="id_Boolean"></column>
+    </metadata>
+    <nodeData xsi:type="TalendMapper:MapperData">
+      <uiProperties shellMaximized="true"></uiProperties>
+      <varTables sizeState="INTERMEDIATE" name="Var">
+        <mapperTableEntries name="datasetName" expression="((String)globalMap.get(&quot;row1.dataset&quot;))" type="id_String" nullable="false"></mapperTableEntries>
+        <mapperTableEntries name="businessKey" expression="&quot;customers&quot;.equals(Var.datasetName) ? (row2.row.getColumnValue(&quot;customer_id&quot;) != null ? String.valueOf(row2.row.getColumnValue(&quot;customer_id&quot;)) : &quot;&quot;) : (row2.row.getColumnValue(&quot;order_id&quot;) != null ? String.valueOf(row2.row.getColumnValue(&quot;order_id&quot;)) : &quot;&quot;)" type="id_String" nullable="false"></mapperTableEntries>
+        <mapperTableEntries name="payloadJson" expression="row2.row.toString()" type="id_String" nullable="false"></mapperTableEntries>
+        <mapperTableEntries name="dq001_passed" expression="!(&quot;customers&quot;.equals(Var.datasetName) || &quot;orders&quot;.equals(Var.datasetName)) || (row2.row.getColumnValue(&quot;customer_id&quot;) != null &amp;&amp; !String.valueOf(row2.row.getColumnValue(&quot;customer_id&quot;)).trim().isEmpty())" type="id_Boolean"></mapperTableEntries>
+        <mapperTableEntries name="dq002_passed" expression="!&quot;orders&quot;.equals(Var.datasetName) || java.util.Arrays.asList(&quot;delivered&quot;, &quot;shipped&quot;, &quot;canceled&quot;, &quot;unavailable&quot;, &quot;invoiced&quot;, &quot;processing&quot;, &quot;approved&quot;, &quot;created&quot;).contains(row2.row.getColumnValue(&quot;order_status&quot;) != null ? String.valueOf(row2.row.getColumnValue(&quot;order_status&quot;)) : &quot;&quot;)" type="id_Boolean"></mapperTableEntries>
+        <mapperTableEntries name="dq004_passed" expression="!&quot;order_items&quot;.equals(Var.datasetName) || (row2.row.getColumnValue(&quot;price&quot;) != null &amp;&amp; Double.parseDouble(String.valueOf(row2.row.getColumnValue(&quot;price&quot;))) &gt; 0)" type="id_Boolean"></mapperTableEntries>
+        <mapperTableEntries name="dq005_passed" expression="!&quot;orders&quot;.equals(Var.datasetName) || row2.row.getColumnValue(&quot;order_delivered_customer_date&quot;) == null || row2.row.getColumnValue(&quot;order_purchase_timestamp&quot;) == null || !((java.util.Date)row2.row.getColumnValue(&quot;order_delivered_customer_date&quot;)).before((java.util.Date)row2.row.getColumnValue(&quot;order_purchase_timestamp&quot;))" type="id_Boolean"></mapperTableEntries>
+        <mapperTableEntries name="rulePassed" expression="Var.dq001_passed &amp;&amp; Var.dq002_passed &amp;&amp; Var.dq004_passed &amp;&amp; Var.dq005_passed" type="id_Boolean"></mapperTableEntries>
+        <mapperTableEntries name="ruleId" expression="Var.rulePassed ? &quot;&quot; : (!Var.dq001_passed ? &quot;DQ-001&quot; : (!Var.dq002_passed ? &quot;DQ-002&quot; : (!Var.dq005_passed ? &quot;DQ-005&quot; : &quot;DQ-004&quot;)))" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="dimension" expression="Var.rulePassed ? &quot;&quot; : (!Var.dq001_passed ? &quot;Completitud&quot; : (!Var.dq002_passed ? &quot;Validez&quot; : (!Var.dq005_passed ? &quot;Consistencia&quot; : &quot;Validez&quot;)))" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="severity" expression="Var.rulePassed ? &quot;&quot; : (!Var.dq001_passed || !Var.dq002_passed ? &quot;Crítica&quot; : &quot;Alta&quot;)" type="id_String"></mapperTableEntries>
+      </varTables>
+      <outputTables sizeState="INTERMEDIATE" name="row_rules">
+        <mapperTableEntries name="run_id" expression="context.run_id" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="run_ts" expression="new java.util.Date()" type="id_Date"></mapperTableEntries>
+        <mapperTableEntries name="dataset" expression="Var.datasetName" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="business_key" expression="Var.businessKey" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="payload_json" expression="Var.payloadJson" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="rule_id" expression="Var.ruleId" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="dimension" expression="Var.dimension" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="severity" expression="Var.severity" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="rule_passed" expression="Var.rulePassed" type="id_Boolean"></mapperTableEntries>
+      </outputTables>
+      <inputTables sizeState="INTERMEDIATE" name="row2" matchingMode="ALL_ROWS" lookupMode="LOAD_ONCE">
+        <mapperTableEntries name="dataset" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="row" type="id_Dynamic"></mapperTableEntries>
+      </inputTables>
+    </nodeData>
+  </node>
+  <node xmi:id="_EaX8s0PLgW6t_KMuDIxDXU" componentName="tUniqRow" posX="700" posY="220">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tUniqRow_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Verificar Unicidad DQ-003"></elementParameter>
+    <elementParameter field="TABLE" name="UNIQUE_KEY">
+      <elementValue elementRef="SCHEMA_COLUMN" value="business_key" id="0"></elementValue>
+      <elementValue elementRef="KEY_ATTRIBUTE" value="true" id="1"></elementValue>
+      <elementValue elementRef="CASE_SENSITIVE" value="false" id="2"></elementValue>
+    </elementParameter>
+    <metadata connector="FLOW" label="tUniqRow_1" name="tUniqRow_1" xmi:id="_ps1wDcFfQonB04SlcnwvCi">
+      <column name="run_id" type="id_String"></column>
+      <column name="run_ts" type="id_Date"></column>
+      <column name="dataset" type="id_String"></column>
+      <column name="business_key" type="id_String"></column>
+      <column name="payload_json" type="id_String"></column>
+      <column name="rule_id" type="id_String"></column>
+      <column name="dimension" type="id_String"></column>
+      <column name="severity" type="id_String"></column>
+      <column name="rule_passed" type="id_Boolean"></column>
+    </metadata>
+  </node>
+  <node xmi:id="_8DMbrDbJ2JnRhAbywF_xiI" componentName="JL_calidad_olist" posX="850" posY="220">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="JL_calidad_olist_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Aplicar Calidad (Unique)"></elementParameter>
+  </node>
+  <node xmi:id="_569UVqiWVBVjf52yqxOuiA" componentName="tLogRow" posX="1000" posY="220">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tLogRow_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Ver Consola"></elementParameter>
+  </node>
+  <node xmi:id="_EA5fYqJyYctYVhwxT54NWr" componentName="tMap" posX="850" posY="340">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMap_duplicate"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Fijar DQ-003"></elementParameter>
+    <metadata connector="FLOW" label="row_duplicate_dq" name="row_duplicate_dq" xmi:id="__N2aab0DVfGMrjgi28Xr2w">
+      <column name="run_id" type="id_String"></column>
+      <column name="run_ts" type="id_Date"></column>
+      <column name="dataset" type="id_String"></column>
+      <column name="business_key" type="id_String"></column>
+      <column name="payload_json" type="id_String"></column>
+      <column name="rule_id" type="id_String"></column>
+      <column name="dimension" type="id_String"></column>
+      <column name="severity" type="id_String"></column>
+      <column name="rule_passed" type="id_Boolean"></column>
+    </metadata>
+    <nodeData xsi:type="TalendMapper:MapperData">
+      <uiProperties shellMaximized="true"></uiProperties>
+      <varTables sizeState="INTERMEDIATE" name="Var" minimized="true"></varTables>
+      <outputTables sizeState="INTERMEDIATE" name="row_duplicate_dq">
+        <mapperTableEntries name="run_id" expression="row_dup.run_id" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="run_ts" expression="row_dup.run_ts" type="id_Date"></mapperTableEntries>
+        <mapperTableEntries name="dataset" expression="row_dup.dataset" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="business_key" expression="row_dup.business_key" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="payload_json" expression="row_dup.payload_json" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="rule_id" expression="&quot;DQ-003&quot;" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="dimension" expression="&quot;Unicidad&quot;" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="severity" expression="&quot;Crítica&quot;" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="rule_passed" expression="false" type="id_Boolean"></mapperTableEntries>
+      </outputTables>
+      <inputTables sizeState="INTERMEDIATE" name="row_dup" matchingMode="ALL_ROWS" lookupMode="LOAD_ONCE">
+        <mapperTableEntries name="run_id" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="run_ts" type="id_Date"></mapperTableEntries>
+        <mapperTableEntries name="dataset" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="business_key" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="payload_json" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="rule_id" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="dimension" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="severity" type="id_String"></mapperTableEntries>
+        <mapperTableEntries name="rule_passed" type="id_Boolean"></mapperTableEntries>
+      </inputTables>
+    </nodeData>
+  </node>
+  <node xmi:id="_GvHoAvq3NVKS7g-Qblzs1H" componentName="JL_calidad_olist" posX="1000" posY="340">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="JL_calidad_olist_2"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Aplicar Calidad (Duplicates)"></elementParameter>
+  </node>
+  <node xmi:id="_JDIrpI8Yk7CHGDgjz_K37k" componentName="tLogRow" posX="1150" posY="340">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tLogRow_2"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Ver Consola Rejects"></elementParameter>
+  </node>
+  <node xmi:id="_apu49cZklJg2m6qeFvjoEz" componentName="tPostjob" posX="100" posY="460">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tPostjob_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Fin del Job"></elementParameter>
+  </node>
+  <node xmi:id="_AFNdY_k_kUWkuh7Gmhvt2g" componentName="tMysqlCommit" posX="250" posY="460">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBCommit_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Confirmar Transacciones"></elementParameter>
+    <elementParameter field="TEXT" name="CONNECTION" value="tDBConnection_1"></elementParameter>
+    <elementParameter field="TEXT" name="CLOSE" value="false"></elementParameter>
+  </node>
+  <node xmi:id="_3jOr82VlpBsaP-fgfv9dLN" componentName="tMysqlClose" posX="400" posY="460">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBClose_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Cerrar Conexión"></elementParameter>
+    <elementParameter field="TEXT" name="CONNECTION" value="tDBConnection_1"></elementParameter>
+  </node>
+  <connection xmi:id="_9q_FvUo4H-bqu4pTZxfYkr" source="tPrejob_1" target="tDBConnection_1" label="OnComponentOk1" connectorName="COMPONENT_OK">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="OnComponentOk1"></elementParameter>
+  </connection>
+  <connection xmi:id="_BcVPXMvlbsYlKuznwFQitD" source="tDBConnection_1" target="tFileInputDelimited_2" label="OnComponentOk2" connectorName="COMPONENT_OK">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="OnComponentOk2"></elementParameter>
+  </connection>
+  <connection xmi:id="_7t3SO9LJ0T0n6KlcHTohW8" source="tFileInputDelimited_2" target="tContextLoad_1" label="row_context" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row_context"></elementParameter>
+  </connection>
+  <connection xmi:id="_Ve1GwS1A5SHge2uOtnoeTZ" source="tFixedFlowInput_1" target="tFlowToIterate_1" label="row1" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row1"></elementParameter>
+  </connection>
+  <connection xmi:id="_K3BvOa5fyuWgSwWVlKgZKD" source="tFlowToIterate_1" target="tDBInput_1" label="Iterate1" connectorName="ITERATE">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Iterate1"></elementParameter>
+  </connection>
+  <connection xmi:id="_ux5EsuglQwioi7rdAU-oEM" source="tDBInput_1" target="tMap_rules" label="row2" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row2"></elementParameter>
+  </connection>
+  <connection xmi:id="_ppC1cAkLqNNAqAcPyLpQga" source="tMap_rules" target="tUniqRow_1" label="row_rules" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row_rules"></elementParameter>
+  </connection>
+  <connection xmi:id="_AxuyxCyg0UAdmVEaC3PLoR" source="tUniqRow_1" target="JL_calidad_olist_1" label="Unique" connectorName="UNIQUE">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="Unique"></elementParameter>
+  </connection>
+  <connection xmi:id="_y8EZlO8gvOMpoUHmP4WGPi" source="JL_calidad_olist_1" target="tLogRow_1" label="row_unique_out" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row_unique_out"></elementParameter>
+  </connection>
+  <connection xmi:id="_yieI797TQlrm2qkom4vUOx" source="tUniqRow_1" target="tMap_duplicate" label="row_dup" connectorName="DUPLICATE">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row_dup"></elementParameter>
+  </connection>
+  <connection xmi:id="_et6kw-t4YiJscdDBk6qvIR" source="tMap_duplicate" target="JL_calidad_olist_2" label="row_duplicate_dq" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row_duplicate_dq"></elementParameter>
+  </connection>
+  <connection xmi:id="_-5kcYdVGJjOk40vQaF6E1q" source="JL_calidad_olist_2" target="tLogRow_2" label="row_dup_out" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row_dup_out"></elementParameter>
+  </connection>
+  <connection xmi:id="_jWGrznAJ-SC5jN_gajqCCh" source="tPostjob_1" target="tDBCommit_1" label="OnComponentOk3" connectorName="COMPONENT_OK">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="OnComponentOk3"></elementParameter>
+  </connection>
+  <connection xmi:id="_vMfMgd94A0BzFEC-MCdca_" source="tDBCommit_1" target="tDBClose_1" label="OnComponentOk4" connectorName="COMPONENT_OK">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="OnComponentOk4"></elementParameter>
+  </connection>
+</talendfile:ProcessType>

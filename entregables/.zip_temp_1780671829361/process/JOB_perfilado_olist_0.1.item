@@ -1,0 +1,78 @@
+<talendfile:ProcessType xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:talendfile="platform:/resource/org.talend.model/model/TalendFile.xsd" xmi:id="_0N1BUZ0Kjrcs6APXwc8cTD" defaultContext="DEV" jobType="Standard">
+  <context confirmationNeeded="false" hide="false" name="DEV">
+    <contextParameter xmi:id="_0uoo7BgZt8tcKd3OevBosK" name="olist_path" type="id_String" value="/Users/andresgaibor/geniuslab/Fuentes/" comment="Ruta de los datasets de Olist"></contextParameter>
+    <contextParameter xmi:id="_JYwqu1yjeSPPj02LQuAGKP" name="ss_host" type="id_String" value="localhost" comment="Host de SingleStore"></contextParameter>
+    <contextParameter xmi:id="_v5cKdD2IADh76FZaCsHTkP" name="ss_port" type="id_Integer" value="3306" comment="Puerto de SingleStore"></contextParameter>
+    <contextParameter xmi:id="_i8tN3l3f1iOjLrKxLcF0oH" name="ss_db" type="id_String" value="aliware_dq" comment="Base de datos"></contextParameter>
+    <contextParameter xmi:id="_EYmAHWSroMhpj9t8Jg0-iw" name="ss_user" type="id_String" value="aliware_dev" comment="Usuario"></contextParameter>
+    <contextParameter xmi:id="_Uo87VMDSvSj89zDN9aLMUh" name="ss_password" type="id_Password" value="password" comment="Clave"></contextParameter>
+    <contextParameter xmi:id="_FLRxQpHS-aF7cknWPu3MYQ" name="run_id" type="id_String" value="routines.System.currentTimeMillis().toString()" comment="ID de corrida"></contextParameter>
+  </context>
+  <node xmi:id="_TVKSENj9RpIDXep3y3CxTn" componentName="tFixedFlowInput" posX="100" posY="100">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tFixedFlowInput_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Lista de Datasets"></elementParameter>
+    <elementParameter field="TEXT" name="NB_ROWS" value="1"></elementParameter>
+  </node>
+  <node xmi:id="_q9MyJ_fMj98skyaumos7nA" componentName="tFlowToIterate" posX="250" posY="100">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tFlowToIterate_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Iterar archivos"></elementParameter>
+  </node>
+  <node xmi:id="_8M1ADvlzajIJKB1fUOrTak" componentName="tFileInputDelimited" posX="400" posY="100">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tFileInputDelimited_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Leer CSV dinámico"></elementParameter>
+    <elementParameter field="TEXT" name="FILENAME" value="context.olist_path + ((String)globalMap.get(&quot;dataset&quot;)) + &quot;.csv&quot;"></elementParameter>
+    <elementParameter field="TEXT" name="FIELDSEPARATOR" value="&quot;,&quot;"></elementParameter>
+    <elementParameter field="TEXT" name="HEADER" value="1"></elementParameter>
+    <elementParameter field="TEXT" name="ENCODING" value="&quot;UTF-8&quot;"></elementParameter>
+  </node>
+  <node xmi:id="_osMRiVBEQDidl963nZWsZ7" componentName="tStatCatcher" posX="400" posY="250">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tStatCatcher_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Capturar stats"></elementParameter>
+  </node>
+  <node xmi:id="_eJKB9Rh192zW4thEqd5M6-" componentName="tMap" posX="600" posY="100">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tMap_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Calcular métricas"></elementParameter>
+    <nodeData xsi:type="TalendMapper:MapperData">
+      <uiProperties shellMaximized="true"></uiProperties>
+      <varTables sizeState="INTERMEDIATE" name="Var" minimized="true"></varTables>
+      <outputTables sizeState="INTERMEDIATE" name="out1"></outputTables>
+      <inputTables sizeState="INTERMEDIATE" name="row1" matchingMode="ALL_ROWS" lookupMode="LOAD_ONCE"></inputTables>
+    </nodeData>
+  </node>
+  <node xmi:id="_XvzK7NzZzqey1jaWdc92Pl" componentName="tDBOutput" posX="800" posY="100">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBOutput_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Cargar a SingleStore"></elementParameter>
+    <elementParameter field="TEXT" name="TABLE" value="&quot;stg_dq_profile&quot;"></elementParameter>
+    <elementParameter field="TEXT" name="DATA_ACTION" value="INSERT"></elementParameter>
+    <elementParameter field="TEXT" name="DIE_ON_ERROR" value="true"></elementParameter>
+    <elementParameter field="TEXT" name="USE_EXISTING_CONNECTION" value="false"></elementParameter>
+    <elementParameter field="TEXT" name="HOST" value="context.ss_host"></elementParameter>
+    <elementParameter field="TEXT" name="PORT" value="context.ss_port"></elementParameter>
+    <elementParameter field="TEXT" name="DBNAME" value="context.ss_db"></elementParameter>
+    <elementParameter field="TEXT" name="USER" value="context.ss_user"></elementParameter>
+    <elementParameter field="TEXT" name="PASS" value="context.ss_password"></elementParameter>
+  </node>
+  <node xmi:id="_L5tGPB2Z55QU9KDaPlUYZr" componentName="tWarn" posX="600" posY="250">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tWarn_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Log Warn si pct_null &gt; 50"></elementParameter>
+  </node>
+  <node xmi:id="_wGkBdJHO5IJtou98qi5LLS" componentName="tDie" posX="800" posY="250">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDie_1"></elementParameter>
+    <elementParameter field="TEXT" name="LABEL" value="Frenar por error"></elementParameter>
+  </node>
+  <connection xmi:id="_MhmUNXtrEaLeYSOh8Z9o_g" source="tFixedFlowInput_1" target="tFlowToIterate_1" label="row1" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row1"></elementParameter>
+  </connection>
+  <connection xmi:id="_yUm663PUviMDYqwVswNi65" source="tFlowToIterate_1" target="tFileInputDelimited_1" label="iterate1" connectorName="ITERATE">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="iterate1"></elementParameter>
+  </connection>
+  <connection xmi:id="_LDMHRB9qeB3iR-OEfPbksF" source="tFileInputDelimited_1" target="tMap_1" label="row2" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row2"></elementParameter>
+  </connection>
+  <connection xmi:id="_VWzm0qa1FP8dPinRyP2ksW" source="tMap_1" target="tDBOutput_1" label="out1" connectorName="FLOW">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="out1"></elementParameter>
+  </connection>
+  <connection xmi:id="_lJYMbWb6l56VBbS7ilsxix" source="tDBOutput_1" target="tDie_1" label="row3" connectorName="COMPONENT_ERROR">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="row3"></elementParameter>
+  </connection>
+</talendfile:ProcessType>

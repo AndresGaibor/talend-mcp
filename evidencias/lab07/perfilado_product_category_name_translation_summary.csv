@@ -1,0 +1,3 @@
+column_name,rows_total,rows_null,pct_null,cardinality,min_val,max_val,avg_len,pattern_top,pct_top
+"product_category_name",71,0,0,71,"agro_industria_e_comercio","utilidades_domesticas",16.97,"aaaaaaaaaa",4.23
+"product_category_name_english",71,0,0,71,"agro_industry_and_commerce","watches_gifts",16.07,"aaaa",5.63

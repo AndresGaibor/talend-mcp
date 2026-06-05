@@ -1,0 +1,20 @@
+{
+  "jobName": "JL_calidad_olist",
+  "files": [
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/joblets/aliware/quality/JL_calidad_olist_0.1.properties",
+      "type": "joblet",
+      "sizeBytes": 931,
+      "description": "JL_calidad_olist_0.1.properties"
+    },
+    {
+      "path": "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/joblets/aliware/quality/JL_calidad_olist_0.1.item",
+      "type": "joblet",
+      "sizeBytes": 14948,
+      "description": "JL_calidad_olist_0.1.item"
+    }
+  ],
+  "createdAt": 1780672310525,
+  "totalSizeBytes": 3788,
+  "zipPath": "/Users/andresgaibor/code/javascript/talend-mcp/entregables/JL_calidad_olist_package.zip"
+}

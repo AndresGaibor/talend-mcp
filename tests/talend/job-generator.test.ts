@@ -193,4 +193,27 @@ describe("Talend job generator", () => {
     expect(resInvalid.errors.length).toBe(1);
     expect(resInvalid.errors[0].message).toContain("requiere el parámetro 'METHOD'");
   });
+
+  test("buildJobItemXml genera contexto con variables custom", () => {
+    const spec = {
+      jobName: "CustomContextJob",
+      components: [
+        { uniqueName: "tJava_1", componentName: "tJava" },
+      ],
+      contexts: [
+        { name: "my_param", type: "id_String", value: "hello", comment: "Test param" },
+        { name: "my_int", type: "id_Integer", value: "123" },
+      ],
+    };
+
+    const { xml } = buildJobItemXml(spec);
+    
+    expect(xml).toContain('name="my_param"');
+    expect(xml).toContain('type="id_String"');
+    expect(xml).toContain('value="hello"');
+    expect(xml).toContain('comment="Test param"');
+    expect(xml).toContain('name="my_int"');
+    expect(xml).toContain('type="id_Integer"');
+    expect(xml).toContain('value="123"');
+  });
 });

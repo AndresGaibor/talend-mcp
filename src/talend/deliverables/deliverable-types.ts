@@ -1,6 +1,6 @@
 export interface DeliverableFile {
   path: string;
-  type: "job" | "context" | "schema" | "script" | "readme" | "other";
+  type: "job" | "joblet" | "context" | "schema" | "script" | "readme" | "other";
   description?: string;
   sizeBytes?: number;
 }
