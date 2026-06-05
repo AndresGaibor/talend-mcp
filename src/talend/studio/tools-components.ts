@@ -244,7 +244,7 @@ export const componentTools = [
       jobName: z.string().describe("Nombre del job"),
       folderPath: z.string().optional().describe("Ruta de la carpeta del job"),
       uniqueName: z.string().describe("UNIQUE_NAME del componente"),
-      patch: z.record(z.string()).describe("Patch de parámetros (clave-valor)"),
+      patch: z.record(z.string(), z.string()).describe("Patch de parámetros (clave-valor)"),
     }),
     handler: async ({ jobName, folderPath, uniqueName, patch }: { jobName: string; folderPath?: string; uniqueName: string; patch: Record<string, string> }) => {
       const projectPath = getConfiguredProjectPath();
@@ -309,7 +309,7 @@ export const componentTools = [
       jobName: z.string().describe("Nombre del job"),
       folderPath: z.string().optional().describe("Ruta de la carpeta del job"),
       uniqueName: z.string().describe("UNIQUE_NAME del componente"),
-      patch: z.record(z.string()).describe("Patch de parámetros (clave-valor)"),
+      patch: z.record(z.string(), z.string()).describe("Patch de parámetros (clave-valor)"),
     }),
     handler: async ({ jobName, folderPath, uniqueName, patch }: { jobName: string; folderPath?: string; uniqueName: string; patch: Record<string, string> }) => {
       const projectPath = getConfiguredProjectPath();

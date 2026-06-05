@@ -6,6 +6,7 @@ import { ComponentParametersTable } from "./components/ComponentParametersTable"
 import { ComponentSchemaTable } from "./components/ComponentSchemaTable";
 import { ComponentConnectionsPanel } from "./components/ComponentConnectionsPanel";
 import { ComponentEditDrawer } from "./components/ComponentEditDrawer";
+import { TMapInspector } from "./components/TMapInspector";
 import { useActiveJobDetails, useComponentDetails, useSelectInStudio } from "./hooks";
 import type { ComponentParameter } from "./types";
 
@@ -15,7 +16,7 @@ export function JobComponentStudioApp() {
   const { select: selectInStudio, isLoading: isSelecting } = useSelectInStudio();
 
   const [selectedCompName, setSelectedCompName] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"params" | "schema" | "connections" | "raw">("params");
+  const [activeTab, setActiveTab] = useState<"params" | "schema" | "connections" | "mappings" | "raw">("params");
   
   // Drawer states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -177,22 +178,31 @@ export function JobComponentStudioApp() {
 
                 {/* Tabs selection */}
                 <div className="flex px-6 border-b border-gray-100 bg-white flex-shrink-0">
-                  {(["params", "schema", "connections", "raw"] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`py-3.5 px-4 text-xs font-semibold border-b-2 transition-all relative -mb-[2px] ${
-                        activeTab === tab
-                          ? "border-blue-600 text-blue-600 font-bold"
-                          : "border-transparent text-gray-400 hover:text-gray-600"
-                      }`}
-                    >
-                      {tab === "params" && "Parámetros"}
-                      {tab === "schema" && "Schemas"}
-                      {tab === "connections" && "Conexiones"}
-                      {tab === "raw" && "Modo Avanzado (JSON)"}
-                    </button>
-                  ))}
+                  {(() => {
+                    const tabs = ["params", "schema", "connections"] as string[];
+                    if (compDetails.component.componentName === "tMap" && (compDetails.component as any).tMapData) {
+                      tabs.push("mappings");
+                    }
+                    tabs.push("raw");
+                    
+                    return tabs.map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab as any)}
+                        className={`py-3.5 px-4 text-xs font-semibold border-b-2 transition-all relative -mb-[2px] ${
+                          activeTab === tab
+                            ? "border-blue-600 text-blue-600 font-bold"
+                            : "border-transparent text-gray-400 hover:text-gray-600"
+                        }`}
+                      >
+                        {tab === "params" && "Parámetros"}
+                        {tab === "schema" && "Schemas"}
+                        {tab === "connections" && "Conexiones"}
+                        {tab === "mappings" && "Mapeos (tMap)"}
+                        {tab === "raw" && "Modo Avanzado (JSON)"}
+                      </button>
+                    ));
+                  })()}
                 </div>
 
                 {/* Tab content panel */}
@@ -212,6 +222,9 @@ export function JobComponentStudioApp() {
                       outgoing={compDetails.component.outgoingConnections}
                       onSelectComponent={handleSelectComponent}
                     />
+                  )}
+                  {activeTab === "mappings" && (compDetails.component as any).tMapData && (
+                    <TMapInspector tMapData={(compDetails.component as any).tMapData} />
                   )}
                   {activeTab === "raw" && (
                     <div className="bg-gray-900 text-gray-100 p-6 rounded-2xl shadow-inner font-mono text-[11px] overflow-auto max-h-[400px]">

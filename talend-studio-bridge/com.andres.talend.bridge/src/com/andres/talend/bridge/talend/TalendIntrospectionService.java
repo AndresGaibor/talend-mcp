@@ -288,6 +288,10 @@ public final class TalendIntrospectionService {
     }
     compInfo.put("outgoingConnections", outgoingList);
 
+    if ("tMap".equals(compInfo.get("componentName"))) {
+      compInfo.put("tMapData", extractTMapData(targetNode));
+    }
+
     if (includeRaw) {
       Map<String, Object> rawMap = new LinkedHashMap<>();
       rawMap.put("class", targetNode.getClass().getName());
@@ -512,5 +516,44 @@ public final class TalendIntrospectionService {
       unsupported.add("getConnections no existe");
     }
     return unsupported;
+  }
+
+  private static Map<String, Object> extractTMapData(Object targetNode) {
+    Map<String, Object> tmapData = new LinkedHashMap<>();
+    try {
+      Object extData = invoke(targetNode, "getExternalData");
+      if (extData != null) {
+        tmapData.put("inputTables", extractMapperTables(invoke(extData, "getInputTables")));
+        tmapData.put("outputTables", extractMapperTables(invoke(extData, "getOutputTables")));
+        tmapData.put("varTables", extractMapperTables(invoke(extData, "getVarTables")));
+      }
+    } catch (Exception e) {
+      tmapData.put("error", e.getMessage());
+    }
+    return tmapData;
+  }
+
+  private static List<Map<String, Object>> extractMapperTables(Object tables) {
+    List<Map<String, Object>> list = new ArrayList<>();
+    if (tables instanceof Iterable) {
+      for (Object table : (Iterable<?>) tables) {
+        Map<String, Object> tableMap = new LinkedHashMap<>();
+        tableMap.put("name", invokeString(table, "getName"));
+        
+        List<Map<String, Object>> entriesList = new ArrayList<>();
+        Object entries = invokeFirst(table, "getMetadataTableEntries", "getMetadataTableEntry");
+        if (entries instanceof Iterable) {
+          for (Object entry : (Iterable<?>) entries) {
+            Map<String, Object> entryMap = new LinkedHashMap<>();
+            entryMap.put("name", invokeString(entry, "getName"));
+            entryMap.put("expression", invokeString(entry, "getExpression"));
+            entriesList.add(entryMap);
+          }
+        }
+        tableMap.put("entries", entriesList);
+        list.add(tableMap);
+      }
+    }
+    return list;
   }
 }
