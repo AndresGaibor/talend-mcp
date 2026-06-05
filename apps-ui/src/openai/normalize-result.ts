@@ -50,7 +50,7 @@ export function normalizeToolResult<T = unknown>(raw: unknown): NormalizedResult
     return {
       ok: isOk,
       success: isOk,
-      data: (sc ?? tryParseJson<T>(textContent)) as T,
+      data: (sc?.data ?? sc ?? tryParseJson<T>(textContent)) as T,
       text: textContent,
       result: textContent,
       error: isOk ? undefined : ((sc?.errors as string) ?? textContent),

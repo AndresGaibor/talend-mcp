@@ -8,6 +8,7 @@ import { listRuns } from "../../talend/runner/run-history";
 import { listSnapshots } from "../../talend/sync/snapshot-manager";
 import { getProbableActiveJob, parseWorkbenchState } from "../../talend/studio/workbench-xmi";
 import { getConfiguredProjectPath } from "../../talend/workspace";
+import { getBridgeOutdatedState } from "../../talend/studio/tools-base";
 import type { PresentationAppId } from "./app-types";
 
 type WorkspaceBundle = {
@@ -42,6 +43,7 @@ function buildBaseState(projectPath: string | undefined) {
   return {
     projectPath,
     liveWatcher: getLiveWatcherStatus(),
+    bridgeOutdated: getBridgeOutdatedState(),
   };
 }
 

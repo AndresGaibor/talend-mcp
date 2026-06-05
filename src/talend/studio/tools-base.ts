@@ -44,7 +44,27 @@ export function bridgeFail(payload: ToolEnvelope): CallToolResult {
   };
 }
 
-export function bridgeResultToEnvelope<T>(result: { ok: boolean; source: string; confidence: BridgeConfidence; data?: T; error?: { code: string; message: string } }, endpoint: string): ToolEnvelope {
+export function isBridgeOutdated(error: { code?: string; message?: string; status?: number } | undefined | null): boolean {
+  if (!error) return false;
+  return (
+    error.message?.includes("404") ||
+    error.status === 404 ||
+    error.code === "ENDPOINT_NOT_FOUND" ||
+    error.code === "HTTP_404"
+  );
+}
+
+let bridgeOutdatedFlag = false;
+
+export function getBridgeOutdatedState(): boolean {
+  return bridgeOutdatedFlag;
+}
+
+export function setBridgeOutdatedState(outdated: boolean): void {
+  bridgeOutdatedFlag = outdated;
+}
+
+export function bridgeResultToEnvelope<T>(result: { ok: boolean; source: string; confidence: BridgeConfidence; data?: T; error?: { code: string; message: string }; status?: number }, endpoint: string): ToolEnvelope {
   if (result.ok) {
     return {
       ok: true,
@@ -55,6 +75,11 @@ export function bridgeResultToEnvelope<T>(result: { ok: boolean; source: string;
     };
   }
 
+  const outdated = isBridgeOutdated(result.error);
+  if (outdated) {
+    setBridgeOutdatedState(true);
+  }
+
   return {
     ok: false,
     source: result.source,
@@ -62,6 +87,7 @@ export function bridgeResultToEnvelope<T>(result: { ok: boolean; source: string;
     endpoint,
     error: result.error,
     warning: result.error?.message,
+    limitations: outdated ? ["Bridge plugin is outdated. Please reinstall the Talend Studio bridge plugin to access this endpoint."] : undefined,
   };
 }
 

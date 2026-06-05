@@ -37,6 +37,8 @@ export const PRESENTATION_APP_IDS = [
   "evidence-pack",
   "report-snippets",
   "job-component-studio",
+  "component-inspector",
+  "studio-bridge",
 ] as const;
 
 export type PresentationAppId = (typeof PRESENTATION_APP_IDS)[number];

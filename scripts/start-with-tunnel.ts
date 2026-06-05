@@ -1,8 +1,9 @@
 import { spawn, spawnSync, execSync } from "node:child_process";
-import { existsSync, chmodSync, appendFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, chmodSync, appendFileSync, mkdirSync, rmSync, cpSync, readdirSync, statSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { homedir, platform, arch } from "node:os";
 import { createInterface } from "node:readline";
+import { fileURLToPath } from "url";
 
 const IS_WIN = platform() === "win32";
 
@@ -15,7 +16,7 @@ const TUNNEL_CONFIG = IS_WIN
   : join(homedir(), ".config", "tunnel-client");
 const TUNNEL_PROFILE = join(TUNNEL_CONFIG, "talend.yaml");
 
-const CONTROL_PLANE_API_KEY_VAR = "CONTROL_PLANE_API_KEY";
+const CONTROL_PLANE_API_KEY_VAR = "CONTROL_PLANE_API_KEY_VAR";
 
 // ─── Estética ──────────────────────────────────────────────
 const C = {
@@ -61,62 +62,57 @@ function formatTunnelLine(raw: string): string {
   const t = raw.trim();
   if (!t) return "";
 
-  let entry: Record<string, any>;
+  let entry: Record<string, unknown>;
   try { entry = JSON.parse(t); } catch { return t; }
 
   const level = (entry.level || "").toUpperCase();
   const msg = entry.msg || "";
-  const tunnelId = entry.tunnel_id || "";
   const component = entry.component || entry.module || "";
-  const time = entry.time || "";
 
-  // OAuth discovery es esperado con autenticación local (no_auth)
-  if (level === "WARN" && entry.msg && entry.msg.toLowerCase().includes("oauth")) {
+  if (level === "WARN" && entry.msg && (entry.msg as string).toLowerCase().includes("oauth")) {
     return `  ${c("○", C.dim)} ${c("OAuth discovery no aplica (modo no_auth) ✓", C.dim)}`;
   }
 
   const levelColor = level === "ERROR" ? C.red : level === "WARN" ? C.yellow : C.reset;
   const badge = level === "ERROR" ? "✖" : level === "WARN" ? "⚠" : "▸";
 
-  let extra = "";
   const extraParts: string[] = [];
 
   if (component) extraParts.push(component);
   if (entry.request_id) extraParts.push(`req:${entry.request_id}`);
   if (entry.rpc_request_id !== undefined) extraParts.push(`rpc:${entry.rpc_request_id}`);
-  if (entry.transport) extraParts.push(entry.transport);
-  if (entry.target) extraParts.push(entry.target);
-  if (entry.route_mode) extraParts.push(entry.route_mode);
-  if (entry.connectorName) extraParts.push(entry.connectorName);
-  if (entry.tunnel_url) extraParts.push(entry.tunnel_url);
-  if (entry.ui_url) extraParts.push(entry.ui_url);
-  if (entry.health_url) extraParts.push(entry.health_url);
-  if (entry.addr) extraParts.push(entry.addr);
-  if (entry.name && entry.name !== "Talend  MCP tunnel") extraParts.push(entry.name);
-  if (entry.function) extraParts.push(entry.function);
-  if (entry.callee) extraParts.push(entry.callee);
+  if (entry.transport) extraParts.push(entry.transport as string);
+  if (entry.target) extraParts.push(entry.target as string);
+  if (entry.route_mode) extraParts.push(entry.route_mode as string);
+  if (entry.connectorName) extraParts.push(entry.connectorName as string);
+  if (entry.tunnel_url) extraParts.push(entry.tunnel_url as string);
+  if (entry.ui_url) extraParts.push(entry.ui_url as string);
+  if (entry.health_url) extraParts.push(entry.health_url as string);
+  if (entry.addr) extraParts.push(entry.addr as string);
+  if (entry.name && entry.name !== "Talend  MCP tunnel") extraParts.push(entry.name as string);
+  if (entry.function) extraParts.push(entry.function as string);
+  if (entry.callee) extraParts.push(entry.callee as string);
   if (entry.error) extraParts.push(`error:${entry.error}`);
-  if (entry.runtime) extraParts.push(entry.runtime);
+  if (entry.runtime) extraParts.push(entry.runtime as string);
   if (entry.kind === "provide") extraParts.push(`provide:${entry.constructor || entry.name || ""}`);
   if (entry.kind === "supply") extraParts.push(`supply:${entry.name || ""}`);
 
   if (extraParts.length > 0) {
-    extra = ` ${c(extraParts.join(" · "), C.dim)}`;
+    return `  ${c(badge, levelColor)} ${c(level, levelColor)} ${c(msg, C.bold)} ${c(extraParts.join(" · "), C.dim)}`;
   }
 
-  return `  ${c(badge, levelColor)} ${c(level, levelColor)} ${c(msg, C.bold)}${extra}`;
+  return `  ${c(badge, levelColor)} ${c(level, levelColor)} ${c(msg, C.bold)}`;
 }
 
-function processTunnelOutput(stream: any): void {
+function processTunnelOutput(stream: ReadableStream<Uint8Array> | null): void {
   if (!stream) return;
-  const rl = createInterface({ input: stream });
+  const rl = createInterface({ input: stream as unknown as NodeJS.ReadableStream });
   rl.on("line", (line: string) => {
     const f = formatTunnelLine(line);
     if (f) console.error(f);
   });
 }
 
-// ─── MCP server output filter (Bun ReadableStream) ────────
 async function processMcpOutput(stream: ReadableStream<Uint8Array> | null): Promise<void> {
   if (!stream) return;
   const reader = stream.getReader();
@@ -144,6 +140,21 @@ function processMcpOutputBg(stream: ReadableStream<Uint8Array> | null): void {
 }
 
 // ─── OS detection ─────────────────────────────────────────
+type StudioOS = "macos" | "wsl" | "windows" | "linux" | "unknown";
+
+function detectStudioOS(): StudioOS {
+  const p = platform();
+  if (p === "darwin") return "macos";
+  if (p === "win32" || p === "cygwin" || p === "msys") return "windows";
+  if (p === "linux") {
+    try {
+      if (execSync("cat /proc/version 2>/dev/null", { encoding: "utf8" }).toLowerCase().includes("microsoft")) return "wsl";
+    } catch {}
+    return "linux";
+  }
+  return "unknown";
+}
+
 function detectOS(): { label: string; archSuffix: string } {
   const p = platform();
   const a = arch();
@@ -228,10 +239,13 @@ async function ensureTunnelProfile(): Promise<void> {
   const tunnelId = await prompt(`\nIngresa tu ${c("Tunnel ID", C.yellow)}: `);
   if (!tunnelId) throw new Error("Tunnel ID es requerido");
   info("Inicializando perfil del tunnel...");
-  const result = Bun.spawnSync([BIN_PATH, "init", "--sample", "sample_mcp_remote_no_auth", "--profile", "talend", "--tunnel-id", tunnelId, "--mcp-server-url", "http://127.0.0.1:3927/mcp"], {
-    env: { ...process.env }, stdio: ["inherit", "pipe", "pipe"],
+  const result = Bun.spawnSync({
+    cmd: [BIN_PATH, "init", "--sample", "sample_mcp_remote_no_auth", "--profile", "talend", "--tunnel-id", tunnelId, "--mcp-server-url", "http://127.0.0.1:3927/mcp"],
+    env: { ...process.env },
+    stdout: "inherit",
+    stderr: "pipe",
   });
-  if (result.exitCode !== 0) throw new Error(`tunnel-client init falló (exit ${result.exitCode}):\n${result.stderr.toString()}`);
+  if (result.exitCode !== 0) throw new Error(`tunnel-client init falló (exit ${result.exitCode}):\n${result.stderr?.toString()}`);
 }
 
 function waitForHealth(url: string, timeoutMs = 15_000): Promise<void> {
@@ -245,13 +259,303 @@ function waitForHealth(url: string, timeoutMs = 15_000): Promise<void> {
   });
 }
 
-function killProcess(proc: { pid?: number; kill: (...args: any[]) => unknown } | null, signal: string | number): void {
+function killProcess(proc: { pid?: number; kill: (...args: unknown[]) => unknown } | null, signal: string | number): void {
   if (!proc) return;
   try { proc.kill(signal); } catch {}
 }
 
+// ─── Maven Install ───────────────────────────────────────
+function isMavenInstalled(): boolean {
+  try {
+    execSync("mvn -version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function installMaven(os: StudioOS): Promise<void> {
+  info("Maven no encontrado. Instalando...");
+
+  switch (os) {
+    case "macos": {
+      const brewCheck = execSync("which brew 2>/dev/null || echo 'not_found'", { encoding: "utf8" }).trim();
+      if (brewCheck === "not_found") {
+        info("Homebrew no encontrado. Instalando Homebrew...");
+        execSync(
+          '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+          { stdio: "inherit", shell: true },
+        );
+      }
+      info("Instalando Maven via Homebrew...");
+      execSync("brew install maven", { stdio: "inherit", shell: true });
+      break;
+    }
+    case "wsl":
+    case "linux": {
+      info("Instalando Maven via apt-get...");
+      execSync("sudo apt-get update && sudo apt-get install -y maven", { stdio: "inherit", shell: true });
+      break;
+    }
+    case "windows": {
+      const mavenVersion = "3.9.9";
+      const mavenUrl = `https://dlcdn.apache.org/maven/maven-3/${mavenVersion}/binaries/apache-maven-${mavenVersion}-bin.zip`;
+      const installDir = join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "maven");
+      mkdirSync(installDir, { recursive: true });
+      const zipPath = join(installDir, "maven.zip");
+
+      info(`Descargando Maven ${mavenVersion}...`);
+      const res = await fetch(mavenUrl);
+      if (!res.ok) throw new Error(`Error descargando Maven: HTTP ${res.status}`);
+      Bun.write(zipPath, await res.arrayBuffer());
+
+      info("Extrayendo Maven...");
+      execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${installDir}' -Force"`, { stdio: "inherit", shell: true });
+      rmSync(zipPath, { force: true });
+
+      const mvnHome = join(installDir, `apache-maven-${mavenVersion}`);
+
+      info(`Maven instalado en: ${mvnHome}`);
+      console.error();
+      console.error(` ${c("IMPORTANTE:", C.yellow)} Agrega al PATH permanentemente:`);
+      console.error(`  ${c(`setx PATH "${mvnHome}\\bin;%PATH%"`, C.cyan)}`);
+
+      process.env.PATH = `${mvnHome}/bin;${process.env.PATH || ""}`;
+      process.env.M2_HOME = mvnHome;
+      break;
+    }
+    default:
+      throw new Error(`No se puede instalar Maven en: ${os}`);
+  }
+
+  ok("Maven instalado correctamente.");
+}
+
+async function ensureMaven(os: StudioOS): Promise<void> {
+  if (isMavenInstalled()) {
+    ok("Maven instalado");
+    return;
+  }
+  await installMaven(os);
+}
+
+// ─── Bridge Install ───────────────────────────────────────
+function findTalendStudio(os: StudioOS): string | null {
+  const paths: Record<StudioOS, string[]> = {
+    macos: [
+      "/Applications/TalendStudio-8.0.1/studio",
+      "/Applications/Talend Studio/studio",
+    ],
+    wsl: [
+      "/mnt/c/Program Files/Talend Studio",
+      "/mnt/c/Program Files (x86)/Talend Studio",
+    ],
+    windows: [
+      `${process.env.PROGRAMFILES || "C:/Program Files"}/Talend Studio`,
+      `${process.env["PROGRAMFILES(X86)"] || "C:/Program Files (x86)"}/Talend Studio`,
+    ],
+    linux: [
+      "/opt/Talend Studio",
+    ],
+    unknown: [],
+  };
+
+  for (const p of paths[os]) {
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+function getStudioExe(os: StudioOS, studioDir: string): string {
+  const exePaths: Record<StudioOS, string> = {
+    macos: join(studioDir, "Talend-Studio-macosx-cocoa-aarch64.app/Contents/MacOS/Talend-Studio-macosx-cocoa"),
+    wsl: join(studioDir, "Talend-Studio.app/Contents/MacOS/Talend-Studio"),
+    windows: join(studioDir, "Talend-Studio.app/Contents/MacOS/Talend-Studio"),
+    linux: join(studioDir, "Talend-Studio"),
+    unknown: "",
+  };
+  return exePaths[os];
+}
+
+function wslToWindowsPath(path: string): string {
+  try {
+    return execSync(`wslpath -w "${path}"`, { encoding: "utf8" }).trim();
+  } catch {
+    return path;
+  }
+}
+
+function isStudioRunning(): boolean {
+  try {
+    const out = execSync("pgrep -fl Talend-Studio 2>/dev/null || echo ''", { encoding: "utf8" });
+    return out.includes("Talend-Studio");
+  } catch {
+    return false;
+  }
+}
+
+function killStudio(): void {
+  try {
+    execSync("pkill -f Talend-Studio 2>/dev/null || true");
+    execSync("sleep 2");
+  } catch {}
+}
+
+function cleanOldPlugins(): void {
+  const pluginsDir = "/Applications/TalendStudio-8.0.1/studio/plugins";
+  if (!existsSync(pluginsDir)) return;
+
+  const files = readdirSync(pluginsDir).filter(f => f.startsWith("com.andres.talend.bridge") && f.endsWith(".jar"));
+  if (files.length <= 1) return;
+
+  const sorted = files
+    .map(f => ({ name: f, time: statSync(join(pluginsDir, f)).mtime.getTime() }))
+    .sort((a, b) => b.time - a.time);
+
+  for (const f of sorted.slice(1)) {
+    const fullPath = join(pluginsDir, f.name);
+    rmSync(fullPath, { force: true });
+    console.log(`      Removed: ${f.name}`);
+  }
+}
+
+async function installBridge(): Promise<void> {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const projectRoot = join(__dirname, "..", "..");
+  const bridgeDir = join(projectRoot, "talend-studio-bridge");
+
+  console.error();
+  console.error(`  ${c("═".repeat(50), C.magenta)}`);
+  console.error(`  ${c("Bridge Install", C.bold)}`);
+  console.error(`  ${c("═".repeat(50), C.magenta)}`);
+  console.error();
+
+  const os = detectStudioOS();
+  info(`Sistema detectado: ${os}`);
+
+  if (os === "unknown") {
+    fail("Sistema operativo no soportado.");
+    return;
+  }
+
+  const studioDir = findTalendStudio(os);
+  if (!studioDir) {
+    fail("No se encontró Talend Studio.");
+    console.error();
+    console.error("Rutas esperadas:");
+    if (os === "macos") console.error("  - /Applications/TalendStudio-8.0.1/studio");
+    if (os === "wsl") console.error("  - /mnt/c/Program Files/Talend Studio");
+    if (os === "windows") console.error("  - %PROGRAMFILES%/Talend Studio");
+    if (os === "linux") console.error("  - /opt/Talend Studio");
+    return;
+  }
+
+  info(`Talend Studio encontrado: ${studioDir}`);
+
+  const studioExe = getStudioExe(os, studioDir);
+  if (!existsSync(studioExe)) {
+    fail(`No se encontró ejecutable: ${studioExe}`);
+    return;
+  }
+
+  const repoDir = join(bridgeDir, "com.andres.talend.bridge.repository/target/repository");
+
+  // Ensure Maven is installed
+  await ensureMaven(os);
+
+  // Build Maven
+  console.error();
+  info("[1/4] Compilando proyecto Maven (Tycho)...");
+  try {
+    execSync("mvn clean verify -DskipTests -q", { cwd: bridgeDir, stdio: "inherit" });
+    ok("Build completado");
+  } catch (e) {
+    fail(`Build Maven falló: ${e}`);
+    return;
+  }
+
+  // Verificar update site
+  console.error();
+  info("[2/4] Verificando update site...");
+  if (!existsSync(repoDir)) {
+    fail(`No se encontró update site en ${repoDir}`);
+    return;
+  }
+  ok("Update site encontrado");
+
+  // Verificar Talend Studio
+  console.error();
+  info("[3/4] Verificando Talend Studio...");
+  if (isStudioRunning()) {
+    warn("Talend Studio está corriendo.");
+    const answer = await prompt("¿Cerrar Talend Studio ahora? (s/n): ");
+    if (answer.toLowerCase() === "s") {
+      info("Cerrando Talend Studio...");
+      killStudio();
+      ok("Talend Studio cerrado");
+    } else {
+      fail("No se puede instalar mientras Talend Studio está corriendo.");
+      return;
+    }
+  } else {
+    ok("Talend Studio no está corriendo");
+  }
+
+  // Limpiar plugins antiguos (solo macOS por ahora)
+  if (os === "macos") {
+    console.error();
+    info("Limpiando versiones antiguas del plugin...");
+    cleanOldPlugins();
+  }
+
+  // Instalar
+  console.error();
+  info("[4/4] Instalando plugin...");
+
+  let repoPath = repoDir;
+  let studioPath = studioDir;
+
+  if (os === "wsl") {
+    repoPath = wslToWindowsPath(repoPath);
+    studioPath = wslToWindowsPath(studioPath);
+  }
+
+  const installResult = Bun.spawnSync({
+    cmd: [
+      studioExe,
+      "-application", "org.eclipse.equinox.p2.director",
+      "-repository", `file://${repoPath}`,
+      "-installIU", "com.andres.talend.bridge.feature.feature.group",
+      "-destination", studioPath,
+      "-profileProperties", "org.eclipse.update.install.features=true",
+      "-nosplash",
+      "-console",
+    ],
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  if (installResult.exitCode !== 0) {
+    fail(`Instalación falló (exit ${installResult.exitCode})`);
+    return;
+  }
+
+  console.error();
+  ok("Plugin instalado correctamente.");
+  console.error();
+  console.error("Abre Talend Studio para usar el bridge actualizado.");
+}
+
 // ─── Main ─────────────────────────────────────────────────
 async function main() {
+  const args = process.argv.slice(2);
+
+  // Bridge install mode
+  if (args.includes("--install-bridge") || args.includes("-i")) {
+    await installBridge();
+    return;
+  }
+
   console.error(`\n  ${c("Talend MCP", C.bold)} ${c("— Inicio automatizado", C.dim)}\n`);
 
   // ── Preliminares ──────────────────────────────────────
@@ -271,22 +575,15 @@ async function main() {
   info("Iniciando servidor MCP...");
 
   const mcpPort = process.env.TALEND_MCP_PORT || 3927;
-  // Default filter. Set TALEND_MCP_FILTER before running to customize:
-  //   canonical   → 214 unique tools (no duplicate aliases) + UI apps  [default]
-  //   all         → 252 tools including legacy aliases
-  //   core        → 21 essential tools only (~10KB)
-  //   core,apps   → 21 essentials + UI launchers
   const mcpFilter = process.env.TALEND_MCP_FILTER || "canonical";
 
-  // Kill any stale process on the MCP port so we always bind to the right port.
-  // (The tunnel-client profile points to 127.0.0.1:3927 — if we bind elsewhere, everything breaks.)
   try {
     if (!IS_WIN) {
-      const lsof = Bun.spawnSync(["lsof", "-ti", `tcp:${mcpPort}`], { stdio: ["ignore", "pipe", "pipe"] });
+      const lsof = Bun.spawnSync({ cmd: ["lsof", "-ti", `tcp:${mcpPort}`], stdout: "pipe", stderr: "ignore" });
       const pids = lsof.stdout.toString().trim().split("\n").filter(Boolean);
       for (const pid of pids) {
         info(`Puerto ${mcpPort} ocupado por PID ${pid} — terminando proceso anterior...`);
-        Bun.spawnSync(["kill", "-9", pid], { stdio: ["ignore", "ignore", "ignore"] });
+        Bun.spawnSync({ cmd: ["kill", "-9", pid], stdout: "ignore", stderr: "ignore" });
       }
     }
   } catch {}
@@ -297,7 +594,6 @@ async function main() {
     stdio: ["ignore", "inherit", "pipe"],
   });
 
-  // Capturar stderr del MCP server y formatearlo
   processMcpOutputBg(mcpServer.stderr);
 
   const mcpUrl = `http://127.0.0.1:${mcpPort}/healthz`;
@@ -311,7 +607,6 @@ async function main() {
     warn("Servidor MCP no responde");
   }
 
-  // Detectar si el MCP server se cae después
   let mcpCrashed = false;
   mcpServer.ref();
   mcpServer.exited.then((code: number | null) => {
@@ -332,7 +627,6 @@ async function main() {
   processTunnelOutput(tunnel.stdout);
   processTunnelOutput(tunnel.stderr);
 
-  // Si el MCP no estaba listo al arrancar, mostrar ayuda
   if (!mcpReady) {
     setTimeout(() => {
       banner(

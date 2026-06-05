@@ -203,4 +203,18 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
       createTextAction("List snippets", TOOL_NAMES.REPORT.SNIPPETS_GENERATE, "Lista snippets disponibles.", "category", { inputLabel: "Category", inputPlaceholder: "validation" }),
     ],
   },
+  {
+    id: "component-inspector",
+    title: "Talend Component Inspector",
+    description: "Inspecciona componentes instalados y sus propiedades en detalle.",
+    resourceUri: "ui://talend/component-inspector.html",
+    launcherToolName: "talend_app_component_inspector",
+    launchMessage: "Abriendo el inspector de componentes.",
+    uiMode: "react",
+    actions: [
+      createTextAction("Scan installed", TOOL_NAMES.COMPONENTS.SCAN_INSTALLED, "Escanea componentes instalados.", "pluginsDir", { inputLabel: "Plugins dir", inputPlaceholder: "Ruta a plugins de Talend Studio" }),
+      createTextAction("Search component", TOOL_NAMES.COMPONENTS.SEARCH, "Busca componentes en el catálogo.", "query", { inputLabel: "Query", inputPlaceholder: "mysql" }),
+      createTextAction("Inspect component", TOOL_NAMES.COMPONENTS.INSPECT, "Inspecciona un componente.", "componentName", { inputLabel: "Component name", inputPlaceholder: "tMysqlInput" }),
+    ],
+  },
 ];
