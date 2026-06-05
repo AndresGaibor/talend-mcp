@@ -94,7 +94,7 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
     node.metadata = metadata;
   }
 
-  if (spec.componentName === "tMap" && spec.schema?.columns) {
+  if (spec.componentName === "tMap") {
     node.nodeData = buildMapNodeData(spec.uniqueName);
   }
 

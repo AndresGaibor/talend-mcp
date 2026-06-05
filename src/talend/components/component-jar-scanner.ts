@@ -57,19 +57,28 @@ function getTalendStudioPluginsDir(): string | null {
   return resolveTalendPluginsDir();
 }
 
-function findProviderDir(pluginsDir: string): string | null {
+function findAllLocalComponentsDirs(pluginsDir: string): { dir: string; pluginName: string }[] {
+  const results: { dir: string; pluginName: string }[] = [];
   try {
     const dirs = readdirSync(pluginsDir);
-    const provider = dirs.find((d) => d.startsWith("org.talend.designer.components.localprovider_"));
-    return provider ? join(pluginsDir, provider) : null;
-  } catch { return null; }
-}
-
-function findLocalComponentsDir(pluginsDir: string): string | null {
-  const pd = findProviderDir(pluginsDir);
-  if (!pd) return null;
-  const cd = join(pd, "components");
-  return existsSync(cd) ? cd : null;
+    for (const d of dirs) {
+      const fullPath = join(pluginsDir, d);
+      try {
+        const stat = statSync(fullPath);
+        if (stat.isDirectory()) {
+          const compDir = join(fullPath, "components");
+          if (existsSync(compDir)) {
+            results.push({ dir: compDir, pluginName: d });
+          }
+          const tacoDir = join(fullPath, "tacokit", "components");
+          if (existsSync(tacoDir)) {
+            results.push({ dir: tacoDir, pluginName: d });
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+  return results;
 }
 
 function listComponentDirs(cd: string): string[] {
@@ -154,10 +163,14 @@ async function scanJarFile(jarPath: string, errors: string[]): Promise<Component
       const xml = readFileSync(extracted, "utf8");
       const parsed = parseComponentXmlWithParser(xml);
 
-      if (!parsed.name) continue;
+      const parts = xmlEntry.split("/");
+      const fallbackName = parts.length >= 2 ? parts[parts.length - 2] : basename(xmlEntry, "_java.xml");
+      const componentName = parsed.name || fallbackName;
+
+      if (!componentName) continue;
 
       entries.push({
-        componentName: parsed.name,
+        componentName,
         family: parsed.family,
         version: parsed.version,
         sourcePlugin: basename(jarPath),
@@ -188,10 +201,11 @@ function scanComponentDir(dirName: string, cd: string, src: string, errors: stri
         const xml = readFileSync(xp, "utf8");
         const parsed = parseComponentXmlWithParser(xml);
         
-        if (!parsed.name) continue;
+        const componentName = parsed.name || dirName;
+        if (!componentName) continue;
 
         return {
-          componentName: parsed.name,
+          componentName,
           family: parsed.family,
           version: parsed.version,
           sourcePlugin: src,
@@ -255,15 +269,17 @@ export async function scanInstalledPlugins(options?: { pluginsDir?: string }): P
     return { scannedPlugins: [], entries: [], errors };
   }
 
-  // 1. Local provider components (unzipped)
-  const cd = findLocalComponentsDir(pluginsDir);
-  if (cd) {
-    for (const dn of listComponentDirs(cd)) {
-      const e = scanComponentDir(dn, cd, basename(cd), errors);
-      if (e) entries.push(e);
+  // 1. Unzipped plugin components
+  const compDirs = findAllLocalComponentsDirs(pluginsDir);
+  if (compDirs.length > 0) {
+    for (const { dir, pluginName } of compDirs) {
+      for (const dn of listComponentDirs(dir)) {
+        const e = scanComponentDir(dn, dir, pluginName, errors);
+        if (e) entries.push(e);
+      }
     }
   } else {
-    errors.push("No localprovider components directory found, scanning JARs only");
+    errors.push("No components directories found in plugins");
   }
 
   // 2. Scan JAR files

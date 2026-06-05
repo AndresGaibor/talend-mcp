@@ -13,6 +13,18 @@ function toArray<T>(value: T | T[] | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
+function getAttr(obj: Record<string, any>, key: string): any {
+  if (!obj || typeof obj !== "object") return undefined;
+  const upperKey = key.toUpperCase();
+  const lowerKey = key.toLowerCase();
+  return (
+    obj[`@_${upperKey}`] ??
+    obj[`@_${lowerKey}`] ??
+    obj[upperKey] ??
+    obj[lowerKey]
+  );
+}
+
 function collectByKey(obj: unknown, keyNames: string[]): unknown[] {
   const found: unknown[] = [];
 
@@ -27,7 +39,12 @@ function collectByKey(obj: unknown, keyNames: string[]): unknown[] {
     const record = value as Record<string, unknown>;
 
     for (const [key, child] of Object.entries(record)) {
-      if (keyNames.includes(key)) {
+      const match = keyNames.some(
+        (kn) =>
+          key.toUpperCase() === kn.toUpperCase() ||
+          key.toUpperCase() === `@_${kn.toUpperCase()}`
+      );
+      if (match) {
         found.push(...toArray(child as any));
       }
       walk(child);
@@ -85,22 +102,29 @@ export function parseComponentXmlWithParser(xml: string): ParsedComponent {
   const rawImpl = COMPONENT.IMPL ?? COMPONENT.impl ?? {};
   const IMPL = rawImpl as Record<string, unknown>;
 
-  const PARAMETERS = collectByKey(COMPONENT, ["PARAMETER", "parameter"]);
-  const CONNECTORS = collectByKey(COMPONENT, ["CONNECTOR", "connector", "CONNECTORS", "connectors"]);
+  const PARAMETERS = collectByKey(COMPONENT, ["PARAMETER"]);
+  const CONNECTORS = collectByKey(COMPONENT, ["CONNECTOR", "CONNECTORS"]);
 
   const parameters: ParsedParameter[] = [];
   for (const p of PARAMETERS) {
     if (!p || typeof p !== "object") continue;
     const pr = p as Record<string, unknown>;
-    const pName = pr.NAME ?? pr.name ?? pr["@_name"] ?? "";
+    const pName = getAttr(pr, "NAME");
     if (!pName) continue;
+    
+    const pField = getAttr(pr, "FIELD") ?? "id_String";
+    const requiredVal = getAttr(pr, "REQUIRED");
+    const defaultVal = getAttr(pr, "DEFAULT") ?? getAttr(pr, "DEFAULT_VALUE");
+    const showVal = getAttr(pr, "SHOW");
+    const repositoryValue = getAttr(pr, "REPOSITORY_VALUE");
+
     parameters.push({
       name: String(pName),
-      field: String(pr.FIELD ?? pr.field ?? "id_String"),
-      required: pr.REQUIRED === "true" || pr.required === "true" || pr["@_required"] === "true",
-      defaultValue: String(pr.DEFAULT ?? pr.defaultValue ?? pr["@_default"] ?? null),
-      show: pr.SHOW !== "false" && pr.show !== "false",
-      repositoryValue: String(pr.REPOSITORY_VALUE ?? pr.repositoryValue ?? null),
+      field: String(pField),
+      required: requiredVal === "true" || requiredVal === true,
+      defaultValue: defaultVal !== undefined && defaultVal !== null ? String(defaultVal) : null,
+      show: showVal !== "false" && showVal !== false,
+      repositoryValue: repositoryValue !== undefined && repositoryValue !== null ? String(repositoryValue) : null,
     });
   }
 
@@ -116,15 +140,20 @@ export function parseComponentXmlWithParser(xml: string): ParsedComponent {
   for (const c of CONNECTORS) {
     if (!c || typeof c !== "object") continue;
     const cr = c as Record<string, unknown>;
-    const cName = cr.NAME ?? cr.name ?? "FLOW";
-    const cTypeRaw = (cr.TYPE ?? cr.type ?? "FLOW") as unknown;
+    const cTypeRaw = getAttr(cr, "CTYPE") ?? getAttr(cr, "TYPE") ?? "FLOW";
     const cType = String(cTypeRaw).toUpperCase() as ParsedConnector["type"];
+    const cName = getAttr(cr, "NAME") ?? cType;
+    
+    const maxInputRaw = getAttr(cr, "MAX_INPUT");
+    const maxOutputRaw = getAttr(cr, "MAX_OUTPUT");
+
     connectors.push({
       name: String(cName),
       type: cType || "UNKNOWN",
-      maxInput: typeof cr.MAX_INPUT === "number" ? cr.MAX_INPUT : typeof cr.maxInput === "number" ? cr.maxInput : undefined,
-      maxOutput: typeof cr.MAX_OUTPUT === "number" ? cr.MAX_OUTPUT : typeof cr.maxOutput === "number" ? cr.maxOutput : undefined,
+      maxInput: maxInputRaw !== undefined && maxInputRaw !== null ? Number(maxInputRaw) : undefined,
+      maxOutput: maxOutputRaw !== undefined && maxOutputRaw !== null ? Number(maxOutputRaw) : undefined,
     });
+
     if (cType === "FLOW") {
       capabilities.canReceiveFlow = true;
       capabilities.canOutputFlow = true;
@@ -135,9 +164,9 @@ export function parseComponentXmlWithParser(xml: string): ParsedComponent {
     }
   }
 
-  const hasInputSchemaRaw = COMPONENT.INPUT_SCHEMA ?? COMPONENT.inputSchema;
-  const hasOutputSchemaRaw = COMPONENT.OUTPUT_SCHEMA ?? COMPONENT.outputSchema;
-  const hasDynamicSchemaRaw = COMPONENT.DYNAMIC_SCHEMA ?? COMPONENT.dynamicSchema;
+  const hasInputSchemaRaw = getAttr(COMPONENT, "INPUT_SCHEMA");
+  const hasOutputSchemaRaw = getAttr(COMPONENT, "OUTPUT_SCHEMA");
+  const hasDynamicSchemaRaw = getAttr(COMPONENT, "DYNAMIC_SCHEMA");
 
   const schemas = {
     hasInputSchema:
@@ -154,16 +183,33 @@ export function parseComponentXmlWithParser(xml: string): ParsedComponent {
       xml.includes("DYNAMIC"),
   };
 
-  const STARTABLE = HEADER.STARTABLE ?? HEADER.startable ?? COMPONENT.STARTABLE ?? false;
-  const startableRaw = STARTABLE as unknown;
-  if (startableRaw === "true" || startableRaw === true) {
+  const STARTABLE = getAttr(HEADER, "STARTABLE") ?? getAttr(COMPONENT, "STARTABLE") ?? false;
+  if (STARTABLE === "true" || STARTABLE === true) {
     capabilities.canStartFlow = true;
   }
 
+  let family = "Unknown";
+  const familiesObj = COMPONENT.FAMILIES ?? COMPONENT.families;
+  if (familiesObj && typeof familiesObj === "object") {
+    const familyVal = (familiesObj as Record<string, any>).FAMILY ?? (familiesObj as Record<string, any>).family;
+    if (familyVal) {
+      if (Array.isArray(familyVal)) {
+        family = String(familyVal[0]);
+      } else {
+        family = String(familyVal);
+      }
+    }
+  } else {
+    const headerFamily = getAttr(HEADER, "FAMILY");
+    if (headerFamily) {
+      family = String(headerFamily);
+    }
+  }
+
   return {
-    name: String(HEADER.NAME ?? HEADER.name ?? ""),
-    version: String(HEADER.VERSION ?? HEADER.version ?? "1.0"),
-    family: String(HEADER.FAMILY ?? HEADER.family ?? "Unknown"),
+    name: String(getAttr(HEADER, "NAME") ?? ""),
+    version: String(getAttr(HEADER, "VERSION") ?? "1.0"),
+    family,
     parameters,
     connectors,
     schemas,

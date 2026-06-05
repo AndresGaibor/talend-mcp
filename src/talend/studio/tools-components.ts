@@ -11,6 +11,8 @@ import {
 } from "../editor";
 import { parseJobItem } from "../job-parser";
 import { parseXml, buildXml } from "../xml";
+import { ComponentEditService } from "./component-edit.service";
+import { PatchPreviewService } from "./patch-preview.service";
 
 export const componentTools = [
   {
@@ -20,14 +22,37 @@ export const componentTools = [
       pluginsDir: z.string().optional().describe("Directorio de plugins de Talend"),
     }),
     handler: async ({ pluginsDir }: { pluginsDir?: string }) => {
-      const { saveComponentCatalog } = await import("../components/component-catalog-store");
-      const result = await saveComponentCatalog({ pluginsDir });
+      const { TalendPluginScanner } = await import("../../modules/component-knowledge/infrastructure/talend-plugin-scanner");
+      const { ComponentCacheRepository } = await import("../../modules/component-knowledge/infrastructure/component-cache.repository");
+      const { resolveTalendPluginsDir } = await import("../components/talend-paths");
+
+      const scanner = new TalendPluginScanner();
+      const cacheRepo = new ComponentCacheRepository();
+
+      const resolvedDir = pluginsDir ?? resolveTalendPluginsDir() ?? pluginsDir;
+      if (!resolvedDir) {
+        return bridgeFail({
+          ok: false,
+          source: "workspace-files",
+          confidence: "low",
+          endpoint: "/components/scan",
+          error: { code: "NO_PLUGINS_DIR", message: "No se pudo resolver el directorio de plugins de Talend" },
+        });
+      }
+
+      const components = await scanner.scanStudioPlugins(resolvedDir);
+      const result = await cacheRepo.save(components, resolvedDir);
+
       return bridgeOk({
         ok: result.ok,
         source: "workspace-files",
         confidence: result.ok ? "high" : "low",
         endpoint: "/components/scan",
-        data: result,
+        data: {
+          ...result,
+          scannedComponents: components.length,
+          pluginsDir: resolvedDir,
+        },
       });
     },
   },
@@ -210,20 +235,9 @@ export const componentTools = [
           error: { code: "NO_PROJECT", message: "TALEND_PROJECT no configurado" }
         });
       }
-      const job = await findTalendJob(projectPath, jobName, folderPath);
-      const xml = await readTextFile(job.itemPath, projectPath);
-      
-      // Auto snapshot
-      try {
-        const { FileSnapshotRepository } = await import("../../modules/snapshots/adapters/file-snapshot.repository");
-        const snapRepo = new FileSnapshotRepository();
-        await snapRepo.create({ name: `before-rename-label-${uniqueName}`, sourcePath: job.itemPath });
-      } catch (e) {
-        console.warn("No se pudo crear snapshot:", e);
-      }
 
-      const newXml = updateTalendComponentParameterXml(xml, { uniqueName, parameterName: "LABEL", value: newLabel });
-      await writeTextFile(job.itemPath, newXml, projectPath);
+      const editService = new ComponentEditService();
+      const result = await editService.renameLabel(jobName, uniqueName, newLabel, folderPath);
 
       const bridge = await loadBridge();
       await bridge.refreshWorkspace();
@@ -233,7 +247,7 @@ export const componentTools = [
         source: "workspace-files",
         confidence: "high",
         endpoint: "/talend/components/rename-label",
-        data: { jobName, uniqueName, newLabel },
+        data: { jobName, uniqueName, newLabel, snapshotId: result.snapshotId },
       });
     }
   },
@@ -247,34 +261,8 @@ export const componentTools = [
       patch: z.record(z.string(), z.string()).describe("Patch de parámetros (clave-valor)"),
     }),
     handler: async ({ jobName, folderPath, uniqueName, patch }: { jobName: string; folderPath?: string; uniqueName: string; patch: Record<string, string> }) => {
-      const projectPath = getConfiguredProjectPath();
-      if (!projectPath) {
-        return bridgeFail({
-          ok: false,
-          source: "unavailable",
-          confidence: "low",
-          endpoint: "/talend/components/preview-patch",
-          error: { code: "NO_PROJECT", message: "TALEND_PROJECT no configurado" }
-        });
-      }
-      const job = await findTalendJob(projectPath, jobName, folderPath);
-      const xml = await readTextFile(job.itemPath, projectPath);
-      
-      const parsedBefore = parseJobItem(xml, job.itemPath);
-      const compBefore = parsedBefore.components.find(c => c.uniqueName === uniqueName);
-
-      const newXml = patchTalendComponentXml(xml, uniqueName, patch);
-      const parsedAfter = parseJobItem(newXml, job.itemPath);
-      const compAfter = parsedAfter.components.find(c => c.uniqueName === uniqueName);
-
-      const diffLines: string[] = [];
-      if (compBefore && compAfter) {
-        for (const key of Object.keys(patch)) {
-          const valBefore = compBefore.parameters?.[key] ?? "";
-          const valAfter = compAfter.parameters?.[key] ?? "";
-          diffLines.push(`${key}: "${valBefore}" -> "${valAfter}"`);
-        }
-      }
+      const previewService = new PatchPreviewService();
+      const result = await previewService.previewPatch(jobName, uniqueName, patch, folderPath);
 
       let riskLevel: "low" | "medium" | "high" = "low";
       const warnings: string[] = [];
@@ -293,9 +281,9 @@ export const componentTools = [
         endpoint: "/talend/components/preview-patch",
         data: {
           ok: true,
-          componentBefore: compBefore,
-          componentAfter: compAfter,
-          diff: diffLines.join("\n"),
+          componentBefore: result.current,
+          componentAfter: result.proposed,
+          diff: result.diff.join("\n"),
           warnings,
           riskLevel,
         },
@@ -304,38 +292,37 @@ export const componentTools = [
   },
   {
     name: "talend_components_apply_patch",
-    description: "Aplica un parche de parámetros a un componente Talend abriendo un snapshot previo.",
+    description: "Aplica un parche de parámetros a un componente Talend. Requiere confirmationToken si el preview indica alto riesgo.",
     inputSchema: z.object({
       jobName: z.string().describe("Nombre del job"),
       folderPath: z.string().optional().describe("Ruta de la carpeta del job"),
       uniqueName: z.string().describe("UNIQUE_NAME del componente"),
       patch: z.record(z.string(), z.string()).describe("Patch de parámetros (clave-valor)"),
+      confirmationToken: z.string().optional().describe("Token de confirmación (requerido si riskLevel es high)"),
     }),
-    handler: async ({ jobName, folderPath, uniqueName, patch }: { jobName: string; folderPath?: string; uniqueName: string; patch: Record<string, string> }) => {
-      const projectPath = getConfiguredProjectPath();
-      if (!projectPath) {
+    handler: async ({ jobName, folderPath, uniqueName, patch, confirmationToken }: { jobName: string; folderPath?: string; uniqueName: string; patch: Record<string, string>; confirmationToken?: string }) => {
+      const previewService = new PatchPreviewService();
+      const result = await previewService.applyPatch(jobName, uniqueName, patch, confirmationToken, folderPath);
+
+      if (result.requiresConfirmation) {
         return bridgeFail({
           ok: false,
-          source: "unavailable",
-          confidence: "low",
+          source: "workspace-files",
+          confidence: "high",
           endpoint: "/talend/components/apply-patch",
-          error: { code: "NO_PROJECT", message: "TALEND_PROJECT no configurado" }
+          error: { code: "CONFIRMATION_REQUIRED", message: "Se requiere token de confirmación", details: { diff: result.diff } }
         });
       }
-      const job = await findTalendJob(projectPath, jobName, folderPath);
-      const xml = await readTextFile(job.itemPath, projectPath);
 
-      // Auto snapshot
-      try {
-        const { FileSnapshotRepository } = await import("../../modules/snapshots/adapters/file-snapshot.repository");
-        const snapRepo = new FileSnapshotRepository();
-        await snapRepo.create({ name: `before-patch-${uniqueName}`, sourcePath: job.itemPath });
-      } catch (e) {
-        console.warn("No se pudo crear snapshot:", e);
+      if (!result.success) {
+        return bridgeFail({
+          ok: false,
+          source: "workspace-files",
+          confidence: "high",
+          endpoint: "/talend/components/apply-patch",
+          error: { code: "APPLY_FAILED", message: result.error ?? "Error desconocido" }
+        });
       }
-
-      const newXml = patchTalendComponentXml(xml, uniqueName, patch);
-      await writeTextFile(job.itemPath, newXml, projectPath);
 
       const bridge = await loadBridge();
       await bridge.refreshWorkspace();
@@ -345,7 +332,7 @@ export const componentTools = [
         source: "workspace-files",
         confidence: "high",
         endpoint: "/talend/components/apply-patch",
-        data: { ok: true, jobName, uniqueName, patch },
+        data: { ok: true, jobName, uniqueName, patch, snapshotId: result.snapshotId },
       });
     }
   },
@@ -370,11 +357,9 @@ export const componentTools = [
           error: { code: "NO_PROJECT", message: "TALEND_PROJECT no configurado" }
         });
       }
-      const job = await findTalendJob(projectPath, jobName, folderPath);
-      const xml = await readTextFile(job.itemPath, projectPath);
 
-      const newXml = moveTalendComponentXml(xml, { uniqueName, posX, posY });
-      await writeTextFile(job.itemPath, newXml, projectPath);
+      const editService = new ComponentEditService();
+      const result = await editService.updatePosition(jobName, uniqueName, posX, posY, folderPath);
 
       const bridge = await loadBridge();
       await bridge.refreshWorkspace();
@@ -384,7 +369,7 @@ export const componentTools = [
         source: "workspace-files",
         confidence: "high",
         endpoint: "/talend/components/update-position",
-        data: { ok: true, uniqueName, posX, posY },
+        data: { ok: true, uniqueName, posX, posY, snapshotId: result.snapshotId },
       });
     }
   },
@@ -474,20 +459,9 @@ export const componentTools = [
           error: { code: "NO_PROJECT", message: "TALEND_PROJECT no configurado" }
         });
       }
-      const job = await findTalendJob(projectPath, jobName, folderPath);
-      const xml = await readTextFile(job.itemPath, projectPath);
 
-      // Auto snapshot
-      try {
-        const { FileSnapshotRepository } = await import("../../modules/snapshots/adapters/file-snapshot.repository");
-        const snapRepo = new FileSnapshotRepository();
-        await snapRepo.create({ name: `before-rename-uniq-${oldUniqueName}`, sourcePath: job.itemPath });
-      } catch (e) {
-        console.warn("No se pudo crear snapshot:", e);
-      }
-
-      const newXml = renameUniqueNameXml(xml, oldUniqueName, newUniqueName);
-      await writeTextFile(job.itemPath, newXml, projectPath);
+      const editService = new ComponentEditService();
+      const result = await editService.renameUniqueName(jobName, oldUniqueName, newUniqueName, folderPath);
 
       const bridge = await loadBridge();
       await bridge.refreshWorkspace();
@@ -497,54 +471,8 @@ export const componentTools = [
         source: "workspace-files",
         confidence: "high",
         endpoint: "/talend/components/rename-unique-name-apply",
-        data: { ok: true, oldUniqueName, newUniqueName },
+        data: { ok: true, oldUniqueName, newUniqueName, snapshotId: result.snapshotId },
       });
     }
   },
 ];
-
-function renameUniqueNameXml(xml: string, oldUniqueName: string, newUniqueName: string): string {
-  const parsed = parseXml(xml) as Record<string, any>;
-  const root = parsed["talendfile:ProcessType"] ?? parsed.ProcessType;
-  if (!root) throw new Error("XML de job Talend inválido: falta ProcessType");
-
-  const nodes = Array.isArray(root.node) ? root.node : (root.node ? [root.node] : []);
-  let nodeFound = false;
-  for (const node of nodes) {
-    const params = Array.isArray(node.elementParameter) 
-      ? node.elementParameter 
-      : (node.elementParameter ? [node.elementParameter] : []);
-    const uniqueParam = params.find((p: any) => p["@_name"] === "UNIQUE_NAME");
-    if (uniqueParam && uniqueParam["@_value"] === oldUniqueName) {
-      uniqueParam["@_value"] = newUniqueName;
-      nodeFound = true;
-    }
-  }
-
-  if (!nodeFound) {
-    throw new Error(`Componente ${oldUniqueName} no encontrado en el job.`);
-  }
-
-  const connections = Array.isArray(root.connection) ? root.connection : (root.connection ? [root.connection] : []);
-  for (const conn of connections) {
-    if (conn["@_source"] === oldUniqueName) {
-      conn["@_source"] = newUniqueName;
-    }
-    if (conn["@_target"] === oldUniqueName) {
-      conn["@_target"] = newUniqueName;
-    }
-  }
-
-  for (const node of nodes) {
-    const params = Array.isArray(node.elementParameter) 
-      ? node.elementParameter 
-      : (node.elementParameter ? [node.elementParameter] : []);
-    for (const p of params) {
-      if (p["@_value"] && typeof p["@_value"] === "string") {
-        p["@_value"] = p["@_value"].replace(new RegExp(`\\b${oldUniqueName}\\b`, "g"), newUniqueName);
-      }
-    }
-  }
-
-  return buildXml(parsed);
-}

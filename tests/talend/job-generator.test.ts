@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec } from "../../src/talend/job-generator";
 import { parseJobItem } from "../../src/talend/job-parser";
 import { parseJobProperties } from "../../src/talend/repository";
+import { validateJobDesign, DEFAULT_VALIDATION_CONTEXT } from "../../src/talend/validation/job-design-validator";
+
 
 describe("Talend job generator", () => {
   test("buildJobItemXml genera XML válido con componentes y conexiones", () => {
@@ -144,5 +146,51 @@ describe("Talend job generator", () => {
     const job = parseJobItem(xml, "test.item");
 
     expect(job.components.length).toBeGreaterThan(0);
+  });
+
+  test("validateJobDesign valida requerimiento de parámetros de componentes", () => {
+    const spec = {
+      jobName: "TestValidateDesign",
+      pattern: "batch" as any,
+      description: "Validation test",
+      components: [
+        {
+          name: "tRESTClient_1",
+          componentName: "tRESTClient",
+          type: "input" as const,
+          connections: [],
+          parameters: {
+            URL: '"https://api.example.com"',
+            METHOD: "GET",
+          },
+        },
+      ],
+      contexts: [],
+    };
+
+    // Válido
+    const resValid = validateJobDesign(spec, DEFAULT_VALIDATION_CONTEXT);
+    expect(resValid.valid).toBe(true);
+
+    // Inválido (falta parámetro requerido METHOD para tRESTClient)
+    const badSpec = {
+      ...spec,
+      components: [
+        {
+          name: "tRESTClient_1",
+          componentName: "tRESTClient",
+          type: "input" as const,
+          connections: [],
+          parameters: {
+            URL: '"https://api.example.com"',
+          },
+        },
+      ],
+    };
+
+    const resInvalid = validateJobDesign(badSpec, DEFAULT_VALIDATION_CONTEXT);
+    expect(resInvalid.valid).toBe(false);
+    expect(resInvalid.errors.length).toBe(1);
+    expect(resInvalid.errors[0].message).toContain("requiere el parámetro 'METHOD'");
   });
 });

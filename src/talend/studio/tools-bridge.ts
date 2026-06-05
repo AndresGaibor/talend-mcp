@@ -2,6 +2,7 @@ import * as z from "zod/v4";
 import { bridgeOk, bridgeFail, loadBridge, bridgeResultToEnvelope } from "./tools-base";
 import { createPlatformContext } from "../../platform";
 import { toTalendHostPath } from "../../platform/path-bridge";
+import { getJobInspector, type ActiveJobConnection } from "./job-inspector.service";
 
 export const bridgeTools = [
   {
@@ -314,9 +315,28 @@ export const bridgeTools = [
     description: "Obtiene los detalles profundos del job activo en Talend Studio (componentes con posiciones, conexiones).",
     inputSchema: z.object({}),
     handler: async () => {
-      const bridge = await loadBridge();
-      const result = await bridge.activeJobDetails();
-      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-job/details"));
+      try {
+        const inspector = getJobInspector();
+        const details = await inspector.getActiveJobDetails();
+        return bridgeOk({
+          ok: true,
+          source: "studio-bridge",
+          confidence: "high",
+          endpoint: "/talend/active-job/details",
+          data: details,
+        });
+      } catch (error) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint: "/talend/active-job/details",
+          error: {
+            code: "JOB_INSPECTOR_ERROR",
+            message: error instanceof Error ? error.message : "Error al obtener job details",
+          },
+        });
+      }
     },
   },
   {
@@ -327,9 +347,28 @@ export const bridgeTools = [
       includeRaw: z.boolean().optional().describe("Incluir metadatos raw"),
     }),
     handler: async ({ uniqueName, includeRaw }: { uniqueName: string; includeRaw?: boolean }) => {
-      const bridge = await loadBridge();
-      const result = await bridge.activeComponentDetails(uniqueName, includeRaw);
-      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-component/details"));
+      try {
+        const inspector = getJobInspector();
+        const details = await inspector.getComponentDetails(uniqueName, includeRaw);
+        return bridgeOk({
+          ok: true,
+          source: "studio-bridge",
+          confidence: "high",
+          endpoint: "/talend/active-component/details",
+          data: { component: details },
+        });
+      } catch (error) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint: "/talend/active-component/details",
+          error: {
+            code: "COMPONENT_INSPECTOR_ERROR",
+            message: error instanceof Error ? error.message : "Error al obtener component details",
+          },
+        });
+      }
     },
   },
   {
@@ -339,12 +378,28 @@ export const bridgeTools = [
       uniqueName: z.string().describe("UNIQUE_NAME del componente"),
     }),
     handler: async ({ uniqueName }: { uniqueName: string }) => {
-      const bridge = await loadBridge();
-      const result = await bridge.activeComponentDetails(uniqueName, false);
-      if (result.ok && result.data?.component) {
-        result.data = { parameters: result.data.component.parameters };
+      try {
+        const inspector = getJobInspector();
+        const parameters = await inspector.getComponentParameters(uniqueName);
+        return bridgeOk({
+          ok: true,
+          source: "studio-bridge",
+          confidence: "high",
+          endpoint: "/talend/active-component/parameters",
+          data: { parameters },
+        });
+      } catch (error) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint: "/talend/active-component/parameters",
+          error: {
+            code: "COMPONENT_INSPECTOR_ERROR",
+            message: error instanceof Error ? error.message : "Error al obtener parámetros",
+          },
+        });
       }
-      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-component/parameters"));
     },
   },
   {
@@ -354,12 +409,28 @@ export const bridgeTools = [
       uniqueName: z.string().describe("UNIQUE_NAME del componente"),
     }),
     handler: async ({ uniqueName }: { uniqueName: string }) => {
-      const bridge = await loadBridge();
-      const result = await bridge.activeComponentDetails(uniqueName, false);
-      if (result.ok && result.data?.component) {
-        result.data = { schemas: result.data.component.schemas };
+      try {
+        const inspector = getJobInspector();
+        const schemas = await inspector.getComponentSchemas(uniqueName);
+        return bridgeOk({
+          ok: true,
+          source: "studio-bridge",
+          confidence: "high",
+          endpoint: "/talend/active-component/schemas",
+          data: { schemas },
+        });
+      } catch (error) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint: "/talend/active-component/schemas",
+          error: {
+            code: "COMPONENT_INSPECTOR_ERROR",
+            message: error instanceof Error ? error.message : "Error al obtener schemas",
+          },
+        });
       }
-      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-component/schemas"));
     },
   },
   {
@@ -369,15 +440,31 @@ export const bridgeTools = [
       uniqueName: z.string().describe("UNIQUE_NAME del componente"),
     }),
     handler: async ({ uniqueName }: { uniqueName: string }) => {
-      const bridge = await loadBridge();
-      const result = await bridge.activeComponentDetails(uniqueName, false);
-      if (result.ok && result.data?.component) {
-        result.data = {
-          incomingConnections: result.data.component.incomingConnections,
-          outgoingConnections: result.data.component.outgoingConnections,
-        };
+      try {
+        const inspector = getJobInspector();
+        const connections = await inspector.getComponentConnections(uniqueName);
+        return bridgeOk({
+          ok: true,
+          source: "studio-bridge",
+          confidence: "high",
+          endpoint: "/talend/active-component/connections",
+          data: {
+            incomingConnections: connections.incoming,
+            outgoingConnections: connections.outgoing,
+          },
+        });
+      } catch (error) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint: "/talend/active-component/connections",
+          error: {
+            code: "COMPONENT_INSPECTOR_ERROR",
+            message: error instanceof Error ? error.message : "Error al obtener conexiones",
+          },
+        });
       }
-      return bridgeOk(bridgeResultToEnvelope(result, "/talend/active-component/connections"));
     },
   },
   {

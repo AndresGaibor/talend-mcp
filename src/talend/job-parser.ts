@@ -123,6 +123,7 @@ export function parseJobItem(xml: string, itemPath: string): ParsedJob {
       nodeAttributes: nodeAttributes(node),
       parameters,
       schemas: parseSchemas(node),
+      rawNodeData: node.nodeData,
     };
   });
 

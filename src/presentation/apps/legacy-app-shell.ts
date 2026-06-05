@@ -9,6 +9,7 @@ import { createSecretSafetyHtml } from "./legacy-shells/secret-safety.shell";
 import { createSnapshotManagerHtml } from "./legacy-shells/snapshot-manager.shell";
 import { createDeliverablesHtml } from "./legacy-shells/deliverables.shell";
 import { createComponentCatalogHtml } from "./legacy-shells/component-catalog.shell";
+import { createStudioBridgeAppHtml } from "./legacy-shells/studio-bridge.shell";
 import { createGenericShellHtml } from "./legacy-shells/generic.shell";
 
 export function createPresentationAppShellHtml(app: PresentationAppDefinition): string {
@@ -33,6 +34,8 @@ export function createPresentationAppShellHtml(app: PresentationAppDefinition): 
       return createDeliverablesHtml();
     case "component-catalog":
       return createComponentCatalogHtml();
+    case "studio-bridge":
+      return createStudioBridgeAppHtml(app);
     default:
       return createGenericShellHtml(app);
   }

@@ -18,6 +18,12 @@ import { EvidencePackApp } from "../apps/evidence-pack/EvidencePackApp";
 import { RequirementChecklistApp } from "../apps/requirement-checklist/RequirementChecklistApp";
 import { ProblemsViewApp } from "../apps/problems-view/ProblemsViewApp";
 import { JobComponentStudioApp } from "../apps/job-component-studio/JobComponentStudioApp";
+import { ComponentAtlasApp } from "../apps/component-atlas/ComponentAtlasApp";
+import { ComponentMasteryCenterApp } from "../apps/component-mastery-center/ComponentMasteryCenterApp";
+import { SchemaMappingStudioApp } from "../apps/schema-mapping-studio/SchemaMappingStudioApp";
+import { RecipeBuilderApp } from "../apps/recipe-builder/RecipeBuilderApp";
+import { ExecutionCenterApp } from "../apps/execution-center/ExecutionCenterApp";
+import { JobQualityCenterApp } from "../apps/job-quality-center/JobQualityCenterApp";
 
 export const APP_ROUTES: AppRoute[] = [
   { id: "home", component: HomeApp, title: "Home" },
@@ -32,6 +38,8 @@ export const APP_ROUTES: AppRoute[] = [
   { id: "secret-safety", component: SecretSafetyApp, title: "Secret Safety" },
   { id: "deliverables", component: DeliverablesApp, title: "Deliverables" },
   { id: "component-catalog", component: ComponentCatalogApp, title: "Component Catalog" },
+  { id: "component-atlas", component: ComponentAtlasApp, title: "Component Atlas" },
+  { id: "component-mastery-center", component: ComponentMasteryCenterApp, title: "Component Mastery Center" },
   { id: "workshop-progress", component: WorkshopProgressApp, title: "Workshop Progress" },
   { id: "fix-wizard", component: FixWizardApp, title: "Fix Wizard" },
   { id: "antipattern-detector", component: AntiPatternDetectorApp, title: "Antipattern Detector" },
@@ -41,4 +49,8 @@ export const APP_ROUTES: AppRoute[] = [
   { id: "problems-view", component: ProblemsViewApp, title: "Problems View" },
   { id: "job-component-studio", component: JobComponentStudioApp, title: "Job Component Studio" },
   { id: "component-inspector", component: JobComponentStudioApp, title: "Component Inspector Pro" },
+  { id: "schema-mapping-studio", component: SchemaMappingStudioApp, title: "Schema Mapping Studio" },
+  { id: "recipe-builder", component: RecipeBuilderApp, title: "Recipe Builder" },
+  { id: "execution-center", component: ExecutionCenterApp, title: "Execution Center" },
+  { id: "job-quality-center", component: JobQualityCenterApp, title: "Job Quality Center" },
 ];

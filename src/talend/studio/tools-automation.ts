@@ -1,6 +1,7 @@
 import * as z from "zod/v4";
 import { bridgeOk, bridgeFail, loadBridge } from "./tools-base";
 import { getConfiguredProjectPath } from "../workspace";
+import { getUiDriver } from "../ui/ui-driver";
 
 export const automationTools = [
   {
@@ -175,6 +176,110 @@ export const automationTools = [
         confidence: result.confidence,
         endpoint: "/commands/execute-safe",
         data: result.data,
+      });
+    },
+  },
+  {
+    name: "talend_bridge_select_component",
+    description: "Selecciona y revela un componente en el editor activo de Talend Studio.",
+    inputSchema: z.object({
+      componentId: z.string().describe("UNIQUE_NAME del componente a seleccionar"),
+    }),
+    handler: async ({ componentId }: { componentId: string }) => {
+      const uiDriver = getUiDriver();
+      await uiDriver.selectComponent(componentId);
+      return bridgeOk({
+        ok: true,
+        source: "studio-bridge",
+        confidence: "high",
+        endpoint: "/talend/active-job/select-component",
+        data: { componentId },
+      });
+    },
+  },
+  {
+    name: "talend_bridge_open_component_settings",
+    description: "Abre la configuración de un componente en Talend Studio.",
+    inputSchema: z.object({
+      componentId: z.string().describe("UNIQUE_NAME del componente"),
+    }),
+    handler: async ({ componentId }: { componentId: string }) => {
+      const uiDriver = getUiDriver();
+      await uiDriver.openComponentSettings(componentId);
+      return bridgeOk({
+        ok: true,
+        source: "studio-bridge",
+        confidence: "high",
+        endpoint: "/talend/open-component-settings",
+        data: { componentId },
+      });
+    },
+  },
+  {
+    name: "talend_bridge_show_view",
+    description: "Muestra una vista específica en el workbench de Talend Studio.",
+    inputSchema: z.object({
+      viewName: z.enum(["Problems", "Run", "Console"]).describe("Nombre de la vista a mostrar"),
+    }),
+    handler: async ({ viewName }: { viewName: "Problems" | "Run" | "Console" }) => {
+      const uiDriver = getUiDriver();
+      await uiDriver.showView(viewName);
+      return bridgeOk({
+        ok: true,
+        source: "studio-bridge",
+        confidence: "high",
+        endpoint: "/workbench/show-view",
+        data: { viewName },
+      });
+    },
+  },
+  {
+    name: "talend_bridge_activate_editor",
+    description: "Activa un editor en el workbench por su identificador.",
+    inputSchema: z.object({
+      editorId: z.string().describe("ID o título del editor a activar"),
+    }),
+    handler: async ({ editorId }: { editorId: string }) => {
+      const uiDriver = getUiDriver();
+      await uiDriver.activateEditor(editorId);
+      return bridgeOk({
+        ok: true,
+        source: "studio-bridge",
+        confidence: "high",
+        endpoint: "/workbench/activate-editor",
+        data: { editorId },
+      });
+    },
+  },
+  {
+    name: "talend_bridge_save_active_editor",
+    description: "Guarda el editor activo en Talend Studio.",
+    inputSchema: z.object({}),
+    handler: async () => {
+      const uiDriver = getUiDriver();
+      await uiDriver.saveActiveEditor();
+      return bridgeOk({
+        ok: true,
+        source: "studio-bridge",
+        confidence: "high",
+        endpoint: "/workbench/save-active",
+        data: {},
+      });
+    },
+  },
+  {
+    name: "talend_bridge_refresh_workspace",
+    description: "Refresca el workspace de Talend Studio.",
+    inputSchema: z.object({}),
+    handler: async () => {
+      const uiDriver = getUiDriver();
+      await uiDriver.refreshWorkspace();
+      return bridgeOk({
+        ok: true,
+        source: "studio-bridge",
+        confidence: "high",
+        endpoint: "/workspace/refresh",
+        data: {},
       });
     },
   },

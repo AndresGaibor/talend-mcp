@@ -1,4 +1,23 @@
 import type { JobSpec } from "../jobs/job-spec-types";
+import { COMPONENT_REGISTRY } from "../component-registry";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+let cachedCatalog: any = null;
+
+function getCatalog(): any {
+  if (cachedCatalog) return cachedCatalog;
+  const catalogPath = join(process.cwd(), ".talend-mcp", "component-catalog.json");
+  if (existsSync(catalogPath)) {
+    try {
+      cachedCatalog = JSON.parse(readFileSync(catalogPath, "utf8"));
+    } catch {
+      // Ignore errors
+    }
+  }
+  return cachedCatalog;
+}
+
 
 export interface ValidationRule {
   id: string;
@@ -128,6 +147,44 @@ const DEFAULT_RULES: ValidationRule[] = [
           severity: "error",
           message: "El job debe tener al menos un componente",
         };
+      }
+      return null;
+    },
+  },
+  {
+    id: "component-parameters",
+    description: "Verifica que todos los componentes del job tengan sus parámetros obligatorios según el registro",
+    check: (spec) => {
+      const catalog = getCatalog();
+      const catalogEntries = catalog?.entries || [];
+
+      for (const comp of spec.components || []) {
+        let requiredParams: string[] = [];
+        const def = COMPONENT_REGISTRY[comp.componentName];
+        if (def) {
+          requiredParams = def.requiredParameters;
+        } else {
+          const catEntry = catalogEntries.find((e: any) => e.componentName === comp.componentName);
+          if (catEntry) {
+            requiredParams = catEntry.parameters
+              .filter((p: any) => p.required)
+              .map((p: any) => p.name);
+          } else {
+            continue;
+          }
+        }
+
+        for (const reqParam of requiredParams) {
+          const value = comp.parameters[reqParam];
+          if (value === undefined || value === null || String(value).trim() === "") {
+            return {
+              ruleId: "component-parameters",
+              severity: "error",
+              message: `El componente '${comp.name || comp.uniqueName}' (${comp.componentName}) requiere el parámetro '${reqParam}'`,
+              fix: `Agregar el parámetro '${reqParam}' en la configuración del componente.`,
+            };
+          }
+        }
       }
       return null;
     },
