@@ -29,8 +29,8 @@ describe("Talend MCP Unified Registry (SDK Integration)", () => {
         const registryTool = toolMap.get(app.launcherToolName);
         expect(registryTool).toBeDefined();
         expect(registryTool?._meta).toBeDefined();
-        expect(registryTool?._meta?.ui?.resourceUri).toBe(app.resourceUri);
-        expect(registryTool?._meta?.["openai/outputTemplate"]).toBe(app.resourceUri);
+        expect((registryTool?._meta as any)?.ui?.resourceUri).toBe(app.resourceUri);
+        expect((registryTool?._meta as any)?.["openai/outputTemplate"]).toBe(app.resourceUri);
       }
     });
 

@@ -131,7 +131,7 @@ export function PipelineSpecEditorApp() {
 
     if (result.ok) {
       await updateSession({ pipelineSpec: specDraft });
-      const itemPath = result.data?.itemPath;
+      const itemPath = (result.data as any)?.itemPath;
       if (itemPath) {
         setAppliedItemPath(itemPath);
         const openResult = await callTool("talend_bridge_open_resource", { path: itemPath });

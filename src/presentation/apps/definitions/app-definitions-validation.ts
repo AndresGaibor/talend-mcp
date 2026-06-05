@@ -11,9 +11,9 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el reporte de validación.",
     uiMode: "react",
     actions: [
-      createTextAction("Validate design", "talend_job_validate_design", "Valida el diseño del job.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Validate context usage", "talend_job_validate_context_usage", "Valida los contextos requeridos.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Validate performance", "talend_job_validate_performance_settings", "Valida batch size y performance.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate design", "talend_validation_validate_design", "Valida el diseño del job.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate context usage", "talend_validation_validate_context_usage", "Valida los contextos requeridos.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate performance", "talend_validation_validate_performance", "Valida batch size y performance.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
   {
@@ -24,9 +24,9 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_problems_view",
     launchMessage: "Abriendo la vista de problemas.",
     actions: [
-      createNoInputAction("Error stats", "talend_error_stats", "Muestra estadísticas de errores."),
-      createTextAction("Explain error", "talend_error_explain", "Explica un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
-      createTextAction("Suggest fix", "talend_error_suggest_fix", "Sugiere un fix.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
+      createNoInputAction("Error stats", "talend_errors_stats", "Muestra estadísticas de errores."),
+      createTextAction("Explain error", "talend_errors_explain", "Explica un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
+      createTextAction("Suggest fix", "talend_errors_suggest_fix", "Sugiere un fix.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
     ],
   },
   {
@@ -37,9 +37,9 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_error_explorer",
     launchMessage: "Abriendo el explorador de errores.",
     actions: [
-      createTextAction("Explain error", "talend_error_explain", "Explica un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
-      createTextAction("Suggest fix", "talend_error_suggest_fix", "Sugiere un fix.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
-      createNoInputAction("Error stats", "talend_error_stats", "Muestra estadísticas de errores."),
+      createTextAction("Explain error", "talend_errors_explain", "Explica un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
+      createTextAction("Suggest fix", "talend_errors_suggest_fix", "Sugiere un fix.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
+      createNoInputAction("Error stats", "talend_errors_stats", "Muestra estadísticas de errores."),
     ],
   },
   {
@@ -50,9 +50,9 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_validation_timeline",
     launchMessage: "Abriendo la línea de tiempo de validación.",
     actions: [
-      createTextAction("Validate design", "talend_job_validate_design", "Valida el diseño.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Validate contexts", "talend_job_validate_context_usage", "Valida contextos.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
-      createTextAction("Validate audit", "talend_job_validate_audit_columns", "Valida audit columns.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate design", "talend_validation_validate_design", "Valida el diseño.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate contexts", "talend_validation_validate_context_usage", "Valida contextos.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate audit", "talend_validation_validate_audit_columns", "Valida audit columns.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },
   {
@@ -66,7 +66,7 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     actions: [
       createNoInputAction("Studio process", "talend_studio_process", "Detecta el proceso de Talend Studio."),
       createNoInputAction("Bridge audit", "talend_bridge_audit_environment", "Audita el entorno de Studio."),
-      createNoInputAction("Error stats", "talend_error_stats", "Muestra estadísticas de errores."),
+      createNoInputAction("Error stats", "talend_errors_stats", "Muestra estadísticas de errores."),
     ],
   },
 ];

@@ -51,7 +51,7 @@ export const JOB_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_pattern_gallery",
     launchMessage: "Abriendo la galería de patrones.",
     actions: [
-      createTextAction("Validate job design", "talend_job_validate_design", "Valida el diseño del job.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
+      createTextAction("Validate job design", "talend_validation_validate_design", "Valida el diseño del job.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
       createJsonAction("Generate job", "talend_job_generate_from_pipeline_spec", "Genera job desde spec.", { pattern: "multi_csv_raw_loader", name: "myJob" }, { requiresConfirmation: true }),
       createJsonAction("Preview pipeline", "talend_job_preview_pipeline_spec", "Previsualiza una spec.", { pattern: "multi_csv_raw_loader", name: "myJob" }),
     ],

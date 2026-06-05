@@ -38,8 +38,8 @@ export const MONITORING_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_launch_history",
     launchMessage: "Abriendo el historial de lanzamientos.",
     actions: [
-      createNoInputAction("List runs", "talend_list_runs", "Lista runs recientes."),
-      createTextAction("Read run", "talend_read_run", "Lee un run por id.", "runId", { inputLabel: "Run id", inputPlaceholder: "run_123" }),
+      createNoInputAction("List runs", "talend_runs_list", "Lista runs recientes."),
+      createTextAction("Read run", "talend_runs_read", "Lee un run por id.", "runId", { inputLabel: "Run id", inputPlaceholder: "run_123" }),
       createTextAction("Tail output", "talend_tail_run_output", "Lee el stdout/stderr de un run.", "runId", { inputLabel: "Run id", inputPlaceholder: "run_123" }),
     ],
   },
@@ -51,8 +51,8 @@ export const MONITORING_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launcherToolName: "talend_app_runtime_comparison",
     launchMessage: "Abriendo la comparación de runtimes.",
     actions: [
-      createNoInputAction("List runs", "talend_list_runs", "Lista runs recientes."),
-      createTextAction("Read run", "talend_read_run", "Lee un run por id.", "runId", { inputLabel: "Run id", inputPlaceholder: "run_123" }),
+      createNoInputAction("List runs", "talend_runs_list", "Lista runs recientes."),
+      createTextAction("Read run", "talend_runs_read", "Lee un run por id.", "runId", { inputLabel: "Run id", inputPlaceholder: "run_123" }),
       createTextAction("Measure runtime", "talend_job_measure_runtime", "Mide runtime.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
     ],
   },

@@ -147,7 +147,7 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     uiMode: "react",
     actions: [
       createNoInputAction("List workshops", "talend_jobs_list", "Lista workshops disponibles."),
-      createTextAction("Get progress", "talend_list_runs", "Obtiene progreso de un workshop.", "workshopId", { inputLabel: "Workshop id", inputPlaceholder: "workshop_001" }),
+      createTextAction("Get progress", "talend_runs_list", "Obtiene progreso de un workshop.", "workshopId", { inputLabel: "Workshop id", inputPlaceholder: "workshop_001" }),
     ],
   },
   {
@@ -172,7 +172,7 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     launchMessage: "Abriendo el asistente de fixes.",
     uiMode: "react",
     actions: [
-      createTextAction("Explain error", "talend_error_explain", "Sugiere un fix para un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
+      createTextAction("Explain error", "talend_errors_explain", "Sugiere un fix para un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
       createTextAction("Apply fix", "talend_jobs_patch_component", "Aplica un fix sugerido.", "fixId", { inputLabel: "Fix id", inputPlaceholder: "fix_001", requiresConfirmation: true }),
     ],
   },

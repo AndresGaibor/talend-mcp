@@ -208,6 +208,7 @@ const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_deliverables_export_job: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
   talend_deliverables_collect: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
   talend_deliverables_validate: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_deliverable_validate_checklist: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_deliverables_create_package: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
 
   talend_error_stats: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
