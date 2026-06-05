@@ -10,7 +10,7 @@ export type ToolSafety = {
   destructiveHint: boolean;
   openWorldHint: boolean;
   requiresWorkspace?: boolean;
-  requiresConfirmation?: boolean;
+  requiresConfirmation: boolean;
   risk: ToolRisk;
 };
 

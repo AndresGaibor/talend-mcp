@@ -32,7 +32,7 @@ describe("Validación de llamadas a tools en React", () => {
     
     // Regex para encontrar talend_... dentro de callTool("...") o callTool('...')
     // Captura el nombre de la tool
-    const toolCallRegex = /callTool\s*\(\s*["'](talend_[^"']+)["']/g;
+    const toolCallRegex = /(?:callTool|execute)\s*\(\s*["'](talend_[^"']+)["']/g;
 
     for await (const filePath of walk(appsUiSrc)) {
       const content = await readFile(filePath, "utf-8");

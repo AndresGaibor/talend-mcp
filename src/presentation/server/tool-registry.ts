@@ -38,6 +38,7 @@ type ToolSafetyAnnotation = {
   idempotentHint: boolean;
   destructiveHint: boolean;
   openWorldHint: boolean;
+  requiresConfirmation?: boolean;
 };
 
 export const TOOL_NAME_ALIASES: Record<string, string> = {
@@ -238,6 +239,26 @@ const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_secrets_scan_project: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_secrets_scan_job: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_secrets_suggest_context_migration: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_runs_list: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_runs_read: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_runs_start: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: true },
+  talend_runs_start_exported: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: true },
+
+  talend_errors_explain: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_errors_suggest_fix: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_errors_stats: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_validation_validate_design: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_validation_validate_context_usage: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_validation_validate_audit_columns: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_validation_validate_performance: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+
+  talend_evidence_pack_build: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_evidence_pack_export: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
+
+  talend_report_snippets_list: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_report_snippets_generate: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
 };
 
 const TOOL_REQUIRES_WORKSPACE = new Set([

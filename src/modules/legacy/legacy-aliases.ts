@@ -15,11 +15,23 @@ export const LEGACY_TO_CANONICAL: Array<[string, string]> = [
   ["talend_requirements_analyze", "talend_task_analyze_requirements"],
   ["talend_requirements_build_checklist", "talend_task_build_execution_plan"],
   ["talend_antipattern_scan_project", "talend_jobs_detect_antipatterns"],
-  ["talend_fix_suggest", "talend_error_suggest_fix"],
-  ["talend_fix_apply", "talend_jobs_apply_pipeline_spec"],
-  ["talend_evidence_pack_export", "talend_evidence_pack_build"],
-  ["talend_report_snippet_get", "talend_report_generate_snippets"],
-  ["talend_report_snippet_list", "talend_report_generate_snippets"],
-  ["talend_workshop_list", "talend_list_jobs"],
-  ["talend_workshop_progress", "talend_list_runs"],
+
+  ["talend_list_runs", "talend_runs_list"],
+  ["talend_read_run", "talend_runs_read"],
+  ["talend_run_job", "talend_runs_start"],
+  ["talend_run_exported_job", "talend_runs_start_exported"],
+
+  ["talend_error_explain", "talend_errors_explain"],
+  ["talend_error_suggest_fix", "talend_errors_suggest_fix"],
+  ["talend_error_stats", "talend_errors_stats"],
+  ["talend_fix_suggest", "talend_errors_suggest_fix"],
+
+  ["talend_job_validate_design", "talend_validation_validate_design"],
+  ["talend_job_validate_context_usage", "talend_validation_validate_context_usage"],
+  ["talend_job_validate_audit_columns", "talend_validation_validate_audit_columns"],
+  ["talend_job_validate_performance_settings", "talend_validation_validate_performance"],
+
+  ["talend_report_snippet_get", "talend_report_snippets_generate"],
+  ["talend_report_snippet_list", "talend_report_snippets_list"],
+  ["talend_analyze_job", "analyze_talend_job"],
 ];

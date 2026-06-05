@@ -1,6 +1,7 @@
 import { test, expect, describe, beforeEach } from "bun:test";
 import { createTalendMcpServer } from "../../src/presentation/server/new-server";
 import { PRESENTATION_APP_DEFINITIONS } from "../../src/presentation/apps/app-registry";
+import { getAllRuntimeTools } from "../../src/server/registered-tools";
 
 let server: any;
 let registeredTools: Record<string, any>;
@@ -15,10 +16,21 @@ beforeEach(() => {
 describe("Talend MCP Unified Registry (SDK Integration)", () => {
   describe("1. App Launchers registration", () => {
     test("all apps have their launcherToolName registered in _registeredTools", () => {
+      const canonicalTools = getAllRuntimeTools();
+      const toolMap = new Map(canonicalTools.map((t) => [t.name, t]));
+
       for (const app of PRESENTATION_APP_DEFINITIONS) {
-        expect(registeredTools[app.launcherToolName]).toBeDefined();
+        const serverTool = registeredTools[app.launcherToolName];
+        expect(serverTool).toBeDefined();
         // El servidor MCP registra la descripción en el objeto de la herramienta
-        expect(registeredTools[app.launcherToolName].description).toBe(app.launchMessage);
+        expect(serverTool.description).toBe(app.launchMessage);
+
+        // Verificar metadatos en la definición canónica del registry
+        const registryTool = toolMap.get(app.launcherToolName);
+        expect(registryTool).toBeDefined();
+        expect(registryTool?._meta).toBeDefined();
+        expect(registryTool?._meta?.ui?.resourceUri).toBe(app.resourceUri);
+        expect(registryTool?._meta?.["openai/outputTemplate"]).toBe(app.resourceUri);
       }
     });
 

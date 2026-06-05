@@ -4,8 +4,13 @@ import { wrapHandler } from "../../../presentation/tools/common/logger";
 
 export function createRunExportedJobTool() {
   return {
-    name: "talend_run_exported_job",
+    name: "talend_runs_start_exported",
     description: "Ejecuta un job exportado (compilado) desde el directorio de builds.",
+    annotations: {
+      readOnly: false,
+      openWorldHint: true,
+      requiresConfirmation: true,
+    },
     inputSchema: {
       type: "object",
       properties: {

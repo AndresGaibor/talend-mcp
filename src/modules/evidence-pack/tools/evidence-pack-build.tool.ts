@@ -1,6 +1,5 @@
 import { z } from "zod/v4";
-import type { McpToolAnnotation } from "../../../server/adapt-tool";
-import { ok, fail } from "../../../presentation/tools/common/response";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 
 export const EvidencePackBuildSchema = z.object({
   jobName: z.string().describe("Nombre del job para generar evidence pack"),
@@ -19,22 +18,26 @@ export function createEvidencePackBuildTool() {
     annotations: {
       readOnly: true,
       destructive: false,
-    } as McpToolAnnotation,
-    handler: async (input: EvidencePackBuildInput) => {
-      const start = Date.now();
+    },
+    handler: async (input: EvidencePackBuildInput): Promise<CallToolResult> => {
       try {
-        return ok(
-          {
-            packId: `evidence_${Date.now()}`,
-            jobName: input.jobName,
-            files: [],
-            sizeBytes: 0,
-            generatedAt: new Date().toISOString(),
-          },
-          { startTime: start }
-        );
+        const packId = `evidence_${Date.now()}`;
+        const result = {
+          packId,
+          files: [] as string[],
+          summary: `Evidence pack built successfully for job ${input.jobName}.`,
+          warnings: [] as string[],
+        };
+        return {
+          content: [{ type: "text", text: `Evidence pack ${packId} built.` }],
+          structuredContent: result as any,
+          isError: false,
+        };
       } catch (err) {
-        return fail("EVIDENCE_PACK_ERROR", `Error generando evidence pack: ${err}`, { startTime: start });
+        return {
+          content: [{ type: "text", text: `Error generando evidence pack: ${err}` }],
+          isError: true,
+        };
       }
     },
   };

@@ -39,6 +39,21 @@ import { createReadRunTool } from "./runs/tools/read-run.tool";
 import { createRunJobTool } from "./runs/tools/run-job.tool";
 import { createRunExportedJobTool } from "./runs/tools/run-exported-job.tool";
 
+import { createErrorsExplainTool } from "./errors/tools/errors-explain.tool";
+import { createErrorsSuggestFixTool } from "./errors/tools/errors-suggest-fix.tool";
+import { createErrorsStatsTool } from "./errors/tools/errors-stats.tool";
+
+import { createValidateDesignTool } from "./validation/tools/validate-design.tool";
+import { createValidateContextUsageTool } from "./validation/tools/validate-context-usage.tool";
+import { createValidateAuditColumnsTool } from "./validation/tools/validate-audit-columns.tool";
+import { createValidatePerformanceTool } from "./validation/tools/validate-performance.tool";
+
+import { createEvidencePackBuildTool } from "./evidence-pack/tools/evidence-pack-build.tool";
+import { createEvidencePackExportTool } from "./evidence-pack/tools/evidence-pack-export.tool";
+
+import { createReportSnippetsListTool } from "./jobs/tools/report-snippets-list.tool";
+import { createReportSnippetsGenerateTool } from "./jobs/tools/report-snippets-generate.tool";
+
 export function createModuleTools(): McpToolDefinition[] {
   const tools: McpToolDefinition[] = [];
 
@@ -79,6 +94,21 @@ export function createModuleTools(): McpToolDefinition[] {
   tools.push(adaptToolToMcp(createReadRunTool()));
   tools.push(adaptToolToMcp(createRunJobTool()));
   tools.push(adaptToolToMcp(createRunExportedJobTool()));
+
+  tools.push(adaptToolToMcp(createErrorsExplainTool()));
+  tools.push(adaptToolToMcp(createErrorsSuggestFixTool()));
+  tools.push(adaptToolToMcp(createErrorsStatsTool()));
+
+  tools.push(adaptToolToMcp(createValidateDesignTool()));
+  tools.push(adaptToolToMcp(createValidateContextUsageTool()));
+  tools.push(adaptToolToMcp(createValidateAuditColumnsTool()));
+  tools.push(adaptToolToMcp(createValidatePerformanceTool()));
+
+  tools.push(adaptToolToMcp(createEvidencePackBuildTool()));
+  tools.push(adaptToolToMcp(createEvidencePackExportTool()));
+
+  tools.push(adaptToolToMcp(createReportSnippetsListTool()));
+  tools.push(adaptToolToMcp(createReportSnippetsGenerateTool()));
 
   return tools;
 }

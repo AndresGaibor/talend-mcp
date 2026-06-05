@@ -17,13 +17,14 @@ export function createAppSessionClearTool() {
     inputSchema: ClearSessionSchema,
     annotations: {
       readOnly: false,
-      requiresConfirmation: true,
+      destructive: true,
     },
     handler: async (input: z.infer<typeof ClearSessionSchema>): Promise<CallToolResult> => {
       try {
         await clearSessionUseCase.execute(input.sessionId);
         return {
-          content: [{ type: "text", text: `Sesión ${input.sessionId} eliminada` }],
+          content: [{ type: "text", text: `Sesión ${input.sessionId} eliminada.` }],
+          structuredContent: { success: true } as any,
           isError: false,
         };
       } catch (err) {

@@ -1,4 +1,4 @@
-import { getRegisteredServerTools, TOOL_NAME_ALIASES, GENERIC_TOOL_OUTPUT_SCHEMA } from "../presentation/server/tool-registry";
+import { getRegisteredServerTools, TOOL_NAME_ALIASES, GENERIC_TOOL_OUTPUT_SCHEMA, getRegisteredServerToolAnnotations } from "../presentation/server/tool-registry";
 import type { McpToolDefinition } from "./adapt-tool";
 import { adaptToolToMcp } from "./adapt-tool";
 import { LEGACY_TO_CANONICAL } from "../modules/legacy/legacy-aliases";
@@ -45,10 +45,24 @@ import { createEvidencePackBuildTool } from "../modules/evidence-pack/tools/evid
 import { talendCanReadProjectTool, talendCanReadProcessTool, talendCanReadMetadataTool } from "../modules/jobs/tools/doctor-can-read.tool";
 import { talendJobsListPatternsTool } from "../modules/jobs/tools/jobs-list-patterns.tool";
 
-import { createListRunsTool } from "../presentation/tools/execution/list-runs.tool";
-import { createReadRunTool } from "../presentation/tools/execution/read-run.tool";
-import { createRunJobTool } from "../presentation/tools/execution/run-job.tool";
-import { createRunExportedJobTool } from "../presentation/tools/execution/run-exported-job.tool";
+import { createListRunsTool } from "../modules/runs/tools/list-runs.tool";
+import { createReadRunTool } from "../modules/runs/tools/read-run.tool";
+import { createRunJobTool } from "../modules/runs/tools/run-job.tool";
+import { createRunExportedJobTool } from "../modules/runs/tools/run-exported-job.tool";
+
+import { createErrorsExplainTool } from "../modules/errors/tools/errors-explain.tool";
+import { createErrorsSuggestFixTool } from "../modules/errors/tools/errors-suggest-fix.tool";
+import { createErrorsStatsTool } from "../modules/errors/tools/errors-stats.tool";
+
+import { createValidateDesignTool } from "../modules/validation/tools/validate-design.tool";
+import { createValidateContextUsageTool } from "../modules/validation/tools/validate-context-usage.tool";
+import { createValidateAuditColumnsTool } from "../modules/validation/tools/validate-audit-columns.tool";
+import { createValidatePerformanceTool } from "../modules/validation/tools/validate-performance.tool";
+
+import { createEvidencePackExportTool } from "../modules/evidence-pack/tools/evidence-pack-export.tool";
+
+import { createReportSnippetsListTool } from "../modules/jobs/tools/report-snippets-list.tool";
+import { createReportSnippetsGenerateTool } from "../modules/jobs/tools/report-snippets-generate.tool";
 
 export type RuntimeTool = {
   definition: McpToolDefinition;
@@ -100,6 +114,16 @@ function getModuleTools(): RuntimeTool[] {
     createReadRunTool(),
     createRunJobTool(),
     createRunExportedJobTool(),
+    createErrorsExplainTool(),
+    createErrorsSuggestFixTool(),
+    createErrorsStatsTool(),
+    createValidateDesignTool(),
+    createValidateContextUsageTool(),
+    createValidateAuditColumnsTool(),
+    createValidatePerformanceTool(),
+    createEvidencePackExportTool(),
+    createReportSnippetsListTool(),
+    createReportSnippetsGenerateTool(),
   ];
 
   return rawTools.map((tool) => ({
@@ -117,6 +141,17 @@ export function buildRuntimeToolCache(): void {
   const legacyTools = getRegisteredServerTools();
   for (const tool of legacyTools) {
     const definition = adaptToolToMcp(tool);
+    const registryAnn = getRegisteredServerToolAnnotations(tool.name);
+    if (registryAnn) {
+      definition.annotations = {
+        readOnlyHint: registryAnn.readOnlyHint,
+        idempotentHint: registryAnn.idempotentHint,
+        destructiveHint: registryAnn.destructiveHint,
+        openWorldHint: registryAnn.openWorldHint,
+        requiresConfirmation: registryAnn.requiresConfirmation ?? registryAnn.destructiveHint,
+        ...definition.annotations,
+      };
+    }
     cache.set(definition.name, {
       definition,
       handler: tool.handler,
@@ -161,7 +196,15 @@ export function buildRuntimeToolCache(): void {
   }
 
   toolCache = cache;
-  aliasCache = new Map(Object.entries(TOOL_NAME_ALIASES));
+
+  const mergedAliases = new Map<string, string>();
+  for (const [legacyName, canonicalName] of Object.entries(TOOL_NAME_ALIASES)) {
+    mergedAliases.set(legacyName, canonicalName);
+  }
+  for (const [legacyName, canonicalName] of LEGACY_TO_CANONICAL) {
+    mergedAliases.set(legacyName, canonicalName);
+  }
+  aliasCache = mergedAliases;
 }
 
 export function getAllRuntimeTools(): McpToolDefinition[] {

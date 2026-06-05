@@ -31,7 +31,8 @@ export function createAppSessionGetTool() {
           };
         }
         return {
-          content: [{ type: "text", text: JSON.stringify(session, null, 2) }],
+          content: [{ type: "text", text: `Sesión ${session.id} obtenida.` }],
+          structuredContent: session as any,
           isError: false,
         };
       } catch (err) {

@@ -38,13 +38,29 @@ export function normalizeToolResult<T = unknown>(raw: unknown): NormalizedResult
       .map((c: any) => c.text)
       .join("\n");
 
+    let parsedData: T | undefined;
+    try {
+      parsedData = JSON.parse(textContent);
+    } catch {
+      parsedData = undefined;
+    }
+
+    const isOk = anyRaw.isError !== true;
+    let errorMsg: string | undefined = undefined;
+    if (!isOk) {
+      errorMsg = anyRaw.error || textContent || "Error en la herramienta";
+    } else if (anyRaw.structuredContent?.errors && Array.isArray(anyRaw.structuredContent.errors)) {
+      errorMsg = anyRaw.structuredContent.errors.join("\n");
+    }
+
     normalized = {
       ...normalized,
-      ok: true,
-      success: true,
-      data: anyRaw.structuredContent as T,
+      ok: isOk,
+      success: isOk,
+      data: (anyRaw.structuredContent !== undefined ? anyRaw.structuredContent : parsedData) as T,
       text: textContent,
-      result: textContent
+      result: textContent,
+      error: errorMsg,
     };
   }
   // 2. Manejar formato TalendToolResult { ok, data?, error? }

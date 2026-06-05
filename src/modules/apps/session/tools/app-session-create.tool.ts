@@ -14,10 +14,10 @@ const createSessionUseCase = new CreateSessionUseCase(repository);
 export function createAppSessionCreateTool() {
   return {
     name: "talend_app_session_create",
-    description: "Crea una nueva sesión de app. Solo lectura.",
+    description: "Crea una nueva sesión de app.",
     inputSchema: CreateSessionSchema,
     annotations: {
-      readOnly: true,
+      readOnly: false,
     },
     handler: async (input: z.infer<typeof CreateSessionSchema>): Promise<CallToolResult> => {
       try {
@@ -26,7 +26,8 @@ export function createAppSessionCreateTool() {
           projectPath: input.projectPath,
         });
         return {
-          content: [{ type: "text", text: JSON.stringify(session, null, 2) }],
+          content: [{ type: "text", text: `Sesión ${session.id} creada.` }],
+          structuredContent: session as any,
           isError: false,
         };
       } catch (err) {

@@ -43,4 +43,39 @@ describe("normalizeToolResult", () => {
     expect(normalized.ok).toBe(false);
     expect(normalized.error).toContain("Formato de resultado desconocido");
   });
+
+  it("debe normalizar formato MCP con JSON sólo en content", () => {
+    const sessionObj = { id: "test-session", projectPath: "/foo" };
+    const raw = {
+      content: [{ type: "text", text: JSON.stringify(sessionObj) }],
+      isError: false,
+    };
+    const normalized = normalizeToolResult<typeof sessionObj>(raw);
+    expect(normalized.ok).toBe(true);
+    expect(normalized.data).toEqual(sessionObj);
+  });
+
+  it("debe normalizar formato MCP con structuredContent", () => {
+    const sessionObj = { id: "test-session", projectPath: "/foo" };
+    const raw = {
+      content: [{ type: "text", text: "Sesión cargada" }],
+      structuredContent: sessionObj,
+      isError: false,
+    };
+    const normalized = normalizeToolResult<typeof sessionObj>(raw);
+    expect(normalized.ok).toBe(true);
+    expect(normalized.data).toEqual(sessionObj);
+    expect(normalized.text).toBe("Sesión cargada");
+  });
+
+  it("debe normalizar formato MCP con isError: true", () => {
+    const raw = {
+      content: [{ type: "text", text: "Algo falló en la sesión" }],
+      isError: true,
+      error: "Error grave de sesión",
+    };
+    const normalized = normalizeToolResult(raw);
+    expect(normalized.ok).toBe(false);
+    expect(normalized.error).toBe("Error grave de sesión");
+  });
 });

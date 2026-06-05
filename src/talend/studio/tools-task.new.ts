@@ -32,6 +32,7 @@ export const talend_task_analyze_requirements = defineTool({
     idempotentHint: true,
     destructiveHint: false,
     openWorldHint: false,
+    requiresConfirmation: false,
     risk: "low",
   },
   async handler(input: AnalyzeRequirementsInput, _ctx: ToolContext) {
@@ -78,6 +79,7 @@ export const talend_task_extract_talend_responsibilities = defineTool({
     idempotentHint: true,
     destructiveHint: false,
     openWorldHint: false,
+    requiresConfirmation: false,
     risk: "low",
   },
   async handler(input: ExtractResponsibilitiesInput, _ctx: ToolContext) {
@@ -126,6 +128,7 @@ export const talend_task_build_execution_plan = defineTool({
     idempotentHint: true,
     destructiveHint: false,
     openWorldHint: false,
+    requiresConfirmation: false,
     risk: "low",
   },
   async handler(input: BuildExecutionPlanInput, _ctx: ToolContext) {

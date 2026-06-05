@@ -4,8 +4,13 @@ import { wrapHandler } from "../../../presentation/tools/common/logger";
 
 export function createRunJobTool() {
   return {
-    name: "talend_run_job",
+    name: "talend_runs_start",
     description: "Ejecuta un job de Talend Studio localmente en el proyecto configurado.",
+    annotations: {
+      readOnly: false,
+      openWorldHint: true,
+      requiresConfirmation: true,
+    },
     inputSchema: {
       type: "object",
       properties: {

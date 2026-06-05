@@ -59,9 +59,18 @@ export function createJobsApplyPipelineSpecTool() {
           spec: input.spec as PipelineSpec,
           overwrite: input.overwrite ?? false,
         });
+        const lastSlash = Math.max(job.path.lastIndexOf("/"), job.path.lastIndexOf("\\"));
+        const folderPath = lastSlash !== -1 ? job.path.substring(0, lastSlash) : ".";
+        const responseData = {
+          jobId: job.id,
+          itemPath: job.path,
+          propertiesPath: job.path.replace(/\.item$/, ".properties"),
+          folderPath: folderPath,
+          label: job.name,
+        };
         return {
-          content: [{ type: "text", text: JSON.stringify(job, null, 2) }],
-          structuredContent: job as any,
+          content: [{ type: "text", text: JSON.stringify(responseData, null, 2) }],
+          structuredContent: responseData as any,
           isError: false,
         };
       } catch (err) {

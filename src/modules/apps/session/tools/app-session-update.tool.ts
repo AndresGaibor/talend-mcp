@@ -21,11 +21,11 @@ const updateSessionUseCase = new UpdateSessionUseCase(repository);
 export function createAppSessionUpdateTool() {
   return {
     name: "talend_app_session_update",
-    description: "Actualiza una sesión de app existente. Requiere confirmación.",
+    description: "Actualiza una sesión de app existente.",
     inputSchema: UpdateSessionSchema,
     annotations: {
       readOnly: false,
-      requiresConfirmation: true,
+      requiresConfirmation: false,
     },
     handler: async (input: z.infer<typeof UpdateSessionSchema>): Promise<CallToolResult> => {
       try {
@@ -46,7 +46,8 @@ export function createAppSessionUpdateTool() {
           };
         }
         return {
-          content: [{ type: "text", text: JSON.stringify(session, null, 2) }],
+          content: [{ type: "text", text: `Sesión ${session.id} actualizada.` }],
+          structuredContent: session as any,
           isError: false,
         };
       } catch (err) {

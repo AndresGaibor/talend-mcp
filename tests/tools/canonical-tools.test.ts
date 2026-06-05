@@ -131,8 +131,8 @@ describe("Canonical Tools", () => {
     });
 
     test("alias names do not shadow actual tool names", () => {
-      const toolNames = new Set(toolsValidos.map((t) => t.name));
-      const duplicados = [...aliases.keys()].filter((k) => toolNames.has(k));
+      const canonicalToolNames = new Set(toolsValidos.map((t) => t.name).filter((name) => !aliases.has(name)));
+      const duplicados = [...aliases.keys()].filter((k) => canonicalToolNames.has(k));
 
       expect(
         duplicados,

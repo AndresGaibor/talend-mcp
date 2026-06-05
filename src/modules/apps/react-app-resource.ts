@@ -33,12 +33,72 @@ export function registerReactAppResource(
   const htmlPath = join(APPS_UI_DIST, "index.html");
   const resourceUri = `ui://talend/${appId}.html`;
 
+  let htmlContent = "";
   if (!existsSync(htmlPath)) {
-    console.warn(`[react-app-resource] No se encontró: ${htmlPath}`);
-    return;
+    console.warn(`[react-app-resource] No se encontró: ${htmlPath}. Usando fallback HTML.`);
+    htmlContent = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${appTitle} - Fallback</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 500px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      color: #38bdf8;
+      margin-top: 0;
+      font-size: 24px;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    code {
+      background-color: #020617;
+      color: #f43f5e;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 14px;
+      display: inline-block;
+      margin-top: 10px;
+      border: 1px solid #e11d48;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Recurso no Construido</h1>
+    <p>La aplicación <strong>${appTitle}</strong> no está disponible porque la interfaz de usuario no ha sido compilada.</p>
+    <p>Por favor, ejecuta el siguiente comando en la raíz del proyecto para compilarla:</p>
+    <code>bun run ui:build</code>
+  </div>
+</body>
+</html>`;
+  } else {
+    htmlContent = inyectarAppId(readFileSync(htmlPath, "utf-8"), appId);
   }
-
-  const htmlContent = inyectarAppId(readFileSync(htmlPath, "utf-8"), appId);
 
   server.registerResource(appId, resourceUri, {
     title: appTitle,

@@ -15,6 +15,7 @@ export interface Pattern {
   id: string;
   name: string;
   description: string;
+  defaultSpec?: PipelineSpec;
 }
 
 export interface PipelineSpec {
@@ -33,6 +34,7 @@ export function PipelineSpecEditorApp() {
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [selectedPattern, setSelectedPattern] = useState<Pattern | null>(null);
   const [specDraft, setSpecDraft] = useState<PipelineSpec>({});
+  const [appliedItemPath, setAppliedItemPath] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[] } | null>(null);
   const [previewResult, setPreviewResult] = useState<string | null>(null);
   const [sessionMappings, setSessionMappings] = useState<Record<string, unknown> | null>(null);
@@ -62,7 +64,7 @@ export function PipelineSpecEditorApp() {
 
   const handleSelectPattern = useCallback((pattern: Pattern) => {
     setSelectedPattern(pattern);
-    setSpecDraft({
+    setSpecDraft(pattern.defaultSpec || {
       name: pattern.name,
       description: pattern.description,
       patternId: pattern.id,
@@ -107,32 +109,48 @@ export function PipelineSpecEditorApp() {
     setShowConfirmation(false);
     setError(null);
     setStep("apply");
+
+    const projectPathOrJobPath = session?.projectPath || ".";
+    const snapshotResult = await callTool("talend_snapshots_create", {
+      name: `before-pipeline-${Date.now()}`,
+      sourcePath: projectPathOrJobPath,
+      description: `Before applying ${specDraft.name ?? "pipeline"}`,
+    });
+
+    if (!snapshotResult.ok) {
+      setError("No se puede aplicar sin snapshot previo.");
+      setStep("preview");
+      return;
+    }
+
     const result = await callTool("talend_jobs_apply_pipeline_spec", { 
       jobId: specDraft.name ?? "new-pipeline",
       spec: specDraft,
-      overwrite: true 
+      overwrite: false 
     });
+
     if (result.ok) {
       await updateSession({ pipelineSpec: specDraft });
-      const snapshotResult = await callTool("talend_snapshots_create", {
-        name: `pipeline-${Date.now()}`,
-        sourcePath: ".", // Requerido por el esquema
-        description: `Snapshot for ${specDraft.name ?? "pipeline"}`,
-      });
-      if (!snapshotResult.ok) {
-        setError("Pipeline applied but snapshot creation failed");
+      const itemPath = result.data?.itemPath;
+      if (itemPath) {
+        setAppliedItemPath(itemPath);
+        const openResult = await callTool("talend_bridge_open_resource", { path: itemPath });
+        if (!openResult.ok) {
+          setError(`Pipeline applied and session updated, but failed to open in Studio: ${openResult.error}`);
+        }
       }
     } else {
       setError(result.error ?? "Apply failed");
     }
-  }, [callTool, specDraft, showConfirmation, updateSession]);
+  }, [callTool, specDraft, showConfirmation, updateSession, session]);
 
   const handleOpenInStudio = useCallback(async () => {
-    const result = await callTool("talend_bridge_open_resource", { path: specDraft.name ?? "" });
+    const path = appliedItemPath || specDraft.name || "";
+    const result = await callTool("talend_bridge_open_resource", { path });
     if (!result.ok) {
       setError(result.error ?? "Failed to open in Studio");
     }
-  }, [callTool, specDraft]);
+  }, [callTool, appliedItemPath, specDraft]);
 
   const handleBack = useCallback((targetStep: Step) => {
     setStep(targetStep);

@@ -72,7 +72,7 @@ export function ValidationReportApp() {
     const suggestedFixes: SuggestedFix[] = [];
     let fixIdCounter = 1;
 
-    const designResult = await callTool("talend_job_validate_design", { spec: { jobName: name } });
+    const designResult = await callTool("talend_validation_validate_design", { spec: { jobName: name } });
     if (designResult.success && designResult.result) {
       try {
         const data = JSON.parse(designResult.result);
@@ -104,7 +104,7 @@ export function ValidationReportApp() {
       }
     }
 
-    const contextResult = await callTool("talend_job_validate_context_usage", { spec: { jobName: name } });
+    const contextResult = await callTool("talend_validation_validate_context_usage", { spec: { jobName: name } });
     const missingContexts: string[] = [];
     if (contextResult.success && contextResult.result) {
       try {
@@ -138,7 +138,7 @@ export function ValidationReportApp() {
       }
     }
 
-    const auditResult = await callTool("talend_job_validate_audit_columns", { spec: { jobName: name } });
+    const auditResult = await callTool("talend_validation_validate_audit_columns", { spec: { jobName: name } });
     const auditColumns = { enabled: false, has_load_ts: false, has_load_run: false };
     if (auditResult.success && auditResult.result) {
       try {
@@ -189,7 +189,7 @@ export function ValidationReportApp() {
       }
     }
 
-    const perfResult = await callTool("talend_job_validate_performance_settings", { spec: { jobName: name } });
+    const perfResult = await callTool("talend_validation_validate_performance", { spec: { jobName: name } });
     const performanceSettings = { batchSize: 5000, issues: [] as string[], recommendation: "" };
     if (perfResult.success && perfResult.result) {
       try {

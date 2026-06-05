@@ -4,8 +4,12 @@ import { wrapHandler } from "../../../presentation/tools/common/logger";
 
 export function createListRunsTool() {
   return {
-    name: "talend_list_runs",
+    name: "talend_runs_list",
     description: "Lista las ejecuciones de jobs guardadas en el historial local.",
+    annotations: {
+      readOnly: true,
+      requiresConfirmation: false,
+    },
     inputSchema: {
       type: "object",
       properties: {

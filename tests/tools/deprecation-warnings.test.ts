@@ -24,6 +24,7 @@ function createMockTool(name: string): TalendToolDefinition<TestInput, TestOutpu
       idempotentHint: true,
       destructiveHint: false,
       openWorldHint: false,
+      requiresConfirmation: false,
       risk: "low",
     },
     async handler(_input: TestInput, _ctx: ToolContext) {
@@ -129,6 +130,7 @@ describe("Deprecation wrapper", () => {
         idempotentHint: true,
         destructiveHint: false,
         openWorldHint: false,
+        requiresConfirmation: false,
         risk: "low",
       },
       async handler(_input: TestInput, _ctx: ToolContext) {

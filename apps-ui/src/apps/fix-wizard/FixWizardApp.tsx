@@ -30,7 +30,7 @@ export function FixWizardApp() {
     setCause(null);
     setStep("cause");
 
-    const result = await callTool("talend_error_explain", { error: errorInput });
+    const result = await callTool("talend_errors_explain", { errorMessage: errorInput });
     if (result.success && result.result) {
       try {
         const data = JSON.parse(result.result);
@@ -48,8 +48,8 @@ export function FixWizardApp() {
     setOptions([]);
     setStep("options");
 
-    const result = await callTool("talend_error_suggest_fix", {
-      error: errorInput,
+    const result = await callTool("talend_errors_suggest_fix", {
+      errorMessage: errorInput,
       jobId: jobId || undefined,
       componentId: componentId || undefined,
     });
@@ -90,22 +90,26 @@ export function FixWizardApp() {
     setError(null);
     setStep("apply");
 
-    const snapshotResult = await callTool("talend_snapshots_create", {
-      name: `fix-${Date.now()}`,
+    const snapshotResultBefore = await callTool("talend_snapshots_create", {
+      name: `fix-pre-${Date.now()}`,
+      sourcePath: ".",
       description: `Snapshot before applying fix: ${selectedOption.description}`,
     });
 
-    if (!snapshotResult.success || !snapshotResult.result) {
+    if (!snapshotResultBefore.success || !snapshotResultBefore.result) {
       setError("Cannot apply fix: snapshot creation failed. A snapshot is required before applying any fix.");
       setStep("preview");
       return;
     }
 
+    let preId = "";
     try {
-      const snapshotData = JSON.parse(snapshotResult.result);
-      setSnapshotId(snapshotData.id ?? snapshotData.snapshotId ?? snapshotResult.result);
+      const snapshotData = JSON.parse(snapshotResultBefore.result);
+      preId = snapshotData.id ?? snapshotData.snapshotId ?? snapshotResultBefore.result;
+      setSnapshotId(preId);
     } catch {
-      setSnapshotId(snapshotResult.result ?? "unknown");
+      preId = snapshotResultBefore.result ?? "unknown";
+      setSnapshotId(preId);
     }
 
     if (jobId && componentId) {
@@ -119,6 +123,33 @@ export function FixWizardApp() {
         setError(`Fix applied but revalidation failed: ${patchResult.error}`);
       } else {
         setError(null);
+        
+        // Post snapshot and diff flow
+        const snapshotResultAfter = await callTool("talend_snapshots_create", {
+          name: `fix-post-${Date.now()}`,
+          sourcePath: ".",
+          description: `Snapshot after applying fix: ${selectedOption.description}`,
+        });
+
+        if (snapshotResultAfter.success && snapshotResultAfter.result) {
+          let postId = "";
+          try {
+            const postData = JSON.parse(snapshotResultAfter.result);
+            postId = postData.id ?? postData.snapshotId ?? snapshotResultAfter.result;
+          } catch {
+            postId = snapshotResultAfter.result;
+          }
+
+          if (preId && postId) {
+            const diffResult = await callTool("talend_snapshots_diff", {
+              leftId: preId,
+              rightId: postId,
+            });
+            if (diffResult.success && diffResult.result) {
+              setDiffContent(diffResult.result);
+            }
+          }
+        }
       }
     } else {
       setError("Job ID and Component ID are required to apply the fix");
@@ -152,7 +183,7 @@ export function FixWizardApp() {
 
   const handleRevalidate = useCallback(async () => {
     setError(null);
-    const result = await callTool("talend_error_explain", { error: errorInput });
+    const result = await callTool("talend_errors_explain", { errorMessage: errorInput });
     if (result.success && result.result) {
       try {
         const data = JSON.parse(result.result);

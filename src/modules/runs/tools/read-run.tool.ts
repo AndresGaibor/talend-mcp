@@ -4,8 +4,12 @@ import { wrapHandler } from "../../../presentation/tools/common/logger";
 
 export function createReadRunTool() {
   return {
-    name: "talend_read_run",
+    name: "talend_runs_read",
     description: "Lee el detalle de una ejecución guardada por su runId.",
+    annotations: {
+      readOnly: true,
+      requiresConfirmation: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
