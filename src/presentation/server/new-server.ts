@@ -119,6 +119,14 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
       return;
     }
 
+    if (requestUrl.pathname === "/.well-known/oauth-protected-resource") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resource: `http://${host}:${listenPort}/mcp`,
+      }));
+      return;
+    }
+
     if (requestUrl.pathname !== path) {
       res.writeHead(404, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: "not_found" }));
