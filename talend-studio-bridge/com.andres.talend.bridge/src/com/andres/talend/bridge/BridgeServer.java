@@ -16,6 +16,8 @@ import java.util.concurrent.TimeUnit;
 import com.andres.talend.bridge.audit.CapabilityAuditService;
 import com.andres.talend.bridge.audit.CommandAuditService;
 import com.andres.talend.bridge.audit.PluginAuditService;
+import com.andres.talend.bridge.automation.CodeRunnerService;
+import com.andres.talend.bridge.automation.JobOperationsService;
 import com.andres.talend.bridge.events.EventsService;
 import com.andres.talend.bridge.launch.LaunchConfigService;
 import com.andres.talend.bridge.launch.LaunchTrackerService;
@@ -128,6 +130,14 @@ final class BridgeServer {
       server.createContext("/events/recent", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.recent())));
       server.createContext("/events/clear", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.clear())));
       server.createContext("/automation/run-active-job", exchange -> guarded(exchange, () -> handleAutomationRunActiveJob(exchange)));
+      server.createContext("/automation/job/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createJob")));
+      server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
+      server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
+      server.createContext("/automation/nodes/update", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "updateNode")));
+      server.createContext("/automation/nodes/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteNodes")));
+      server.createContext("/automation/nodes/copy", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "copyNode")));
+      server.createContext("/automation/nodes/list", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "listNodes")));
+      server.createContext("/automation/run-code", exchange -> guarded(exchange, () -> handleRunCode(exchange)));
       server.createContext("/launch/runs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchTrackerService.runs())));
       server.createContext("/launch/run-status", exchange -> guarded(exchange, () -> handleLaunchRunStatus(exchange)));
       server.createContext("/launch/wait", exchange -> guarded(exchange, () -> handleLaunchWait(exchange)));
@@ -342,8 +352,55 @@ final class BridgeServer {
     respond(exchange, 200, AutomationService.runActiveJob(saveBefore, waitForTermination, timeoutMs, dryRun, config()));
   }
 
-  private void handleLaunchRunStatus(HttpExchange exchange) throws IOException {
+  /**
+   * Opera sobre los nodos del job abierto en Talend.
+   *
+   * Las operaciones usan la API del IDE, de modo que cada nodo nace con sus
+   * parametros y valores por defecto y el XML lo escribe Studio.
+   */
+  private void handleNodeOperation(HttpExchange exchange, String operation) throws IOException {
     JsonObject body = readJsonBody(exchange);
+    respond(exchange, 200, UiThread.sync(() -> {
+      switch (operation) {
+        case "createJob":
+          return JobOperationsService.createJob(body);
+        case "addNode":
+          return JobOperationsService.addNode(body);
+        case "connect":
+          return JobOperationsService.connect(body);
+        case "updateNode":
+          return JobOperationsService.updateNode(body);
+        case "deleteNodes":
+          return JobOperationsService.deleteNodes(body);
+        case "copyNode":
+          return JobOperationsService.copyNode(body);
+        default:
+          return JobOperationsService.listNodes();
+      }
+    }));
+  }
+
+  /**
+   * Ejecuta codigo Java dentro de Studio.
+   *
+   * El codigo ve las mismas APIs que ve el IDE. Solo corre si las acciones
+   * inseguras estan habilitadas: ejecutar codigo arbitrario puede tocar el
+   * workspace de forma irreversible.
+   */
+  private void handleRunCode(HttpExchange exchange) throws IOException {
+    JsonObject body = readJsonBody(exchange);
+    BridgeConfig current = config();
+    if (current.readOnly) {
+      throw new BadRequestException("READ_ONLY", "El bridge esta en modo readOnly");
+    }
+    if (!current.unsafeActions) {
+      throw new BadRequestException("UNSAFE_ACTIONS_DISABLED",
+          "La ejecucion de codigo requiere unsafeActions=true");
+    }
+    respond(exchange, 200, CodeRunnerService.run(body));
+  }
+
+  private void handleLaunchRunStatus(HttpExchange exchange) throws IOException {    JsonObject body = readJsonBody(exchange);
     String launchId = optString(body, "launchId");
     if (launchId == null || launchId.trim().isEmpty()) {
       launchId = queryParam(exchange, "launchId");

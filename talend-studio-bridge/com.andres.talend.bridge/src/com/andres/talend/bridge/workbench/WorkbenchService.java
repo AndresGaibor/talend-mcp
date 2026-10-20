@@ -463,6 +463,12 @@ public final class WorkbenchService {
     return activePage();
   }
 
+  /** Editor activo, o null si no hay ninguno. */
+  public static IEditorPart activeEditorPart() {
+    IWorkbenchPage page = activePage();
+    return page != null ? page.getActiveEditor() : null;
+  }
+
   private static IWorkbenchPage activePage() {
     IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
     if (window != null && window.getActivePage() != null) {

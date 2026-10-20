@@ -435,7 +435,118 @@ Este ultimo es el que destapo el problema: el `.item` del job en ejecucion ya es
 pero existia un `id_Decimal` en el `.item` de un job viejo, y el composite de la pestana Run
 seguia apuntando a ese.
 
-## 11. Lo que quedo sin resolver
+## 11. Operar sobre el job abierto con la API de Studio
+
+Escribir el `.item` a mano obliga a reproducir el formato XML de Talend: el `context`, el
+`metadata`, el `LENGTHS` de cada componente, los tipos Java de columna. studio no avisa de
+los cambios hechos por fuera, asi que ademas hay que forzar la recarga del modelo EMF. Son
+fallos que aparecen uno a uno y con nombres de error poco descriptivos.
+
+La via correcta es operar sobre el job abierto con la API del propio IDE. El bridge expone
+estas operaciones:
+
+| Operacion | Endpoint | Que hace |
+|---|---|---|
+| Crear job | `POST /automation/job/create` | Crea el item en el repositorio de Talend y lo abre en el editor |
+| Anadir nodo | `POST /automation/nodes/add` | Anade un componente con todos sus parametros por defecto |
+| Conectar | `POST /automation/nodes/connect` | Conecta dos nodos del flujo |
+| Modificar | `POST /automation/nodes/update` | Cambia parametros o etiqueta de un nodo |
+| Borrar | `POST /automation/nodes/delete` | Elimina nodos del job |
+| Copiar | `POST /automation/nodes/copy` | Copia un nodo, como el portapapeles del editor |
+| Listar | `POST /automation/nodes/list` | Nodos del job abierto |
+| Ejecutar codigo | `POST /automation/run-code` | Compila y ejecuta Java dentro de Studio |
+
+### Como se anade un nodo
+
+`Node(component)` crea el nodo con la definicion del componente y todos sus parametros y
+valores por defecto. Eso es justo lo que el MCP no puede reproducir a mano.
+
+```java
+Node node = new Node(catalogComponent);
+NodeContainer container = new NodeContainer(node);
+CreateNodeContainerCommand command =
+    new CreateNodeContainerCommand(process, container, location);
+commandStack.execute(command);
+```
+
+`CreateNodeContainerCommand` es la clase concreta de `CreateCommand`, que es abstracta. El
+`Process.addNodeContainer(...)` es el metodo publico que registra el nodo en el modelo.
+
+### Como se conecta
+
+`ConnectionCreateCommand` es el comando que usa el editor al arrastrar una conexion:
+
+```java
+ConnectionCreateCommand command =
+    new ConnectionCreateCommand(sourceNode, "FLOW", new ArrayList<>());
+command.setTarget(targetNode);
+command.execute();
+```
+
+### Como se crea el job
+
+El item se crea con la factoria EMF del modelo y se registra en el repositorio:
+
+```java
+Object factory = PropertiesFactory.eINSTANCE;
+Property property = factory.createProperty();
+property.setId(id);
+property.setLabel(name);
+property.setVersion(version);
+
+ProcessItem item = factory.createProcessItem();
+item.setProperty(property);
+item.setProcess(TalendFileFactory.eINSTANCE.createProcessType());
+item.setState(factory.createItemState());
+
+repositoryFactory.create(project, item, path);
+```
+
+Tres detalles que hay que respetar o la llamada falla:
+
+- El `ProcessType` es el contenido del `.item`. Sin el, el repositorio no serializa el job.
+- El `ItemState` marca el item como vivo. Sin el, el repositorio lo considera borrado.
+- La ruta que espera `create()` es la completa dentro de la carpeta del tipo de objeto:
+  `process/<nombre>_<version>.item/<nombre>_<version>.item`. Con una ruta a medias, el
+  repositorio crea una carpeta con el nombre del item en vez de un archivo.
+
+Studio escribe despues los tres archivos que acompañan a un job: el `.item`, el
+`.properties` y el `.screenshot`.
+
+### `run_code`: libertad total
+
+`POST /automation/run-code` compila y ejecuta Java dentro de Studio. El codigo ve las mismas
+APIs que ve el IDE, asi que sirve para lo que no cabe en una tool: explorar una API
+desconocida, consultar el estado interno o hacer una operacion que aun no tenga endpoint.
+
+El codigo debe tener una clase con un metodo estatico `public static Object run()`. El valor
+que devuelva se serializa a JSON.
+
+```java
+public class MiConsulta {
+  public static Object run() throws Exception {
+    Map<String, Object> out = new LinkedHashMap<>();
+    Class<?> pm = Class.forName("org.talend.repository.ProjectManager");
+    Object pmi = pm.getMethod("getInstance").invoke(null);
+    Object project = pm.getMethod("getCurrentProject").invoke(pmi);
+    out.put("proyecto", project.getClass().getMethod("getLabel").invoke(project));
+    return out;
+  }
+}
+```
+
+Detalles de la implementacion:
+
+- Se compila con `javax.tools.JavaCompiler`, que viene en el modulo `jdk.compiler` del JDK
+  que ejecuta Studio. El runtime de Studio no trae el compilador, pero su JDK si.
+- El classpath se arma con los jars de los bundles cargados.
+- **Las clases de Talend se cargan desde los bundles del framework, no desde los jars.** Si se
+  cargaran desde el jar, el codigo veria una copia distinta de las clases que usa el IDE, con
+  singletons y caches diferentes, y las llamadas a la API fallarian.
+- Solo corre si `unsafeActions` esta activo y el modo no es lectura. Ejecutar codigo
+  arbitrario puede tocar el workspace de forma irreversible.
+
+## 12. Lo que quedo sin resolver
 
 - El job todavia no llega a ejecutarse de punta a punta. La recarga del item y el parametro
   `LENGTHS` ya estan resueltos, pero el generador de Talend sigue fallando con

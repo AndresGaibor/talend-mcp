@@ -164,14 +164,27 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
     }
   }
 
-  // `tLogRow` necesita el parametro `LENGTHS`: es una tabla con un par
-  // SCHEMA_COLUMN/LENGTH por cada columna del schema. Si falta, el generador
-  // de codigo de Talend hace `Integer.parseInt` sobre un valor vacio y el
-  // job falla con `NumberFormatException`. Ver docs/TALEND-STUDIO-INTERNALS.md.
-  if (spec.componentName === "tLogRow" && !("LENGTHS" in (spec.parameters ?? {}))) {
+  // `tLogRow` necesita varios parametros que el generador de codigo de Talend
+  // lee sin comprobar que existan. Si faltan, falla con
+  // `NumberFormatException: For input string: "Main1100Main1"`.
+  //
+  //   LENGTHS                tabla con un par SCHEMA_COLUMN/LENGTH por columna
+  //   PRINT_CONTENT_WITH_LOG4J  registra con log4j en vez del main del job
+  //   SCHEMA_OPT_NUM         limite de filas que imprime el log
+  //
+  // Ver docs/TALEND-STUDIO-INTERNALS.md.
+  if (spec.componentName === "tLogRow") {
     const lengths = buildLogRowLengths(spec);
-    if (lengths) {
+    if (lengths && !("LENGTHS" in (spec.parameters ?? {}))) {
       parameters.push({ "@_field": "TABLE", "@_name": "LENGTHS", elementValue: lengths });
+    }
+
+    if (!("PRINT_CONTENT_WITH_LOG4J" in (spec.parameters ?? {}))) {
+      parameters.push(buildElementParameter("PRINT_CONTENT_WITH_LOG4J", "true", "CHECK"));
+    }
+
+    if (!("SCHEMA_OPT_NUM" in (spec.parameters ?? {}))) {
+      parameters.push(buildElementParameter("SCHEMA_OPT_NUM", "100", "TEXT"));
     }
   }
 
@@ -186,10 +199,13 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
   if (spec.posY !== undefined) node["@_posY"] = String(spec.posY);
 
   if (spec.schema && spec.schema.columns && Array.isArray(spec.schema.columns)) {
+    // El nombre del metadata es el unique name del componente. Usar el nombre
+    // de la primera columna deja el modelo de Studio inconsistente.
+    const metadataName = spec.schema.name ?? spec.uniqueName;
     const metadata: Record<string, unknown> = {
       "@_connector": spec.schema.connector ?? "FLOW",
-      "@_label": spec.schema.name ?? spec.uniqueName,
-      "@_name": spec.schema.name ?? spec.uniqueName,
+      "@_label": metadataName,
+      "@_name": metadataName,
       "@_xmi:id": generateTalendId(),
       column: spec.schema.columns.map((c) => buildColumn(c)),
     };
@@ -254,20 +270,26 @@ export function buildJobItemXml(spec: JobSpec): { xml: string; rootId: string } 
       "@_value": ctx.value,
       "@_comment": ctx.comment ?? "",
     }));
-  } else {
-    contextParam = spec.components.some((c) => c.componentName === "tFileInputDelimited" || c.componentName === "tDBInput")
-      ? [{ "@_xmi:id": generateTalendId(), "@_name": "DEFAULT", "@_type": "id_String", "@_value": "" }]
-      : [];
+  }
+  // Sin variables de contexto, el `context` va vacio, como en los jobs que
+  // escribe el propio Studio. Poner un `contextParameter` llamado DEFAULT
+  // rompe la resolucion de variables: Studio lo interpola en los valores de
+  // los parametros del componente y el job falla al generar codigo.
+
+  const context: Record<string, unknown> = {
+    "@_confirmationNeeded": "false",
+    "@_hide": "false",
+    "@_name": defaultContext,
+  };
+  // Sin variables de contexto el elemento va vacio, como en los jobs que
+  // escribe el propio Studio. Un `contextParameter` vacio no es lo mismo.
+  if (contextParam.length === 1) {
+    context.contextParameter = contextParam[0];
+  } else if (contextParam.length > 1) {
+    context.contextParameter = contextParam;
   }
 
-  const contextSection = {
-    context: {
-      "@_confirmationNeeded": "false",
-      "@_hide": "false",
-      "@_name": defaultContext,
-      contextParameter: contextParam.length === 1 ? contextParam[0] : contextParam,
-    },
-  };
+  const contextSection = { context };
 
   const nodes = spec.components.map((c) => buildComponentNode(c));
   const nodeSection = nodes.length === 1 ? nodes[0] : nodes;
@@ -423,14 +445,20 @@ export function buildJobletItemXml(spec: JobletSpec): { xml: string; rootId: str
     }));
   }
 
-  const contextSection = {
-    context: {
-      "@_confirmationNeeded": "false",
-      "@_hide": "false",
-      "@_name": defaultContext,
-      contextParameter: contextParam.length === 1 ? contextParam[0] : contextParam,
-    },
+  const context: Record<string, unknown> = {
+    "@_confirmationNeeded": "false",
+    "@_hide": "false",
+    "@_name": defaultContext,
   };
+  // Sin variables de contexto el elemento va vacio, como en los jobs que
+  // escribe el propio Studio. Un `contextParameter` vacio no es lo mismo.
+  if (contextParam.length === 1) {
+    context.contextParameter = contextParam[0];
+  } else if (contextParam.length > 1) {
+    context.contextParameter = contextParam;
+  }
+
+  const contextSection = { context };
 
   const nodes = spec.components.map((c) => buildComponentNode(c));
   const nodeSection = nodes.length === 1 ? nodes[0] : nodes;

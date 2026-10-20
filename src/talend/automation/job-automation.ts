@@ -63,7 +63,9 @@ function inheritSchemaFromSource(
       continue;
     }
     return {
-      name: source.schema[0]?.name ?? "Default",
+      // El metadata del componente que hereda el schema se llama como el
+      // componente, no como la primera columna.
+      name: componentId,
       connector: "FLOW",
       columns: source.schema.map((col) => ({
         name: col.name,
@@ -76,7 +78,6 @@ function inheritSchemaFromSource(
   }
   return undefined;
 }
-
 export async function createJobFromSpec(
   projectPath: string,
   spec: TalendJobSpec,
@@ -114,7 +115,9 @@ export async function createJobFromSpec(
       parameters: c.parameters ?? {},
       schema: c.schema
         ? {
-            name: c.schema[0]?.name ?? "Default",
+            // El metadata se llama como el componente, no como la primera
+            // columna. Asi lo escribe el propio Studio.
+            name: c.id,
             connector: "FLOW",
             columns: c.schema.map((col) => ({
               name: col.name,
