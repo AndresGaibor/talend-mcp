@@ -24,6 +24,7 @@ export const componentTools = [
     handler: async ({ pluginsDir }: { pluginsDir?: string }) => {
       const { TalendPluginScanner } = await import("../../modules/component-knowledge/infrastructure/talend-plugin-scanner");
       const { ComponentCacheRepository } = await import("../../modules/component-knowledge/infrastructure/component-cache.repository");
+      const { saveComponentCatalog } = await import("../components/component-catalog-store");
       const { resolveTalendPluginsDir } = await import("../components/talend-paths");
 
       const scanner = new TalendPluginScanner();
@@ -42,16 +43,18 @@ export const componentTools = [
 
       const components = await scanner.scanStudioPlugins(resolvedDir);
       const result = await cacheRepo.save(components, resolvedDir);
+      const catalog = await saveComponentCatalog({ pluginsDir: resolvedDir });
 
       return bridgeOk({
-        ok: result.ok,
+        ok: result.ok && catalog.ok,
         source: "workspace-files",
-        confidence: result.ok ? "high" : "low",
+        confidence: result.ok && catalog.ok ? "high" : "low",
         endpoint: "/components/scan",
         data: {
           ...result,
           scannedComponents: components.length,
           pluginsDir: resolvedDir,
+          catalog,
         },
       });
     },

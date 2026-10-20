@@ -90,8 +90,14 @@ function listComponentDirs(cd: string): string[] {
   } catch { return []; }
 }
 
+export function getJarCommand(): string {
+  const jarName = process.platform === "win32" ? "jar.exe" : "jar";
+  const javaHomeJar = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, "bin", jarName) : "";
+  return javaHomeJar && existsSync(javaHomeJar) ? javaHomeJar : "jar";
+}
+
 async function listJarEntries(jarPath: string): Promise<string[]> {
-  const proc = Bun.spawn(["jar", "tf", jarPath], {
+  const proc = Bun.spawn([getJarCommand(), "tf", jarPath], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -123,7 +129,7 @@ async function extractJarEntry(
 ): Promise<string | null> {
   mkdirSync(targetDir, { recursive: true });
 
-  const proc = Bun.spawn(["jar", "xf", jarPath, entry], {
+  const proc = Bun.spawn([getJarCommand(), "xf", jarPath, entry], {
     cwd: targetDir,
     stdout: "pipe",
     stderr: "pipe",

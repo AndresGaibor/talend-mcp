@@ -19,8 +19,7 @@ export type PluginScanResult = {
 };
 
 export class TalendPluginScanner {
-  async scanStudioPlugins(talendStudioPath: string): Promise<TalendComponentDefinition[]> {
-    const pluginsPath = path.join(talendStudioPath, 'plugins');
+  async scanStudioPlugins(pluginsPath: string): Promise<TalendComponentDefinition[]> {
     if (!fs.existsSync(pluginsPath)) {
       return [];
     }
