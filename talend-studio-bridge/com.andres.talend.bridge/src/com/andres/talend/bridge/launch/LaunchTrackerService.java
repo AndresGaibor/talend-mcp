@@ -12,6 +12,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class LaunchTrackerService {
 
@@ -95,21 +97,110 @@ public final class LaunchTrackerService {
     }
   }
 
+  /**
+   * Marca como terminada la ultima ejecucion de una configuracion de arranque.
+   *
+   * Es la via que usa el listener de Eclipse: al terminar el proceso del job
+   * solo se sabe el nombre de la configuracion, no el identificador que se
+   * dio al registrar el arranque.
+   */
+  public static void markTerminatedByLaunchName(String launchConfigName, Integer exitCode) {
+    if (launchConfigName == null) {
+      return;
+    }
+    String launchId = launchNameToLatestId.get(launchConfigName);
+    if (launchId == null) {
+      return;
+    }
+    markTerminated(launchId, exitCode, null);
+  }
+
   public static LaunchRunInfo waitForLaunch(String launchId, int timeoutMs) {
     long deadline = System.currentTimeMillis() + timeoutMs;
-    while (System.currentTimeMillis() < deadline) {
+    while (true) {
       LaunchRunInfo info = getLaunch(launchId);
       if (info != null && info.terminatedAt != null) {
         return info;
       }
+      long remaining = deadline - System.currentTimeMillis();
+      if (remaining <= 0) {
+        return getLaunch(launchId);
+      }
+      if (info != null) {
+        // Talend ejecuta cada job en una JVM aparte. El fin del proceso es
+        // la senal de que el job termino: el evento de depuracion de
+        // Eclipse no se emite para estos lanzamientos.
+        for (ProcessHandle handle : processesOfJob(info.launchConfigName)) {
+          try {
+            handle.onExit().get(Math.min(remaining, 1000), TimeUnit.MILLISECONDS);
+            markTerminated(launchId, exitCodeOf(handle), null);
+            return getLaunch(launchId);
+          } catch (TimeoutException e) {
+            // Todavia no ha terminado: se sigue esperando.
+          } catch (Exception e) {
+            // El proceso ya no esta: se comprueba en la siguiente vuelta.
+          }
+        }
+      }
       try {
-        Thread.sleep(500);
+        Thread.sleep(50);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
       }
     }
     return getLaunch(launchId);
+  }
+
+  /**
+   * Codigo de salida de un proceso ya terminado.
+   *
+   * Se pide por reflexion porque la version de Java con la que compila el
+   * plugin no siempre expone `ProcessHandle.Info.exitCode`.
+   */
+  private static Integer exitCodeOf(ProcessHandle handle) {
+    try {
+      Object info = handle.getClass().getMethod("info").invoke(handle);
+      Object value = info.getClass().getMethod("exitCode").invoke(info);
+      if (value instanceof java.util.Optional) {
+        value = ((java.util.Optional<?>) value).orElse(null);
+      }
+      return value instanceof Integer ? (Integer) value : null;
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * Procesos del sistema operativo que corresponden a un job.
+   *
+   * Se buscan por la linea de comandos, que incluye el nombre de la clase
+   * java del job: `prj_bancolombia.mcp_fase0_zero_0_1.MCP_Fase0_Zero`.
+   */
+  private static List<ProcessHandle> processesOfJob(String launchConfigName) {
+    List<ProcessHandle> found = new ArrayList<>();
+    if (launchConfigName == null) {
+      return found;
+    }
+    String jobName = launchConfigName.trim();
+    int space = jobName.indexOf(' ');
+    if (space > 0) {
+      jobName = jobName.substring(0, space);
+    }
+    if (jobName.isEmpty()) {
+      return found;
+    }
+    for (ProcessHandle handle : ProcessHandle.allProcesses().toArray(ProcessHandle[]::new)) {
+      try {
+        String command = handle.info().commandLine().orElse("");
+        if (command.contains(jobName)) {
+          found.add(handle);
+        }
+      } catch (Exception e) {
+        // Hay procesos que no dejan leer su linea de comandos.
+      }
+    }
+    return found;
   }
 
   private static void persist(LaunchRunInfo info) {

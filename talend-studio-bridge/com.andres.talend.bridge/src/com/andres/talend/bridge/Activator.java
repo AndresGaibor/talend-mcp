@@ -2,6 +2,7 @@ package com.andres.talend.bridge;
 
 import com.andres.talend.bridge.events.EventsService;
 import com.andres.talend.bridge.launch.LaunchTrackerService;
+import com.andres.talend.bridge.workbench.ModalGuard;
 
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
@@ -21,12 +22,18 @@ public final class Activator extends AbstractUIPlugin {
     bridgeServer = new BridgeServer(context);
     bridgeServer.start();
 
+    // El guardian cierra los modales que bloquean a Studio (por ejemplo el
+    // "Jobname Error" al reusar la etiqueta de un job). Sin el, el hilo de
+    // la UI se queda dentro del dialogo y el IDE no responde.
+    ModalGuard.startWatchdog();
+
     hotReloadService = new HotReloadService();
     hotReloadService.start(context.getBundle());
   }
 
   @Override
   public void stop(BundleContext context) throws Exception {
+    ModalGuard.stopWatchdog();
     if (hotReloadService != null) {
       hotReloadService.stop();
       hotReloadService = null;

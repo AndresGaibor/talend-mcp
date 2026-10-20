@@ -114,7 +114,13 @@ public final class WorkbenchService {
     }
 
     IEditorPart editor = page.getActiveEditor();
-    if (!editor.isDirty()) {
+
+    // Ojo con `isDirty`: ese indicador mira el estado de la UI (paginas y
+    // command stack de GEF), no el estado real del modelo de Talend, que es
+    // `process.isProcessModified()`. Un job modificado por la API queda con el
+    // editor limpio, asi que comprobar `dirty` hacia que el guardado no
+    // ocurriera nunca. Se pregunta al proceso.
+    if (!editor.isDirty() && !isProcessModified(editor)) {
       payload.put("saved", false);
       payload.put("message", "Editor no está dirty, no se necesita guardar");
       return payload;
@@ -130,6 +136,29 @@ public final class WorkbenchService {
       payload.put("error", error("SAVE_FAILED", e.getMessage()));
     }
     return payload;
+  }
+
+  /**
+   * Indica si el proceso del editor tiene cambios pendientes.
+   *
+   * Es el estado real del modelo de Talend, a diferencia de `isDirty` del
+   * editor, que solo refleja el estado de la interfaz.
+   */
+  public static boolean isProcessModified(IEditorPart editor) {
+    try {
+      Object designer = editor.getClass().getMethod("getDesignerEditor").invoke(editor);
+      if (designer == null) {
+        return false;
+      }
+      Object process = designer.getClass().getMethod("getProcess").invoke(designer);
+      if (process == null) {
+        return false;
+      }
+      Object modified = process.getClass().getMethod("isProcessModified").invoke(process);
+      return Boolean.TRUE.equals(modified);
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   public static Map<String, Object> saveAllEditors() {

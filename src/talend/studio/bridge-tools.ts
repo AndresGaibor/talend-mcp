@@ -5,6 +5,7 @@ import { masteryTools } from "./tools-mastery";
 import { snapshotTools } from "./tools-snapshot";
 import { errorTools } from "./tools-errors";
 import { automationTools } from "./tools-automation";
+import { jobOperationsTools } from "./tools-job-operations";
 import { coverageTools } from "./tools-coverage";
 import { taskTools } from "./tools-task";
 import { deliverableTools } from "./tools-deliverables";
@@ -22,6 +23,7 @@ export const allTools: BridgeToolDef[] = [
   ...snapshotTools,
   ...errorTools,
   ...automationTools,
+  ...jobOperationsTools,
   ...coverageTools,
   ...taskTools,
   ...deliverableTools,

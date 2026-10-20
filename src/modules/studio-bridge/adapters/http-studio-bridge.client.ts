@@ -446,6 +446,134 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  /** Crea un job vacio en el repositorio de Talend y lo abre en el editor. */
+  async createJob(options: {
+    name: string;
+    version?: string;
+    folder?: string;
+    description?: string;
+    replace?: boolean;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/create", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Borra un job del repositorio de Talend, con sus archivos. */
+  async deleteJob(options: { name: string; version?: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/delete", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /**
+   * Lista los dialogos modales que bloquean Studio y cierra los conocidos.
+   *
+   * El guardian de modales del plugin hace esto solo cada poco; esto es para
+   * forzarlo bajo demanda.
+   */
+  async dismissDialogs(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/dialogs", {
+      method: "POST",
+      body: {},
+    });
+  }
+
+  /** Abre un job del proyecto en el editor de Talend. */
+  async openJob(options: {
+    name: string;
+    version?: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/open", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Anade un componente al job abierto, con los parametros que pidio Studio. */
+  async addNode(options: {
+    type: string;
+    label?: string;
+    position?: { x: number; y: number };
+    parameters?: Record<string, { value: string; field?: string }>;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/nodes/add", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Conecta dos nodos del job abierto. */
+  async connectNodes(options: {
+    source: string;
+    target: string;
+    type?: string;
+    name?: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/nodes/connect", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Cambia parametros o etiqueta de un nodo del job abierto. */
+  async updateNode(options: {
+    uniqueName: string;
+    label?: string;
+    parameters?: Record<string, { value: string; field?: string }>;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/nodes/update", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Define el schema (las columnas) de un nodo del job abierto. */
+  async setNodeSchema(options: {
+    uniqueName: string;
+    connector?: string;
+    columns: Array<{
+      name: string;
+      type?: string;
+      length?: number;
+      precision?: number;
+      nullable?: boolean;
+      key?: boolean;
+    }>;
+    values?: string[][];
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/nodes/schema", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Lista los nodos del job abierto. */
+  async listNodes(options?: { job?: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/nodes/list", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
+  /**
+   * Ejecuta codigo Java dentro de Studio.
+   *
+   * El codigo ve las mismas APIs que ve el IDE, asi que sirve para lo que no
+   * cabe en una tool. Debe tener una clase con `public static Object run()`.
+   */
+  async runCode(options: {
+    code: string;
+    className?: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/run-code", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   private async request<T>(endpoint: string, init: BridgeRequestInit = {}): Promise<BridgeResult<T>> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);

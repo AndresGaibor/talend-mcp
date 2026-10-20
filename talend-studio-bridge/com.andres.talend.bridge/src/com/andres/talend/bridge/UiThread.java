@@ -5,10 +5,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.swt.widgets.Display;
 
-final class UiThread {
+public final class UiThread {
   private UiThread() {}
 
-  static <T> T sync(Callable<T> action) {
+  public static <T> T sync(Callable<T> action) {
     if (Display.getCurrent() != null) {
       return call(action);
     }

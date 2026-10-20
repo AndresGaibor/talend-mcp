@@ -48,8 +48,10 @@ public final class CodeRunnerService {
   /**
    * Compila y ejecuta el codigo dado.
    *
-   * @param spec code (obligatorio) y className (opcional, por defecto se
-   *        deduce del propio codigo).
+   * @param spec code (obligatorio), className (opcional) y uiThread (opcional).
+   *        Con `uiThread` el codigo corre en el hilo de la UI, que es lo
+   *        necesario para tocar widgets, diálogos o el workbench. Sin eso, SWT
+   *        lanza `Invalid thread access`.
    */
   public static Map<String, Object> run(JsonObject spec) {
     Map<String, Object> payload = new LinkedHashMap<>();
@@ -97,12 +99,35 @@ public final class CodeRunnerService {
         ClassLoader loader = studioClassLoader(outputDir);
         Class<?> compiledClass = loader.loadClass(className);
 
-        // 3. Ejecutar.
+        // 3. Ejecutar. En el hilo de la UI si se pide.
         Method entryPoint = compiledClass.getMethod(ENTRY_POINT);
-        Object result = entryPoint.invoke(null);
+        boolean onUiThread = Boolean.TRUE.equals(
+            spec.has("uiThread") && !spec.get("uiThread").isJsonNull()
+                ? spec.get("uiThread").getAsBoolean() : Boolean.FALSE);
+
+        Object result;
+        if (onUiThread) {
+          final Object[] holder = new Object[1];
+          final Throwable[] failure = new Throwable[1];
+          org.eclipse.swt.widgets.Display.getDefault().syncExec(() -> {
+            try {
+              holder[0] = entryPoint.invoke(null);
+            } catch (Throwable t) {
+              failure[0] = t;
+            }
+          });
+          if (failure[0] != null) {
+            throw failure[0] instanceof Exception ? (Exception) failure[0]
+                : new java.lang.RuntimeException(failure[0]);
+          }
+          result = holder[0];
+        } else {
+          result = entryPoint.invoke(null);
+        }
 
         payload.put("ok", true);
         payload.put("className", className);
+        payload.put("uiThread", onUiThread);
         payload.put("result", toJson(result));
       } finally {
         deleteRecursively(sourceDir);
@@ -140,22 +165,18 @@ public final class CodeRunnerService {
       classpath.append(entry);
     }
 
-    StringWriter out = new StringWriter();
-    StringWriter err = new StringWriter();
-    int status = compiler.run(null, null, null,
+    java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+    java.io.ByteArrayOutputStream err = new java.io.ByteArrayOutputStream();
+    int status = compiler.run(null, out, err,
         "-nowarn",
         "-classpath", classpath.toString(),
         "-d", outputDir.toString(),
         sourceFile.toString());
-    PrintWriter writer = new PrintWriter(out);
-    writer.flush();
-    PrintWriter errorWriter = new PrintWriter(err);
-    errorWriter.flush();
 
     if (status != 0) {
-      String errors = err.toString();
+      String errors = err.toString(java.nio.charset.StandardCharsets.UTF_8);
       if (errors.isEmpty()) {
-        errors = out.toString();
+        errors = out.toString(java.nio.charset.StandardCharsets.UTF_8);
       }
       for (String line : errors.split("\n")) {
         if (!line.trim().isEmpty()) {
@@ -163,7 +184,10 @@ public final class CodeRunnerService {
         }
       }
       if (messages.isEmpty()) {
-        messages.add("El compilador devolvio el codigo " + status);
+        // El compilador no siempre escribe el detalle: se recoge con un
+        // escritor propio para no perder el diagnostico.
+        messages.add("El compilador devolvio el codigo " + status + " sin detalle. "
+            + "Revisa que las clases importadas existan en el classpath de Studio.");
       }
       return false;
     }

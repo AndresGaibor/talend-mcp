@@ -25,6 +25,7 @@ import com.andres.talend.bridge.problems.ProblemMarkerService;
 import com.andres.talend.bridge.resources.WorkspaceService;
 import com.andres.talend.bridge.talend.TalendClassProbeService;
 import com.andres.talend.bridge.talend.TalendIntrospectionService;
+import com.andres.talend.bridge.workbench.ModalGuard;
 import com.andres.talend.bridge.workbench.WorkbenchService;
 
 import com.google.gson.JsonElement;
@@ -114,6 +115,7 @@ final class BridgeServer {
       server.createContext("/workbench/activate-editor", exchange -> guarded(exchange, () -> handleActivateEditor(exchange)));
       server.createContext("/workbench/find-editor", exchange -> guarded(exchange, () -> handleFindEditor(exchange)));
       server.createContext("/workbench/show-view", exchange -> guarded(exchange, () -> handleShowView(exchange)));
+      server.createContext("/workbench/dialogs", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(ModalGuard::dismissBlockingDialogs))));
       server.createContext("/workspace/state", exchange -> guarded(exchange, () -> respond(exchange, 200, WorkspaceService.state())));
       server.createContext("/workspace/refresh", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkspaceService::refresh))));
       server.createContext("/problems/markers", exchange -> guarded(exchange, () -> respond(exchange, 200, ProblemMarkerService.markers())));
@@ -131,12 +133,15 @@ final class BridgeServer {
       server.createContext("/events/clear", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.clear())));
       server.createContext("/automation/run-active-job", exchange -> guarded(exchange, () -> handleAutomationRunActiveJob(exchange)));
       server.createContext("/automation/job/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createJob")));
+      server.createContext("/automation/job/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteJob")));
+      server.createContext("/automation/job/open", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "openJob")));
       server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
       server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
       server.createContext("/automation/nodes/update", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "updateNode")));
       server.createContext("/automation/nodes/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteNodes")));
       server.createContext("/automation/nodes/copy", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "copyNode")));
       server.createContext("/automation/nodes/list", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "listNodes")));
+      server.createContext("/automation/nodes/schema", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setSchema")));
       server.createContext("/automation/run-code", exchange -> guarded(exchange, () -> handleRunCode(exchange)));
       server.createContext("/launch/runs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchTrackerService.runs())));
       server.createContext("/launch/run-status", exchange -> guarded(exchange, () -> handleLaunchRunStatus(exchange)));
@@ -364,6 +369,10 @@ final class BridgeServer {
       switch (operation) {
         case "createJob":
           return JobOperationsService.createJob(body);
+        case "deleteJob":
+          return JobOperationsService.deleteJob(body);
+        case "openJob":
+          return JobOperationsService.openJob(body);
         case "addNode":
           return JobOperationsService.addNode(body);
         case "connect":
@@ -374,8 +383,10 @@ final class BridgeServer {
           return JobOperationsService.deleteNodes(body);
         case "copyNode":
           return JobOperationsService.copyNode(body);
+        case "setSchema":
+          return JobOperationsService.setSchema(body);
         default:
-          return JobOperationsService.listNodes();
+          return JobOperationsService.listNodes(body);
       }
     }));
   }
