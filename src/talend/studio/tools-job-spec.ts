@@ -4,7 +4,7 @@ import { bridgeOk, bridgeFail, loadBridge } from "./tools-base";
 import { generateJobSpec, validateJobSpec } from "../jobs/pipeline-patterns";
 import { toGeneratorSpec, validateGeneratorSpec } from "../jobs/job-spec-generator";
 import { buildJobItemXml, buildJobPropertiesXml } from "../job-generator";
-import { writeTextFile } from "../files";
+import { readTextFile, writeTextFile } from "../files";
 import { getConfiguredProjectPath } from "../workspace";
 import { listJobs } from "../repository";
 import { createPlatformContext } from "../../platform";
@@ -183,7 +183,6 @@ export const jobSpecTools = [
         let snapshotPath: string | undefined;
 
         if (existingJob) {
-          const { readTextFile } = await import("../files");
           try {
             const content = await readTextFile(existingJob.itemPath, projectPath);
             snapshotPath = existingJob.itemPath + ".snapshot_" + Date.now();

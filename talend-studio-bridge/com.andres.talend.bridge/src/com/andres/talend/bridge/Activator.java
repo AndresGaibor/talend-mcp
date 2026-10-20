@@ -9,14 +9,11 @@ import org.osgi.framework.BundleContext;
 public final class Activator extends AbstractUIPlugin {
   public static final String PLUGIN_ID = "com.andres.talend.bridge";
 
-  private static Activator instance;
-
   private BridgeServer bridgeServer;
 
   @Override
   public void start(BundleContext context) throws Exception {
     super.start(context);
-    instance = this;
     LaunchTrackerService.loadPersistedRuns();
     EventsService.start();
     bridgeServer = new BridgeServer(context);
@@ -30,7 +27,6 @@ public final class Activator extends AbstractUIPlugin {
       bridgeServer = null;
     }
     EventsService.stop();
-    instance = null;
     super.stop(context);
   }
 }

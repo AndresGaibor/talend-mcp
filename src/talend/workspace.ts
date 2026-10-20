@@ -47,12 +47,22 @@ export function extractWorkspacePathFromLsofOutput(output: string): string | und
   return undefined;
 }
 
-export function extractProjectPathFromLsofOutput(output: string): string | undefined {
-  const paths = output
+/**
+ * Extrae las rutas candidatas del output de `lsof` sin tocar el filesystem.
+ * `lsof` solo existe en Unix, por eso el parser trabaja con rutas POSIX.
+ */
+export function extractCandidatePathsFromLsofOutput(output: string): string[] {
+  return output
     .split(/\r?\n/)
     .map((line) => line.match(/(\/[^\s]+)$/)?.[1])
     .filter((ruta): ruta is string => Boolean(ruta));
+}
 
+/**
+ * Busca hacia arriba la carpeta que contiene `talend.project`, revisando también
+ * las subcarpetas de cada nivel.
+ */
+export function findProjectDirFromCandidates(paths: string[]): string | undefined {
   for (const path of paths) {
     let current = dirname(path);
 
@@ -76,6 +86,10 @@ export function extractProjectPathFromLsofOutput(output: string): string | undef
   }
 
   return undefined;
+}
+
+export function extractProjectPathFromLsofOutput(output: string): string | undefined {
+  return findProjectDirFromCandidates(extractCandidatePathsFromLsofOutput(output));
 }
 
 function runProcess(command: string, args: string[]): string {

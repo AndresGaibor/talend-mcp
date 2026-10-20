@@ -1,5 +1,5 @@
 import { readTextFile } from "../../../infrastructure/filesystem/file-reader";
-import { parseXml, asArray } from "../../../infrastructure/xml/xml-utils";
+import { parseXml, asArray, elementNameFromHref } from "../../../infrastructure/xml/xml-utils";
 import { ok, fail } from "../common/response";
 import type { DqAnalysis, DQIndicator } from "../../../infrastructure/repositories/dq-xml.repository";
 
@@ -43,8 +43,7 @@ function extractIndicatorType(indicator: XmlRecord): string {
 }
 
 function fileNameFromHref(href: string): string {
-  const base = href.split("#")[0] ?? href;
-  return base.split("/").pop()?.replace(".item", "") ?? "unknown";
+  return elementNameFromHref(href);
 }
 
 function parseDQAnalysisFromXml(parsed: XmlRecord, anaPath: string): DqAnalysis | null {

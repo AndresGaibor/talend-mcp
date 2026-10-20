@@ -191,7 +191,7 @@ describe("Talend job generator", () => {
     const resInvalid = validateJobDesign(badSpec, DEFAULT_VALIDATION_CONTEXT);
     expect(resInvalid.valid).toBe(false);
     expect(resInvalid.errors.length).toBe(1);
-    expect(resInvalid.errors[0].message).toContain("requiere el parámetro 'METHOD'");
+    expect(resInvalid.errors[0]!.message).toContain("requiere el parámetro 'METHOD'");
   });
 
   test("buildJobItemXml genera contexto con variables custom", () => {

@@ -64,6 +64,14 @@ import { createEvidencePackExportTool } from "../modules/evidence-pack/tools/evi
 import { createReportSnippetsListTool } from "../modules/jobs/tools/report-snippets-list.tool";
 import { createReportSnippetsGenerateTool } from "../modules/jobs/tools/report-snippets-generate.tool";
 
+import { createRecipeGenerateTool } from "../modules/component-knowledge/tools/recipe-generate.tool";
+import { createRecipeGetTool } from "../modules/component-knowledge/tools/recipe-get.tool";
+import { createSchemaExtractTool } from "../modules/component-knowledge/tools/schema-extract.tool";
+import { createSchemaCompareTool } from "../modules/component-knowledge/tools/schema-compare.tool";
+import { createSchemaSuggestionsTool } from "../modules/component-knowledge/tools/schema-suggestions.tool";
+import { createCatalogRebuildTool } from "../modules/component-knowledge/tools/catalog-rebuild.tool";
+import { createJobQualityReportTool, createJobQualityIssuesTool } from "../modules/component-knowledge/tools/job-quality.tool";
+
 export type RuntimeTool = {
   definition: McpToolDefinition;
   handler: (input: unknown) => Promise<unknown>;
@@ -124,6 +132,14 @@ function getModuleTools(): RuntimeTool[] {
     createEvidencePackExportTool(),
     createReportSnippetsListTool(),
     createReportSnippetsGenerateTool(),
+    createRecipeGenerateTool(),
+    createRecipeGetTool(),
+    createSchemaExtractTool(),
+    createSchemaCompareTool(),
+    createSchemaSuggestionsTool(),
+    createCatalogRebuildTool(),
+    createJobQualityReportTool(),
+    createJobQualityIssuesTool(),
   ];
 
   return rawTools.map((tool) => ({
@@ -259,7 +275,7 @@ const PRESET_CORE = new Set([
 
 // Known legacy duplicate aliases within the talend_* namespace.
 // These point to the same handler as their newer canonical counterpart.
-// Excluded from "canonical" to avoid showing duplicate tools in ChatGPT.
+// Excluded from "canonical" to avoid exposing duplicate tools to clients.
 const LEGACY_TALEND_ALIASES = new Set([
   "talend_secret_scan_project",               // → talend_secrets_scan_project
   "talend_secret_scan_job",                   // → talend_secrets_scan_job

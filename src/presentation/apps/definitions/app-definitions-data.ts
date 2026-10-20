@@ -10,7 +10,6 @@ export const DATA_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/dataset-inspector.html",
     launcherToolName: "talend_app_dataset_inspector",
     launchMessage: "Abriendo el inspector de datasets.",
-    uiMode: "react",
     actions: [
       createTextAction("Inspect CSV folder", TOOL_NAMES.DATASETS.INSPECT_CSV_FOLDER, "Inspecciona una carpeta CSV.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/path/to/csv" }),
       createTextAction("Infer schema", TOOL_NAMES.DATASETS.INFER_CSV_SCHEMA, "Infers schema de CSVs.", "folderPath", { inputLabel: "Folder path", inputPlaceholder: "/path/to/csv" }),

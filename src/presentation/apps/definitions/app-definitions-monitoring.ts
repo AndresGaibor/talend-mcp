@@ -10,7 +10,6 @@ export const MONITORING_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/run-monitor.html",
     launcherToolName: "talend_app_run_monitor",
     launchMessage: "Abriendo el monitor de ejecuciones.",
-    uiMode: "react",
     actions: [
       createNoInputAction("List runs", TOOL_NAMES.RUNS.LIST, "Lista ejecuciones recientes."),
       createTextAction("Read run", TOOL_NAMES.RUNS.READ, "Lee detalles de una ejecución.", "runId", { inputLabel: "Run ID", inputPlaceholder: "run_001" }),

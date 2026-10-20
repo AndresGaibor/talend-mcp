@@ -8,6 +8,11 @@ import { parseJobItem } from "../../src/talend/job-parser";
 import { createTalendFolder, createTalendJob, duplicateTalendJob, findTalendJob, moveTalendJobToFolder } from "../../src/talend/job-crud";
 import { listJobs } from "../../src/talend/repository";
 
+/** Normaliza separadores para comparar rutas entre Windows y Unix. */
+function toPosix(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
 describe("Talend job CRUD", () => {
   test("parseJobProperties resuelve href relativo del item", async () => {
     const xml = await readTextFile("tests/fixtures/talend/lab04_olist_orders_to_staging_0.1.properties");
@@ -67,7 +72,7 @@ describe("Talend job CRUD", () => {
     const job = jobs[0];
     expect(job).toBeDefined();
     expect(job?.folderPath).toBe("bloque2_talend_base");
-    expect(job?.itemPath).toContain("carpeta_a/subcarpeta_b/lab04_olist_orders_to_staging_0.1.item");
+    expect(toPosix(job?.itemPath ?? "")).toContain("carpeta_a/subcarpeta_b/lab04_olist_orders_to_staging_0.1.item");
 
     rmSync(tempRoot, { recursive: true, force: true });
   });
@@ -86,8 +91,8 @@ describe("Talend job CRUD", () => {
       folderPath: "carpeta_destino/subcarpeta",
     });
 
-    expect(result.newItemPath).toContain("process/carpeta_destino/subcarpeta/lab04_olist_orders_to_staging_0.1.item");
-    expect(result.newPropertiesPath).toContain("process/carpeta_destino/subcarpeta/lab04_olist_orders_to_staging_0.1.properties");
+    expect(toPosix(result.newItemPath)).toContain("process/carpeta_destino/subcarpeta/lab04_olist_orders_to_staging_0.1.item");
+    expect(toPosix(result.newPropertiesPath)).toContain("process/carpeta_destino/subcarpeta/lab04_olist_orders_to_staging_0.1.properties");
     expect(existsSync(result.newItemPath)).toBe(true);
     expect(existsSync(result.newPropertiesPath)).toBe(true);
 
@@ -108,8 +113,8 @@ describe("Talend job CRUD", () => {
       folderPath: "carpeta_nueva",
     });
 
-    expect(result.itemPath).toContain("process/carpeta_nueva/nuevo_job_0.1.item");
-    expect(result.propertiesPath).toContain("process/carpeta_nueva/nuevo_job_0.1.properties");
+    expect(toPosix(result.itemPath)).toContain("process/carpeta_nueva/nuevo_job_0.1.item");
+    expect(toPosix(result.propertiesPath)).toContain("process/carpeta_nueva/nuevo_job_0.1.properties");
 
     rmSync(tempRoot, { recursive: true, force: true });
   });
@@ -135,7 +140,7 @@ describe("Talend job CRUD", () => {
 
     const job = await findTalendJob(projectPath, "duplicado", "folder_b");
     expect(job.folderPath).toBe("folder_b");
-    expect(job.itemPath).toContain("folder_b/duplicado_0.1.item");
+    expect(toPosix(job.itemPath)).toContain("folder_b/duplicado_0.1.item");
 
     await expect(findTalendJob(projectPath, "duplicado")).rejects.toThrow("Job ambiguo");
 
@@ -157,8 +162,8 @@ describe("Talend job CRUD", () => {
       targetFolderPath: "folder_c",
     });
 
-    expect(result.itemPath).toContain("folder_c/duplicado_copia_0.2.item");
-    expect(result.propertiesPath).toContain("folder_c/duplicado_copia_0.2.properties");
+    expect(toPosix(result.itemPath)).toContain("folder_c/duplicado_copia_0.2.item");
+    expect(toPosix(result.propertiesPath)).toContain("folder_c/duplicado_copia_0.2.properties");
     expect(existsSync(result.itemPath)).toBe(true);
     expect(existsSync(result.propertiesPath)).toBe(true);
 

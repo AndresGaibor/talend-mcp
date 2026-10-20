@@ -23,7 +23,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/deliverables.html",
     launcherToolName: "talend_app_deliverables",
     launchMessage: "Abriendo la vista de entregables.",
-    uiMode: "react",
     actions: [
       createTextAction("Export deliverable", TOOL_NAMES.DELIVERABLES.EXPORT_JOB, "Prepara un paquete de entregable.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob", requiresConfirmation: true }),
       createTextAction("Collect files", TOOL_NAMES.DELIVERABLES.COLLECT, "Recolecta archivos asociados.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
@@ -37,7 +36,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/component-catalog.html",
     launcherToolName: "talend_app_component_catalog",
     launchMessage: "Abriendo el catálogo de componentes.",
-    uiMode: "react",
     actions: [
       createTextAction("Scan installed", TOOL_NAMES.COMPONENTS.SCAN_INSTALLED, "Escanea componentes instalados.", "pluginsDir", { inputLabel: "Plugins dir", inputPlaceholder: "Ruta a plugins de Talend Studio" }),
       createTextAction("Search component", TOOL_NAMES.COMPONENTS.SEARCH, "Busca componentes en el catálogo.", "query", { inputLabel: "Query", inputPlaceholder: "mysql" }),
@@ -64,7 +62,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/home.html",
     launcherToolName: "talend_app_home",
     launchMessage: "Abriendo la pantalla de inicio.",
-    uiMode: "react",
     actions: [
       createNoInputAction("Bridge ping", TOOL_NAMES.BRIDGE.PING, "Verifica el bridge."),
       createNoInputAction("List jobs", TOOL_NAMES.JOBS.LIST, "Lista los jobs del proyecto."),
@@ -118,7 +115,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/secret-safety.html",
     launcherToolName: "talend_app_secret_safety",
     launchMessage: "Abriendo el scanner de secretos.",
-    uiMode: "react",
     actions: [
       createNoInputAction("Scan project", TOOL_NAMES.SECRETS.SCAN_PROJECT, "Escanea todo el proyecto en busca de secretos expuestos."),
       createTextAction("Scan job", TOOL_NAMES.SECRETS.SCAN_JOB, "Escanea un job específico.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
@@ -132,7 +128,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/requirement-checklist.html",
     launcherToolName: "talend_app_requirement_checklist",
     launchMessage: "Abriendo el checklist de requisitos.",
-    uiMode: "react",
     actions: [
       createTextAction("Analyze requirements", TOOL_NAMES.REQUIREMENTS.ANALYZE, "Analiza requisitos del proyecto.", "projectPath", { inputLabel: "Project path", inputPlaceholder: "/path/to/project" }),
       createJsonAction("Build checklist", TOOL_NAMES.REQUIREMENTS.BUILD_CHECKLIST, "Construye checklist de requisitos.", { requirements: [] }),
@@ -145,7 +140,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/workshop-progress.html",
     launcherToolName: "talend_app_workshop_progress",
     launchMessage: "Abriendo el progreso de workshop.",
-    uiMode: "react",
     actions: [
       createNoInputAction("List workshops", TOOL_NAMES.JOBS.LIST, "Lista workshops disponibles."),
       createTextAction("Get progress", TOOL_NAMES.RUNS.LIST, "Obtiene progreso de un workshop.", "workshopId", { inputLabel: "Workshop id", inputPlaceholder: "workshop_001" }),
@@ -158,7 +152,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/antipattern-detector.html",
     launcherToolName: "talend_app_antipattern_detector",
     launchMessage: "Abriendo el detector de antipatrones.",
-    uiMode: "react",
     actions: [
       createTextAction("Detect antipatterns", TOOL_NAMES.JOBS.DETECT_ANTIPATTERNS, "Detecta antipatrones en jobs.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
       createNoInputAction("Scan project", TOOL_NAMES.JOBS.DETECT_ANTIPATTERNS, "Escanea todo el proyecto."),
@@ -171,7 +164,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/fix-wizard.html",
     launcherToolName: "talend_app_fix_wizard",
     launchMessage: "Abriendo el asistente de fixes.",
-    uiMode: "react",
     actions: [
       createTextAction("Explain error", TOOL_NAMES.ERRORS.EXPLAIN, "Sugiere un fix para un error.", "errorMessage", { inputLabel: "Error message", inputPlaceholder: "NullPointerException" }),
       createTextAction("Apply fix", TOOL_NAMES.JOBS.PATCH_COMPONENT, "Aplica un fix sugerido.", "fixId", { inputLabel: "Fix id", inputPlaceholder: "fix_001", requiresConfirmation: true }),
@@ -184,7 +176,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/evidence-pack.html",
     launcherToolName: "talend_app_evidence_pack",
     launchMessage: "Abriendo el generador de evidence pack.",
-    uiMode: "react",
     actions: [
       createTextAction("Build evidence pack", TOOL_NAMES.EVIDENCE.PACK_BUILD, "Construye un paquete de evidencia.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
       createTextAction("Export evidence", TOOL_NAMES.EVIDENCE.PACK_BUILD, "Exporta el evidence pack.", "packId", { inputLabel: "Pack id", inputPlaceholder: "pack_001" }),
@@ -197,7 +188,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/report-snippets.html",
     launcherToolName: "talend_app_report_snippets",
     launchMessage: "Abriendo el gestor de snippets de reporte.",
-    uiMode: "react",
     actions: [
       createTextAction("Get snippet", TOOL_NAMES.REPORT.SNIPPETS_GENERATE, "Obtiene un snippet de reporte.", "snippetId", { inputLabel: "Snippet id", inputPlaceholder: "snippet_001" }),
       createTextAction("List snippets", TOOL_NAMES.REPORT.SNIPPETS_GENERATE, "Lista snippets disponibles.", "category", { inputLabel: "Category", inputPlaceholder: "validation" }),
@@ -210,7 +200,6 @@ export const TOOLS_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/component-inspector.html",
     launcherToolName: "talend_app_component_inspector",
     launchMessage: "Abriendo el inspector de componentes.",
-    uiMode: "react",
     actions: [
       createTextAction("Scan installed", TOOL_NAMES.COMPONENTS.SCAN_INSTALLED, "Escanea componentes instalados.", "pluginsDir", { inputLabel: "Plugins dir", inputPlaceholder: "Ruta a plugins de Talend Studio" }),
       createTextAction("Search component", TOOL_NAMES.COMPONENTS.SEARCH, "Busca componentes en el catálogo.", "query", { inputLabel: "Query", inputPlaceholder: "mysql" }),

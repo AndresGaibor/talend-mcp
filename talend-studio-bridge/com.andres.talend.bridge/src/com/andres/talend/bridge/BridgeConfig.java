@@ -7,11 +7,21 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+/**
+ * Lectura de la configuracion del bridge desde {@code ~/.talend-bridge/config.json}.
+ *
+ * El archivo es opcional: si no existe o esta corrupto se usan los valores por
+ * defecto, que mantienen el bridge en modo solo lectura.
+ */
 public final class BridgeConfig {
   public final int port;
   public final boolean readOnly;
@@ -20,12 +30,13 @@ public final class BridgeConfig {
   public final List<String> allowCommands;
   public final int timeoutMs;
 
-  private BridgeConfig(int port, boolean readOnly, boolean unsafeActions, boolean allowAllCommands, List<String> allowCommands, int timeoutMs) {
+  private BridgeConfig(int port, boolean readOnly, boolean unsafeActions, boolean allowAllCommands,
+      List<String> allowCommands, int timeoutMs) {
     this.port = port;
     this.readOnly = readOnly;
     this.unsafeActions = unsafeActions;
     this.allowAllCommands = allowAllCommands;
-    this.allowCommands = allowCommands;
+    this.allowCommands = Collections.unmodifiableList(allowCommands);
     this.timeoutMs = timeoutMs;
   }
 
@@ -39,7 +50,8 @@ public final class BridgeConfig {
     try {
       String json = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
       return parse(json);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
+      BridgeLog.warn("No se pudo leer la configuracion del bridge, se usan los valores por defecto", e);
       return defaults();
     }
   }
@@ -56,32 +68,64 @@ public final class BridgeConfig {
       }
 
       String token = UUID.randomUUID().toString().replace("-", "");
-      Files.write(tokenPath, (token + System.lineSeparator()).getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+      Files.write(tokenPath, (token + System.lineSeparator()).getBytes(StandardCharsets.UTF_8),
+          StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+      restrictPermissions(tokenPath);
       return token;
     } catch (IOException e) {
       throw new IllegalStateException("No se pudo preparar el token local del bridge", e);
     }
   }
 
+  public static Path tokenPath() {
+    return Paths.get(System.getProperty("user.home"), ".talend-bridge", "token");
+  }
+
+  private static void restrictPermissions(Path path) {
+    try {
+      java.io.File file = path.toFile();
+      if (!file.setReadable(false, false) || !file.setReadable(true, true) || !file.setWritable(false, false)) {
+        BridgeLog.warn("No se pudieron ajustar los permisos del token del bridge: " + path);
+      }
+    } catch (SecurityException e) {
+      BridgeLog.warn("No se pudieron ajustar los permisos del token del bridge: " + path, e);
+    }
+  }
+
   private static BridgeConfig parse(String json) {
-    int port = readInt(json, "port", 3930);
-    boolean readOnly = readBoolean(json, "readOnly", true);
-    boolean unsafeActions = readBoolean(json, "unsafeActions", false);
-    boolean allowAllCommands = readBoolean(json, "allowAllCommands", false);
-    int timeoutMs = readInt(json, "timeoutMs", 2500);
-    List<String> allowCommands = readStringArray(json, "allowCommands");
+    JsonObject root;
+    try {
+      JsonElement parsed = JsonParser.parseString(json);
+      if (!parsed.isJsonObject()) {
+        return defaults();
+      }
+      root = parsed.getAsJsonObject();
+    } catch (RuntimeException e) {
+      BridgeLog.warn("La configuracion del bridge no es JSON valido, se usan los valores por defecto", e);
+      return defaults();
+    }
+
+    int port = readInt(root, "port", 3930);
+    boolean readOnly = readBoolean(root, "readOnly", true);
+    boolean unsafeActions = readBoolean(root, "unsafeActions", false);
+    boolean allowAllCommands = readBoolean(root, "allowAllCommands", false);
+    int timeoutMs = readInt(root, "timeoutMs", 2500);
+    List<String> allowCommands = readStringArray(root, "allowCommands");
     if (allowCommands.isEmpty()) {
-      allowCommands.add("org.eclipse.ui.file.save");
-      allowCommands.add("org.eclipse.ui.file.saveAll");
+      allowCommands = defaultAllowedCommands();
     }
     return new BridgeConfig(port, readOnly, unsafeActions, allowAllCommands, allowCommands, timeoutMs);
   }
 
   private static BridgeConfig defaults() {
-    List<String> allowCommands = new ArrayList<>();
-    allowCommands.add("org.eclipse.ui.file.save");
-    allowCommands.add("org.eclipse.ui.file.saveAll");
-    return new BridgeConfig(3930, true, false, false, allowCommands, 2500);
+    return new BridgeConfig(3930, true, false, false, defaultAllowedCommands(), 2500);
+  }
+
+  private static List<String> defaultAllowedCommands() {
+    List<String> commands = new ArrayList<>();
+    commands.add("org.eclipse.ui.file.save");
+    commands.add("org.eclipse.ui.file.saveAll");
+    return commands;
   }
 
   private static void writeDefaultConfig(Path configPath) {
@@ -95,42 +139,60 @@ public final class BridgeConfig {
           + "  \"allowCommands\": [\n"
           + "    \"org.eclipse.ui.file.save\",\n"
           + "    \"org.eclipse.ui.file.saveAll\"\n"
-          + "  ]\n"
+          + "  ],\n"
+          + "  \"timeoutMs\": 2500\n"
           + "}\n";
-      Files.write(configPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-    } catch (IOException ignored) {
+      Files.write(configPath, content.getBytes(StandardCharsets.UTF_8),
+          StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+    } catch (IOException e) {
+      BridgeLog.warn("No se pudo escribir la configuracion por defecto del bridge", e);
     }
   }
 
-  private static int readInt(String json, String key, int fallback) {
-    Matcher matcher = Pattern.compile("\\\"" + Pattern.quote(key) + "\\\"\\s*:\\s*(\\d+)").matcher(json);
-    return matcher.find() ? Integer.parseInt(matcher.group(1)) : fallback;
+  private static int readInt(JsonObject root, String key, int fallback) {
+    JsonElement element = root.get(key);
+    if (element == null || !element.isJsonPrimitive()) {
+      return fallback;
+    }
+    try {
+      return element.getAsInt();
+    } catch (RuntimeException e) {
+      return fallback;
+    }
   }
 
-  private static boolean readBoolean(String json, String key, boolean fallback) {
-    Matcher matcher = Pattern.compile("\\\"" + Pattern.quote(key) + "\\\"\\s*:\\s*(true|false)").matcher(json);
-    return matcher.find() ? Boolean.parseBoolean(matcher.group(1)) : fallback;
+  private static boolean readBoolean(JsonObject root, String key, boolean fallback) {
+    JsonElement element = root.get(key);
+    if (element == null || !element.isJsonPrimitive()) {
+      return fallback;
+    }
+    try {
+      return element.getAsBoolean();
+    } catch (RuntimeException e) {
+      return fallback;
+    }
   }
 
-  private static List<String> readStringArray(String json, String key) {
-    Matcher matcher = Pattern.compile("\\\"" + Pattern.quote(key) + "\\\"\\s*:\\s*\\[(.*?)\\]", Pattern.DOTALL).matcher(json);
+  private static List<String> readStringArray(JsonObject root, String key) {
     List<String> result = new ArrayList<>();
-    if (!matcher.find()) {
+    JsonElement element = root.get(key);
+    if (element == null || !element.isJsonArray()) {
       return result;
     }
 
-    Matcher itemMatcher = Pattern.compile("\\\"(.*?)\\\"").matcher(matcher.group(1));
-    while (itemMatcher.find()) {
-      result.add(itemMatcher.group(1));
+    JsonArray array = element.getAsJsonArray();
+    for (JsonElement item : array) {
+      if (item != null && item.isJsonPrimitive()) {
+        String value = item.getAsString();
+        if (value != null && !value.trim().isEmpty()) {
+          result.add(value.trim());
+        }
+      }
     }
     return result;
   }
 
   private static Path configPath() {
     return Paths.get(System.getProperty("user.home"), ".talend-bridge", "config.json");
-  }
-
-  private static Path tokenPath() {
-    return Paths.get(System.getProperty("user.home"), ".talend-bridge", "token");
   }
 }

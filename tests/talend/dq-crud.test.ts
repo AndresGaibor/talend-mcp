@@ -5,11 +5,13 @@ import { tmpdir } from "node:os";
 import { duplicateDQAnalysisFiles } from "../../src/talend/dq-crud";
 import { parseDQAnalysis } from "../../src/talend/dq-analysis";
 
+const FIXTURES = join(import.meta.dir, "..", "fixtures", "talend", "dq");
+
 describe("DQ analysis CRUD", () => {
   test("duplica un analysis con nuevo nombre y version", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "talend-dq-"));
     const projectPath = join(tempRoot, "project");
-    const srcDir = "/Applications/TalendStudio-8.0.1/studio/workspace/aliware-calidad-1916860628/ALIWARECALIDAD/TDQ_Data Profiling/Analyses";
+    const srcDir = FIXTURES;
     const dstDir = join(projectPath, "TDQ_Data Profiling", "Analyses");
 
     mkdirSync(dstDir, { recursive: true });
@@ -28,6 +30,18 @@ describe("DQ analysis CRUD", () => {
     expect(duplicated?.name).toBe("Basic_Column_Analysis_orders_copy");
     expect(duplicated?.purpose).toBe("Copia de prueba");
     expect(duplicated?.version).toBe("0.2");
+
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  test("falla si el analysis origen no existe", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "talend-dq-"));
+    const projectPath = join(tempRoot, "project");
+    mkdirSync(join(projectPath, "TDQ_Data Profiling", "Analyses"), { recursive: true });
+
+    expect(() =>
+      duplicateDQAnalysisFiles(projectPath, "no_existe", "copia"),
+    ).toThrow("Analysis no encontrado");
 
     rmSync(tempRoot, { recursive: true, force: true });
   });

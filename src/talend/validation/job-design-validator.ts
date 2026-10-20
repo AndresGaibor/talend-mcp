@@ -180,7 +180,7 @@ const DEFAULT_RULES: ValidationRule[] = [
             return {
               ruleId: "component-parameters",
               severity: "error",
-              message: `El componente '${comp.name || comp.uniqueName}' (${comp.componentName}) requiere el parámetro '${reqParam}'`,
+              message: `El componente '${comp.name}' (${comp.componentName}) requiere el parámetro '${reqParam}'`,
               fix: `Agregar el parámetro '${reqParam}' en la configuración del componente.`,
             };
           }

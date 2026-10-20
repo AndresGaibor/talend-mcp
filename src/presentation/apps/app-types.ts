@@ -65,7 +65,6 @@ export interface PresentationAppDefinition {
   launcherToolName: string;
   launchMessage: string;
   actions: PresentationAppAction[];
-  uiMode?: "react" | "legacy";
 }
 
 export interface PresentationAppLaunchResult {

@@ -28,7 +28,7 @@ TALEND_PROJECT="C:/ruta/al/workspace/MI_PROYECTO"
 El proyecto es la carpeta que contiene `talend.project`. En WSL usa su ruta Linux, por ejemplo
 `/mnt/c/Users/usuario/Talend/workspace/MI_PROYECTO`.
 
-### Conectar en esta máquina (sin tunnel)
+### Conectar en esta máquina
 
 ```bash
 bun run start:server
@@ -37,29 +37,31 @@ bun run start:server
 El servidor queda en `http://127.0.0.1:3927/mcp`. Para clientes que usan el protocolo stdio,
 configura `bun run index.ts` como se muestra en [Clientes MCP](#uso-con-otros-clientes-mcp-stdio).
 
-### Conectar ChatGPT Web (con tunnel)
-
-Necesitas una API key con acceso a Tunnels y un tunnel creado en la [configuración de OpenAI](https://platform.openai.com/settings/organization/tunnels).
-Ejecuta:
-
-```bash
-bun run start
-```
-
-La primera ejecución descarga `tunnel-client`, solicita la API key y el ID del tunnel, y guarda
-la configuración local. Después inicia el servidor y el tunnel. La API key queda en `.env.local`;
-no compartas ese archivo.
+El script `bun run start` hace lo mismo que `start:server` y además libera el puerto si
+estaba ocupado.
 
 ### Instalar el plugin opcional de Talend Studio
 
-El plugin habilita la integración del bridge con Studio. Cierra Studio y ejecuta:
+El plugin habilita la integración del bridge con Studio (job abierto, selección, ejecuciones,
+markers). El instalador todo por CLI: detecta la instalación de Talend Studio y su JDK,
+compila el plugin con Maven + Tycho, **desinstala la versión anterior** y instala la nueva.
 
 ```bash
-bun run scripts/start-with-tunnel.ts --install-bridge
+bun run scripts/start.ts --install-bridge
 ```
 
-El instalador compila el plugin con Maven y lo instala en Talend Studio. No se necesita para usar
-las herramientas que leen y editan directamente el proyecto.
+Cierra Talend Studio antes (el script lo ofrece). Si ya tienes una versión anterior
+instalada, se reemplaza automáticamente; no hay que desinstalar a mano.
+
+Para verificar que quedó activo:
+
+```bash
+curl http://127.0.0.1:3930/ping
+```
+
+El bridge escucha en `127.0.0.1:3930` y pide un token que vive en
+`~/.talend-bridge/token`. La configuración (`~/.talend-bridge/config.json`) deja el bridge en
+modo solo lectura por defecto.
 
 ## Variables de entorno
 
@@ -69,9 +71,10 @@ las herramientas que leen y editan directamente el proyecto.
 | `TALEND_MCP_PORT` | `3927` | Puerto del servidor HTTP |
 | `TALEND_MCP_HOST` | `127.0.0.1` | Host del servidor HTTP |
 | `TALEND_MCP_LIVE` | `true` | Modo live (logs en stderr) |
+| `TALEND_MCP_FILTER` | `canonical` | Preset de tools expuestas (`canonical`, `core`, `all`) |
 | `TALEND_WORKSPACE` | - | Workspace de Talend Studio; el proyecto se autodetecta |
 | `TALEND_PROJECT` | - | Ruta directa al proyecto; preferible para inicio rápido |
-| `CONTROL_PLANE_API_KEY` | - | API key de OpenAI para el tunnel (se persiste en `.env.local`) |
+| `TALEND_DISABLE_AUTODETECT` | - | `1` desactiva la detección automática del proyecto |
 
 ## Herramientas disponibles
 
@@ -136,23 +139,25 @@ las herramientas que leen y editan directamente el proyecto.
 - `talend_run_job` - ejecuta un job de Talend Studio
 - `talend_job_info` - informacion del script de ejecucion
 
+### Conocimiento de componentes
+
+- `talend_components_catalog_status` - estado del catalogo de componentes
+- `talend_components_scan_installed` - escanea los plugins instalados
+- `talend_components_catalog_rebuild` - reconstruye el catalogo local
+- `talend_components_search` - busca componentes en el catalogo
+- `talend_components_inspect` - inspecciona un componente
+- `talend_components_extract_schema` - extrae el schema de un componente
+- `talend_components_compare_schemas` - compara los schemas de dos componentes
+- `talend_components_get_mapping_suggestions` - sugiere mapeos entre schemas
+
+### Recetas y calidad
+
+- `talend_recipe_generate` - genera una receta de flujo a partir de un objetivo
+- `talend_recipe_get` - recupera una receta generada
+- `talend_job_quality_report` - puntaje de calidad de un job con hallazgos
+- `talend_job_quality_issues` - lista los hallazgos de calidad de un job
+
 ---
-
-## Conectar en ChatGPT Web
-
-1. Manten `bun run start` corriendo
-2. Ve a https://chatgpt.com/#settings/Connectors
-3. Presiona **+** y selecciona **Tunnel**
-4. Elige el tunnel ID que creaste
-5. ¡Listo! ChatGPT ya puede usar las herramientas de Talend
-
-## Uso con ChatGPT Desktop (sin tunnel)
-
-Si usas la app de escritorio de ChatGPT, puedes conectar directo sin tunnel:
-
-1. Inicia el servidor: `bun run start:server`
-2. En ChatGPT Desktop: Settings > Connectors > + > URL
-3. Ingresa: `http://127.0.0.1:3927/mcp`
 
 ## Uso con otros clientes MCP (stdio)
 
@@ -184,14 +189,27 @@ bun run contexts list
 
 Para comprobar el estado del servidor, abre `http://127.0.0.1:3927/healthz`.
 
+## Desarrollo
+
+```bash
+bun install          # dependencias
+bun test             # suite completa (330+ tests)
+bun run typecheck    # TypeScript sin emitir
+```
+
+La guia de trabajo para agentes de IA esta en [AGENTS.md](AGENTS.md). El mapa del repositorio
+y las convenciones de arquitectura estan en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md), y
+las recetas para agregar tools, apps y cambios del plugin en
+[docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md).
+
 ## Solucion de problemas
 
-- **No se ve la URL**: el modo por defecto ahora es `http`; si ves `$ bun run index.ts` sin mas,
+- **No se ve la URL**: el modo por defecto es `http`; si ves `$ bun run index.ts` sin mas,
   el servidor esta vivo pero en modo stdio. Verifica que `TALEND_MCP_MODE` sea `http`.
-- **Tailscale Funnel falla**: usa `TALEND_MCP_FUNNEL=false` para desactivarlo.
-- **No detecta el proyecto**: verifica que `TALEND_WORKSPACE` apunte a una ruta existente.
+- **No detecta el proyecto**: verifica que `TALEND_WORKSPACE` apunte a una ruta existente o
+  define `TALEND_PROJECT`.
 - **Job abierto no aparece**: asegurate de tener Talend Studio abierto con un editor activo.
-- **Tunnel no aparece en ChatGPT**: verifica que `tunnel-client run` este corriendo y que el
-  tunnel ID en ChatGPT coincida con el del perfil. Revisa `http://127.0.0.1:8080/ui`.
-- **doctor falla**: asegurate que `CONTROL_PLANE_API_KEY` este definida y tenga permisos
-  Tunnels **Read** + **Use** en platform.openai.com.
+- **El puerto 3927 esta ocupado**: `bun run start` termina el proceso anterior antes de
+  arrancar.
+- **El bridge no responde en 3930**: el plugin debe estar instalado y Talend Studio abierto.
+  Ver `docs/PLAN-DE-TRABAJO.md` para la tabla de errores del plugin.

@@ -4,7 +4,6 @@ import { z } from "zod/v4";
 
 import { createPresentationAppShellHtml } from "./legacy-app-shell";
 import { buildLauncherInitialStateForApp } from "./app-state";
-import { registerReactAppResource } from "../../modules/apps/react-app-resource";
 import {
   PRESENTATION_APP_IDS,
   type PresentationAppAction,
@@ -84,32 +83,28 @@ export function getPresentationAppDefinition(appId: PresentationAppId): Presenta
 
 export function registerPresentationAppResources(server: McpServer): void {
   for (const app of PRESENTATION_APP_DEFINITIONS) {
-    if (app.uiMode === "react") {
-      registerReactAppResource(server, app.id, app.title, app.description);
-    } else {
-      server.registerResource(app.id, app.resourceUri, {
-        title: app.title,
-        description: app.description,
+    server.registerResource(app.id, app.resourceUri, {
+      title: app.title,
+      description: app.description,
+      mimeType: APP_MIME_TYPE,
+    }, async () => ({
+      contents: [{
+        uri: app.resourceUri,
         mimeType: APP_MIME_TYPE,
-      }, async () => ({
-        contents: [{
-          uri: app.resourceUri,
-          mimeType: APP_MIME_TYPE,
-          text: createPresentationAppShellHtml(app),
-          _meta: {
-            ui: {
-              prefersBorder: true,
-              csp: {
-                connectDomains: [],
-                resourceDomains: [],
-              },
+        text: createPresentationAppShellHtml(app),
+        _meta: {
+          ui: {
+            prefersBorder: true,
+            csp: {
+              connectDomains: [],
+              resourceDomains: [],
             },
-            "openai/widgetDescription": app.description,
-            "openai/widgetPrefersBorder": true,
           },
-        }],
-      }));
-    }
+          "openai/widgetDescription": app.description,
+          "openai/widgetPrefersBorder": true,
+        },
+      }],
+    }));
   }
 }
 

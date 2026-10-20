@@ -1,23 +1,19 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { spawn } from "node:child_process";
 import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { listPresentationAppIds, registerPresentationAppResources } from "../apps";
 import { getAllRuntimeTools, getRuntimeTools } from "../../server/registered-tools";
 import { GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
-import { resolvePublicUrl } from "../../tailscale/resolve-public-url";
 
 export interface NewServerOptions {
   port?: number;
   host?: string;
-  autoFunnel?: boolean;
   live?: boolean;
 }
 
 export interface NewServerHandle {
   localUrl: string;
-  publicUrl: string | null;
   close(): Promise<void>;
 }
 
@@ -40,42 +36,11 @@ function isLocalOrigin(origin: string): boolean {
   return origin.startsWith("http://127.0.0.1:") || origin.startsWith("http://localhost:");
 }
 
-function isOpenAIOrigin(origin: string): boolean {
-  return origin === "https://chatgpt.com" || origin === "https://chat.openai.com" || origin.endsWith(".openai.com");
-}
-
 function isAllowedOrigin(origin: string | undefined, allowOrigins: string[] = []): boolean {
   if (!origin) return true;
   if (allowOrigins.includes("*")) return true;
   if (allowOrigins.includes(origin)) return true;
-  return isLocalOrigin(origin) || isOpenAIOrigin(origin);
-}
-
-async function runProcess(command: string, args: string[], timeoutMs = 10_000): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  return await new Promise((resolve) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    const timer = setTimeout(() => {
-      if (process.platform === "win32") {
-        spawn("taskkill", ["/F", "/T", "/PID", String(child.pid)]);
-      } else {
-        child.kill("SIGKILL");
-      }
-    }, timeoutMs);
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => (stdout += chunk));
-    child.stderr.on("data", (chunk) => (stderr += chunk));
-    child.on("close", (exitCode) => {
-      clearTimeout(timer);
-      resolve({ ok: exitCode === 0, stdout, stderr });
-    });
-    child.on("error", () => {
-      clearTimeout(timer);
-      resolve({ ok: false, stdout, stderr });
-    });
-  });
+  return isLocalOrigin(origin);
 }
 
 export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.WritableStream }) {
@@ -153,7 +118,7 @@ function sendAccepted(res: ServerResponse, origin: string | undefined) {
 
 // ─── MCP request dispatcher ───────────────────────────────────────────────────
 // Handles all standard MCP JSON-RPC methods directly, without SSE streaming.
-// This is required for the OpenAI tunnel-client which expects real HTTP responses.
+// Some HTTP clients require a real HTTP response per request instead of a stream.
 
 function buildServerCapabilities() {
   return {
@@ -322,7 +287,7 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
 
     // ── Direct JSON-RPC dispatch (no SSE) ─────────────────────────────────────
     // Handles initialize, tools/list, tools/call, notifications, etc.
-    // Responds with Connection: close — required for OpenAI tunnel-client compatibility.
+    // Responds with Connection: close so each JSON-RPC request is a complete HTTP response.
 
     const method = parsed.method as string | undefined;
     const id = parsed.id;
@@ -380,30 +345,9 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
   });
 
   const localUrl = `http://${host}:${listenPort}`;
-  let publicUrl: string | null = null;
-
-  if (options?.autoFunnel !== false) {
-    const tsStatus = await runProcess("tailscale", ["status", "--json"], 10_000);
-    if (tsStatus.ok) {
-      const funnelResult = await runProcess("tailscale", ["funnel", "--bg", "--yes", "--https=443", String(listenPort)], 15_000);
-      if (funnelResult.ok) {
-        publicUrl = await resolvePublicUrl({
-          path: "/mcp",
-          timeoutMs: 15_000,
-          intervalMs: 1_000,
-          readTailscaleStatus: async () =>
-            (await runProcess("tailscale", ["status", "--json"])).stdout,
-          readFunnelStatus: async () =>
-            (await runProcess("tailscale", ["funnel", "status", "--json"])).stdout,
-          publicPort: 443,
-        });
-      }
-    }
-  }
 
   return {
     localUrl,
-    publicUrl,
     async close() {
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     },

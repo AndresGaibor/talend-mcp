@@ -64,7 +64,6 @@ export const JOB_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/pipeline-spec-editor.html",
     launcherToolName: "talend_app_pipeline_spec_editor",
     launchMessage: "Abriendo el editor de pipeline spec.",
-    uiMode: "react",
     actions: [
       createJsonAction("Validate spec", TOOL_NAMES.JOBS.VALIDATE_PIPELINE_SPEC, "Valida una spec de pipeline.", { spec: { pattern: "multi_csv_raw_loader", name: "new_job" } }),
       createJsonAction("Preview spec", TOOL_NAMES.JOBS.PREVIEW_PIPELINE_SPEC, "Previsualiza una spec de pipeline.", { pattern: "multi_csv_raw_loader", name: "new_job" }),
@@ -78,7 +77,6 @@ export const JOB_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/job-component-studio.html",
     launcherToolName: "talend_app_job_component_studio",
     launchMessage: "Abriendo Job Component Studio.",
-    uiMode: "react",
     actions: [
       createNoInputAction("Active job details", "talend_bridge_active_job_details", "Obtiene detalles profundos del job activo."),
       createJsonAction("Component details", "talend_bridge_active_component_details", "Obtiene detalles completos de un componente.", { uniqueName: "tFileInputDelimited_1", includeRaw: false }),

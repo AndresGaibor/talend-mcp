@@ -1,31 +1,48 @@
-import { test, expect, describe, mock } from "bun:test";
+import { test, expect, describe, afterEach } from "bun:test";
 import { detectRuntimeOS, detectTalendHostOS, detectPathMode, createPlatformContext, isWsl } from "../../src/platform/runtime";
+
+const REAL_PLATFORM = process.platform;
+const REAL_WSL_DISTRO = process.env.WSL_DISTRO_NAME;
+
+/**
+ * Estos tests simulan otro sistema operativo. `process.platform` y
+ * `WSL_DISTRO_NAME` son globales, así que hay que restaurarlos siempre:
+ * si quedan mutados, contaminan los archivos de test que se ejecutan después.
+ */
+afterEach(() => {
+  Object.defineProperty(process, "platform", { value: REAL_PLATFORM });
+  if (REAL_WSL_DISTRO === undefined) {
+    delete process.env.WSL_DISTRO_NAME;
+  } else {
+    process.env.WSL_DISTRO_NAME = REAL_WSL_DISTRO;
+  }
+});
+
+function setPlatform(value: NodeJS.Platform): void {
+  Object.defineProperty(process, "platform", { value });
+}
 
 describe("detectRuntimeOS", () => {
   test("macos cuando platform es darwin", () => {
-    Object.defineProperty(process, "platform", { value: "darwin" });
+    setPlatform("darwin");
     expect(detectRuntimeOS()).toBe("macos");
   });
 
   test("windows cuando platform es win32", () => {
-    Object.defineProperty(process, "platform", { value: "win32" });
+    setPlatform("win32");
     expect(detectRuntimeOS()).toBe("windows");
   });
 
   test("linux cuando platform es linux y no WSL", () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
-    const origWsl = process.env.WSL_DISTRO_NAME;
+    setPlatform("linux");
     process.env.WSL_DISTRO_NAME = "";
     expect(detectRuntimeOS()).toBe("linux");
-    if (origWsl) process.env.WSL_DISTRO_NAME = origWsl;
   });
 
   test("wsl cuando WSL_DISTRO_NAME está presente", () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
-    const origWsl = process.env.WSL_DISTRO_NAME;
+    setPlatform("linux");
     process.env.WSL_DISTRO_NAME = "Ubuntu";
     expect(detectRuntimeOS()).toBe("wsl");
-    if (origWsl) process.env.WSL_DISTRO_NAME = origWsl;
   });
 });
 
@@ -37,20 +54,18 @@ describe("detectTalendHostOS", () => {
   });
 
   test("WSL runtime asume Talend en Windows", () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
-    const origWsl = process.env.WSL_DISTRO_NAME;
+    setPlatform("linux");
     process.env.WSL_DISTRO_NAME = "Ubuntu";
     expect(detectTalendHostOS()).toBe("windows");
-    if (origWsl) process.env.WSL_DISTRO_NAME = origWsl;
   });
 
   test("macOS runtime asume Talend en macOS", () => {
-    Object.defineProperty(process, "platform", { value: "darwin" });
+    setPlatform("darwin");
     expect(detectTalendHostOS()).toBe("macos");
   });
 
   test("Windows runtime asume Talend en Windows", () => {
-    Object.defineProperty(process, "platform", { value: "win32" });
+    setPlatform("win32");
     expect(detectTalendHostOS()).toBe("windows");
   });
 });
@@ -75,7 +90,7 @@ describe("detectPathMode", () => {
 
 describe("createPlatformContext", () => {
   test("retorna estructura correcta", () => {
-    Object.defineProperty(process, "platform", { value: "darwin" });
+    setPlatform("darwin");
     const ctx = createPlatformContext();
     expect(ctx).toHaveProperty("runtimeOs");
     expect(ctx).toHaveProperty("talendHostOs");
@@ -83,13 +98,25 @@ describe("createPlatformContext", () => {
   });
 
   test("acepta overrides via env", () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
-    const origWsl = process.env.WSL_DISTRO_NAME;
+    setPlatform("linux");
     process.env.WSL_DISTRO_NAME = "Ubuntu";
     const ctx = createPlatformContext({ talendHostOs: "windows", pathMode: "wsl-windows" });
     expect(ctx.runtimeOs).toBe("wsl");
     expect(ctx.talendHostOs).toBe("windows");
     expect(ctx.pathMode).toBe("wsl-windows");
-    if (origWsl) process.env.WSL_DISTRO_NAME = origWsl;
+  });
+});
+
+describe("isWsl", () => {
+  test("detecta WSL por variable de entorno", () => {
+    setPlatform("linux");
+    process.env.WSL_DISTRO_NAME = "Ubuntu";
+    expect(isWsl()).toBe(true);
+  });
+
+  test("no detecta WSL en Windows nativo", () => {
+    setPlatform("win32");
+    delete process.env.WSL_DISTRO_NAME;
+    expect(isWsl()).toBe(false);
   });
 });

@@ -3,6 +3,7 @@ import type { TalendStudioBridgeClient } from "../studio/bridge-client";
 
 export interface ActiveJobComponent {
   id: string;
+  uniqueName: string;
   label: string;
   componentName: string;
   x: number;
@@ -73,6 +74,7 @@ export class JobInspectorService {
         for (const comp of data.components as Record<string, unknown>[]) {
           components.push({
             id: (comp.id as string) ?? "",
+            uniqueName: (comp.uniqueName as string) ?? (comp.id as string) ?? "",
             label: (comp.label as string) ?? "",
             componentName: (comp.componentName as string) ?? "",
             x: (comp.x as number) ?? 0,

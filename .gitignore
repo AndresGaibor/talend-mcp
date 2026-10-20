@@ -30,6 +30,13 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # talend-mcp runtime
 .talend-mcp/
 
+# Salidas generadas (paquetes de entrega, evidencias de taller)
+entregables/
+evidencias/
+
+# Indice local de CodeGraph
+.codegraph/
+
 # Gemini/Antigravity local config
 .antigravitycli/
 
@@ -43,5 +50,4 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 *.class
 target/
 talend-studio-bridge/**/target
-apps-ui/dist
 scratch/

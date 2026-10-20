@@ -16,10 +16,9 @@
   </modules>
 
   <properties>
-    <tycho.version>4.0.9</tycho.version>
+    <tycho.version>4.0.13</tycho.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.release>17</maven.compiler.release>
   </properties>
 
   <build>
@@ -33,11 +32,39 @@
     </plugins>
   </build>
 
+  <!--
+    Target platform del plugin.
+
+    Se compila contra un release estable de Eclipse (no contra la instalacion de
+    Talend Studio) y el MANIFEST no fija versiones, asi que el bundle resultante
+    es instalable en cualquier Talend Studio 8.x.
+
+    Gson llega desde el repositorio de Orbit: el bundle oficial de la
+    instalacion de Talend aporta los mismos paquetes en tiempo de ejecucion.
+  -->
   <repositories>
     <repository>
       <id>eclipse-2024-06</id>
       <layout>p2</layout>
       <url>https://download.eclipse.org/releases/2024-06</url>
     </repository>
+    <repository>
+      <id>orbit-aggregation</id>
+      <layout>p2</layout>
+      <url>https://download.eclipse.org/tools/orbit/simrel/orbit-aggregation/release/latest</url>
+    </repository>
   </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>eclipse-2024-06</id>
+      <layout>p2</layout>
+      <url>https://download.eclipse.org/releases/2024-06</url>
+    </pluginRepository>
+    <pluginRepository>
+      <id>orbit-aggregation</id>
+      <layout>p2</layout>
+      <url>https://download.eclipse.org/tools/orbit/simrel/orbit-aggregation/release/latest</url>
+    </pluginRepository>
+  </pluginRepositories>
 </project>

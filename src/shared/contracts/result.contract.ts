@@ -5,7 +5,7 @@ export type Confidence = "high" | "medium" | "low" | "none";
 /**
  * Zod schema for the standard TalendResult envelope.
  * Use this as `outputSchema` in tool definitions so MCP clients
- * (e.g. ChatGPT Actions) know the shape of every tool response.
+ * know the shape of every tool response.
  */
 export const TalendResultSchema = z.object({
   ok: z.boolean().describe("Whether the operation succeeded"),

@@ -1,0 +1,190 @@
+# AGENTS.md
+
+Instrucciones para agentes de IA que trabajan en **talend-mcp**.
+
+Este archivo es la fuente de verdad. Si una regla aqui contradice una costumbre mia, gana este
+archivo. `CLAUDE.md` solo guarda el detalle de Bun y apunta aqui.
+
+## 1. Que es el repo
+
+Servidor MCP (Model Context Protocol) que analiza y edita proyectos de **Qlik Talend Studio**
+sobre los archivos `.item` y `.properties` de un workspace de Talend.
+
+El servidor expone ~250 herramientas MCP y ~40 apps HTML que corren dentro de un cliente MCP.
+
+## 2. Stack y comandos
+
+| Comando | Que hace |
+|---|---|
+| `bun install` | Instala dependencias. **Nunca** uses npm, yarn o pnpm. |
+| `bun test` | Suite completa (330+ tests). Solo corre `tests/`. |
+| `bun run typecheck` | `tsc --noEmit`. Debe terminar sin errores. |
+| `bun run start:server` | Levanta el servidor MCP en `http://127.0.0.1:3927/mcp`. |
+| `bun run start` | Igual que `start:server`, ademas libera el puerto 3927 si esta ocupado. |
+| `bun run scripts/start.ts --install-bridge` | Compila e instala (o actualiza) el plugin Java en Talend Studio. |
+| `bun run jobs ...` / `bun run contexts ...` | CLI local para jobs y contextos. |
+
+Reglas de Bun (proyecto, no Node):
+
+- `bun <file>` en vez de `node <file>` o `ts-node`.
+- `bun test` en vez de `jest` o `vitest`.
+- `bun run <script>` en vez de `npm run <script>`.
+- `bunx <pkg>` en vez de `npx <pkg>`.
+- Bun carga `.env` solo: no agregues `dotenv`.
+- `Bun.serve()`, `Bun.file()`, `bun:sqlite`, `Bun.$` ya estan disponibles.
+
+## 3. Estado del repositorio
+
+- **No existe `apps-ui/`.** La carpeta React/Vite se elimino. Las UIs se generan en el servidor
+  como HTML autocontenido en `src/presentation/apps/legacy-shells/`.
+- **No hay tunnel ni Tailscale Funnel.** El servidor es local (`127.0.0.1`) o stdio.
+  No reintroduzcas `CONTROL_PLANE_API_KEY`, `TALEND_MCP_FUNNEL` ni `src/tailscale/`.
+- **No hay exposicion publica.** Si necesitas acceso remoto, resuelvelo con el cliente MCP,
+  no con un proxy dentro del repo.
+- **No hay ChatGPT Web.** El unico host es un cliente MCP local.
+- **El registro de tools vive en un solo lugar:** `getModuleTools()` en
+  `src/server/registered-tools.ts`. No existe un indice alterno.
+- **No hay codigo muerto.** Si agregas un archivo, conectalo: los barridos de referencias
+  orfas son parte de la revision.
+- **`entregables/` y `evidencias/`** son salidas generadas y no se versionan.
+
+## 4. Reglas de oro
+
+1. **No rompas los tests para hacerlos pasar.** Si un test falla, primero entiende si el codigo
+   esta mal (arregla el codigo) o si el test estaba desactualizado (actualiza el test y explica
+   por que en el mensaje del commit).
+2. **Un cambio, un concern.** No mezcles refactors con features en el mismo cambio.
+3. **TypeScript estricto.** `strict`, `noUncheckedIndexedAccess` y `noImplicitOverride` estan
+   activos. Los indices de array se acceden con `!` o con una guarda explicita.
+4. **Sin rutas hardcodeadas.** Nunca escribas rutas absolutas de una maquina concreta
+   (`/Users/alguien`, `/Applications/TalendStudio-8.0.1`, `C:/Users/...`). Hay un test que lo
+   verifica: `tests/platform/portability.test.ts`.
+5. **Portable entre Windows, macOS, Linux y WSL.** Compara rutas con separadores normalizados,
+   nunca con `toContain("carpeta/subcarpeta")` sobre una ruta nativa.
+6. **No mutes globales de proceso en tests.** Si necesitas simular otro sistema operativo,
+   restaura `process.platform` y `WSL_DISTRO_NAME` en un `afterEach`.
+7. **Comentarios y mensajes en espanol**, codigo e identificadores en ingles.
+
+## 5. Estructura del repositorio
+
+```
+index.ts                     punto de entrada: modo http o stdio
+src/
+├── platform/                deteccion de SO (macos/windows/linux/wsl) y traduccion de rutas
+├── shared/                  contratos compartidos (TalendResult, result envelope)
+├── domain/                  entidades y repositorios (interfaces) del nucleo
+├── application/             casos de uso del nucleo
+├── infrastructure/          implementaciones (filesystem, git, xml, workspace)
+├── talend/                  logica de Talend: XML, jobs, contextos, DQ, mastery, diagnostico
+├── modules/                 modulos hexagonales: domain / application / ports / adapters / tools
+├── presentation/
+│   ├── tools/               tools de presentacion (una carpeta por area)
+│   └── apps/                apps HTML: app-registry, app-state, legacy-shells/
+├── server/                  registro de tools, adaptadores MCP, esquemas
+└── tools/                   catalogo de nombres de tools (TOOL_NAMES)
+scripts/                     scripts de operacion (start, jobs, contexts, deploy-bridge, ...)
+tests/                       suite de tests (bun test)
+talend-studio-bridge/        plugin Java (Eclipse/Tycho) que expone Studio por HTTP
+docs/                        documentacion tecnica
+```
+
+Detalle completo en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
+
+## 6. Como agregar una tool
+
+1. **Implementa el caso de uso** en `src/modules/<modulo>/application/` o en `src/talend/`.
+   Nada de logica de negocio dentro del handler de la tool.
+2. **Crea el tool** en `src/modules/<modulo>/tools/<nombre>.tool.ts` con schema Zod:
+
+   ```typescript
+   import { z } from "zod/v4";
+   import type { CallToolResult } from "@modelcontextprotocol/server";
+
+   export function createMiTool() {
+     return {
+       name: "talend_mi_cosa",
+       description: "Que hace la tool, en una frase.",
+       inputSchema: z.object({}),
+       annotations: { readOnly: true },
+       handler: async (input): Promise<CallToolResult> => ({
+         content: [{ type: "text", text: "..." }],
+         structuredContent: { ...payload },
+         isError: false,
+       }),
+     };
+   }
+   ```
+
+3. **Registrala** en `getModuleTools()` de `src/server/registered-tools.ts`. Ese es el registro
+   vivo del servidor; `src/modules/index.ts` es un indice auxiliar que hoy no se invoca.
+4. **Anota el nombre** en `src/tools/tool-names.ts` (`TOOL_NAMES`) si la usan otras apps.
+5. **Escribe el test** en `tests/tools/` o `tests/<area>/`.
+6. **Verifica**: `bun run typecheck` y `bun test`.
+
+Convenciones:
+
+- Nombre: `talend_<area>_<verbo>`. Areas: `jobs`, `components`, `contexts`, `runs`, `errors`,
+  `validation`, `secrets`, `snapshots`, `datasets`, `deliverables`, `evidence`, `requirements`,
+  `bridge`, `app`, `recipe`, `mastery`.
+- Marca `annotations.readOnly: true` en toda tool que no escriba.
+- El `structuredContent` debe llevar el payload en `data` cuando la tool use el envelope
+  `TalendResult`; los clientes leen `structuredContent.data`.
+
+## 7. Como agregar una app
+
+Ver [docs/mcp-apps-ui.md](docs/mcp-apps-ui.md). Resumen:
+
+1. ID en `src/presentation/apps/app-types.ts`.
+2. Definicion en `src/presentation/apps/definitions/`.
+3. Shell HTML en `src/presentation/apps/legacy-shells/` + dispatch en `legacy-app-shell.ts`.
+4. Estado inicial en `src/presentation/apps/app-state.ts`.
+5. Test en `tests/presentation/apps/app-registry.test.ts`.
+
+## 8. Contrato de resultado
+
+El servidor usa el envelope estandar:
+
+```typescript
+{
+  ok: boolean,
+  source: string,        // tool que produjo el resultado
+  confidence: "high" | "medium" | "low" | "none",
+  data?: unknown,        // payload
+  errors?: Array<{ code: string; message: string; details?: unknown }>,
+  warnings?: string[],
+  nextActions?: Array<{ label: string; toolName: string; input?: Record<string, unknown> }>,
+}
+```
+
+`ok`/`fail` viven en `src/presentation/tools/common/response.ts`.
+El schema Zod esta en `src/shared/contracts/result.contract.ts`.
+
+## 9. Tests
+
+- Ubicacion: `tests/<area>/<tema>.test.ts`, con `import { describe, expect, test } from "bun:test"`.
+- Fixtures: `tests/fixtures/talend/`. No dependas de archivos que existan solo en una maquina.
+- Para rutas, crea temporales con `mkdtempSync(join(tmpdir(), "talend-<area>-"))` y borralos en
+  `afterAll`.
+- Los tests de la UI HTML (shells) no existen todavia; el server-side si tiene cobertura.
+- `bunfig.toml` limita `bun test` a `tests/` a proposito: no agregues tests fuera de esa carpeta.
+
+Cobertura existente por area:
+
+| Carpeta | Que cubre |
+|---|---|
+| `tests/tools/` | registro, contratos, schemas, seguridad, deprecaciones |
+| `tests/apps/` | registro de apps y launchers |
+| `tests/presentation/` | envelope de resultado y registro de apps |
+| `tests/talend/` | jobs, contextos, DQ, logs, workspace, ejecuciones, diagnostico |
+| `tests/platform/` | deteccion de SO, portabilidad de rutas |
+| `tests/modules/` | modulos hexagonales |
+
+## 10. Before de tocar codigo
+
+```bash
+bun install
+bun run typecheck   # debe estar limpio antes de empezar
+bun test            # debe estar verde antes de empezar
+```
+
+Si alguno de los dos falla antes de tu cambio, el problema es preexistente: reportalo y sigue.

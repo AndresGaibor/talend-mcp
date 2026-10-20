@@ -15,40 +15,6 @@ const FORBIDDEN_APP_PATTERNS = [
   /function\s+create[A-Z]\w+Html\s*\(\s*\)/,
 ];
 
-const KNOWN_APP_IDS = [
-  "dashboard",
-  "dataset-inspector",
-  "job-designer",
-  "validation-report",
-  "run-monitor",
-  "snapshot-diff",
-  "deliverables",
-  "component-catalog",
-  "command-center",
-  "home",
-  "environment-doctor",
-  "workspace-explorer",
-  "job-browser",
-  "pattern-gallery",
-  "visual-job-designer",
-  "pipeline-spec-editor",
-  "mapping-builder",
-  "tmap-designer",
-  "dataset-inspector-pro",
-  "csv-preview",
-  "raw-mapping-matrix",
-  "context-profiles",
-  "database-connection-wizard",
-  "secret-safety",
-  "run-monitor-pro",
-  "launch-history",
-  "runtime-comparison",
-  "problems-view",
-  "error-explorer",
-  "validation-timeline",
-  "snapshot-manager",
-] as const;
-
 test("legacy-app-shell.ts no excede tamaño actual + 5%", () => {
   const content = readFileSync(LEGACY_FILE_PATH, "utf-8");
   const lineCount = content.split("\n").length;
@@ -88,7 +54,7 @@ test("no se agregaron nuevas UI apps a legacy-app-shell", () => {
 
     if (newOnes.length > 0) {
       throw new Error(
-        `Se encontraron nuevas funciones de UI en legacy-app-shell: ${newOnes.join(", ")}. Las nuevas apps deben vivir en apps-ui/.`
+        `Se encontraron nuevas funciones de UI en legacy-app-shell: ${newOnes.join(", ")}. Cada app nueva debe tener su propio archivo en src/presentation/apps/legacy-shells/.`
       );
     }
   }

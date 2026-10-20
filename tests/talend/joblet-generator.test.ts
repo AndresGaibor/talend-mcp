@@ -33,7 +33,8 @@ describe("Talend Joblet Generator", () => {
       jobletName: "JL_test_calidad",
       version: "0.1",
       label: "JL_test_calidad",
-      folderPath: "quality"
+      folderPath: "quality",
+      components: [],
     };
 
     const xml = buildJobletPropertiesXml(spec, "root_id_123");

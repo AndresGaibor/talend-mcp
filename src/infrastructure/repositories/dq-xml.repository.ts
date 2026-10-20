@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
-import { parseXml, asArray, buildXml } from "../xml/xml-utils";
+import { parseXml, asArray, buildXml, elementNameFromHref } from "../xml/xml-utils";
 
 export interface DQIndicator {
   name: string;
@@ -74,8 +74,7 @@ function extractIndicatorType(indicator: XmlRecord): string {
 }
 
 function fileNameFromHref(href: string): string {
-  const base = href.split("#")[0] ?? href;
-  return base.split("/").pop()?.replace(".item", "") ?? "unknown";
+  return elementNameFromHref(href);
 }
 
 function parseDQAnalysisFromXml(parsed: XmlRecord, anaPath: string): DqAnalysis | null {

@@ -1,7 +1,9 @@
+Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Talend Studio Bridge
 Bundle-SymbolicName: com.andres.talend.bridge;singleton:=true
 Bundle-Version: 0.1.0.qualifier
+Bundle-Vendor: Andres
 Bundle-Activator: com.andres.talend.bridge.Activator
 Bundle-ActivationPolicy: lazy
 Require-Bundle: org.eclipse.core.runtime,
@@ -12,6 +14,7 @@ Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.debug.core,
  org.eclipse.debug.ui,
  org.eclipse.ui.ide,
- org.eclipse.equinox.common
+ org.eclipse.equinox.common,
+ com.google.gson
 Import-Package: com.sun.net.httpserver
-Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-RequiredExecutionEnvironment: JavaSE-17

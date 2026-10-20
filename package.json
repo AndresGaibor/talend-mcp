@@ -11,17 +11,14 @@
   },
   "scripts": {
     "clean:artifacts": "bun run scripts/clean-artifacts.ts",
-    "start": "bun run scripts/start-with-tunnel.ts",
+    "start": "bun run scripts/start.ts",
     "start:server": "bun run index.ts",
     "detect:talend-project": "bun run scripts/detect-talend-project.ts",
     "dq:analyses": "bun run scripts/list-dq-analyses.ts",
     "jobs": "bun run scripts/jobs.ts",
     "contexts": "bun run scripts/contexts.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "ui:dev": "bun --cwd apps-ui vite",
-    "ui:build": "bun --cwd apps-ui vite build",
-    "ui:typecheck": "tsc -p apps-ui/tsconfig.json --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",

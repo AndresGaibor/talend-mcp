@@ -2,7 +2,7 @@ import { rm } from "fs/promises";
 import { existsSync } from "node:fs";
 import { $ } from "bun";
 
-const targets = [".talend-mcp/runs", "apps-ui/dist"];
+const targets = [".talend-mcp/runs"];
 
 async function main() {
   for (const target of targets) {

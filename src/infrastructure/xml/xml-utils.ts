@@ -30,6 +30,24 @@ export function asArray<T>(valor: T | T[] | undefined | null): T[] {
   return Array.isArray(valor) ? valor : [valor];
 }
 
+/**
+ * Extrae el nombre de un elemento referenciado por `href` en los XML de Talend.
+ *
+ * Los href de Data Quality tienen la forma `context/<Contexto>#<elemento>`,
+ * donde el fragmento es el nombre real de la conexion o de la columna. Sin
+ * fragmento se usa el ultimo segmento de la ruta.
+ */
+export function elementNameFromHref(href: string): string {
+  if (!href) return "unknown";
+
+  const parts = href.split("#");
+  const fragment = parts.length > 1 ? parts[parts.length - 1] : undefined;
+
+  if (fragment) return fragment.replace(/\.item$/, "");
+
+  return parts[0]?.split("/").filter(Boolean).pop()?.replace(/\.item$/, "") ?? "unknown";
+}
+
 export function parseLaunchConfig(xml: string, path: string): {
   currentProjectName?: string;
   jobProjectTechLabel?: string;

@@ -10,7 +10,6 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/validation-report.html",
     launcherToolName: "talend_app_validation_report",
     launchMessage: "Abriendo el reporte de validación.",
-    uiMode: "react",
     actions: [
       createTextAction("Validate design", TOOL_NAMES.VALIDATION.VALIDATE_DESIGN, "Valida diseño del job.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
       createTextAction("Validate context", TOOL_NAMES.VALIDATION.VALIDATE_CONTEXT_USAGE, "Valida uso de contextos.", "jobName", { inputLabel: "Job name", inputPlaceholder: "myJob" }),
@@ -49,7 +48,6 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/problems-view.html",
     launcherToolName: "talend_app_problems_view",
     launchMessage: "Abriendo la vista de problemas.",
-    uiMode: "react",
     actions: [
       createNoInputAction("Problems markers", TOOL_NAMES.BRIDGE.PROBLEMS_MARKERS, "Lista markers de problemas."),
     ],
@@ -61,7 +59,6 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/snapshot-manager.html",
     launcherToolName: "talend_app_snapshot_manager",
     launchMessage: "Abriendo el gestor de snapshots.",
-    uiMode: "react",
     actions: [
       createNoInputAction("List snapshots", TOOL_NAMES.SNAPSHOTS.LIST, "Lista snapshots disponibles."),
       createTextAction("Read snapshot", TOOL_NAMES.SNAPSHOTS.READ, "Lee un snapshot.", "snapshotId", { inputLabel: "Snapshot ID", inputPlaceholder: "snap_001" }),
@@ -88,7 +85,6 @@ export const VALIDATION_APP_DEFINITIONS: PresentationAppDefinition[] = [
     resourceUri: "ui://talend/environment-doctor.html",
     launcherToolName: "talend_app_environment_doctor",
     launchMessage: "Abriendo el diagnóstico del entorno.",
-    uiMode: "react",
     actions: [
       createNoInputAction("Studio process", TOOL_NAMES.STUDIO.PROCESS, "Detecta el proceso de Talend Studio."),
       createNoInputAction("Bridge audit", TOOL_NAMES.BRIDGE.AUDIT_ENVIRONMENT, "Audita el entorno de Studio."),

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dataquality.analysis="http://www.talend.org/dataquality.analysis" xmlns:dataquality.indicators="http://www.talend.org/dataquality.indicators" xmi:version="2.0">
+  <dataquality.analysis:Analysis name="Basic_Column_Analysis_orders" defaultContext="Default">
+    <taggedValue tag="Status" value="Draft" />
+    <taggedValue tag="Purpose" value="Analisis basico de la columna orders" />
+    <taggedValue tag="Description" value="Analisis de ejemplo usado en las pruebas" />
+    <taggedValue tag="Version" value="0.1" />
+    <taggedValue tag="Author" value="qa@example.com" />
+    <context xsi:type="dataquality.analysis:TDQConnectionContext">
+      <connection href="context/ALIWARECALIDAD_0.1#orders_0.1" />
+      <analysedElements href="context/ALIWARECALIDAD_0.1#orders_0.1#order_id" />
+    </context>
+    <results>
+      <resultMetadata lastRunOk="false" executionDate="2025-06-01 08:00:00" executionDuration="1500" />
+      <indicators xsi:type="dataquality.indicators:RowCountIndicator" computed="false">
+        <analyzedElement href="context/ALIWARECALIDAD_0.1#orders_0.1#order_id" />
+        <builtInIndicatorDefinition name="Row Count" label="Row Count" />
+      </indicators>
+    </results>
+  </dataquality.analysis:Analysis>
+</xmi:XMI>
