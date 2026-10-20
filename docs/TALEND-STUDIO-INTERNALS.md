@@ -502,16 +502,93 @@ item.setState(factory.createItemState());
 repositoryFactory.create(project, item, path);
 ```
 
-Tres detalles que hay que respetar o la llamada falla:
+Cuatro detalles que hay que respetar o la llamada falla:
 
 - El `ProcessType` es el contenido del `.item`. Sin el, el repositorio no serializa el job.
 - El `ItemState` marca el item como vivo. Sin el, el repositorio lo considera borrado.
-- La ruta que espera `create()` es la completa dentro de la carpeta del tipo de objeto:
-  `process/<nombre>_<version>.item/<nombre>_<version>.item`. Con una ruta a medias, el
-  repositorio crea una carpeta con el nombre del item en vez de un archivo.
+- **La ruta que espera `create()` es la de la carpeta, no la del archivo.** El repositorio
+  antepone la carpeta del tipo de objeto (`process`) y crea dentro los tres archivos del job.
+  Con la ruta equivocada, el repositorio crea una carpeta con el nombre del item en vez de
+  un archivo. La ruta correcta es solo el nombre: `Path.fromOSString(nombre)`.
+- **El label del job no puede llevar puntos ni guiones.** El repositorio lo valida con
+  `^[a-zA-Z]+[a-zA-Z0-9_]*$` y rechaza el item si no cumple.
 
 Studio escribe despues los tres archivos que acompañan a un job: el `.item`, el
 `.properties` y el `.screenshot`.
+
+Con la ruta bien puesta, el resultado en disco es:
+
+```
+process/MiJob_0.1.item/MiJob_0.1.item
+process/MiJob_0.1.item/MiJob_0.1.properties
+process/MiJob_0.1.item/MiJob_0.1.screenshot
+```
+
+Es decir: una carpeta por job, con los tres archivos dentro. Un job creado a mano desde el
+IDE tiene la misma forma.
+
+### Consultar el repositorio
+
+`getAllVersion` y `getProcessItem` no encuentran los jobs por su nombre. El id que espera el
+repositorio es el id interno de la propiedad, que en el `.properties` es el atributo `id` del
+elemento `Property`:
+
+```xml
+<TalendProperties:Property xmi:id="_aQicUMzNEfGJMsMWYwBlcw" id="_83101607873700" label="MCP_Fase0_Api" ...>
+```
+
+No es el `xmi:id` de la raiz del `.item` (el `.item` de un job vacio no lo tiene) sino el
+atributo `id` del `.properties`. Con ese id, `ItemCacheManager.getProcessItem(projectLabel, id,
+version)` devuelve el item y `ProcessEditorInput` carga el proceso.
+
+`getAllVersion` tiene tres sobrecargas y solo una sirve para listar:
+
+| Firma | Nota |
+|---|---|
+| `getAllVersion(Project, String, boolean)` | Con el id vacio no devuelve nada |
+| `getAllVersion(Project, String, String, ERepositoryObjectType)` | La que lista, con id y tipo |
+| `getAllVersion(String)` | Por path de proyecto |
+
+`ERepositoryObjectType` no es un enum: son constantes estaticas. La de job es `PROCESS`
+(no `PROCESS_JOB`).
+
+### Anadir nodos sin pasar por el command stack
+
+El command stack (`CreateNodeContainerCommand`) es la via del editor, y ya funciona desde el
+bridge. Pero para construir un job entero por codigo, `Process.addNodeContainer(...)` es mas
+directo: crea el `NodeContainer`, lo registra en el modelo y devuelve el nodo ya con su
+unique name asignado por Studio.
+
+```java
+Node node = new Node(catalogComponent);
+NodeContainer container = new NodeContainer(node);
+node.setLabel("entrada");
+node.setLocation(new Point(200, 100));
+process.addNodeContainer(container);
+```
+
+El unique name lo pone Studio: `tFileInputDelimited_7`, `tLogRow_2`.
+
+### Conectar nodos
+
+`ConnectionCreateCommand` es el comando que usa el editor al arrastrar una conexion. Su
+tercer argumento no es una lista cualquiera: es una lista posicional con al menos tres
+elementos, y el constructor lee los tres primeros sin comprobar nada.
+
+```java
+List<Object> meta = new ArrayList<>();
+meta.add(metaName);        // nombre del schema de la conexion
+meta.add(connectionName);  // nombre de la conexion
+meta.add(metadataTable);   // IMetadataTable con el schema que viaja
+
+ConnectionCreateCommand command =
+    new ConnectionCreateCommand(sourceNode, "FLOW", meta);
+command.setTarget(targetNode);
+command.execute();
+```
+
+Si la lista va vacia, el constructor revienta con
+`IndexOutOfBoundsException: Index 0 out of bounds for length 0`.
 
 ### `run_code`: libertad total
 

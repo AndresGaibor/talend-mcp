@@ -54,6 +54,11 @@ public final class JobOperationsService {
   public static Map<String, Object> createJob(JsonObject spec) {
     return run("create-job", () -> {
       String name = required(spec, "name");
+      // Talend exige que el label del job no tenga puntos ni guiones.
+      if (!name.matches("^[a-zA-Z]+[a-zA-Z0-9_]*$")) {
+        throw new IllegalArgumentException(
+            "El nombre del job solo admite letras, digitos y guion bajo: " + name);
+      }
       String version = string(spec, "version");
       if (version == null || version.trim().isEmpty()) {
         version = "0.1";
@@ -114,7 +119,7 @@ public final class JobOperationsService {
               new boolean[0]);
 
       // Abrir el job: a partir de aqui se opera sobre el, con el editor.
-      Map<String, Object> opened = openCreatedJob(processItem);
+      Map<String, Object> opened = openCreatedJob(processItem, name, version);
       if (!Boolean.TRUE.equals(opened.get("opened"))) {
         throw new IllegalStateException(
             "No se pudo abrir el job recien creado: " + opened.get("error"));
@@ -380,34 +385,24 @@ public final class JobOperationsService {
   }
 
   /**
-   * Ruta del item para el repositorio.
+   * Ruta de la carpeta del item para el repositorio.
    *
-   * El repositorio espera la ruta completa del archivo dentro de la carpeta
-   * del tipo de objeto: `process/<nombre>_<version>.item/<nombre>_<version>.item`.
+   * El repositorio antepone la carpeta del tipo de objeto (`process`) y crea
+   * dentro los tres archivos del job: `.item`, `.properties` y `.screenshot`.
+   * Por eso la ruta es solo el nombre de la carpeta, sin la carpeta `process`
+   * y sin la extension.
    */
   private static org.eclipse.core.runtime.IPath processPath(String folder, String name, String version)
       throws Exception {
-    String fileName = name + "_" + version + ".item";
-    org.eclipse.core.runtime.IPath path = org.eclipse.core.runtime.Path.fromOSString(fileName);
+    org.eclipse.core.runtime.IPath path = org.eclipse.core.runtime.Path.fromOSString(name);
     if (folder != null && !folder.trim().isEmpty()) {
       for (String part : folder.split("/")) {
         if (!part.trim().isEmpty()) {
-          path = org.eclipse.core.runtime.Path.fromOSString(part).append(path);
+          path = path.append(part);
         }
       }
     }
-    return path.append(fileName);
-  }
-
-  /** Ruta del item en el disco, tal cual la espera `openResource`. */
-  private static String itemPathOnDisk(Object processItem, String name, String version) throws Exception {
-    IProject iProject = resourceProject();
-    if (iProject == null) {
-      return null;
-    }
-    org.eclipse.core.resources.IFile file = iProject.getFolder("process")
-        .getFile(name + "_" + version + ".item");
-    return file.getLocation().toOSString();
+    return path;
   }
 
   /** Proyecto de Eclipse que corresponde al proyecto de Talend abierto. */
@@ -428,7 +423,8 @@ public final class JobOperationsService {
    * puede estar recien creado y el arbol de recursos de Eclipse todavia no lo
    * conoce, asi que antes se refresca el ancestro.
    */
-  private static Map<String, Object> openCreatedJob(Object processItem) throws Exception {
+  private static Map<String, Object> openCreatedJob(Object processItem, String name, String version)
+      throws Exception {
     IProject iProject = resourceProject();
     if (iProject == null) {
       Map<String, Object> payload = new LinkedHashMap<>();
@@ -437,19 +433,10 @@ public final class JobOperationsService {
       return payload;
     }
 
-    // El item vive en `process/<nombre>_<version>.item` dentro del proyecto.
-    Object property = processItem.getClass().getMethod("getProperty").invoke(processItem);
-    Object label = property.getClass().getMethod("getLabel").invoke(property);
-    Object version = property.getClass().getMethod("getVersion").invoke(property);
-    String fileName = label + "_" + version + ".item";
-
-    // El item lo acaba de crear el repositorio: el arbol de recursos de
-    // Eclipse todavia no lo conoce, hay que refrescarlo.
-    org.eclipse.core.resources.IFolder processFolder = iProject.getFolder("process");
-    processFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
-    processFolder.getFile(fileName).refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
-
-    org.eclipse.core.resources.IFile file = processFolder.getFile(fileName);
+    // El repositorio crea una carpeta por job, con los tres archivos dentro.
+    org.eclipse.core.resources.IFolder jobFolder = iProject.getFolder("process").getFolder(name);
+    jobFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
+    org.eclipse.core.resources.IFile file = jobFolder.getFile(name + "_" + version + ".item");
     if (!file.exists()) {
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("opened", false);
@@ -476,29 +463,6 @@ public final class JobOperationsService {
       throw new IllegalStateException("El editor no tiene un proceso cargado");
     }
     return process;
-  }
-
-  /** Edit part raiz del editor de job. */
-  private static Object rootEditPartOf(Object editor) throws Exception {
-    Object viewer = editor.getClass().getMethod("getViewer").invoke(editor);
-    if (viewer == null) {
-      return null;
-    }
-    Object root = viewer.getClass().getMethod("getRootEditPart").invoke(viewer);
-    if (root != null) {
-      return root;
-    }
-    Object parts = viewer.getClass().getMethod("getEditParts").invoke(viewer);
-    if (parts instanceof Iterable) {
-      for (Object part : (Iterable<?>) parts) {
-        Object model = part.getClass().getMethod("getModel").invoke(part);
-        if (model != null
-            && talendClass("org.talend.designer.core.ui.editor.process.Process").isInstance(model)) {
-          return part;
-        }
-      }
-    }
-    return null;
   }
 
   /** Parte grafica de un nodo, que es lo que guarda el portapapeles. */
