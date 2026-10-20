@@ -16,7 +16,7 @@ const TUNNEL_CONFIG = IS_WIN
   : join(homedir(), ".config", "tunnel-client");
 const TUNNEL_PROFILE = join(TUNNEL_CONFIG, "talend.yaml");
 
-const CONTROL_PLANE_API_KEY_VAR = "CONTROL_PLANE_API_KEY_VAR";
+const CONTROL_PLANE_API_KEY_VAR = "CONTROL_PLANE_API_KEY";
 
 // ─── Estética ──────────────────────────────────────────────
 const C = {
@@ -421,7 +421,7 @@ function cleanOldPlugins(): void {
 
 async function installBridge(): Promise<void> {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  const projectRoot = join(__dirname, "..", "..");
+  const projectRoot = join(__dirname, "..");
   const bridgeDir = join(projectRoot, "talend-studio-bridge");
 
   console.error();

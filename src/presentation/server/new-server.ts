@@ -4,7 +4,7 @@ import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { listPresentationAppIds, registerPresentationAppResources } from "../apps";
-import { getAllRuntimeTools, getRuntimeTools } from "../../server/registered-tools";
+import { getRuntimeTools } from "../../server/registered-tools";
 import { GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
 import { resolvePublicUrl } from "../../tailscale/resolve-public-url";
 
@@ -165,6 +165,13 @@ function handleMcpRequest(
   origin: string | undefined,
   res: ServerResponse,
   mcpServer: McpServer,
+  tools: Array<{
+    name: string;
+    description: string;
+    inputSchema: unknown;
+    outputSchema?: unknown;
+    annotations?: unknown;
+  }>,
 ): boolean {
   const { id, method, params } = parsed;
 
@@ -184,13 +191,6 @@ function handleMcpRequest(
   }
 
   if (method === "tools/list") {
-    const tools = getAllRuntimeTools().map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema ?? { type: "object", properties: {} },
-      outputSchema: t.outputSchema,
-      ...(t.annotations ? { annotations: t.annotations } : {}),
-    }));
     sendJson(res, origin, jsonRpcOk(id, { tools }));
     return true;
   }
@@ -225,6 +225,15 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
   // Create one McpServer for stateful tool calls (tools/call), plus one SSE transport
   // for clients that want full streaming MCP (e.g. Claude Desktop)
   const mcpServer = createNewMcpServer({ live: options?.live, stderr: process.stderr });
+  const runtimeTools = getRuntimeTools();
+  const tools = runtimeTools.map(({ definition: t }) => ({
+    name: t.name,
+    description: t.description,
+    inputSchema: t.inputSchema ?? { type: "object", properties: {} },
+    outputSchema: t.outputSchema,
+    ...(t.annotations ? { annotations: t.annotations } : {}),
+  }));
+  const toolsByName = new Map(runtimeTools.map((tool) => [tool.definition.name, tool]));
   const sseTransport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await mcpServer.connect(sseTransport);
 
@@ -322,7 +331,7 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     const id = parsed.id;
 
     // Handle simple stateless methods synchronously
-    const handled = handleMcpRequest(parsed as any, origin, res, mcpServer);
+    const handled = handleMcpRequest(parsed as any, origin, res, mcpServer, tools);
     if (handled) return;
 
     // tools/call — invoke the actual tool handler
@@ -333,8 +342,7 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
         sendJson(res, origin, jsonRpcError(id, -32602, "Missing tool name"));
         return;
       }
-      const runtimeTools = getRuntimeTools();
-      const tool = runtimeTools.find((t) => t.definition.name === toolName);
+      const tool = toolsByName.get(toolName);
       if (!tool) {
         sendJson(res, origin, jsonRpcError(id, -32602, `Tool not found: ${toolName}`));
         return;
