@@ -4,7 +4,7 @@ import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { listPresentationAppIds, registerPresentationAppResources } from "../apps";
-import { getRuntimeTools } from "../../server/registered-tools";
+import { getAllRuntimeTools, getRuntimeTools } from "../../server/registered-tools";
 import { GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
 import { resolvePublicUrl } from "../../tailscale/resolve-public-url";
 
@@ -129,7 +129,10 @@ function jsonRpcError(id: unknown, code: number, message: string) {
 }
 
 function sendJson(res: ServerResponse, origin: string | undefined, payload: unknown) {
-  const json = JSON.stringify(payload);
+  sendJsonText(res, origin, JSON.stringify(payload));
+}
+
+function sendJsonText(res: ServerResponse, origin: string | undefined, json: string) {
   res.writeHead(200, {
     "content-type": "application/json",
     "content-length": Buffer.byteLength(json),
@@ -165,13 +168,7 @@ function handleMcpRequest(
   origin: string | undefined,
   res: ServerResponse,
   mcpServer: McpServer,
-  tools: Array<{
-    name: string;
-    description: string;
-    inputSchema: unknown;
-    outputSchema?: unknown;
-    annotations?: unknown;
-  }>,
+  toolsJson: string,
 ): boolean {
   const { id, method, params } = parsed;
 
@@ -191,7 +188,7 @@ function handleMcpRequest(
   }
 
   if (method === "tools/list") {
-    sendJson(res, origin, jsonRpcOk(id, { tools }));
+    sendJsonText(res, origin, `{"jsonrpc":"2.0","id":${JSON.stringify(id ?? null)},"result":{"tools":${toolsJson}}}`);
     return true;
   }
 
@@ -226,13 +223,13 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
   // for clients that want full streaming MCP (e.g. Claude Desktop)
   const mcpServer = createNewMcpServer({ live: options?.live, stderr: process.stderr });
   const runtimeTools = getRuntimeTools();
-  const tools = runtimeTools.map(({ definition: t }) => ({
+  const toolsJson = JSON.stringify(runtimeTools.map(({ definition: t }) => ({
     name: t.name,
     description: t.description,
     inputSchema: t.inputSchema ?? { type: "object", properties: {} },
     outputSchema: t.outputSchema,
     ...(t.annotations ? { annotations: t.annotations } : {}),
-  }));
+  })));
   const toolsByName = new Map(runtimeTools.map((tool) => [tool.definition.name, tool]));
   const sseTransport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await mcpServer.connect(sseTransport);
@@ -331,7 +328,7 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     const id = parsed.id;
 
     // Handle simple stateless methods synchronously
-    const handled = handleMcpRequest(parsed as any, origin, res, mcpServer, tools);
+    const handled = handleMcpRequest(parsed as any, origin, res, mcpServer, toolsJson);
     if (handled) return;
 
     // tools/call — invoke the actual tool handler

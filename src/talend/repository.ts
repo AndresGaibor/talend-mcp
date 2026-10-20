@@ -30,10 +30,13 @@ export async function listJobs(projectPath: string): Promise<TalendJobResource[]
   const propertiesFiles = await listFilesRecursive(processPath, (ruta) => ruta.endsWith(".properties"));
   const jobs: TalendJobResource[] = [];
 
-  for (const propertiesPath of propertiesFiles) {
-    const xml = await readTextFile(propertiesPath, projectPath);
-    const job = parseJobProperties(xml, propertiesPath);
-    if (job.label && job.itemPath.endsWith(".item")) jobs.push(job);
+  for (let i = 0; i < propertiesFiles.length; i += 32) {
+    const batch = await Promise.all(propertiesFiles.slice(i, i + 32).map(async (propertiesPath) => {
+      const xml = await readTextFile(propertiesPath, projectPath);
+      const job = parseJobProperties(xml, propertiesPath);
+      return job.label && job.itemPath.endsWith(".item") ? job : null;
+    }));
+    jobs.push(...batch.filter((job): job is TalendJobResource => job !== null));
   }
 
   return jobs;
