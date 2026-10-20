@@ -60,7 +60,12 @@ public final class HotReloadService {
   }
 
   private void watch(Bundle bundle) {
-    String lastSignature = null;
+    // La firma se guarda en un archivo aparte porque el classloader del bundle se
+    // reemplaza al recargar: sin esto, la instancia nueva detectaria el mismo
+    // jar como "cambiado" y volveria a recargar en bucle.
+    Path signatureFile = signaturePath();
+    String lastSignature = readSignature(signatureFile);
+    Path hotJar = hotJarPath();
 
     while (running.get()) {
       try {
@@ -69,20 +74,19 @@ public final class HotReloadService {
         return;
       }
 
-      Path hotJar = hotJarPath();
       try {
         if (!Files.isRegularFile(hotJar)) continue;
 
-        long modified = Files.getLastModifiedTime(hotJar).toMillis();
-        long size = Files.size(hotJar);
-        String signature = modified + ":" + size;
+        String signature = signatureOf(hotJar);
         if (signature.equals(lastSignature)) continue;
         lastSignature = signature;
 
         byte[] bytes = Files.readAllBytes(hotJar);
         if (bytes.length == 0) continue;
 
-        // El framework reinicia el Activator al recargar: la instance vieja ya no
+        writeSignature(signatureFile, signature);
+
+        // El framework reinicia el Activator al recargar: la instancia vieja ya no
         // debe seguir vigilando.
         running.set(false);
         BridgeLog.info("Cambio detectado en " + hotJar + ". Recargando el bundle...");
@@ -91,6 +95,34 @@ public final class HotReloadService {
       } catch (IOException | RuntimeException e) {
         BridgeLog.warn("No se pudo evaluar la carga en caliente", e);
       }
+    }
+  }
+
+  /** Firma del jar: tamaño y fecha de modificacion. */
+  private static String signatureOf(Path jar) throws IOException {
+    return Files.size(jar) + ":" + Files.getLastModifiedTime(jar).toMillis();
+  }
+
+  private static Path signaturePath() {
+    Path jar = hotJarPath();
+    Path parent = jar.getParent();
+    return parent == null ? Paths.get(jar.getFileName() + ".sig") : parent.resolve(jar.getFileName() + ".sig");
+  }
+
+  private static String readSignature(Path file) {
+    try {
+      if (!Files.isRegularFile(file)) return "";
+      return new String(Files.readAllBytes(file), java.nio.charset.StandardCharsets.UTF_8).trim();
+    } catch (IOException e) {
+      return "";
+    }
+  }
+
+  private static void writeSignature(Path file, String signature) {
+    try {
+      Files.write(file, signature.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    } catch (IOException e) {
+      BridgeLog.warn("No se pudo guardar la firma del jar", e);
     }
   }
 

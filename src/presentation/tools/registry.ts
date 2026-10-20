@@ -5,6 +5,7 @@ import { CreateJobUseCase } from "../../application/jobs/create-job.usecase";
 
 import { createAnalyzeJobTool } from "./jobs/analyze-job.tool";
 import { createCreateJobTool } from "./jobs/create-job.tool";
+import { createJobsCreateFromSpecTool } from "./jobs/create-from-spec.tool";
 import { createCreateFolderTool } from "./jobs/create-folder.tool";
 import { createDeleteJobTool } from "./jobs/delete-job.tool";
 import { createDuplicateJobTool } from "./jobs/duplicate-job.tool";
@@ -80,6 +81,8 @@ const createJobUseCase = new CreateJobUseCase(jobRepo);
 export const allTools = [
   createAnalyzeJobTool(analyzeJobUseCase),
   createCreateJobTool(),
+
+  createJobsCreateFromSpecTool(),
   createCreateFolderTool(),
   createDeleteJobTool(),
   createDuplicateJobTool(),

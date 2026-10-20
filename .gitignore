@@ -34,6 +34,13 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 entregables/
 evidencias/
 
+# Datos de prueba generados por scripts/make-testdata.ts.
+# Los ficheros grandes no se versionan: se regeneran con `bun run scripts/make-testdata.ts`.
+testdata/*.csv
+testdata/*.xlsx
+testdata/*.txt
+testdata/resultados.csv
+
 # Indice local de CodeGraph
 .codegraph/
 

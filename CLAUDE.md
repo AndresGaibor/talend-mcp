@@ -19,5 +19,8 @@ Mapas utiles:
 - [docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md) - recetas para agregar tools y cambios en el
   plugin.
 - [docs/tool-migration.md](docs/tool-migration.md) - migracion de tools legacy a canonicas.
+- [docs/TALEND-STUDIO-INTERNALS.md](docs/TALEND-STUDIO-INTERNALS.md) - APIs internas de Talend
+  Studio que usa el plugin: tipos de columna validos, flujo de ejecucion de un job y recarga
+  del modelo en memoria.
 
 Documentacion de la API de Bun: `node_modules/bun-types/docs/**.mdx`.

@@ -202,7 +202,8 @@ bun run typecheck    # TypeScript sin emitir
 La guia de trabajo para agentes de IA esta en [AGENTS.md](AGENTS.md). El mapa del repositorio
 y las convenciones de arquitectura estan en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md), y
 las recetas para agregar tools y cambios del plugin en
-[docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md).
+[docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md). Las APIs internas de Talend Studio que usa
+el plugin Java estan en [docs/TALEND-STUDIO-INTERNALS.md](docs/TALEND-STUDIO-INTERNALS.md).
 
 ## Solucion de problemas
 

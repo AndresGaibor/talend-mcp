@@ -70,8 +70,8 @@ final class BridgeServer {
   }
 
   private final BundleContext bundleContext;
-  private final BridgeConfig config;
   private final String token;
+  private volatile BridgeConfig config;
   private HttpServer server;
   private ExecutorService executor;
 
@@ -81,11 +81,26 @@ final class BridgeServer {
     this.token = BridgeConfig.ensureToken();
   }
 
+  /**
+   * Configuracion vigente.
+   *
+   * Se relee cuando cambia el archivo para que ajustar permisos (por ejemplo
+   * habilitar ejecuciones) no exija reiniciar Talend Studio.
+   */
+  private BridgeConfig config() {
+    BridgeConfig current = this.config;
+    BridgeConfig reloaded = BridgeConfig.load();
+    if (reloaded != null) {
+      this.config = reloaded;
+    }
+    return this.config;
+  }
+
   void start() {
     try {
       server = HttpServer.create(new InetSocketAddress("127.0.0.1", config.port), 0);
       server.createContext("/ping", exchange -> guarded(exchange, () -> respond(exchange, 200, pingPayload())));
-      server.createContext("/capabilities", exchange -> guarded(exchange, () -> respond(exchange, 200, CapabilityAuditService.capabilities(config))));
+      server.createContext("/capabilities", exchange -> guarded(exchange, () -> respond(exchange, 200, CapabilityAuditService.capabilities(config()))));
       server.createContext("/audit/environment", exchange -> guarded(exchange, () -> respond(exchange, 200, PluginAuditService.auditEnvironment(bundleContext))));
       server.createContext("/workbench/state", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::state))));
       server.createContext("/workbench/selection", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::selection))));
@@ -157,8 +172,8 @@ final class BridgeServer {
     payload.put("endpoint", "/ping");
     payload.put("plugin", Activator.PLUGIN_ID);
     payload.put("version", pluginVersion());
-    payload.put("mode", config.readOnly ? "readOnly" : "readWrite");
-    payload.put("unsafeActions", config.unsafeActions);
+    payload.put("mode", config().readOnly ? "readOnly" : "readWrite");
+    payload.put("unsafeActions", config().unsafeActions);
     payload.put("hotReload", true);
     return payload;
   }
@@ -222,7 +237,7 @@ final class BridgeServer {
       throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'commandId'");
     }
     boolean dryRun = optBoolean(body, "dryRun", true);
-    respond(exchange, 200, UiThread.sync(() -> CommandAuditService.executeCommand(commandId, dryRun, config)));
+    respond(exchange, 200, UiThread.sync(() -> CommandAuditService.executeCommand(commandId, dryRun, config())));
   }
 
   private void handleLaunchRun(HttpExchange exchange) throws IOException {
@@ -233,7 +248,7 @@ final class BridgeServer {
     }
     String mode = optString(body, "mode");
     boolean dryRun = optBoolean(body, "dryRun", true);
-    respond(exchange, 200, LaunchConfigService.runLaunchConfig(name, mode, dryRun, config));
+    respond(exchange, 200, LaunchConfigService.runLaunchConfig(name, mode, dryRun, config()));
   }
 
   private void handleOpenResource(HttpExchange exchange) throws IOException {
@@ -320,7 +335,11 @@ final class BridgeServer {
     boolean saveBefore = optBoolean(body, "saveBefore", true);
     boolean waitForTermination = optBoolean(body, "waitForTermination", true);
     int timeoutMs = optInt(body, "timeoutMs", 120000);
-    respond(exchange, 200, UiThread.sync(() -> AutomationService.runActiveJob(saveBefore, waitForTermination, timeoutMs, dryRun, config)));
+
+    // Ojo: la ejecucion NO va dentro de UiThread.sync. Lanzar el job y esperar
+    // su terminacion tarda decenas de segundos y bloquearia el hilo de la UI,
+    // congelando Talend Studio.
+    respond(exchange, 200, AutomationService.runActiveJob(saveBefore, waitForTermination, timeoutMs, dryRun, config()));
   }
 
   private void handleLaunchRunStatus(HttpExchange exchange) throws IOException {

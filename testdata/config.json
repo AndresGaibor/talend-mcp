@@ -1,0 +1,39 @@
+{
+  "job": {
+    "nombre": "carga_clientes",
+    "version": "0.1",
+    "parametros": {
+      "origen": {
+        "tipo": "csv",
+        "ruta": "clientes.csv",
+        "separador": ";"
+      },
+      "destino": {
+        "tipo": "csv",
+        "ruta": "salida.csv"
+      },
+      "reglas": [
+        {
+          "campo": "monto",
+          "tipo": "numero",
+          "decimales": 2,
+          "defecto": 0
+        },
+        {
+          "campo": "estado",
+          "tipo": "texto",
+          "valores": [
+            "ACTIVO",
+            "INACTIVO",
+            "SUSPENDIDO"
+          ],
+          "defecto": "ACTIVO"
+        }
+      ],
+      "umbrales": {
+        "montoAlto": 2000,
+        "lote": 5000
+      }
+    }
+  }
+}

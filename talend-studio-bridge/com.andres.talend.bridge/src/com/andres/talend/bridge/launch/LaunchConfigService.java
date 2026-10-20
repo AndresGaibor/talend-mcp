@@ -87,6 +87,27 @@ public final class LaunchConfigService {
   }
 
   public static Map<String, Object> runLaunchConfig(String name, String mode, boolean dryRun, BridgeConfig config) {
+    ILaunchConfiguration launchConfiguration = findLaunchConfiguration(name);
+    Map<String, Object> payload = runLaunchConfig(launchConfiguration, name, mode, dryRun, config);
+    if (launchConfiguration == null) {
+      payload.put("ok", false);
+      payload.put("confidence", "low");
+      Map<String, Object> error = new LinkedHashMap<>();
+      error.put("code", "LAUNCH_NOT_FOUND");
+      error.put("message", "No se encontró la launch config solicitada");
+      payload.put("error", error);
+    }
+    return payload;
+  }
+
+  /**
+   * Ejecuta una launch config ya resuelta.
+   *
+   * Permite lanzar una configuracion recien creada sin depender de la busqueda
+   * por nombre, que todavia no la ve en el launch manager.
+   */
+  public static Map<String, Object> runLaunchConfig(ILaunchConfiguration launchConfiguration, String name,
+      String mode, boolean dryRun, BridgeConfig config) {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ok", true);
     payload.put("source", "studio-bridge");
@@ -95,17 +116,9 @@ public final class LaunchConfigService {
     payload.put("name", name);
     payload.put("mode", mode);
     payload.put("dryRun", dryRun);
-
-    ILaunchConfiguration launchConfiguration = findLaunchConfiguration(name);
     payload.put("supported", launchConfiguration != null);
 
     if (launchConfiguration == null) {
-      payload.put("ok", false);
-      payload.put("confidence", "low");
-      Map<String, Object> error = new LinkedHashMap<>();
-      error.put("code", "LAUNCH_NOT_FOUND");
-      error.put("message", "No se encontró la launch config solicitada");
-      payload.put("error", error);
       return payload;
     }
 

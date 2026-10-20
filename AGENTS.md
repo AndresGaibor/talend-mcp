@@ -94,7 +94,9 @@ talend-studio-bridge/        plugin Java (Eclipse/Tycho) que expone Studio por H
 docs/                        documentacion tecnica
 ```
 
-Detalle completo en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
+Detalle completo en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). Las APIs internas de Talend
+Studio que usa el plugin Java estan en
+[docs/TALEND-STUDIO-INTERNALS.md](docs/TALEND-STUDIO-INTERNALS.md).
 
 ## 6. Como agregar una tool
 

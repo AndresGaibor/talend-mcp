@@ -404,7 +404,7 @@ public final class TalendIntrospectionService {
     return value != null && invoke(value, name) != null;
   }
 
-  private static Object invokeFirst(Object value, String... names) {
+  public static Object invokeFirst(Object value, String... names) {
     if (value == null) return null;
     for (String name : names) {
       Object result = invoke(value, name);

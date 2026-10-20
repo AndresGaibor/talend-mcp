@@ -17,7 +17,7 @@ export type TalendJobSpec = {
     type: string;
     label?: string;
     position?: { x: number; y: number };
-    parameters?: Record<string, string>;
+    parameters?: Record<string, string | { value: string; field?: string }>;
     schema?: Array<{
       name: string;
       type: string;
@@ -45,17 +45,53 @@ export type CreateJobFromSpecResult = {
   errors: string[];
 };
 
+/**
+ * Schema que un componente recibe del flujo, si no declara el suyo.
+ *
+ * Un `tLogRow` al final de un flujo no declara schema, pero Talend si lo
+ * necesita: el parametro `LENGTHS` se arma con las columnas que le llegan.
+ * Sin schema, el job falla al generar codigo con `NumberFormatException`.
+ */
+function inheritSchemaFromSource(
+  componentId: string,
+  spec: TalendJobSpec,
+): { name: string; connector: string; columns: Array<{ name: string; type: string; nullable?: boolean; length?: number; precision?: number }> } | undefined {
+  const incoming = spec.connections.filter((c) => c.target === componentId && c.type === "FLOW");
+  for (const connection of incoming) {
+    const source = spec.components.find((c) => c.id === connection.source);
+    if (!source?.schema || source.schema.length === 0) {
+      continue;
+    }
+    return {
+      name: source.schema[0]?.name ?? "Default",
+      connector: "FLOW",
+      columns: source.schema.map((col) => ({
+        name: col.name,
+        type: col.type,
+        nullable: col.nullable,
+        length: col.length,
+        precision: col.precision,
+      })),
+    };
+  }
+  return undefined;
+}
+
 export async function createJobFromSpec(
   projectPath: string,
   spec: TalendJobSpec,
   bridge?: TalendStudioBridgeClient,
 ): Promise<CreateJobFromSpecResult> {
   const errors: string[] = [];
+  const componentVersions = new Map<string, string>();
 
   for (const comp of spec.components) {
     const catalogEntry = await inspectComponent(comp.type);
     if (!catalogEntry) {
       errors.push("Componente '" + comp.type + "' no encontrado en catalogo");
+    } else if (catalogEntry.version) {
+      // Studio necesita la version del componente para resolverlo al ejecutar.
+      componentVersions.set(comp.id, catalogEntry.version);
     }
   }
 
@@ -71,21 +107,24 @@ export async function createJobFromSpec(
     components: spec.components.map((c) => ({
       componentName: c.type,
       uniqueName: c.id,
+      componentVersion: componentVersions.get(c.id),
       label: c.label,
       posX: c.position?.x ?? 160,
       posY: c.position?.y ?? 96,
       parameters: c.parameters ?? {},
-      schema: c.schema ? {
-        name: c.schema[0]?.name ?? "Default",
-        connector: "FLOW",
-        columns: c.schema.map((col) => ({
-          name: col.name,
-          type: col.type,
-          nullable: col.nullable,
-          length: col.length,
-          precision: col.precision,
-        })),
-      } : undefined,
+      schema: c.schema
+        ? {
+            name: c.schema[0]?.name ?? "Default",
+            connector: "FLOW",
+            columns: c.schema.map((col) => ({
+              name: col.name,
+              type: col.type,
+              nullable: col.nullable,
+              length: col.length,
+              precision: col.precision,
+            })),
+          }
+        : inheritSchemaFromSource(c.id, spec),
     })),
     connections: spec.connections.map((c) => ({
       source: c.source,

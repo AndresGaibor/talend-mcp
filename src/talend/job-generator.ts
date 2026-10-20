@@ -3,13 +3,24 @@ import { createEmptyJobItemXml } from "./job-crud";
 import { generateTalendId } from "./utils";
 import { buildMapNodeData } from "./component-mappers";
 
+/**
+ * Valor de un parametro de componente.
+ *
+ * Un string simple se escribe como `field="TEXT"`. Para los parametros que
+ * Talend tipa de otra forma (FILE, CHECK, RADIO, DIRECTORY, COMPONENT_LIST)
+ * se puede indicar el campo explicitamente.
+ */
+export type ParameterValue = string | { value: string; field?: string };
+
 export interface ComponentSpec {
   uniqueName: string;
   componentName: string;
+  /** Version del componente en Talend (por ejemplo 0.102). Sin ella Studio no resuelve el componente. */
+  componentVersion?: string;
   posX?: number;
   posY?: number;
   label?: string;
-  parameters?: Record<string, string>;
+  parameters?: Record<string, ParameterValue>;
   schema?: {
     name: string;
     connector?: string;
@@ -61,8 +72,66 @@ function buildElementParameter(name: string, value: string, field = "TEXT"): Rec
 
 type ColumnSpec = { name: string; type?: string; length?: number; precision?: number; nullable?: boolean; key?: boolean; sourceType?: string; pattern?: string };
 
+/**
+ * Tipos Java validos de Talend para una columna de schema.
+ *
+ * Usar un id que no existe (por ejemplo id_Decimal) hace que el generador de
+ * codigo de Studio falle con "Unknown java id type" al ejecutar el job.
+ */
+const TALEND_COLUMN_TYPES = new Set([
+  "id_String",
+  "id_Integer",
+  "id_Long",
+  "id_Double",
+  "id_Float",
+  "id_BigDecimal",
+  "id_Boolean",
+  "id_Byte",
+  "id_Short",
+  "id_Character",
+  "id_Date",
+  "id_Password",
+  "id_Dynamic",
+]);
+
+const COLUMN_TYPE_ALIASES: Record<string, string> = {
+  string: "id_String",
+  text: "id_String",
+  varchar: "id_String",
+  char: "id_Character",
+  int: "id_Integer",
+  integer: "id_Integer",
+  long: "id_Long",
+  bigint: "id_Long",
+  double: "id_Double",
+  float: "id_Float",
+  real: "id_Double",
+  decimal: "id_BigDecimal",
+  numeric: "id_BigDecimal",
+  bigdecimal: "id_BigDecimal",
+  boolean: "id_Boolean",
+  bool: "id_Boolean",
+  byte: "id_Byte",
+  short: "id_Short",
+  date: "id_Date",
+  datetime: "id_Date",
+  timestamp: "id_Date",
+  password: "id_Password",
+};
+
+/** Normaliza el tipo de una columna al id Java que espera Talend. */
+export function normalizeColumnType(type?: string): string {
+  if (!type) return "id_String";
+  if (TALEND_COLUMN_TYPES.has(type)) return type;
+
+  const alias = COLUMN_TYPE_ALIASES[type.toLowerCase()];
+  if (alias) return alias;
+
+  return "id_String";
+}
+
 function buildColumn(col: ColumnSpec): Record<string, unknown> {
-  const node: Record<string, unknown> = { "@_name": col.name, "@_type": col.type ?? "id_String" };
+  const node: Record<string, unknown> = { "@_name": col.name, "@_type": normalizeColumnType(col.type) };
   if (col.length !== undefined) node["@_length"] = String(col.length);
   if (col.precision !== undefined) node["@_precision"] = String(col.precision);
   if (col.nullable !== undefined) node["@_nullable"] = col.nullable ? "true" : "false";
@@ -77,16 +146,32 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
   if (spec.label) parameters.push(buildElementParameter("LABEL", spec.label));
 
   if (spec.parameters) {
-    for (const [key, value] of Object.entries(spec.parameters)) {
-      if (typeof value === "object" && value !== null) {
+    for (const [key, raw] of Object.entries(spec.parameters)) {
+      if (raw !== null && typeof raw === "object" && !Array.isArray(raw) && "value" in raw) {
+        const typed = raw as { value: string; field?: string };
+        parameters.push(buildElementParameter(key, typed.value, typed.field ?? "TEXT"));
+        continue;
+      }
+      if (typeof raw === "object" && raw !== null) {
         parameters.push({
           "@_field": "TABLE",
           "@_name": key,
-          elementValue: value,
+          elementValue: raw,
         });
       } else {
-        parameters.push(buildElementParameter(key, value));
+        parameters.push(buildElementParameter(key, raw as string));
       }
+    }
+  }
+
+  // `tLogRow` necesita el parametro `LENGTHS`: es una tabla con un par
+  // SCHEMA_COLUMN/LENGTH por cada columna del schema. Si falta, el generador
+  // de codigo de Talend hace `Integer.parseInt` sobre un valor vacio y el
+  // job falla con `NumberFormatException`. Ver docs/TALEND-STUDIO-INTERNALS.md.
+  if (spec.componentName === "tLogRow" && !("LENGTHS" in (spec.parameters ?? {}))) {
+    const lengths = buildLogRowLengths(spec);
+    if (lengths) {
+      parameters.push({ "@_field": "TABLE", "@_name": "LENGTHS", elementValue: lengths });
     }
   }
 
@@ -96,6 +181,7 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
     elementParameter: parameters.length === 1 ? parameters[0] : parameters,
   };
 
+  if (spec.componentVersion) node["@_componentVersion"] = spec.componentVersion;
   if (spec.posX !== undefined) node["@_posX"] = String(spec.posX);
   if (spec.posY !== undefined) node["@_posY"] = String(spec.posY);
 
@@ -115,6 +201,26 @@ function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
   }
 
   return node;
+}
+
+/**
+ * Tabla `LENGTHS` de `tLogRow`: un par SCHEMA_COLUMN/LENGTH por columna.
+ *
+ * La longitud por defecto es 10, que es la que usan los jobs de Talend.
+ */
+function buildLogRowLengths(spec: ComponentSpec): Record<string, unknown>[] | null {
+  const columns = spec.schema?.columns;
+  if (!Array.isArray(columns) || columns.length === 0) {
+    return null;
+  }
+
+  const values: Record<string, unknown>[] = [];
+  let id = 0;
+  for (const column of columns) {
+    values.push({ "@_elementRef": "SCHEMA_COLUMN", "@_value": column.name, "@_id": String(id++) });
+    values.push({ "@_elementRef": "LENGTH", "@_value": String(column.length ?? 10), "@_id": String(id++) });
+  }
+  return values;
 }
 
 function buildConnectionNode(spec: ConnectionSpec): Record<string, unknown> {

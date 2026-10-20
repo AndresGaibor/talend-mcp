@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.andres.talend.bridge.resources.WorkspaceService;
+import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
@@ -309,8 +311,29 @@ public final class WorkbenchService {
     return payload;
   }
 
-  public static Map<String, Object> openResource(String absolutePath) {
-    Map<String, Object> payload = new LinkedHashMap<>();
+  /**
+   * Refresca en disco el ancestro mas cercano que el workspace ya conoce.
+   *
+   * Sirve para que Eclipse descubra carpetas y archivos creados por fuera
+   * (por ejemplo un job generado por el MCP) sin tener que reiniciar.
+   */
+  private static void refreshClosestAncestor(IWorkspaceRoot root, String absolutePath) {
+    org.eclipse.core.runtime.IPath current = Path.fromOSString(absolutePath).removeLastSegments(1);
+    while (current != null && current.segmentCount() > 0) {
+      try {
+        IContainer container = root.getContainerForLocation(current);
+        if (container != null && container.exists()) {
+          container.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_INFINITE, null);
+          return;
+        }
+      } catch (Exception e) {
+        // Se sigue hacia arriba.
+      }
+      current = current.removeLastSegments(1);
+    }
+  }
+
+  public static Map<String, Object> openResource(String absolutePath) {    Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("source", "studio-bridge");
     payload.put("endpoint", "/workbench/open-resource");
     payload.put("path", absolutePath);
@@ -323,6 +346,11 @@ public final class WorkbenchService {
     }
 
     IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
+
+    // Un archivo creado fuera de Studio no esta en el arbol de recursos: hay que
+    // refrescar el ancestro mas cercano que Eclipse ya conoce para que lo descubra.
+    refreshClosestAncestor(root, absolutePath);
+
     IFile file = root.getFileForLocation(Path.fromOSString(absolutePath));
     if (file == null || !file.exists()) {
       payload.put("ok", false);
@@ -335,6 +363,13 @@ public final class WorkbenchService {
       file.getParent().refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ONE, null);
     } catch (Exception e) {
     }
+
+    // Studio puede tener una version anterior del `.item` en su modelo EMF:
+    // el MCP escribe los jobs por fuera del IDE. Sin recargar el item, el
+    // editor abre el schema viejo y el job se ejecuta con el schema viejo.
+    // Ver docs/TALEND-STUDIO-INTERNALS.md, seccion 7.
+    Map<String, Object> reload = WorkspaceService.reloadItemFromDisk(absolutePath);
+    payload.put("itemReloaded", reload.get("reloaded"));
 
     try {
       IWorkbenchPage page = activePage();
