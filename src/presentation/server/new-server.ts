@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
-import { McpServer } from "@modelcontextprotocol/server";
+import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { listPresentationAppIds, registerPresentationAppResources } from "../apps";
@@ -19,6 +19,12 @@ export interface NewServerHandle {
   localUrl: string;
   publicUrl: string | null;
   close(): Promise<void>;
+}
+
+function toStandardSchema(schema: unknown) {
+  return schema && typeof schema === "object" && "~standard" in schema
+    ? schema
+    : fromJsonSchema(schema as Parameters<typeof fromJsonSchema>[0]);
 }
 
 function createHealthPayload() {
@@ -81,8 +87,8 @@ export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.W
       tool.definition.name,
       {
         description: tool.definition.description,
-        inputSchema: tool.definition.inputSchema as Parameters<typeof server.registerTool>[1]["inputSchema"],
-        outputSchema: (tool.definition.outputSchema ?? GENERIC_TOOL_OUTPUT_SCHEMA) as Parameters<typeof server.registerTool>[1]["outputSchema"],
+        inputSchema: toStandardSchema(tool.definition.inputSchema) as Parameters<typeof server.registerTool>[1]["inputSchema"],
+        outputSchema: toStandardSchema(tool.definition.outputSchema ?? GENERIC_TOOL_OUTPUT_SCHEMA) as Parameters<typeof server.registerTool>[1]["outputSchema"],
         annotations: tool.definition.annotations as Parameters<typeof server.registerTool>[1]["annotations"],
       },
       tool.handler as never,

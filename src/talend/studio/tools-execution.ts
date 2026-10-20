@@ -265,43 +265,6 @@ export const executionTools = [
     },
   },
   {
-    name: "talend_bridge_launch_runs",
-    description: "Obtiene el historial de ejecuciones de jobs desde el bridge.",
-    inputSchema: z.object({
-      jobName: z.string().optional().describe("Nombre opcional del job para filtrar"),
-    }),
-    handler: async (input: { jobName?: string }) => {
-      try {
-        const runs = await executionTracker.getLaunchRuns(input.jobName);
-        return bridgeOk({
-          ok: true,
-          source: "studio-bridge",
-          confidence: "high",
-          endpoint: "/launch/runs",
-          data: {
-            runs: runs.map((r) => ({
-              id: r.id,
-              jobName: r.jobName,
-              status: r.status,
-              startTime: r.startTime,
-              endTime: r.endTime,
-              duration: r.duration,
-              errorCount: r.errors?.length ?? 0,
-            })),
-          },
-        });
-      } catch (err) {
-        return bridgeFail({
-          ok: false,
-          source: "execution",
-          confidence: "low",
-          endpoint: "/launch/runs",
-          error: { code: "RUNS_FAILED", message: String(err) },
-        });
-      }
-    },
-  },
-  {
     name: "talend_runs_collect_logs",
     description: "Recolecta los logs de una ejecucion especifica.",
     inputSchema: z.object({
