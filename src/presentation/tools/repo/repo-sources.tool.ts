@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createRepoSourcesTool() {
   return {
-    name: "repo_sources",
+    name: "talend_repo_sources",
     description: "Lista los repositorios en caché local.",
     inputSchema: {
       type: "object",

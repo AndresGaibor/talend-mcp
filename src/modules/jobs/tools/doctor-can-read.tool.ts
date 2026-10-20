@@ -1,5 +1,5 @@
 import { okResult } from "../../../presentation/tools/common/result";
-import { getConfiguredProjectPath, resolveWorkspaceFromProject } from "../../../talend/workspace";
+import { resolveProjectPath, resolveWorkspaceFromProject } from "../../../talend/workspace";
 import { existsSync } from "node:fs";
 
 export const talendCanReadProjectTool = {
@@ -7,7 +7,7 @@ export const talendCanReadProjectTool = {
   description: "Verifica si se puede leer el proyecto actual.",
   inputSchema: { type: "object", properties: {} },
   handler: async () => {
-    const projectPath = getConfiguredProjectPath();
+    const projectPath = await resolveProjectPath();
     const exists = projectPath ? existsSync(projectPath) : false;
     return {
       content: [{ type: "text", text: JSON.stringify({ exists }) }],
@@ -22,7 +22,7 @@ export const talendCanReadProcessTool = {
   description: "Verifica si se puede leer el directorio de procesos del proyecto.",
   inputSchema: { type: "object", properties: {} },
   handler: async () => {
-    const projectPath = getConfiguredProjectPath();
+    const projectPath = await resolveProjectPath();
     const exists = projectPath ? existsSync(`${projectPath}/process`) : false;
     return {
       content: [{ type: "text", text: JSON.stringify({ exists }) }],
@@ -37,7 +37,7 @@ export const talendCanReadMetadataTool = {
   description: "Verifica si se puede leer el directorio .metadata del workspace.",
   inputSchema: { type: "object", properties: {} },
   handler: async () => {
-    const projectPath = getConfiguredProjectPath();
+    const projectPath = await resolveProjectPath();
     if (!projectPath) {
       return {
         content: [{ type: "text", text: JSON.stringify({ exists: false }) }],

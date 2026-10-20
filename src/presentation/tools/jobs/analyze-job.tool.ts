@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createAnalyzeJobTool(analyzeJobUseCase: AnalyzeJobUseCase) {
   return {
-    name: "analyze_talend_job",
+    name: "talend_analyze_job",
     description: "Analiza un job Talend y retorna información sobre componentes, conexiones, contextos y problemas.",
     inputSchema: {
       type: "object",

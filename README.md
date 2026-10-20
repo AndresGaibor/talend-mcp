@@ -44,14 +44,16 @@ estaba ocupado.
 
 El plugin habilita la integración del bridge con Studio (job abierto, selección, ejecuciones,
 markers). El instalador todo por CLI: detecta la instalación de Talend Studio y su JDK,
-compila el plugin con Maven + Tycho, **desinstala la versión anterior** y instala la nueva.
+compila el plugin con Maven + Tycho y **reemplaza** la versión anterior.
 
 ```bash
 bun run scripts/start.ts --install-bridge
 ```
 
-Cierra Talend Studio antes (el script lo ofrece). Si ya tienes una versión anterior
-instalada, se reemplaza automáticamente; no hay que desinstalar a mano.
+**No hace falta reiniciar Talend Studio.** Si Studio está corriendo, el instalador publica el
+bundle en `~/.talend-bridge/hot/bridge.jar` y el plugin lo detecta y se recarga solo (el
+servidor HTTP del bridge se reinicia con el código nuevo). Si Studio está cerrado, se instala
+con el p2 director como siempre.
 
 Para verificar que quedó activo:
 
@@ -199,7 +201,7 @@ bun run typecheck    # TypeScript sin emitir
 
 La guia de trabajo para agentes de IA esta en [AGENTS.md](AGENTS.md). El mapa del repositorio
 y las convenciones de arquitectura estan en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md), y
-las recetas para agregar tools, apps y cambios del plugin en
+las recetas para agregar tools y cambios del plugin en
 [docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md).
 
 ## Solucion de problemas

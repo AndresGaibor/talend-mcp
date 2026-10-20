@@ -10,18 +10,27 @@ public final class Activator extends AbstractUIPlugin {
   public static final String PLUGIN_ID = "com.andres.talend.bridge";
 
   private BridgeServer bridgeServer;
+  private HotReloadService hotReloadService;
 
   @Override
   public void start(BundleContext context) throws Exception {
     super.start(context);
     LaunchTrackerService.loadPersistedRuns();
     EventsService.start();
+
     bridgeServer = new BridgeServer(context);
     bridgeServer.start();
+
+    hotReloadService = new HotReloadService();
+    hotReloadService.start(context.getBundle());
   }
 
   @Override
   public void stop(BundleContext context) throws Exception {
+    if (hotReloadService != null) {
+      hotReloadService.stop();
+      hotReloadService = null;
+    }
     if (bridgeServer != null) {
       bridgeServer.stop();
       bridgeServer = null;

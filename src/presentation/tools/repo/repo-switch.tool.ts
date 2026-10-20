@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createRepoSwitchTool() {
   return {
-    name: "repo_switch",
+    name: "talend_repo_switch",
     description: "Cambia a un repositorio ya clonado y descubre el proyecto Talend.",
     inputSchema: {
       type: "object",

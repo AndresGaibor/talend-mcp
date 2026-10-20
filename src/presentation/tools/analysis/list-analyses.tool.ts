@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createListAnalysesTool() {
   return {
-    name: "list_analyses",
+    name: "talend_list_analyses",
     description: "Lista todos los análisis DQ (Data Profiling) en un proyecto Talend.",
     inputSchema: {
       type: "object",

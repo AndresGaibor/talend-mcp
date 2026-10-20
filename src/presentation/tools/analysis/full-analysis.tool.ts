@@ -37,7 +37,7 @@ export function createFullAnalysisTool() {
   const jobRepo = new JobXmlRepository();
 
   return {
-    name: "full_analysis",
+    name: "talend_full_analysis",
     description: "Realiza un análisis completo de un job Talend incluyendo componentes, conexiones, contextos, issues de schema y análisis de columnas.",
     inputSchema: {
       type: "object",

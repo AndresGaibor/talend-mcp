@@ -11,7 +11,7 @@ export function createAnalyzeTdbOutputTool() {
   const jobRepo = new JobXmlRepository();
 
   return {
-    name: "analyze_tdboutput",
+    name: "talend_analyze_tdboutput",
     description: "Analiza los componentes tDBOutput (tMysqlOutput, tDBOutput) de un job para mostrar configuración de base de datos.",
     inputSchema: {
       type: "object",

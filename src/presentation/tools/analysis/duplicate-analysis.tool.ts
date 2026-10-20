@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createDuplicateAnalysisTool() {
   return {
-    name: "duplicate_analysis",
+    name: "talend_duplicate_analysis",
     description: "Duplica un análisis DQ existente con un nuevo nombre.",
     inputSchema: {
       type: "object",

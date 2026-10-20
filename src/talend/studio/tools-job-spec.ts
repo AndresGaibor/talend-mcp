@@ -5,7 +5,7 @@ import { generateJobSpec, validateJobSpec } from "../jobs/pipeline-patterns";
 import { toGeneratorSpec, validateGeneratorSpec } from "../jobs/job-spec-generator";
 import { buildJobItemXml, buildJobPropertiesXml } from "../job-generator";
 import { readTextFile, writeTextFile } from "../files";
-import { getConfiguredProjectPath } from "../workspace";
+import { resolveProjectPath } from "../workspace";
 import { listJobs } from "../repository";
 import { createPlatformContext } from "../../platform";
 import { toTalendHostPath } from "../../platform/path-bridge";
@@ -26,7 +26,7 @@ async function findExistingJob(projectPath: string, jobName: string): Promise<{ 
 
 export const jobSpecTools = [
   {
-    name: "talend_job_validate_pipeline_spec",
+    name: "talend_jobs_validate_pipeline_spec",
     description: "Valida una especificación de pipeline antes de generar el job.",
     inputSchema: z.object({
       spec: z.record(z.string(), z.unknown()).describe("Especificación del pipeline"),
@@ -53,7 +53,7 @@ export const jobSpecTools = [
     },
   },
   {
-    name: "talend_job_preview_pipeline_spec",
+    name: "talend_jobs_preview_pipeline_spec",
     description: "Previsualiza cómo quedaría un pipeline.sin generar el job en Talend.",
     inputSchema: z.object({
       pattern: z.enum(["multi_csv_raw_loader", "csv_to_db_with_audit_columns", "sql_orchestration_job", "db_to_db_copy", "api_to_db_loader", "file_watcher_pipeline"]).describe("Patrón del pipeline"),
@@ -134,7 +134,7 @@ export const jobSpecTools = [
     },
   },
   {
-    name: "talend_job_apply_pipeline_spec",
+    name: "talend_jobs_apply_pipeline_spec",
     description: "Genera y escribe archivos .item y .properties reales en el proyecto Talend.",
     inputSchema: z.object({
       pattern: z.enum(["multi_csv_raw_loader", "csv_to_db_with_audit_columns", "sql_orchestration_job", "db_to_db_copy", "api_to_db_loader", "file_watcher_pipeline"]).describe("Patrón del pipeline"),
@@ -147,7 +147,7 @@ export const jobSpecTools = [
     }),
     handler: async (input: { pattern: PatrónTalend; name: string; inputPath?: string; outputTable?: string; batchSize?: number; auditColumns?: boolean; folderPath?: string }) => {
       try {
-        const projectPath = getConfiguredProjectPath();
+        const projectPath = await resolveProjectPath();
         if (!projectPath) {
           return bridgeFail({
             ok: false,
@@ -323,7 +323,7 @@ export const jobSpecTools = [
       contexts?: any[];
     }) => {
       try {
-        const projectPath = getConfiguredProjectPath();
+        const projectPath = await resolveProjectPath();
         if (!projectPath) {
           return bridgeFail({
             ok: false,

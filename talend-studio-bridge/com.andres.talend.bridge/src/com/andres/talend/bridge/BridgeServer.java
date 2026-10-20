@@ -159,6 +159,7 @@ final class BridgeServer {
     payload.put("version", pluginVersion());
     payload.put("mode", config.readOnly ? "readOnly" : "readWrite");
     payload.put("unsafeActions", config.unsafeActions);
+    payload.put("hotReload", true);
     return payload;
   }
 

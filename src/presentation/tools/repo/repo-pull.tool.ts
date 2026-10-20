@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createRepoPullTool() {
   return {
-    name: "repo_pull",
+    name: "talend_repo_pull",
     description: "Hace pull en un repositorio y descubre el proyecto Talend.",
     inputSchema: {
       type: "object",

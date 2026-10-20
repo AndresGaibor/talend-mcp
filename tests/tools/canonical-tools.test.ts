@@ -1,10 +1,9 @@
 import { test, expect, describe } from "bun:test";
-import { getAllRuntimeTools, getLegacyAliases } from "../../src/server/registered-tools";
+import { getAllRuntimeTools } from "../../src/server/registered-tools";
 import type { McpToolDefinition } from "../../src/server/adapt-tool";
 
 describe("Canonical Tools", () => {
   const tools = getAllRuntimeTools();
-  const aliases = getLegacyAliases();
 
   const isValidTool = (t: McpToolDefinition): boolean =>
     typeof t?.name === "string" && t.name.length > 0;
@@ -113,30 +112,23 @@ describe("Canonical Tools", () => {
     });
   });
 
-  describe("4. All legacy aliases point to existing canonical tools", () => {
-    test("all alias targets exist as canonical tool names", () => {
-      const toolNames = new Set(toolsValidos.map((t) => t.name));
-      const errores: string[] = [];
-
-      for (const [alias, target] of aliases.entries()) {
-        if (!toolNames.has(target)) {
-          errores.push(`${alias} -> ${target} (no existe)`);
-        }
-      }
+  describe("4. All tools use the canonical prefix", () => {
+    test("every tool name starts with talend_", () => {
+      const sinPrefijo = toolsValidos.map((t) => t.name).filter((name) => !name.startsWith("talend_"));
 
       expect(
-        errores,
-        `Alias con targets inexistentes:\n${errores.join("\n")}`,
+        sinPrefijo,
+        `Tools sin prefijo talend_:\n${sinPrefijo.join("\n")}`,
       ).toHaveLength(0);
     });
 
-    test("alias names do not shadow actual tool names", () => {
-      const canonicalToolNames = new Set(toolsValidos.map((t) => t.name).filter((name) => !aliases.has(name)));
-      const duplicados = [...aliases.keys()].filter((k) => canonicalToolNames.has(k));
+    test("no hay nombres duplicados", () => {
+      const names = toolsValidos.map((t) => t.name);
+      const duplicados = names.filter((name, index) => names.indexOf(name) !== index);
 
       expect(
-        duplicados,
-        `Alias que chocan con herramientas reales: ${duplicados.join(", ")}`,
+        [...new Set(duplicados)],
+        `Tools duplicadas:\n${[...new Set(duplicados)].join("\n")}`,
       ).toHaveLength(0);
     });
   });

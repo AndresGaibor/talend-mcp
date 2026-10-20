@@ -277,8 +277,11 @@ function p2Director(studio: StudioInstall, args: string[]): number {
 }
 function isStudioRunning(studio: StudioInstall): boolean {
   if (IS_WIN) {
-    const result = spawnSync("tasklist", ["/FI", `IMAGENAME eq ${basename(studio.exe)}`, "/NH"], { encoding: "utf8" });
-    return (result.stdout ?? "").toLowerCase().includes(basename(studio.exe).toLowerCase());
+    // tasklist trunca el nombre de la imagen a 25 caracteres, asi que no se
+    // puede filtrar por el nombre completo: se busca el prefijo.
+    const result = spawnSync("tasklist", ["/NH", "/FO", "CSV"], { encoding: "utf8" });
+    const marker = basename(studio.exe).slice(0, 15).toLowerCase();
+    return (result.stdout ?? "").toLowerCase().includes(marker);
   }
   try {
     const out = execSync("pgrep -fl Talend-Studio 2>/dev/null || echo ''", { encoding: "utf8" });
@@ -554,6 +557,69 @@ function installedFeatureVersion(studio: StudioInstall): string | null {
   return version ?? match;
 }
 
+/**
+ * Carpeta donde el plugin vigila el jar para recargarse en caliente.
+ * Debe coincidir con `HotReloadService.hotJarPath()` del lado Java.
+ */
+function hotJarPath(): string {
+  const dir = process.env.TALEND_BRIDGE_HOT_DIR
+    ?? join(homedir(), ".talend-bridge", "hot");
+  return join(dir, "bridge.jar");
+}
+
+/** Copia el jar compilado a la carpeta de carga en caliente. */
+function publishHotJar(jarPath: string): string | undefined {
+  try {
+    const target = hotJarPath();
+    mkdirSync(dirname(target), { recursive: true });
+    cpSync(jarPath, target, { force: true });
+    return target;
+  } catch (error) {
+    warn(`No se pudo publicar el jar para carga en caliente: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
+function builtJarPath(projectRoot: string): string | undefined {
+  const targetDir = join(projectRoot, "talend-studio-bridge", "com.andres.talend.bridge", "target");
+  const jar = safeReaddir(targetDir).find((name) => name.endsWith(".jar") && !name.includes("sources"));
+  return jar ? join(targetDir, jar) : undefined;
+}
+
+/**
+ * Espera a que el bridge responda con la version recien publicada.
+ *
+ * El watcher del plugin lee el jar nuevo, recarga el bundle y reinicia el
+ * servidor HTTP: la respuesta llega con el mismo numero de version (la version
+ * la fija el build), asi que se valida que el bridge siga respondiendo.
+ */
+async function waitForHotReload(timeoutMs = 30_000): Promise<boolean> {
+  const url = "http://127.0.0.1:3930/ping";
+  const deadline = Date.now() + timeoutMs;
+  let sawDown = false;
+
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      if (response.ok) {
+        const payload = (await response.json()) as { plugin?: string; version?: string };
+        if (payload.plugin === "com.andres.talend.bridge") {
+          if (sawDown) {
+            ok("El bridge se reinicio con el bundle nuevo.");
+          }
+          return true;
+        }
+      }
+    } catch {
+      sawDown = true;
+    }
+  }
+
+  return false;
+}
+
 // ─── Entry point ────────────────────────────────────────────────────────────
 
 export async function installBridge(): Promise<void> {
@@ -580,17 +646,9 @@ export async function installBridge(): Promise<void> {
   ok(`Ejecutable: ${c(basename(studio.exe), C.cyan)}`);
   ok(`JDK: ${c(studio.jdk, C.cyan)} (Java ${runJavaVersion(studio.jdk)})`);
 
-  if (isStudioRunning(studio)) {
-    warn("Talend Studio esta corriendo.");
-    const answer = await prompt("  Cerrar Talend Studio ahora? (s/n): ");
-    if (answer.toLowerCase() === "s") {
-      closeStudio(studio);
-      ok("Talend Studio cerrado.");
-    } else {
-      fail("No se puede instalar el plugin mientras Talend Studio esta corriendo.");
-      process.exitCode = 1;
-      return;
-    }
+  const studioRunning = isStudioRunning(studio);
+  if (studioRunning) {
+    info("Talend Studio esta corriendo: se usara carga en caliente (sin reiniciar).");
   }
 
   separador();
@@ -602,6 +660,38 @@ export async function installBridge(): Promise<void> {
   }
   ok("Plugin compilado.");
 
+  const jar = builtJarPath(projectRoot);
+  if (!jar) {
+    fail("No se encontro el jar compilado del bundle.");
+    process.exitCode = 1;
+    return;
+  }
+
+  // ── Carga en caliente ─────────────────────────────────────────────────────
+  // El plugin instalado vigila ~/.talend-bridge/hot/bridge.jar y se recarga
+  // solo cuando el archivo cambia. No requiere reiniciar Talend Studio.
+  separador();
+  step("Publicando el bundle para carga en caliente...");
+  const hotJar = publishHotJar(jar);
+  if (hotJar) {
+    ok(`Bundle publicado en ${c(hotJar, C.cyan)}`);
+  }
+
+  if (studioRunning) {
+    const reloaded = await waitForHotReload();
+    separador();
+    banner(reloaded ? "Actualizacion en caliente completada" : "Bundle publicado", [
+      `  ${c("Plugin:", C.dim)} com.andres.talend.bridge`,
+      reloaded
+        ? `  ${c("Estado:", C.dim)} ${c("recargado en caliente, sin reiniciar Studio", C.green)}`
+        : `  ${c("Estado:", C.dim)} ${c("el plugin lo detectara en los proximos segundos", C.yellow)}`,
+      ``,
+      `  ${c("El bridge sigue escuchando en http://127.0.0.1:3930", C.dim)}`,
+    ], reloaded ? C.green : C.yellow);
+    return;
+  }
+
+  // ── Instalacion con p2 (Studio cerrado) ──────────────────────────────────
   const repoDir = join(projectRoot, "talend-studio-bridge", "com.andres.talend.bridge.repository", "target", "repository");
   if (!existsSync(repoDir)) {
     fail(`No se encontro el update site en ${repoDir}`);

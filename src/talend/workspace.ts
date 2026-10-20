@@ -207,10 +207,88 @@ export function getConfiguredProjectPath(
     if (detectedFromWorkspace) return detectedFromWorkspace;
   }
 
+  // Proyecto abierto en Talend Studio, detectado via el bridge.
+  if (cachedBridgeProjectPath) return cachedBridgeProjectPath;
+
   if (env.TALEND_DISABLE_AUTODETECT === "1" || env.TALEND_DISABLE_AUTODETECT === "true") return undefined;
 
   const detectedProject = detectProjectFromRunningStudio();
   if (detectedProject) return detectedProject;
 
   return undefined;
+}
+
+/**
+ * Convierte la ubicacion de un proyecto Eclipse a una ruta local.
+ * El bridge devuelve `file:/C:/ruta/proyecto` o `file:/ruta/proyecto`.
+ */
+function eclipseLocationToPath(location: string): string | undefined {
+  if (!location) return undefined;
+
+  let path = location.trim();
+  if (path.startsWith("file:")) {
+    path = path.slice("file:".length);
+    if (path.startsWith("/")) path = path.slice(1);
+  }
+  path = decodeURIComponent(path);
+
+  // En Windows queda "C:/ruta"; en Unix "/ruta".
+  if (/^[a-zA-Z]:[\\/]/.test(path)) return path;
+  if (path.startsWith("/")) return path;
+
+  return undefined;
+}
+
+let cachedBridgeProjectPath: string | undefined;
+
+/**
+ * Detecta el proyecto Talend abierto en Studio usando el bridge.
+ *
+ * Es la unvia que funciona en Windows y WSL, donde `lsof` no existe. El bridge
+ * expone el workspace con los proyectos abiertos y su ubicacion.
+ */
+export async function detectProjectFromBridge(): Promise<string | undefined> {
+  if (cachedBridgeProjectPath) return cachedBridgeProjectPath;
+
+  try {
+    const { createBridgeClient } = await import("../modules/studio-bridge/adapters/http-studio-bridge.client");
+    const bridge = await createBridgeClient();
+    const result = await bridge.workspaceState();
+
+    if (!result.ok || !result.data) return undefined;
+
+    const projects = (result.data as { projects?: Array<{ name?: string; open?: boolean; location?: string }> }).projects ?? [];
+
+    for (const project of projects) {
+      if (project.open === false) continue;
+      const path = project.location ? eclipseLocationToPath(project.location) : undefined;
+      if (!path) continue;
+      if (!existsSync(join(path, "talend.project"))) continue;
+
+      cachedBridgeProjectPath = path;
+      return path;
+    }
+  } catch {
+    // El bridge puede no estar instalado o Studio no estar abierto.
+  }
+
+  return undefined;
+}
+
+/**
+ * Resuelve el proyecto Talend con el que trabajar.
+ *
+ * Prioridad: ruta explicita, variable de entorno, repositorio activo, el
+ * proyecto abierto en Studio (via bridge) y por ultimo la autodeteccion del
+ * sistema operativo.
+ */
+export async function resolveProjectPath(explicitPath?: string): Promise<string | undefined> {
+  if (explicitPath && explicitPath.trim()) {
+    return toMcpPath(explicitPath.trim(), createPlatformContext());
+  }
+
+  const configured = getConfiguredProjectPath();
+  if (configured) return configured;
+
+  return await detectProjectFromBridge();
 }

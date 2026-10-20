@@ -9,7 +9,7 @@ async function createRepositoryContext(
 
 export function createRepositoryContextTool() {
   return {
-    name: "create_repository_context",
+    name: "talend_create_repository_context",
     description: "Crea un nuevo contexto de repositorio en un proyecto Talend.",
     inputSchema: {
       type: "object",

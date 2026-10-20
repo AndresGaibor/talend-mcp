@@ -1,34 +1,50 @@
-# Migración de Herramientas Legacy
+# Convencion de nombres de tools
 
-Tabla de mapeo entre nombres de herramientas legacy y nombres canónicos.
+La migracion de nombres legacy ya termino: **no quedan aliases**. Cada capacidad tiene una
+sola tool y su nombre es canonico.
 
-| Legacy tool | Nueva tool | Módulo | Estado | Se usa en UI | Tests | Fecha de eliminación |
-|-------------|------------|--------|--------|--------------|-------|---------------------|
-| talend_list_jobs | talend_jobs_list | jobs | ✅ Implementado | ❌ | ✅ | - |
-| talend_read_job | talend_jobs_read | jobs | ✅ Implementado | ❌ | ✅ | - |
-| analyze_logs | talend_logs_analyze | logs | ✅ Implementado | ❌ | ✅ | - |
-| full_analysis | talend_diagnostics_full_analysis | diagnostics | ✅ Implementado | ❌ | ✅ | - |
-| add_talend_connection | talend_components_add_connection | components | ✅ Implementado | ❌ | ✅ | - |
-| patch_talend_component | talend_components_patch | components | ✅ Implementado | ❌ | ✅ | - |
-| repo_status | talend_repo_status | repo | ✅ Implementado | ❌ | ✅ | - |
-| repo_pull | talend_repo_pull | repo | ✅ Implementado | ❌ | ✅ | - |
-| talend_dataset_inspect_csv_folder | talend_datasets_inspect_csv_folder | datasets | ✅ Implementado | ❌ | ✅ | - |
-| talend_dataset_infer_csv_schema | talend_datasets_infer_csv_schema | datasets | ✅ Implementado | ❌ | ✅ | - |
-| talend_dataset_generate_raw_table_mappings | talend_datasets_generate_raw_mappings | datasets | ✅ Implementado | ❌ | ✅ | - |
-| talend_secret_scan_project | talend_secrets_scan_project | secrets | ✅ Implementado | ❌ | ✅ | - |
-| talend_secret_scan_job | talend_secrets_scan_job | secrets | ✅ Implementado | ❌ | ✅ | - |
-| talend_secret_suggest_context_migration | talend_secrets_suggest_context_migration | secrets | ✅ Implementado | ❌ | ✅ | - |
-| talend_snapshot_list | talend_snapshots_list | snapshots | ✅ Implementado | ❌ | ✅ | - |
-| talend_snapshot_read | talend_snapshots_read | snapshots | ✅ Implementado | ❌ | ✅ | - |
-| talend_snapshot_diff | talend_snapshots_diff | snapshots | ✅ Implementado | ❌ | ✅ | - |
-| talend_snapshot_restore | talend_snapshots_restore | snapshots | ✅ Implementado | ❌ | ✅ | - |
+## Regla
 
-## Notas
+```
+talend_<area>_<verbo>
+```
 
-- **Legacy tool**: Nombre original de la herramienta.
-- **Nueva tool**: Nombre canónico actualizado con prefijo `talend_` y namespace de módulo.
-- **Módulo**: Dominio funcional al que pertenece la herramienta.
-- **Estado**: Estado actual de implementación.
-- **Se usa en UI**: Indica si la herramienta se utiliza en interfaces de usuario.
-- **Tests**: Indica si la herramienta tiene cobertura de tests.
-- **Fecha de eliminación**: Fecha planeada para remover el alias legacy (vacío = no planificado).
+| Area | Ejemplos |
+|---|---|
+| `jobs` | `talend_jobs_list`, `talend_jobs_read`, `talend_jobs_create`, `talend_jobs_patch_component` |
+| `components` | `talend_components_search`, `talend_components_inspect`, `talend_components_catalog_status` |
+| `contexts` | `talend_list_project_contexts`, `talend_read_repository_context` |
+| `runs` | `talend_runs_list`, `talend_runs_read`, `talend_job_run_by_name`, `talend_run_exported_job` |
+| `errors` | `talend_errors_explain`, `talend_errors_suggest_fix`, `talend_errors_stats` |
+| `validation` | `talend_validation_validate_design`, `talend_validation_validate_context_usage` |
+| `secrets` | `talend_secrets_scan_project`, `talend_secrets_scan_job` |
+| `snapshots` | `talend_snapshots_list`, `talend_snapshots_read`, `talend_snapshots_restore` |
+| `datasets` | `talend_datasets_inspect_csv_folder`, `talend_datasets_infer_csv_schema` |
+| `deliverables` | `talend_deliverables_export_job`, `talend_deliverables_validate` |
+| `evidence` | `talend_evidence_pack_build`, `talend_evidence_pack_export` |
+| `requirements` | `talend_requirements_analyze`, `talend_requirements_build_checklist` |
+| `bridge` | `talend_bridge_ping`, `talend_bridge_selection`, `talend_bridge_active_job_model` |
+| `recipe` | `talend_recipe_generate`, `talend_recipe_get` |
+| `mastery` | `talend_mastery_report`, `talend_mastery_component` |
+
+## Que se elimino
+
+Los nombres legacy se renombraron en lugar de duplicarse. Por ejemplo:
+
+| Antes | Ahora |
+|---|---|
+| `analyze_logs` | `talend_analyze_logs` |
+| `view_logs` | `talend_view_logs` |
+| `repo_setup` | `talend_repo_setup` |
+| `talend_list_jobs` | `talend_jobs_list` |
+| `talend_snapshot_list` | `talend_snapshots_list` |
+| `talend_create_job` | `talend_jobs_create` |
+
+Tambien se elimino el mecanismo que generaba aliases en runtime
+(`TOOL_NAME_ALIASES`, `LEGACY_TO_CANONICAL` y `createLegacyAliasTool`).
+
+## Como se verifica
+
+`tests/tools/canonical-tools.test.ts` falla si alguna tool registrada no empieza con
+`talend_` o si hay nombres duplicados. `tests/apps/no-legacy-tools.test.ts` (movido a
+`tests/tools/`) comprueba lo mismo desde el registro completo.

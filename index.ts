@@ -1,6 +1,15 @@
 import { runNewHttpServer, runNewStdioServer } from "./src/presentation/server/new-server";
+import { detectProjectFromBridge } from "./src/talend/workspace";
 
 const mode = process.env.TALEND_MCP_MODE ?? "http";
+
+// Detecta el proyecto Talend abierto en Studio (via el bridge). Si el bridge no
+// esta instalado o Studio no esta abierto, se sigue sin proyecto: las tools
+// vuelven a resolverlo en cada llamada.
+const detectedProject = await detectProjectFromBridge();
+if (detectedProject) {
+  console.error(`Proyecto Talend detectado: ${detectedProject}`);
+}
 
 if (mode === "http") {
   const port = Number(process.env.TALEND_MCP_PORT) || 3927;

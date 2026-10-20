@@ -1,6 +1,5 @@
 import { allTools as presentationTools } from "../tools/registry";
 import { createStudioBridgeTools } from "../../talend/studio/bridge-tools";
-import { studioToolDefs } from "../../tools/new-tools";
 import { secretTools } from "../../talend/studio/tools-secrets";
 import { fromJsonSchema } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
@@ -41,56 +40,6 @@ type ToolSafetyAnnotation = {
   requiresConfirmation?: boolean;
 };
 
-export const TOOL_NAME_ALIASES: Record<string, string> = {
-  analyze_logs: "talend_analyze_logs",
-  analyze_tdboutput: "talend_analyze_tdboutput",
-  duplicate_analysis: "talend_duplicate_analysis",
-  full_analysis: "talend_full_analysis",
-  inspect_component: "talend_inspect_component",
-  inspect_job: "talend_inspect_job",
-  list_analyses: "talend_list_analyses",
-  read_analysis: "talend_read_analysis",
-  read_run_log: "talend_read_run_log",
-  update_analysis: "talend_update_analysis",
-  view_logs: "talend_view_logs",
-  add_talend_connection: "talend_add_connection",
-  delete_talend_component: "talend_delete_component",
-  delete_talend_connection: "talend_delete_connection",
-  duplicate_talend_component: "talend_duplicate_component",
-  move_talend_component: "talend_move_component",
-  patch_talend_component: "talend_patch_component",
-  preview_delete_talend_component: "talend_preview_delete_component",
-  preview_delete_talend_connection: "talend_preview_delete_connection",
-  preview_talend_component_parameter: "talend_preview_component_parameter",
-  preview_talend_schema_column: "talend_preview_schema_column",
-  update_talend_component_parameter: "talend_update_component_parameter",
-  update_talend_schema_column: "talend_update_schema_column",
-  create_repository_context: "talend_create_repository_context",
-  delete_repository_context: "talend_delete_repository_context",
-  delete_repository_context_parameter: "talend_delete_repository_context_parameter",
-  list_project_contexts: "talend_list_project_contexts",
-  list_repository_contexts: "talend_list_repository_contexts",
-  read_repository_context: "talend_read_repository_context",
-  upsert_repository_context_parameter: "talend_upsert_repository_context_parameter",
-  repo_pull: "talend_repo_pull",
-  repo_setup: "talend_repo_setup",
-  repo_sources: "talend_repo_sources",
-  repo_status: "talend_repo_status",
-  repo_switch: "talend_repo_switch",
-  latest_changes: "talend_latest_changes",
-  live_start: "talend_live_start",
-  live_status: "talend_live_status",
-  live_stop: "talend_live_stop",
-  detect_open_jobs: "talend_detect_open_jobs",
-  summarize_open_job: "talend_summarize_open_job",
-  detect_process: "talend_studio_process",
-  diagnose_environment: "talend_diagnose_environment",
-  list_launch_configs: "talend_list_launch_configs",
-  list_open_editors: "talend_list_open_editors",
-  get_probable_active_job: "talend_get_probable_active_job",
-  analyze_job: "talend_analyze_job",
-};
-
 function dedupeTools(tools: ToolDef[]): ToolDef[] {
   const seen = new Set<string>();
   const result: ToolDef[] = [];
@@ -104,19 +53,6 @@ function dedupeTools(tools: ToolDef[]): ToolDef[] {
   }
 
   return result;
-}
-
-function buildAliasTools(tools: ToolDef[]): ToolDef[] {
-  const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
-  const aliasTools: ToolDef[] = [];
-
-  for (const [sourceName, aliasName] of Object.entries(TOOL_NAME_ALIASES)) {
-    const sourceTool = toolByName.get(sourceName);
-    if (!sourceTool || toolByName.has(aliasName)) continue;
-    aliasTools.push({ ...sourceTool, name: aliasName });
-  }
-
-  return aliasTools;
 }
 
 const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
@@ -268,14 +204,12 @@ const TOOL_REQUIRES_WORKSPACE = new Set([
 ]);
 
 function getToolAnnotations(name: string): ToolSafetyAnnotation & { requiresWorkspace: boolean } {
-  const aliasSource = TOOL_NAME_ALIASES[name];
-  const resolvedName = aliasSource ?? name;
-  const safety = TOOL_SAFETY[resolvedName];
+  const safety = TOOL_SAFETY[name];
 
   if (safety) {
     return {
       ...safety,
-      requiresWorkspace: TOOL_REQUIRES_WORKSPACE.has(resolvedName),
+      requiresWorkspace: TOOL_REQUIRES_WORKSPACE.has(name),
     };
   }
 
@@ -290,12 +224,8 @@ function getToolAnnotations(name: string): ToolSafetyAnnotation & { requiresWork
 
 const registeredTools = dedupeTools([
   ...presentationTools,
-  ...createStudioBridgeTools(),
-  ...studioToolDefs,
-  ...secretTools,
+  ...createStudioBridgeTools(),  ...secretTools,
 ]);
-
-const aliasTools = buildAliasTools(registeredTools);
 
 function isPlainJsonSchema(schema: unknown): schema is Record<string, unknown> {
   return typeof schema === "object" && schema !== null && !("~standard" in schema);
@@ -317,11 +247,11 @@ function withDefaultOutputSchema(tool: ToolDef): ToolDef {
 }
 
 export function getRegisteredServerTools(): ToolDef[] {
-  return [...registeredTools, ...aliasTools].map(withDefaultOutputSchema);
+  return registeredTools.map(withDefaultOutputSchema);
 }
 
 export function getRegisteredServerToolCount(): number {
-  return registeredTools.length + aliasTools.length;
+  return registeredTools.length;
 }
 
 export function getRegisteredServerToolAnnotations(toolName: string) {

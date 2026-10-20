@@ -1,6 +1,6 @@
 import { moveTalendComponentXml } from "../../../talend/editor";
 import { readTextFile, writeTextFile } from "../../../talend/files";
-import { getConfiguredProjectPath } from "../../../talend/workspace";
+import { resolveProjectPath } from "../../../talend/workspace";
 import { findTalendJob } from "../../../talend/job-crud";
 import { ok, fail } from "../common/response";
 import { wrapHandler } from "../common/logger";
@@ -13,7 +13,7 @@ type MoveComponentOptions = {
 
 export function createMoveComponentTool() {
   return {
-    name: "move_talend_component",
+    name: "talend_move_component",
     description: "Mueve un componente Talend a una nueva posición.",
     inputSchema: {
       type: "object",
@@ -29,7 +29,7 @@ export function createMoveComponentTool() {
     handler: wrapHandler("move_talend_component", async (input: MoveComponentOptions & { jobName: string; folderPath?: string }) => {
       const start = Date.now();
       try {
-        const projectPath = getConfiguredProjectPath();
+        const projectPath = await resolveProjectPath();
         if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT ni workspace activo.", { startTime: start });
         const job = await findTalendJob(projectPath, input.jobName, input.folderPath);
         const xml = await readTextFile(job.itemPath, projectPath);

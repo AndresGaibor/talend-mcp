@@ -17,7 +17,7 @@ function formatLogLines(lines: string[], showLineNumbers?: boolean): string {
 
 export function createViewLogsTool() {
   return {
-    name: "view_logs",
+    name: "talend_view_logs",
     description: "Muestra el contenido de un archivo de log con opción de filtrar y limitar líneas.",
     inputSchema: {
       type: "object",

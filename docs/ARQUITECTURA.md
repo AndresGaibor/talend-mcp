@@ -7,24 +7,23 @@ Mapa del repositorio `talend-mcp`. Para las reglas de trabajo mira [AGENTS.md](.
 ```
 ┌──────────────────────────┐
 │   Cliente MCP (host)     │
-│  Claude / cualquier      │
-│  cliente MCP local       │
+│  (cualquier cliente MCP  │
+│   local por HTTP/stdio)  │
 └───────────┬──────────────┘
             │ HTTP / SSE / stdio
 ┌───────────▼──────────────┐
 │      Servidor MCP        │   index.ts
-│  new-server.ts           │   ├─ registro de tools (321)
-│  registered-tools.ts     │   ├─ resources ui://talend/*  (40 apps)
-│                          │   └─ apresentacion de apps
+│  new-server.ts           │   ├─ registro de tools (~200)
+│  registered-tools.ts     │   └─ dispatch JSON-RPC
 └───────────┬──────────────┘
             │
-   ┌────────┴─────────┬──────────────────┬──────────────────┐
-   ▼                  ▼                  ▼                  ▼
-┌─────────┐   ┌─────────────┐   ┌──────────────┐   ┌──────────────┐
-│ Talend  │   │  Workspace  │   │    Bridge    │   │     Apps     │
-│  files  │   │  (proyecto  │   │  (plugin     │   │  (HTML       │
-│ .item   │   │   Talend)   │   │   Java)      │   │  generado)   │
-│ .propert│   └─────────────┘   │  localhost   │   └──────────────┘
+   ┌────────┴─────────┬──────────────────┐
+   ▼                  ▼                  ▼
+┌─────────┐   ┌─────────────┐   ┌──────────────┐
+│ Talend  │   │  Workspace  │   │    Bridge    │
+│  files  │   │  (proyecto  │   │  (plugin     │
+│ .item   │   │   Talend)   │   │   Java)      │
+│ .propert│   └─────────────┘   │  localhost   │
 └─────────┘                     │  :3930       │
                                 └──────────────┘
 ```
@@ -38,54 +37,27 @@ seleccion, ejecuciones, markers).
 | Capa | Carpeta | Responsabilidad |
 |---|---|---|
 | Plataforma | `src/platform/` | Deteccion de SO (macos/windows/linux/wsl) y traduccion de rutas entre el host MCP y el host de Talend. |
-| Nucleo | `src/domain/`, `src/application/` | Entidades, puertos y casos de uso transversales. |
+| Config | `src/config/` | Contrato de variables de entorno. |
+| Nucleo | `src/domain/`, `src/application/` | Entidades de job, workspace, analysis y los casos de uso que las usan. |
 | Infraestructura | `src/infrastructure/` | Filesystem, git, XML y repositorios. |
-| Dominio Talend | `src/talend/` | Todo lo que sabe de Talend: XML de jobs, contextos, Data Quality, mastery, diagnostico, ejecuciones. |
-| Modulos | `src/modules/` | Modulos hexagonales autonomos con `domain/`, `application/`, `ports/`, `adapters/`, `tools/`. |
-| Presentacion | `src/presentation/` | Tools por area (`tools/`), apps HTML (`apps/`). |
+| Dominio Talend | `src/talend/` | Todo lo que sabe de Talend: XML de jobs, contextos, Data Quality, mastery, diagnostico, ejecuciones y las tools de estudio. |
+| Modulos | `src/modules/` | Modulos con casos de uso y adapters propios (datasets, secrets, studio-bridge, component-knowledge, evidence-pack, requirements, runs, errors, validation, snapshots). |
+| Presentacion | `src/presentation/` | Tools por area (`tools/`) y el servidor HTTP/stdio (`server/`). |
 | Servidor | `src/server/` | Registro de tools, adaptacion al MCP, esquemas de salida. |
 | Compartido | `src/shared/` | Contratos: envelope `TalendResult`, result envelope. |
 
-### Modulos (`src/modules/`)
+### Tools: dos ubicaciones, un solo registro
 
-Cada modulo es una unidad de negocio con sus propias tools:
+- **Tools de modulo** (`src/modules/*/tools/`): casos de uso propios, schema Zod,
+  `structuredContent` con el payload en `data`.
+- **Tools de estudio** (`src/talend/studio/tools-<area>.ts`): lo que necesita el IDE en vivo
+  (bridge, componentes, snapshots, ejecuciones, specs de pipeline).
 
-```
-snapshots/     secrets/      datasets/      deliverables/   jobs/
-requirements/  runs/         errors/        validation/     evidence-pack/
-apps/          component-knowledge/          studio-bridge/
-```
+Ambas familias se ensamblan en `src/presentation/server/tool-registry.ts` y se registran en
+`getModuleTools()` (`src/server/registered-tools.ts`). No hay aliases: cada capacidad tiene
+una sola tool, llamada `talend_<area>_<verbo>`.
 
-`component-knowledge/` es el mas rico: catalogo de componentes, mastery, recetas y schemas.
-
-### Tools: dos familias conviven
-
-- **Tools de presentacion** (`src/presentation/tools/`): planas, sin esquema Zod, devuelven
-  strings o envelopes simples. Son las historicas.
-- **Tools de modulo** (`src/modules/*/tools/`): schema Zod, `structuredContent` con el
-  payload en `data`, anotaciones de seguridad.
-
-Las tools canonicas son las de modulo. Las de presentacion siguen vivas por compatibilidad y
-se van migrando (ver `docs/tool-migration.md`).
-
-El registro de tools vive en un solo lugar: `getModuleTools()` en
-`src/server/registered-tools.ts`.
-
-## 3. Apps
-
-Cada app es un recurso MCP `ui://talend/<id>.html` cuyo cuerpo es HTML generado en el
-servidor (`src/presentation/apps/legacy-shells/`), mas una tool lanzadora `talend_app_<id>`.
-
-Flujo:
-
-1. El cliente llama `talend_app_<id>`.
-2. El launcher arma el estado inicial (`app-state.ts`) y devuelve `resourceUri`.
-3. El cliente pide el recurso y renderiza el HTML.
-4. El HTML llama tools por `window.openai.callTool`.
-
-Detalle y pasos para agregar una app: [mcp-apps-ui.md](mcp-apps-ui.md).
-
-## 4. Plugin Java (bridge)
+## 3. Plugin Java (bridge)
 
 `talend-studio-bridge/` es un bundle Eclipse RCP (Tycho) que expone Talend Studio por HTTP
 en `127.0.0.1:3930`.
@@ -107,7 +79,7 @@ Endpoints: `/ping`, `/capabilities`, `/audit/environment`, `/workbench/*`, `/wor
 `/problems/markers`, `/talend/*`, `/commands/*`, `/launch/*`, `/events/*`,
 `/automation/run-active-job`.
 
-## 5. Cross-platform
+## 4. Cross-platform
 
 El repo corre en Windows, macOS, Linux y WSL. La pieza clave es `src/platform/path-bridge.ts`:
 traduce rutas entre el host donde corre el MCP y el host donde corre Talend Studio.
@@ -121,16 +93,14 @@ Reglas practicas:
 
 `tests/platform/portability.test.ts` falla si aparece una ruta personal en `src/` o `scripts/`.
 
-## 6. Tests
+## 5. Tests
 
 ```
 tests/
-├── tools/        registro, contratos, schemas, seguridad, deprecaciones
-├── apps/         registro de apps y launchers
-├── presentation/ envelope de resultado y registro de apps
+├── tools/        registro, contratos, schemas, seguridad, convencion de nombres
+├── presentation/ envelope de resultado
 ├── talend/       jobs, contextos, DQ, logs, workspace, ejecuciones, diagnostico
 ├── platform/     deteccion de SO y portabilidad de rutas
-├── legacy/       alias legacy de tools
 └── fixtures/     archivos de ejemplo de Talend
 ```
 

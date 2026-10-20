@@ -1,7 +1,7 @@
 import * as z from "zod/v4";
 import { existsSync } from "node:fs";
 import { bridgeOk, bridgeFail, loadBridge } from "./tools-base";
-import { getConfiguredProjectPath } from "../workspace";
+import { resolveProjectPath } from "../workspace";
 import { findTalendJob } from "../job-crud";
 import { readTextFile, writeTextFile } from "../files";
 import {
@@ -192,7 +192,7 @@ export const componentTools = [
       projectPath: z.string().optional().describe("Ruta al proyecto"),
     }),
     handler: async ({ componentName, projectPath }: { componentName: string; projectPath?: string }) => {
-      const effectivePath = projectPath ?? getConfiguredProjectPath();
+      const effectivePath = projectPath ?? await resolveProjectPath();
       if (!effectivePath) {
         return bridgeFail({
           ok: false,
@@ -228,7 +228,7 @@ export const componentTools = [
       newLabel: z.string().describe("Nuevo LABEL visible"),
     }),
     handler: async ({ jobName, folderPath, uniqueName, newLabel }: { jobName: string; folderPath?: string; uniqueName: string; newLabel: string }) => {
-      const projectPath = getConfiguredProjectPath();
+      const projectPath = await resolveProjectPath();
       if (!projectPath) {
         return bridgeFail({
           ok: false,
@@ -350,7 +350,7 @@ export const componentTools = [
       posY: z.number().describe("Nueva posición Y"),
     }),
     handler: async ({ jobName, folderPath, uniqueName, posX, posY }: { jobName: string; folderPath?: string; uniqueName: string; posX: number; posY: number }) => {
-      const projectPath = getConfiguredProjectPath();
+      const projectPath = await resolveProjectPath();
       if (!projectPath) {
         return bridgeFail({
           ok: false,
@@ -386,7 +386,7 @@ export const componentTools = [
       newUniqueName: z.string().describe("UNIQUE_NAME propuesto"),
     }),
     handler: async ({ jobName, folderPath, oldUniqueName, newUniqueName }: { jobName: string; folderPath?: string; oldUniqueName: string; newUniqueName: string }) => {
-      const projectPath = getConfiguredProjectPath();
+      const projectPath = await resolveProjectPath();
       if (!projectPath) {
         return bridgeFail({
           ok: false,
@@ -452,7 +452,7 @@ export const componentTools = [
         });
       }
 
-      const projectPath = getConfiguredProjectPath();
+      const projectPath = await resolveProjectPath();
       if (!projectPath) {
         return bridgeFail({
           ok: false,

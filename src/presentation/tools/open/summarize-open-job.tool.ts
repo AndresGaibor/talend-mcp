@@ -1,4 +1,4 @@
-import { getConfiguredProjectPath, resolveWorkspaceFromProject } from "../../../talend/workspace";
+import { resolveProjectPath, resolveWorkspaceFromProject } from "../../../talend/workspace";
 import { findWorkbenchXmiFiles, parseWorkbenchState } from "../../../talend/studio/workbench-xmi";
 import { readTextFile } from "../../../talend/files";
 import { parseLaunchConfig, parseOpenJobsFromWorkbench } from "../../../talend/open-job";
@@ -18,7 +18,7 @@ export function createSummarizeOpenJobTool() {
     handler: wrapHandler(async (input: { jobName?: string }) => {
       const start = Date.now();
       try {
-        const projectPath = getConfiguredProjectPath();
+        const projectPath = await resolveProjectPath();
         if (!projectPath) {
           return fail("NO_PROJECT", "No se detectó TALEND_PROJECT. Configura la variable de entorno.", { startTime: start });
         }

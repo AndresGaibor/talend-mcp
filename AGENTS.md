@@ -10,18 +10,19 @@ archivo. `CLAUDE.md` solo guarda el detalle de Bun y apunta aqui.
 Servidor MCP (Model Context Protocol) que analiza y edita proyectos de **Qlik Talend Studio**
 sobre los archivos `.item` y `.properties` de un workspace de Talend.
 
-El servidor expone ~250 herramientas MCP y ~40 apps HTML que corren dentro de un cliente MCP.
+El servidor expone ~200 herramientas MCP. No tiene interfaz grafica propia: la consumes desde
+un cliente MCP.
 
 ## 2. Stack y comandos
 
 | Comando | Que hace |
 |---|---|
 | `bun install` | Instala dependencias. **Nunca** uses npm, yarn o pnpm. |
-| `bun test` | Suite completa (330+ tests). Solo corre `tests/`. |
+| `bun test` | Suite completa (280+ tests). Solo corre `tests/`. |
 | `bun run typecheck` | `tsc --noEmit`. Debe terminar sin errores. |
 | `bun run start:server` | Levanta el servidor MCP en `http://127.0.0.1:3927/mcp`. |
 | `bun run start` | Igual que `start:server`, ademas libera el puerto 3927 si esta ocupado. |
-| `bun run scripts/start.ts --install-bridge` | Compila e instala (o actualiza) el plugin Java en Talend Studio. |
+| `bun run scripts/start.ts --install-bridge` | Compila y publica el plugin Java. Si Talend Studio esta corriendo, se recarga en caliente. |
 | `bun run jobs ...` / `bun run contexts ...` | CLI local para jobs y contextos. |
 
 Reglas de Bun (proyecto, no Node):
@@ -35,18 +36,23 @@ Reglas de Bun (proyecto, no Node):
 
 ## 3. Estado del repositorio
 
-- **No existe `apps-ui/`.** La carpeta React/Vite se elimino. Las UIs se generan en el servidor
-  como HTML autocontenido en `src/presentation/apps/legacy-shells/`.
+- **No hay apps ni UI.** No existe `apps-ui/` ni la capa `src/presentation/apps/`. El servidor
+  expone solo tools.
 - **No hay tunnel ni Tailscale Funnel.** El servidor es local (`127.0.0.1`) o stdio.
   No reintroduzcas `CONTROL_PLANE_API_KEY`, `TALEND_MCP_FUNNEL` ni `src/tailscale/`.
 - **No hay exposicion publica.** Si necesitas acceso remoto, resuelvelo con el cliente MCP,
   no con un proxy dentro del repo.
 - **No hay ChatGPT Web.** El unico host es un cliente MCP local.
+- **No hay aliases de tools.** Toda tool se llama `talend_<area>_<verbo>` y hay una sola tool
+  por capacidad. No reintentes el mecanismo de aliases legacy.
 - **El registro de tools vive en un solo lugar:** `getModuleTools()` en
-  `src/server/registered-tools.ts`. No existe un indice alterno.
+  `src/server/registered-tools.ts`, que consume `src/presentation/server/tool-registry.ts`.
 - **No hay codigo muerto.** Si agregas un archivo, conectalo: los barridos de referencias
   orfas son parte de la revision.
 - **`entregables/` y `evidencias/`** son salidas generadas y no se versionan.
+- **El plugin Java se recarga en caliente.** `bun run scripts/start.ts --install-bridge`
+  publica el bundle en `~/.talend-bridge/hot/bridge.jar` y el plugin lo detecta y se
+  recarga solo (`Bundle.update`). No reinicies Talend Studio para aplicar cambios.
 
 ## 4. Reglas de oro
 
@@ -71,18 +77,18 @@ Reglas de Bun (proyecto, no Node):
 index.ts                     punto de entrada: modo http o stdio
 src/
 ├── platform/                deteccion de SO (macos/windows/linux/wsl) y traduccion de rutas
+├── config/                  contrato de variables de entorno
 ├── shared/                  contratos compartidos (TalendResult, result envelope)
-├── domain/                  entidades y repositorios (interfaces) del nucleo
+├── domain/                  entidades y puertos del nucleo (jobs, workspace, analysis)
 ├── application/             casos de uso del nucleo
 ├── infrastructure/          implementaciones (filesystem, git, xml, workspace)
-├── talend/                  logica de Talend: XML, jobs, contextos, DQ, mastery, diagnostico
-├── modules/                 modulos hexagonales: domain / application / ports / adapters / tools
+├── talend/                  logica de Talend: XML, jobs, contextos, DQ, mastery, tools
+├── modules/                 modulos con casos de uso y adapters propios
 ├── presentation/
-│   ├── tools/               tools de presentacion (una carpeta por area)
-│   └── apps/                apps HTML: app-registry, app-state, legacy-shells/
-├── server/                  registro de tools, adaptadores MCP, esquemas
-└── tools/                   catalogo de nombres de tools (TOOL_NAMES)
-scripts/                     scripts de operacion (start, jobs, contexts, deploy-bridge, ...)
+│   ├── tools/               tools por area (analysis, components, contexts, execution, jobs)
+│   └── server/              servidor HTTP/stdio y registro de tools
+└── server/                  registro de tools, adaptadores MCP, esquemas
+scripts/                     scripts de operacion (start, install-bridge, jobs, contexts, ...)
 tests/                       suite de tests (bun test)
 talend-studio-bridge/        plugin Java (Eclipse/Tycho) que expone Studio por HTTP
 docs/                        documentacion tecnica
@@ -94,7 +100,7 @@ Detalle completo en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 
 1. **Implementa el caso de uso** en `src/modules/<modulo>/application/` o en `src/talend/`.
    Nada de logica de negocio dentro del handler de la tool.
-2. **Crea el tool** en `src/modules/<modulo>/tools/<nombre>.tool.ts` con schema Zod:
+2. **Crea el tool** con schema Zod:
 
    ```typescript
    import { z } from "zod/v4";
@@ -115,32 +121,25 @@ Detalle completo en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
    }
    ```
 
-3. **Registrala** en `getModuleTools()` de `src/server/registered-tools.ts`. Ese es el registro
-   vivo del servidor; `src/modules/index.ts` es un indice auxiliar que hoy no se invoca.
-4. **Anota el nombre** en `src/tools/tool-names.ts` (`TOOL_NAMES`) si la usan otras apps.
-5. **Escribe el test** en `tests/tools/` o `tests/<area>/`.
-6. **Verifica**: `bun run typecheck` y `bun test`.
+   Ubicacion: `src/modules/<modulo>/tools/` si el modulo existe, `src/talend/studio/tools-<area>.ts`
+   si es una tool de estudio.
+3. **Registrala**:
+   - Tools de modulo: en `getModuleTools()` de `src/server/registered-tools.ts`.
+   - Tools de estudio: en el array `allTools` de `src/talend/studio/bridge-tools.ts`.
+4. **Escribe el test** en `tests/tools/` o `tests/<area>/`.
+5. **Verificacion**: `bun run typecheck` y `bun test`.
 
 Convenciones:
 
 - Nombre: `talend_<area>_<verbo>`. Areas: `jobs`, `components`, `contexts`, `runs`, `errors`,
   `validation`, `secrets`, `snapshots`, `datasets`, `deliverables`, `evidence`, `requirements`,
-  `bridge`, `app`, `recipe`, `mastery`.
-- Marca `annotations.readOnly: true` en toda tool que no escriba.
+  `bridge`, `recipe`, `mastery`.
+- Marca `readOnly: true` en toda tool que no escriba.
 - El `structuredContent` debe llevar el payload en `data` cuando la tool use el envelope
   `TalendResult`; los clientes leen `structuredContent.data`.
+- Si la capacidad ya existe, **no** dupliques la tool: renombra la existente o borra la vieja.
 
-## 7. Como agregar una app
-
-Ver [docs/mcp-apps-ui.md](docs/mcp-apps-ui.md). Resumen:
-
-1. ID en `src/presentation/apps/app-types.ts`.
-2. Definicion en `src/presentation/apps/definitions/`.
-3. Shell HTML en `src/presentation/apps/legacy-shells/` + dispatch en `legacy-app-shell.ts`.
-4. Estado inicial en `src/presentation/apps/app-state.ts`.
-5. Test en `tests/presentation/apps/app-registry.test.ts`.
-
-## 8. Contrato de resultado
+## 7. Contrato de resultado
 
 El servidor usa el envelope estandar:
 
@@ -159,27 +158,24 @@ El servidor usa el envelope estandar:
 `ok`/`fail` viven en `src/presentation/tools/common/response.ts`.
 El schema Zod esta en `src/shared/contracts/result.contract.ts`.
 
-## 9. Tests
+## 8. Tests
 
 - Ubicacion: `tests/<area>/<tema>.test.ts`, con `import { describe, expect, test } from "bun:test"`.
 - Fixtures: `tests/fixtures/talend/`. No dependas de archivos que existan solo en una maquina.
 - Para rutas, crea temporales con `mkdtempSync(join(tmpdir(), "talend-<area>-"))` y borralos en
   `afterAll`.
-- Los tests de la UI HTML (shells) no existen todavia; el server-side si tiene cobertura.
 - `bunfig.toml` limita `bun test` a `tests/` a proposito: no agregues tests fuera de esa carpeta.
 
 Cobertura existente por area:
 
 | Carpeta | Que cubre |
 |---|---|
-| `tests/tools/` | registro, contratos, schemas, seguridad, deprecaciones |
-| `tests/apps/` | registro de apps y launchers |
-| `tests/presentation/` | envelope de resultado y registro de apps |
+| `tests/tools/` | registro, contratos, schemas, seguridad, convencion de nombres |
+| `tests/presentation/` | envelope de resultado |
 | `tests/talend/` | jobs, contextos, DQ, logs, workspace, ejecuciones, diagnostico |
 | `tests/platform/` | deteccion de SO, portabilidad de rutas |
-| `tests/modules/` | modulos hexagonales |
 
-## 10. Before de tocar codigo
+## 9. Before de tocar codigo
 
 ```bash
 bun install

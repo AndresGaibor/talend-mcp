@@ -4,7 +4,7 @@ import { buildChecklist, createPackage, collectJobFiles } from "../deliverables/
 
 export const deliverableTools = [
   {
-    name: "talend_deliverable_export_job",
+    name: "talend_deliverables_export_job",
     description: "Prepara un paquete de entregable para un job.",
     inputSchema: z.object({
       jobName: z.string().describe("Nombre del job"),
@@ -39,7 +39,7 @@ export const deliverableTools = [
     },
   },
   {
-    name: "talend_deliverable_collect_files",
+    name: "talend_deliverables_collect",
     description: "Recolecta los archivos asociados a un job para entrega.",
     inputSchema: z.object({
       jobName: z.string().describe("Nombre del job"),
@@ -66,7 +66,7 @@ export const deliverableTools = [
     },
   },
   {
-    name: "talend_deliverable_create_package",
+    name: "talend_deliverables_create_package",
     description: "Crea un paquete ZIP de entregable.",
     inputSchema: z.object({
       jobName: z.string().describe("Nombre del job"),
@@ -101,7 +101,7 @@ export const deliverableTools = [
     },
   },
   {
-    name: "talend_deliverable_validate_checklist",
+    name: "talend_deliverables_validate",
     description: "Valida que un job cumpla con los requisitos de entregable.",
     inputSchema: z.object({
       jobName: z.string().describe("Nombre del job"),

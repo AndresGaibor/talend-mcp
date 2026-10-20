@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createListProjectContextsTool() {
   return {
-    name: "list_project_contexts",
+    name: "talend_list_project_contexts",
     description: "Lista los contextos definidos en los jobs de un proyecto Talend.",
     inputSchema: {
       type: "object",

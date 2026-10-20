@@ -6,7 +6,7 @@ async function deleteRepositoryContext(projectPath: string, contextName: string)
 
 export function createDeleteRepositoryContextTool() {
   return {
-    name: "delete_repository_context",
+    name: "talend_delete_repository_context",
     description: "Elimina un contexto de repositorio completo.",
     inputSchema: {
       type: "object",

@@ -1,10 +1,8 @@
 import { test, expect, describe } from "bun:test";
 import { convertInputSchema } from "../../src/server/adapt-tool";
-import { createJobsListTool } from "../../src/modules/jobs/tools/jobs-list.tool";
-import { createSnapshotsListTool } from "../../src/modules/snapshots/tools/snapshots-list.tool";
+import { createListJobsTool } from "../../src/presentation/tools/jobs/list-jobs.tool";
 import { createReportSnippetsGenerateTool } from "../../src/modules/jobs/tools/report-snippets-generate.tool";
-import { createAppSessionCreateTool } from "../../src/modules/apps/session/tools/app-session-create.tool";
-import { createAppSessionGetTool } from "../../src/modules/apps/session/tools/app-session-get.tool";
+import { snapshotTools } from "../../src/talend/studio/tools-snapshot";
 
 type JsonSchema = {
   type?: string;
@@ -29,7 +27,7 @@ function getPropertyDefault(schema: unknown, field: string): unknown {
 
 describe("Tool Contracts — campos con default no son required", () => {
   test("talend_jobs_list: limit y offset tienen default y no deben ser required", () => {
-    const tool = createJobsListTool();
+    const tool = createListJobsTool({} as never);
     const schema = convertInputSchema(tool.inputSchema) as JsonSchema;
 
     const required = getRequiredFields(schema);
@@ -40,7 +38,7 @@ describe("Tool Contracts — campos con default no son required", () => {
   });
 
   test("talend_jobs_list acepta {} como input válido", () => {
-    const tool = createJobsListTool();
+    const tool = createListJobsTool({} as never);
     const schema = convertInputSchema(tool.inputSchema);
     const required = getRequiredFields(schema);
 
@@ -51,7 +49,7 @@ describe("Tool Contracts — campos con default no son required", () => {
   });
 
   test("talend_snapshots_list: limit y offset tienen default y no deben ser required", () => {
-    const tool = createSnapshotsListTool();
+    const tool = snapshotTools.find((t) => t.name === "talend_snapshots_list")!;
     const schema = convertInputSchema(tool.inputSchema) as JsonSchema;
 
     const required = getRequiredFields(schema);
@@ -62,7 +60,7 @@ describe("Tool Contracts — campos con default no son required", () => {
   });
 
   test("talend_snapshots_list acepta {} como input válido", () => {
-    const tool = createSnapshotsListTool();
+    const tool = snapshotTools.find((t) => t.name === "talend_snapshots_list")!;
     const schema = convertInputSchema(tool.inputSchema);
     const required = getRequiredFields(schema);
 
@@ -93,43 +91,4 @@ describe("Tool Contracts — campos con default no son required", () => {
     expect(required).not.toContain("mode");
  });
 
-  test("talend_app_session_create: id tiene default 'default' y no debe ser required", () => {
-    const tool = createAppSessionCreateTool();
-    const schema = convertInputSchema(tool.inputSchema) as JsonSchema;
-
-    const required = getRequiredFields(schema);
-    expect(required).not.toContain("id");
-    expect(getPropertyDefault(schema, "id")).toBe("default");
-  });
-
-  test("talend_app_session_create acepta {} como input válido", () => {
-    const tool = createAppSessionCreateTool();
-    const schema = convertInputSchema(tool.inputSchema);
-    const required = getRequiredFields(schema);
-
-    const emptyInput: Record<string, unknown> = {};
-    for (const field of required) {
-      expect(emptyInput).not.toHaveProperty(field);
-    }
-  });
-
-  test("talend_app_session_get: sessionId es required (sin default)", () => {
-    const tool = createAppSessionGetTool();
-    const schema = convertInputSchema(tool.inputSchema) as JsonSchema;
-
-    const required = getRequiredFields(schema);
-    expect(required).toContain("sessionId");
-    expect(getPropertyDefault(schema, "sessionId")).toBeUndefined();
-  });
-
-  test("talend_app_session_get acepta { sessionId } como input válido", () => {
-    const tool = createAppSessionGetTool();
-    const schema = convertInputSchema(tool.inputSchema);
-    const required = getRequiredFields(schema);
-
-    const input = { sessionId: "default" };
-    for (const field of required) {
-      expect(input).toHaveProperty(field);
-    }
-  });
 });

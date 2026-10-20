@@ -11,7 +11,7 @@ async function readRepositoryContext(projectPath: string, contextName: string): 
 
 export function createReadRepositoryContextTool() {
   return {
-    name: "read_repository_context",
+    name: "talend_read_repository_context",
     description: "Lee un contexto de repositorio específico.",
     inputSchema: {
       type: "object",

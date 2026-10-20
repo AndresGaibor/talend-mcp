@@ -21,7 +21,7 @@ export function createInspectComponentTool() {
   const jobRepo = new JobXmlRepository();
 
   return {
-    name: "inspect_component",
+    name: "talend_inspect_component",
     description: "Inspecciona un componente específico de un job Talend mostrando sus parámetros, schemas y conexiones.",
     inputSchema: {
       type: "object",

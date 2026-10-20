@@ -1,6 +1,6 @@
 import { buildTalendComponentEditPreview } from "../../../talend/editor";
 import { readTextFile } from "../../../talend/files";
-import { getConfiguredProjectPath } from "../../../talend/workspace";
+import { resolveProjectPath } from "../../../talend/workspace";
 import { findTalendJob } from "../../../talend/job-crud";
 import { ok, fail } from "../common/response";
 import { wrapHandler } from "../common/logger";
@@ -13,7 +13,7 @@ type ParameterEditOptions = {
 
 export function createPreviewParameterTool() {
   return {
-    name: "preview_talend_component_parameter",
+    name: "talend_preview_component_parameter",
     description: "Muestra una previsualización del cambio en un parámetro de componente Talend.",
     inputSchema: {
       type: "object",
@@ -29,7 +29,7 @@ export function createPreviewParameterTool() {
     handler: wrapHandler("preview_talend_component_parameter", async (input: ParameterEditOptions & { jobName: string; folderPath?: string }) => {
       const start = Date.now();
       try {
-        const projectPath = getConfiguredProjectPath();
+        const projectPath = await resolveProjectPath();
         if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT ni workspace activo.", { startTime: start });
         const job = await findTalendJob(projectPath, input.jobName, input.folderPath);
         const xml = await readTextFile(job.itemPath, projectPath);

@@ -2,7 +2,6 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
-import { listPresentationAppIds, registerPresentationAppResources } from "../apps";
 import { getAllRuntimeTools, getRuntimeTools } from "../../server/registered-tools";
 import { GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
 
@@ -28,7 +27,7 @@ function createHealthPayload() {
     ok: true,
     service: "talend-mcp",
     version: "1.0.0",
-    toolCount: getAllRuntimeTools().length + listPresentationAppIds().length,
+    toolCount: getAllRuntimeTools().length,
   };
 }
 
@@ -58,10 +57,7 @@ export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.W
       },
       tool.handler as never,
     );
-  }
-
-  registerPresentationAppResources(server);
-
+  }
   return server;
 }
 
@@ -93,8 +89,30 @@ function jsonRpcError(id: unknown, code: number, message: string) {
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message } };
 }
 
-function sendJson(res: ServerResponse, origin: string | undefined, payload: unknown) {
-  sendJsonText(res, origin, JSON.stringify(payload));
+/**
+ * Normaliza la salida de un handler al formato de resultado MCP.
+ *
+ * Los handlers que ya devuelven un CallToolResult (content, structuredContent,
+ * isError) se respetan tal cual. Los que devuelven el envelope TalendResult
+ * exponen el envelope tambien como structuredContent, que es lo que exige el
+ * protocolo cuando la tool declara un outputSchema.
+ */
+function toCallToolResult(result: unknown): Record<string, unknown> {
+  if (result && typeof result === "object" && Array.isArray((result as { content?: unknown }).content)) {
+    return result as Record<string, unknown>;
+  }
+
+  const text = typeof result === "string" ? result : JSON.stringify(result, null, 2);
+  const payload: Record<string, unknown> = { content: [{ type: "text", text }] };
+
+  if (result && typeof result === "object" && typeof (result as { ok?: unknown }).ok === "boolean") {
+    payload.structuredContent = result;
+  }
+
+  return payload;
+}
+
+function sendJson(res: ServerResponse, origin: string | undefined, payload: unknown) {  sendJsonText(res, origin, JSON.stringify(payload));
 }
 
 function sendJsonText(res: ServerResponse, origin: string | undefined, json: string) {
@@ -311,7 +329,7 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
       }
       try {
         const result = await tool.handler(p.arguments ?? {});
-        sendJson(res, origin, jsonRpcOk(id, { content: [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result, null, 2) }] }));
+        sendJson(res, origin, jsonRpcOk(id, toCallToolResult(result)));
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         sendJson(res, origin, jsonRpcOk(id, {

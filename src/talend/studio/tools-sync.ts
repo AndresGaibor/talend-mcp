@@ -1,7 +1,7 @@
 import * as z from "zod/v4";
 import { existsSync } from "node:fs";
 import { bridgeOk, bridgeFail, loadBridge } from "./tools-base";
-import { getConfiguredProjectPath } from "../workspace";
+import { resolveProjectPath } from "../workspace";
 import { readTextFile } from "../files";
 
 export const syncTools = [
@@ -14,7 +14,7 @@ export const syncTools = [
     handler: async ({ projectPath }: { projectPath?: string }) => {
       const bridge = await loadBridge();
       const { getSyncStatus } = await import("../sync/studio-file-sync");
-      const effectivePath = projectPath ?? getConfiguredProjectPath();
+      const effectivePath = projectPath ?? await resolveProjectPath();
       if (!effectivePath) {
         return bridgeFail({
           ok: false,
@@ -45,7 +45,7 @@ export const syncTools = [
     handler: async ({ itemPath, propertiesPath, projectPath }: { itemPath: string; propertiesPath: string; projectPath?: string }) => {
       const bridge = await loadBridge();
       const { beforeFileEdit } = await import("../sync/studio-file-sync");
-      const effectivePath = projectPath ?? getConfiguredProjectPath();
+      const effectivePath = projectPath ?? await resolveProjectPath();
       if (!effectivePath) {
         return bridgeFail({
           ok: false,
@@ -77,7 +77,7 @@ export const syncTools = [
     }),
     handler: async ({ itemPath, propertiesPath, uniqueName, parameterName, value }: { itemPath: string; propertiesPath: string; uniqueName: string; parameterName: string; value: string }) => {
       const bridge = await loadBridge();
-      const projectPath = getConfiguredProjectPath();
+      const projectPath = await resolveProjectPath();
       if (!projectPath) {
         return bridgeFail({
           ok: false,
@@ -119,7 +119,7 @@ export const syncTools = [
     }),
     handler: async ({ itemPath, propertiesPath, uniqueName, patch }: { itemPath: string; propertiesPath: string; uniqueName: string; patch: Record<string, string> }) => {
       const bridge = await loadBridge();
-      const projectPath = getConfiguredProjectPath();
+      const projectPath = await resolveProjectPath();
       if (!projectPath) {
         return bridgeFail({
           ok: false,
@@ -162,7 +162,7 @@ export const syncTools = [
     }),
     handler: async ({ itemPath, propertiesPath, sourceUniqueName, targetUniqueName, connectionType }: { itemPath: string; propertiesPath: string; sourceUniqueName: string; targetUniqueName: string; connectionType: string }) => {
       const bridge = await loadBridge();
-      const projectPath = getConfiguredProjectPath();
+      const projectPath = await resolveProjectPath();
       if (!projectPath) {
         return bridgeFail({
           ok: false,

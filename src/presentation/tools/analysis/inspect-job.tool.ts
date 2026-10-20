@@ -35,7 +35,7 @@ export function createInspectJobTool() {
   const jobRepo = new JobXmlRepository();
 
   return {
-    name: "inspect_job",
+    name: "talend_inspect_job",
     description: "Inspecciona un job completo mostrando todos sus componentes, conexiones, contextos y issues de schema.",
     inputSchema: {
       type: "object",

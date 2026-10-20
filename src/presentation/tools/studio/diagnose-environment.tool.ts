@@ -2,7 +2,7 @@ import { okResult, errorResult, type Confidence } from "../common/result";
 import { createPlatformContext } from "../../../platform";
 import { detectRuntimeOS, detectTalendHostOS, detectPathMode } from "../../../platform/runtime";
 import { getTalendMcpEnv } from "../../../config/env";
-import { getConfiguredProjectPath, resolveWorkspaceFromProject } from "../../../talend/workspace";
+import { resolveProjectPath, resolveWorkspaceFromProject } from "../../../talend/workspace";
 import { detectTalendStudioProcess } from "../../../talend/studio/process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -77,7 +77,7 @@ async function diagnoseTalendEnvironment(): Promise<TalendEnvironmentReport> {
     TALEND_BUILDS_DIR: resolvePathTriple(process.env.TALEND_BUILDS_DIR),
   };
 
-  const projectPath = getConfiguredProjectPath();
+  const projectPath = await resolveProjectPath();
   let workspace: Evidence<{ path: string; exists: boolean }>;
   if (projectPath) {
     const talendWorkspace = resolveWorkspaceFromProject(projectPath);

@@ -110,7 +110,7 @@ function parseDQAnalysisFromXml(parsed: XmlRecord, anaPath: string): DqAnalysis 
 
 export function createReadAnalysisTool() {
   return {
-    name: "read_analysis",
+    name: "talend_read_analysis",
     description: "Lee y retorna el contenido de un análisis DQ específico.",
     inputSchema: {
       type: "object",

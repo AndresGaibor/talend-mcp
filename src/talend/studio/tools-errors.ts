@@ -1,64 +1,16 @@
 import * as z from "zod/v4";
-import { bridgeOk, bridgeFail } from "./tools-base";
-import { getConfiguredProjectPath } from "../workspace";
+import { bridgeOk } from "./tools-base";
+import { resolveProjectPath } from "../workspace";
 import { existsSync } from "node:fs";
 
+/**
+ * Tools de errores.
+ *
+ * `talend_errors_explain`, `talend_errors_suggest_fix` y `talend_errors_stats`
+ * viven en `src/modules/errors/tools/`. Aqui queda solo lo que no tiene
+ * equivalente canonico.
+ */
 export const errorTools = [
-  {
-    name: "talend_error_explain",
-    description: "Explica un error de Talend.",
-    inputSchema: z.object({
-      errorMessage: z.string().describe("Mensaje de error"),
-    }),
-    handler: async ({ errorMessage }: { errorMessage: string }) => {
-      const { analyzeError } = await import("../diagnostics/error-knowledge-base");
-      const explanation = analyzeError(errorMessage);
-      return bridgeOk({
-        ok: true,
-        source: "workspace-files",
-        confidence: explanation ? "high" : "low",
-        endpoint: "/errors/explain",
-        data: { explanation },
-      });
-    },
-  },
-  {
-    name: "talend_error_stats",
-    description: "Obtiene estadísticas de errores conocidos.",
-    inputSchema: z.object({}),
-    handler: async () => {
-      const { getErrorStats } = await import("../diagnostics/error-knowledge-base");
-      const stats = getErrorStats();
-      return bridgeOk({
-        ok: true,
-        source: "workspace-files",
-        confidence: "high",
-        endpoint: "/errors/stats",
-        data: stats,
-      });
-    },
-  },
-  {
-    name: "talend_error_suggest_fix",
-    description: "Sugiere un fix automático para un error.",
-    inputSchema: z.object({
-      errorMessage: z.string().describe("Mensaje de error detectado"),
-    }),
-    handler: async ({ errorMessage }: { errorMessage: string }) => {
-      const { suggestFix } = await import("../diagnostics/error-knowledge-base");
-      const result = suggestFix(errorMessage);
-      return bridgeOk({
-        ok: true,
-        source: "workspace-files",
-        confidence: result.error ? "high" : "low",
-        endpoint: "/errors/suggest-fix",
-        data: {
-          error: result.error,
-          advice: result.advice,
-        },
-      });
-    },
-  },
   {
     name: "talend_error_map_to_component",
     description: "Asocia un error a un componente del job.",
@@ -67,7 +19,7 @@ export const errorTools = [
       itemPath: z.string().describe("Ruta al archivo .item"),
     }),
     handler: async ({ errorMessage, itemPath }: { errorMessage: string; itemPath: string }) => {
-      const projectPath = getConfiguredProjectPath();
+      const projectPath = await resolveProjectPath();
       if (!projectPath || !existsSync(itemPath)) {
         return bridgeOk({
           ok: true,

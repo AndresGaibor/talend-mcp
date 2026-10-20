@@ -23,7 +23,7 @@ function parseLatestRunLog(logText: string, jobName: string): LatestRunLog {
 
 export function createReadRunLogTool() {
   return {
-    name: "read_run_log",
+    name: "talend_read_run_log",
     description: "Lee y parsea el último run log de un job mostrando command line y errores.",
     inputSchema: {
       type: "object",

@@ -50,11 +50,8 @@ import { createReadRepositoryContextTool } from "./contexts/read-repository-cont
 import { createUpsertRepositoryContextParameterTool } from "./contexts/upsert-repository-context-parameter.tool";
 
 import { createFindExportedJobsTool } from "./execution/find-exported-jobs.tool";
+import { createTailRunOutputTool } from "./execution/read-run.tool";
 import { createJobInfoTool } from "./execution/job-info.tool";
-import { createListRunsTool } from "./execution/list-runs.tool";
-import { createReadRunTool, createTailRunOutputTool } from "./execution/read-run.tool";
-import { createRunExportedJobTool } from "./execution/run-exported-job.tool";
-import { createRunJobTool } from "./execution/run-job.tool";
 
 import { createLatestChangesTool } from "./live/latest-changes.tool";
 import { createLiveStartTool } from "./live/live-start.tool";
@@ -128,12 +125,8 @@ export const allTools = [
   createUpsertRepositoryContextParameterTool(),
 
   createFindExportedJobsTool(),
-  createJobInfoTool(),
-  createListRunsTool(),
-  createReadRunTool(),
-  createTailRunOutputTool(),
-  createRunExportedJobTool(),
-  createRunJobTool(),
+  createJobInfoTool(),
+  createTailRunOutputTool(),
 
   createLatestChangesTool(),
   createLiveStartTool(),

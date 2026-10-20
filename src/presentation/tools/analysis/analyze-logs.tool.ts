@@ -24,7 +24,7 @@ function analyzeJobLogs(jobName: string): { logFile: LogFileInfo | null; analysi
 
 export function createAnalyzeLogsTool() {
   return {
-    name: "analyze_logs",
+    name: "talend_analyze_logs",
     description: "Analiza los logs de un job para detectar errores y generar sugerencias.",
     inputSchema: {
       type: "object",

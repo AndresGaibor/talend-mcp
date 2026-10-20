@@ -14,7 +14,7 @@ const CreateJobSchema = z.object({
 
 export function createCreateJobTool() {
   return {
-    name: "talend_create_job",
+    name: "talend_jobs_create",
     description: "Crea un job nuevo vacío en el proyecto.",
     inputSchema: CreateJobSchema,
     handler: async (input: z.infer<typeof CreateJobSchema>) => {

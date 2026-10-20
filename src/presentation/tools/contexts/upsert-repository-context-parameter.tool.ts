@@ -13,7 +13,7 @@ async function upsertRepositoryContextParameter(
 
 export function createUpsertRepositoryContextParameterTool() {
   return {
-    name: "upsert_repository_context_parameter",
+    name: "talend_upsert_repository_context_parameter",
     description: "Crea o actualiza un parámetro en un contexto de repositorio.",
     inputSchema: {
       type: "object",

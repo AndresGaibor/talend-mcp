@@ -1,6 +1,6 @@
 import { buildTalendComponentDeletePreview } from "../../../talend/editor";
 import { readTextFile } from "../../../talend/files";
-import { getConfiguredProjectPath } from "../../../talend/workspace";
+import { resolveProjectPath } from "../../../talend/workspace";
 import { findTalendJob } from "../../../talend/job-crud";
 import { ok, fail } from "../common/response";
 import { wrapHandler } from "../common/logger";
@@ -11,7 +11,7 @@ type DeleteComponentOptions = {
 
 export function createPreviewDeleteComponentTool() {
   return {
-    name: "preview_delete_talend_component",
+    name: "talend_preview_delete_component",
     description: "Muestra previsualización de eliminación de un componente Talend.",
     inputSchema: {
       type: "object",
@@ -25,7 +25,7 @@ export function createPreviewDeleteComponentTool() {
     handler: wrapHandler("preview_delete_talend_component", async (input: DeleteComponentOptions & { jobName: string; folderPath?: string }) => {
       const start = Date.now();
       try {
-        const projectPath = getConfiguredProjectPath();
+        const projectPath = await resolveProjectPath();
         if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT ni workspace activo.", { startTime: start });
         const job = await findTalendJob(projectPath, input.jobName, input.folderPath);
         const xml = await readTextFile(job.itemPath, projectPath);

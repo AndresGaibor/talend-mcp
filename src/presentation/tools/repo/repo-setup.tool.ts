@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 export function createRepoSetupTool() {
   return {
-    name: "repo_setup",
+    name: "talend_repo_setup",
     description: "Clona o configura un repositorio Talend desde una fuente remota o local.",
     inputSchema: {
       type: "object",

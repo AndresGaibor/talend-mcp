@@ -10,7 +10,7 @@ async function deleteRepositoryContextParameter(
 
 export function createDeleteRepositoryContextParameterTool() {
   return {
-    name: "delete_repository_context_parameter",
+    name: "talend_delete_repository_context_parameter",
     description: "Elimina un parámetro específico de un contexto de repositorio.",
     inputSchema: {
       type: "object",

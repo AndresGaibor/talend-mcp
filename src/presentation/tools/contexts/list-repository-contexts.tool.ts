@@ -11,7 +11,7 @@ async function listRepositoryContexts(projectPath: string): Promise<RepositoryCo
 
 export function createListRepositoryContextsTool() {
   return {
-    name: "list_repository_contexts",
+    name: "talend_list_repository_contexts",
     description: "Lista todos los contextos de repositorio en un proyecto Talend.",
     inputSchema: {
       type: "object",

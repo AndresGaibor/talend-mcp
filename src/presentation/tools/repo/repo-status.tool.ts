@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createRepoStatusTool() {
   return {
-    name: "repo_status",
+    name: "talend_repo_status",
     description: "Obtiene el estado de un repositorio Talend (branch, commit, remote).",
     inputSchema: {
       type: "object",

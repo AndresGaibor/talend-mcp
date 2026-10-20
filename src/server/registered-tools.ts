@@ -1,15 +1,7 @@
-import { getRegisteredServerTools, TOOL_NAME_ALIASES, GENERIC_TOOL_OUTPUT_SCHEMA, getRegisteredServerToolAnnotations } from "../presentation/server/tool-registry";
+import { getRegisteredServerTools, GENERIC_TOOL_OUTPUT_SCHEMA, getRegisteredServerToolAnnotations } from "../presentation/server/tool-registry";
 import type { McpToolDefinition } from "./adapt-tool";
 import { adaptToolToMcp } from "./adapt-tool";
-import { LEGACY_TO_CANONICAL } from "../modules/legacy/legacy-aliases";
-import { createLegacyAliasTool } from "../modules/legacy/create-legacy-alias-tool";
-import { getPresentationAppLauncherTools } from "../presentation/apps/app-registry";
 
-import { createSnapshotsListTool } from "../modules/snapshots/tools/snapshots-list.tool";
-import { createSnapshotsCreateTool } from "../modules/snapshots/tools/snapshots-create.tool";
-import { createSnapshotsDiffTool } from "../modules/snapshots/tools/snapshots-diff.tool";
-import { createSnapshotsRestoreTool } from "../modules/snapshots/tools/snapshots-restore.tool";
-import { createSnapshotsReadTool } from "../modules/snapshots/tools/snapshots-read.tool";
 
 import { createSecretsSuggestContextMigrationTool } from "../modules/secrets/tools/secrets-suggest-context-migration.tool";
 import { createSecretsScanProjectTool } from "../modules/secrets/tools/secrets-scan-project.tool";
@@ -19,25 +11,10 @@ import { createInspectCsvFolderTool } from "../modules/datasets/tools/datasets-i
 import { createGenerateRawMappingsTool } from "../modules/datasets/tools/datasets-generate-raw-mappings.tool";
 import { createInferCsvSchemaTool } from "../modules/datasets/tools/datasets-infer-csv-schema.tool";
 
-import { createDeliverablesExportJobTool } from "../modules/deliverables/tools/deliverables-export-job";
-import { createDeliverablesCollectTool } from "../modules/deliverables/tools/deliverables-collect";
-import { createDeliverablesCreatePackageTool } from "../modules/deliverables/tools/deliverables-create-package";
-import { createDeliverablesValidateTool } from "../modules/deliverables/tools/deliverables-validate";
 
 import { talendDiagnoseJobTool } from "../modules/jobs/tools/diagnose-job.tool";
-import { createJobsReadTool } from "../modules/jobs/tools/jobs-read.tool";
 import { talendReportGenerateSnippetsTool } from "../modules/jobs/tools/report-generate-snippets.tool";
-import { createJobsPatchComponentTool } from "../modules/jobs/tools/jobs-patch-component.tool";
-import { createJobsPreviewPipelineSpecTool } from "../modules/jobs/tools/jobs-preview-pipeline-spec.tool";
-import { createJobsValidatePipelineSpecTool } from "../modules/jobs/tools/jobs-validate-pipeline-spec.tool";
-import { createJobsApplyPipelineSpecTool } from "../modules/jobs/tools/jobs-apply-pipeline-spec.tool";
-import { createJobsCreateTool } from "../modules/jobs/tools/jobs-create.tool";
-import { createJobsListTool } from "../modules/jobs/tools/jobs-list.tool";
 
-import { createAppSessionCreateTool } from "../modules/apps/session/tools/app-session-create.tool";
-import { createAppSessionGetTool } from "../modules/apps/session/tools/app-session-get.tool";
-import { createAppSessionUpdateTool } from "../modules/apps/session/tools/app-session-update.tool";
-import { createAppSessionClearTool } from "../modules/apps/session/tools/app-session-clear.tool";
 import { createRequirementsAnalyzeTool } from "../modules/requirements/tools/requirements-analyze.tool";
 import { createRequirementsBuildChecklistTool } from "../modules/requirements/tools/requirements-build-checklist.tool";
 import { createJobsDetectAntipatternsTool } from "../modules/jobs/tools/jobs-detect-antipatterns.tool";
@@ -78,38 +55,17 @@ export type RuntimeTool = {
 };
 
 let toolCache: Map<string, RuntimeTool> | null = null;
-let aliasCache: Map<string, string> | null = null;
 
 function getModuleTools(): RuntimeTool[] {
   const rawTools = [
-    createSnapshotsListTool(),
-    createSnapshotsCreateTool(),
-    createSnapshotsDiffTool(),
-    createSnapshotsRestoreTool(),
-    createSnapshotsReadTool(),
     createSecretsScanProjectTool(),
     createSecretsScanJobTool(),
     createSecretsSuggestContextMigrationTool(),
     createInspectCsvFolderTool({} as any),
     createGenerateRawMappingsTool({} as any, {} as any),
     createInferCsvSchemaTool({} as any, {} as any),
-    createDeliverablesExportJobTool(),
-    createDeliverablesCollectTool(),
-    createDeliverablesCreatePackageTool(),
-    createDeliverablesValidateTool(),
     talendDiagnoseJobTool,
-    createJobsListTool(),
-    createJobsReadTool(),
     talendReportGenerateSnippetsTool,
-    createJobsPatchComponentTool(),
-    createJobsPreviewPipelineSpecTool(),
-    createJobsValidatePipelineSpecTool(),
-    createJobsApplyPipelineSpecTool(),
-    createJobsCreateTool(),
-    createAppSessionCreateTool(),
-    createAppSessionGetTool(),
-    createAppSessionUpdateTool(),
-    createAppSessionClearTool(),
     createRequirementsAnalyzeTool(),
     createRequirementsBuildChecklistTool(),
     createJobsDetectAntipatternsTool(),
@@ -184,56 +140,19 @@ export function buildRuntimeToolCache(): void {
     cache.set(tool.definition.name, tool);
   }
 
-  // 3. Lanzadores de Apps (Presentation Apps)
-  const appLaunchers = getPresentationAppLauncherTools();
-  for (const launcher of appLaunchers) {
-    if (!launcher.definition.outputSchema) {
-      (launcher.definition as any).outputSchema = GENERIC_TOOL_OUTPUT_SCHEMA;
-    }
-    cache.set(launcher.definition.name, launcher as RuntimeTool);
-  }
-
-  // 4. Alias adicionales (LEGACY_TO_CANONICAL)
-  // Si una herramienta canónica existe, creamos el alias legacy apuntando a su handler con advertencia
-  for (const [legacyName, canonicalName] of LEGACY_TO_CANONICAL) {
-    const canonicalTool = cache.get(canonicalName);
-    if (canonicalTool) {
-      cache.set(legacyName, createLegacyAliasTool(legacyName, canonicalTool));
-    }
-  }
-
-  // 5. Alias de la presentación (TOOL_NAME_ALIASES)
-  // Envolvemos los alias existentes con advertencias de deprecación
-  for (const [sourceName, aliasName] of Object.entries(TOOL_NAME_ALIASES)) {
-    const canonicalTool = cache.get(sourceName);
-    if (canonicalTool && cache.has(aliasName)) {
-      cache.set(aliasName, createLegacyAliasTool(aliasName, canonicalTool));
-    }
-  }
-
   toolCache = cache;
-
-  const mergedAliases = new Map<string, string>();
-  for (const [legacyName, canonicalName] of Object.entries(TOOL_NAME_ALIASES)) {
-    mergedAliases.set(legacyName, canonicalName);
-  }
-  for (const [legacyName, canonicalName] of LEGACY_TO_CANONICAL) {
-    mergedAliases.set(legacyName, canonicalName);
-  }
-  aliasCache = mergedAliases;
 }
 
 
 // ─── Tool Presets ─────────────────────────────────────────────────────────────
 // Available presets (TALEND_MCP_FILTER env var, comma-separated):
 //
-//   all          → All talend_* tools, no non-prefixed legacy aliases (~252 tools)
-//   canonical    → Same as "all" but removes known legacy duplicate names (~215 tools)
-//   core         → 21 curated essential tools (~10KB, safest for limited clients)
-//   apps         → talend_app_* UI launchers only
-//   jobs         → talend_jobs_* + related job tools
+//   all          → todas las tools talend_*
+//   canonical    → idem, sin los duplicados legacy conocidos
+//   core         → 21 tools esenciales (las mas seguras para clientes limitados)
+//   jobs         → talend_jobs_* + tools de job relacionadas
 //   snapshots    → talend_snapshots_*
-//   runs         → run-related tools
+//   runs         → tools de ejecucion
 //   errors       → talend_errors_*
 //   validation   → talend_validation_*
 //   secrets      → talend_secrets_*
@@ -245,7 +164,7 @@ export function buildRuntimeToolCache(): void {
 //   evidence     → talend_evidence_*
 //   reports      → talend_report_snippets_*
 //
-// Presets are additive: TALEND_MCP_FILTER="core,apps"
+// Presets are additive: TALEND_MCP_FILTER="core,jobs"
 // Wildcards work too:  TALEND_MCP_FILTER="talend_bridge_*"
 
 // 21-tool curated safe set
@@ -258,8 +177,8 @@ const PRESET_CORE = new Set([
   "talend_summarize_open_job",
   "talend_diagnose_environment",
   "talend_bridge_ping",
-  "talend_list_runs",
-  "talend_read_run",
+  "talend_runs_list",
+  "talend_runs_read",
   "talend_job_run_by_name",
   "talend_list_project_contexts",
   "talend_list_repository_contexts",
@@ -273,53 +192,17 @@ const PRESET_CORE = new Set([
   "talend_errors_suggest_fix",
 ]);
 
-// Known legacy duplicate aliases within the talend_* namespace.
-// These point to the same handler as their newer canonical counterpart.
-// Excluded from "canonical" to avoid exposing duplicate tools to clients.
+/**
+ * Nombres legacy que siguen existiendo como tool y duplican una canonica.
+ * Se ocultan en el preset "canonical" para no exponer la misma capacidad dos
+ * veces. Si una tool deja de existir, hay que quitarla de esta lista.
+ */
 const LEGACY_TALEND_ALIASES = new Set([
-  "talend_secret_scan_project",               // → talend_secrets_scan_project
-  "talend_secret_scan_job",                   // → talend_secrets_scan_job
-  "talend_secret_suggest_context_migration",  // → talend_secrets_suggest_context_migration
-  "talend_snapshot_list",                     // → talend_snapshots_list
-  "talend_snapshot_create",                   // → talend_snapshots_create
-  "talend_snapshot_diff",                     // → talend_snapshots_diff
-  "talend_snapshot_restore",                  // → talend_snapshots_restore
-  "talend_snapshot_read",                     // → talend_snapshots_read
-  "talend_deliverable_export_job",            // → talend_deliverables_export_job
-  "talend_deliverable_collect_files",         // → talend_deliverables_collect
-  "talend_deliverable_create_package",        // → talend_deliverables_create_package
-  "talend_deliverable_validate_checklist",    // → talend_deliverables_validate
-  "talend_dataset_inspect_csv_folder",        // → talend_datasets_inspect_csv_folder
-  "talend_dataset_infer_csv_schema",          // → talend_datasets_infer_csv_schema
-  "talend_dataset_generate_raw_table_mapping",   // → talend_datasets_generate_raw_mappings
-  "talend_dataset_generate_raw_table_mappings",  // → talend_datasets_generate_raw_mappings
-  "talend_error_explain",                     // → talend_errors_explain
-  "talend_error_suggest_fix",                 // → talend_errors_suggest_fix
-  "talend_error_stats",                       // → talend_errors_stats
-  "talend_error_map_to_component",            // old name, no canonical equivalent
-  "talend_job_validate_design",               // → talend_validation_validate_design
-  "talend_job_validate_context_usage",        // → talend_validation_validate_context_usage
-  "talend_job_validate_audit_columns",        // → talend_validation_validate_audit_columns
-  "talend_job_validate_performance_settings", // → talend_validation_validate_performance
-  "talend_job_validate_pipeline_spec",        // → talend_jobs_validate_pipeline_spec
-  "talend_job_apply_pipeline_spec",           // → talend_jobs_apply_pipeline_spec
-  "talend_job_preview_pipeline_spec",         // → talend_jobs_preview_pipeline_spec
-  "talend_report_snippet_get",                // → talend_report_snippets_list
-  "talend_report_snippet_list",               // → talend_report_snippets_list
   "talend_report_generate_snippets",          // → talend_report_snippets_generate
-  "talend_runs_list",                         // → talend_list_runs
-  "talend_runs_read",                         // → talend_read_run
-  "talend_runs_start",                        // → talend_job_run_by_name
-  "talend_runs_start_exported",               // → talend_run_exported_job
-  "talend_run_job",                           // → talend_job_run_by_name
-  "talend_create_job",                        // → talend_jobs_create
-  "talend_list_jobs",                         // → talend_jobs_list
-  "talend_read_job",                          // → talend_jobs_read
-  "talend_diagnose_job",                      // older name for talend_diagnose_environment
 ]);
 
 const KNOWN_PRESETS = new Set([
-  "all", "canonical", "core", "apps", "jobs", "snapshots", "runs", "errors",
+  "all", "canonical", "core", "jobs", "snapshots", "runs", "errors",
   "validation", "secrets", "datasets", "deliverables", "components", "bridge",
   "requirements", "evidence", "reports",
 ]);
@@ -335,7 +218,6 @@ function applyFilter<T extends { name: string } | { definition: { name: string }
   const wantsAll          = patterns.includes("all");
   const wantsCanonical    = patterns.includes("canonical");
   const wantsCore         = patterns.includes("core");
-  const wantsApps         = patterns.includes("apps");
   const wantsJobs         = patterns.includes("jobs");
   const wantsSnapshots    = patterns.includes("snapshots");
   const wantsRuns         = patterns.includes("runs");
@@ -355,17 +237,16 @@ function applyFilter<T extends { name: string } | { definition: { name: string }
   return items.filter(item => {
     const name = ("name" in item ? item.name : (item as any).definition.name).toLowerCase();
 
-    // "all": every talend_* tool (drops non-prefixed legacy aliases like "repo_pull")
+    // "all": todas las tools talend_*
     if (wantsAll && name.startsWith("talend_")) return true;
 
-    // "canonical": every talend_* tool that isn't a known legacy duplicate
+    // "canonical": toda tool talend_* que no sea un duplicado legacy conocido
     if (wantsCanonical && name.startsWith("talend_") && !LEGACY_TALEND_ALIASES.has(name)) return true;
 
-    // "core": curated 21-tool safe set
+    // "core": set curado de 21 tools seguras
     if (wantsCore && PRESET_CORE.has(name)) return true;
 
     // Module presets by prefix
-    if (wantsApps         && name.startsWith("talend_app_")) return true;
     if (wantsBridge       && name.startsWith("talend_bridge_")) return true;
     if (wantsComponents   && name.startsWith("talend_components_")) return true;
     if (wantsErrors       && name.startsWith("talend_errors_")) return true;
@@ -378,10 +259,11 @@ function applyFilter<T extends { name: string } | { definition: { name: string }
     if (wantsReports      && name.startsWith("talend_report_snippets_")) return true;
     if (wantsSnapshots    && name.startsWith("talend_snapshots_")) return true;
     if (wantsRuns && (
-      name === "talend_list_runs"     || name === "talend_read_run"         ||
-      name === "talend_tail_run_output" || name === "talend_read_run_log"   ||
-      name === "talend_job_run_by_name" || name === "talend_job_wait_run"   ||
-      name === "talend_run_exported_job"
+      name === "talend_runs_list"      || name === "talend_runs_read"         ||
+      name === "talend_tail_run_output" || name === "talend_read_run_log"     ||
+      name === "talend_job_run_by_name" || name === "talend_job_wait_run"     ||
+      name === "talend_run_exported_job" || name === "talend_runs_collect_logs" ||
+      name === "talend_runs_analyze_output"
     )) return true;
     if (wantsJobs && (
       name.startsWith("talend_jobs_") ||
@@ -414,9 +296,4 @@ export function getRuntimeTools(): RuntimeTool[] {
 export function getToolByName(name: string): McpToolDefinition | undefined {
   buildRuntimeToolCache();
   return toolCache!.get(name)?.definition;
-}
-
-export function getLegacyAliases(): Map<string, string> {
-  buildRuntimeToolCache();
-  return aliasCache!;
 }

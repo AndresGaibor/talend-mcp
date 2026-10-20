@@ -3,7 +3,7 @@ import { ok, fail } from "../common/response";
 
 export function createUpdateAnalysisTool() {
   return {
-    name: "update_analysis",
+    name: "talend_update_analysis",
     description: "Actualiza los metadatos de un análisis DQ (name, status, purpose, description, version, author).",
     inputSchema: {
       type: "object",
