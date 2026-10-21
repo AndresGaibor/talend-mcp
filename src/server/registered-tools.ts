@@ -48,6 +48,7 @@ import { createSchemaCompareTool } from "../modules/component-knowledge/tools/sc
 import { createSchemaSuggestionsTool } from "../modules/component-knowledge/tools/schema-suggestions.tool";
 import { createCatalogRebuildTool } from "../modules/component-knowledge/tools/catalog-rebuild.tool";
 import { createJobQualityReportTool, createJobQualityIssuesTool } from "../modules/component-knowledge/tools/job-quality.tool";
+import { createComponentDefinitionTool } from "../modules/component-definitions/tools/component-definition.tool";
 
 export type RuntimeTool = {
   definition: McpToolDefinition;
@@ -96,6 +97,7 @@ function getModuleTools(): RuntimeTool[] {
     createCatalogRebuildTool(),
     createJobQualityReportTool(),
     createJobQualityIssuesTool(),
+    createComponentDefinitionTool(),
   ];
 
   return rawTools.map((tool) => ({
