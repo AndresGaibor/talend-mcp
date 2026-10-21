@@ -4,6 +4,7 @@
  *   bun run scripts/coverage.ts                    # todos los componentes
  *   bun run scripts/coverage.ts --filter tFile     # solo los que contienen ese texto
  *   bun run scripts/coverage.ts --max 50           # solo los primeros 50
+ *   bun run scripts/coverage.ts --compile          # ademas genera el codigo y comprueba que compila (L4)
  *   bun run scripts/coverage.ts --out informe.csv  # guarda el detalle
  *   bun run scripts/coverage.ts --cancel           # para la medicion en marcha
  *
@@ -39,6 +40,8 @@ type Informe = {
   deleted?: number;
   failed?: number;
   saveFailed?: number;
+  compile?: boolean;
+  compiled?: number;
   cancelled?: boolean;
   components?: Fila[];
 };
@@ -64,7 +67,7 @@ function desenvolver(data: unknown): Estado {
 }
 
 function guardarCsv(salida: string, filas: Fila[]): void {
-  const lineas = ["componente,creado,configurado,guardado,en_el_job,borrado,parametros,unique_name,error"];
+  const lineas = ["componente,creado,configurado,guardado,en_el_job,borrado,parametros,unique_name,error,compila,error_compilacion"];
   for (const fila of filas) {
     lineas.push([
       String(fila.component ?? ""),
@@ -76,6 +79,8 @@ function guardarCsv(salida: string, filas: Fila[]): void {
       String(fila.parametersApplied ?? 0),
       String(fila.uniqueName ?? ""),
       `"${String(fila.error ?? fila.deleteError ?? "").replace(/"/g, '""')}"`,
+      fila.compiles === undefined ? "" : fila.compiles === true ? "si" : "no",
+      `"${String(fila.compileError ?? "").replace(/"/g, '""')}"`,
     ].join(","));
   }
   writeFileSync(salida, `${lineas.join("\n")}\n`, "utf8");
@@ -93,9 +98,10 @@ async function main(): Promise<void> {
 
   const filter = valorDe("--filter");
   const max = valorDe("--max");
+  const compile = args.includes("--compile");
   const inicio = Date.now();
 
-  const arranque = await bridge.coverage({ filter, max: max ? Number(max) : undefined });
+  const arranque = await bridge.coverage({ filter, max: max ? Number(max) : undefined, compile });
   if (!arranque.ok) {
     console.error("No se pudo arrancar la medicion:", arranque.error?.message ?? arranque.rawText?.slice(0, 400));
     process.exit(1);
@@ -137,6 +143,9 @@ async function main(): Promise<void> {
   console.log(`Creados:                   ${data.created}`);
   console.log(`Con parametros aplicados:  ${data.configured}`);
   console.log(`Guardados sin error:       ${(data.created ?? 0) - (data.saveFailed ?? 0)}`);
+  if (data.compile) {
+    console.log(`Compilan (L4):             ${data.compiled}`);
+  }
   console.log(`En el job (listados):      ${data.listed}`);
   console.log(`Borrados del job:          ${data.deleted}`);
   console.log(`Fallidos:                  ${data.failed}`);

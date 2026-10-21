@@ -195,6 +195,15 @@ public final class JobOperationsService {
   }
 
   /**
+   * Genera el codigo del job y comprueba que compila, sin ejecutarlo.
+   *
+   * @param spec `job` opcional.
+   */
+  public static Map<String, Object> compile(JsonObject spec) {
+    return run("compile", () -> JobCompiler.check(spec));
+  }
+
+  /**
    * Progreso de la medicion de cobertura y, al terminar, su informe.
    *
    * @param spec opcionalmente `cancel: true`.

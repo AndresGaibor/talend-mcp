@@ -1473,3 +1473,28 @@ otra cosa (ver `/problems/markers` y la seccion 14).
 
 Dato util al probar con `talend_studio_run_code`: `PlatformUI.getWorkbench().getActiveWorkbenchWindow()`
 es `null` cuando Studio no tiene el foco; usa `getWorkbenchWindows()[0]`.
+
+## 28. Compilar un job sin ejecutarlo
+
+Studio genera el codigo antes de un Run con `ProcessorUtilities.generateCode` y luego comprueba los errores
+de compilacion. Las dos cosas se pueden hacer sin lanzar el job (`JobCompiler.java`, tool `talend_job_compile`):
+
+1. `ProcessorUtilities.generateCode(IProcess, IContext, statistics=false, trace=false, properties=true)`, con el
+   contexto por defecto (`process.getContextManager().getDefaultContext()`). Tarda ~2 s en un job pequeno.
+2. `JobErrorsChecker.checkLastGenerationHasCompilationError(true)`. **Esta clase esta en otro bundle**
+   (`org.talend.designer.runprocess`): se carga con `Platform.getBundle(...).loadClass(...)`, no con el
+   classloader de `org.talend.core`.
+3. Si hay errores lanza `ProcessorException` con `Error Line: N` y `Detail Message: ...`; `generateCode` ya puede
+   lanzarla por si mismo (el check interno es el de `generateBuildInfo`).
+
+**Tiene que ir en el hilo de la UI.** `generateBuildInfo` llama a `JavaProcessor.syntaxCheck` ->
+`TalendJavaEditor.validateSyntax`, que toca widgets; desde otro hilo da `SWTException: Invalid thread access`.
+Studio lo hace igual, dentro de un `ProgressMonitorDialog` en el hilo de UI. Es la excepcion consciente a la regla
+de la seccion 26: dura segundos, se pide explicitamente y la ruta usa un tiempo de espera de 180 s.
+
+Verificado: un `tFileInputDelimited` con `FILENAME` sin comillas da `Syntax error on token ":"` (linea 874) y con
+`literal: true` compila. Un `tFixedFlowInput` -> `tLogRow` compila sin errores.
+
+**Lectura de los fallos:** un componente de salida a archivo sin `FILENAME` da `The constructor File() is
+undefined`: es un parametro obligatorio sin rellenar, no un fallo del MCP. Lo mismo `FileWriter()` en
+`tFileOutputJSON`. Al medir L4 hay que darle a cada componente sus parametros obligatorios.

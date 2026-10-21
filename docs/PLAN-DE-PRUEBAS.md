@@ -71,6 +71,11 @@ configuracion de parametros, guardado en el `.item`, presencia en el job y borra
 | `ArtifactResolutionException`: falta `org.talend.components:components-jdbc-runtime:0.37.61` | 20 (Athena, Databricks SQL, Redshift...) | Studio no encuentra el runtime del componente; no esta en Maven Central ni en el Nexus publico de Talend |
 | `IndexOutOfBoundsException` al guardar (`evaluateSparkMode`) | 29 (Dynamo, Kinesis, Kudu, HDFS/Hive/Azure configuration, Avro...) | Son componentes de **Spark/Big Data**: no son validos en un job Standard |
 
+**L4 (compila), muestra de los 77 componentes `tFile*`** (`coverage.ts --filter tFile --compile`, 11 min):
+64 compilan (83 %). Los 13 que no son componentes de salida (`tFileOutputPositional`, `tFileOutputXML`,
+`tFileOutputDelimited`, `tFileOutputJSON`) a los que no se dio `FILENAME`, y `tFileInputMSXML`. Con `--compile` cada
+componente cuesta ~8 s (el catalogo entero serian ~3 h), por eso es opcional y se usa por familias.
+
 Esto es L1/L2 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista y
 acepte configuracion. **No** dice que compile ni que ejecute bien: eso son L4/L5 y solo estan
 probados en los componentes de las fases validadas.

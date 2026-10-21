@@ -25,6 +25,8 @@ type Row = {
   listed: boolean;
   deleted: boolean;
   error: string;
+  compiles: boolean | null;
+  compileError: string;
 };
 
 /** Parte una fila CSV respetando comillas dobles (el error va entre comillas). */
@@ -67,6 +69,8 @@ const rows: Row[] = lines.slice(1).map((line) => {
     listed: cells[4] === "si",
     deleted: cells[5] === "si",
     error: cells[8] ?? "",
+    compiles: cells[9] === undefined || cells[9] === "" ? null : cells[9] === "si",
+    compileError: cells[10] ?? "",
   };
 });
 
@@ -79,6 +83,10 @@ console.log(`Componentes probados:        ${total}`);
 console.log(`L1 creado:                   ${pct(count((r) => r.created))}`);
 console.log(`L2 con parametros aplicados: ${pct(count((r) => r.configured))}`);
 console.log(`   guardado en el .item:     ${pct(count((r) => r.created && r.saved))}`);
+if (rows.some((r) => r.compiles !== null)) {
+  const medidos = rows.filter((r) => r.compiles !== null);
+  console.log(`L4 compila (de ${medidos.length} medidos): ${medidos.filter((r) => r.compiles).length} (${Math.round((medidos.filter((r) => r.compiles).length / medidos.length) * 100)}%)`);
+}
 console.log(`   en el job tras crearlo:   ${pct(count((r) => r.listed))}`);
 console.log(`   borrado limpiamente:      ${pct(count((r) => r.deleted))}`);
 
@@ -91,7 +99,7 @@ function cause(message: string): string {
     .slice(0, 160);
 }
 
-const failures = rows.filter((row) => !row.created || row.error || !row.saved);
+const failures = rows.filter((row) => !row.created || row.error || !row.saved || row.compiles === false);
 if (failures.length === 0) {
   console.log("\nSin fallos.");
   process.exit(0);
@@ -99,7 +107,7 @@ if (failures.length === 0) {
 
 const groups = new Map<string, string[]>();
 for (const row of failures) {
-  const key = cause(row.error || (row.created && !row.saved ? "Creado pero Studio no pudo guardar el job con este nodo" : "(sin mensaje)"));
+  const key = cause(row.error || (row.compiles === false ? "No compila: " + row.compileError : "") || (row.created && !row.saved ? "Creado pero Studio no pudo guardar el job con este nodo" : "(sin mensaje)"));
   const list = groups.get(key) ?? [];
   list.push(row.component);
   groups.set(key, list);
@@ -117,7 +125,7 @@ for (const row of rows) {
   const family = row.component.match(/^t?([A-Z][a-z0-9]*)/)?.[1] ?? row.component;
   const entry = families.get(family) ?? { total: 0, failed: 0 };
   entry.total += 1;
-  if (!row.created || row.error || !row.saved) entry.failed += 1;
+  if (!row.created || row.error || !row.saved || row.compiles === false) entry.failed += 1;
   families.set(family, entry);
 }
 const worst = [...families.entries()].filter(([, v]) => v.failed > 0).sort((a, b) => b[1].failed - a[1].failed).slice(0, 12);

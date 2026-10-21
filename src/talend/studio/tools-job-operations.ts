@@ -316,12 +316,13 @@ export const jobOperationsTools = [
       action: z.enum(["start", "status", "cancel"]).optional().default("start").describe("start (por defecto), status o cancel"),
       filter: z.string().optional().describe("Solo con start: texto que tiene que aparecer en el nombre del componente"),
       max: z.number().optional().describe("Solo con start: maximo de componentes que probar"),
+      compile: z.boolean().optional().describe("Solo con start: ademas genera el codigo de cada componente y comprueba que compila (nivel L4, ~2 s mas por componente)"),
     }),
-    handler: async ({ action, filter, max }: { action?: "start" | "status" | "cancel"; filter?: string; max?: number }) => {
+    handler: async ({ action, filter, max, compile }: { action?: "start" | "status" | "cancel"; filter?: string; max?: number; compile?: boolean }) => {
       const bridge = await loadBridge();
       const mode = action ?? "start";
       const result = mode === "start"
-        ? await bridge.coverage({ filter, max })
+        ? await bridge.coverage({ filter, max, compile })
         : await bridge.coverageStatus({ cancel: mode === "cancel" });
       return bridgeOk({
         ok: result.ok,
@@ -376,6 +377,25 @@ export const jobOperationsTools = [
         source: result.source,
         confidence: result.confidence,
         endpoint: "/automation/job/execute",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
+    name: "talend_job_compile",
+    description: "Genera el codigo Java del job y comprueba que compila, sin ejecutarlo. Devuelve 'compiles' y, si falla, la linea y el mensaje del error (por ejemplo 'no_comillas cannot be resolved to a variable'). Es la forma de saber si una configuracion genera codigo valido antes de correr el job. Tarda unos segundos y ocupa el hilo de la interfaz de Studio mientras genera, igual que un Run.",
+    inputSchema: z.object({
+      job: z.string().optional().describe("Job a compilar. Si se omite, el job activo"),
+    }),
+    handler: async ({ job }: { job?: string }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.jobCompile({ job });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/job/compile",
         data: result.data,
         error: result.error,
       });

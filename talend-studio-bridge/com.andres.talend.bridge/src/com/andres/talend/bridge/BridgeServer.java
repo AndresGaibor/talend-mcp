@@ -172,6 +172,9 @@ final class BridgeServer {
       server.createContext("/automation/job/execute",
           exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.executeJob(readJsonBody(exchange)))));
       server.createContext("/automation/job/open", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "openJob")));
+      // Generar el codigo toca widgets (validateSyntax), asi que va en la UI, y tarda
+      // varios segundos: de ahi el tiempo de espera largo.
+      server.createContext("/automation/job/compile", exchange -> guarded(exchange, () -> handleCompile(exchange)));
       server.createContext("/automation/job/problems", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "problems")));
       server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
       server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
@@ -443,6 +446,11 @@ final class BridgeServer {
           return JobOperationsService.listNodes(body);
       }
     }));
+  }
+
+  private void handleCompile(HttpExchange exchange) throws IOException {
+    JsonObject body = readJsonBody(exchange);
+    respond(exchange, 200, UiThread.sync(() -> JobOperationsService.compile(body), 180_000L));
   }
 
   /**

@@ -23,6 +23,7 @@ describe("Tools de operaciones sobre el job de Studio", () => {
         "talend_job_set_schema",
         "talend_job_list_nodes",
         "talend_job_problems",
+        "talend_job_compile",
         "talend_studio_run_code",
         "talend_studio_dismiss_dialogs",
         "talend_studio_list_components",

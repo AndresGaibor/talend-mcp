@@ -467,8 +467,16 @@ export class TalendStudioBridgeClient {
    * job de pruebas, lo configura con dos de sus parametros y lo borra.
    * Arranca la medicion y devuelve enseguida: el progreso se consulta con `coverageStatus`.
    */
-  async coverage(options?: { filter?: string; max?: number }): Promise<BridgeResult<Record<string, unknown>>> {
+  async coverage(options?: { filter?: string; max?: number; compile?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/coverage", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
+  /** Genera el codigo del job y comprueba que compila, sin ejecutarlo. */
+  async jobCompile(options?: { job?: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/compile", {
       method: "POST",
       body: options ?? {},
     });

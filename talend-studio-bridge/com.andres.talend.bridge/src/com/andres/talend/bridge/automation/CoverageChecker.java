@@ -38,6 +38,8 @@ public final class CoverageChecker {
     volatile int failed;
     volatile int saveFailed;
     volatile int resets;
+    volatile boolean compile;
+    volatile int compiled;
     volatile String current;
     volatile boolean cancelRequested;
     volatile String error;
@@ -54,6 +56,8 @@ public final class CoverageChecker {
       out.put("failed", failed);
       out.put("saveFailed", saveFailed);
       out.put("resets", resets);
+      out.put("compile", compile);
+      out.put("compiled", compiled);
       out.put("current", current);
       long end = finishedAt != 0 ? finishedAt : System.currentTimeMillis();
       out.put("elapsedMs", end - startedAt);
@@ -163,6 +167,10 @@ public final class CoverageChecker {
 
     // Cada paso cede la UI al terminar: Studio sigue respondiendo mientras dura
     // la medicion. Esta clase NO debe llamarse desde el hilo de la UI.
+    // L4: ademas de crear y configurar, generar el codigo y compilarlo (unos 2 s mas por componente).
+    boolean compile = spec.has("compile") && spec.get("compile").getAsBoolean();
+    run.compile = compile;
+
     List<String> components = new ArrayList<>();
     Object catalog = UiThread.sync(() -> ComponentCatalog.list(new JsonObject()).get("components"), 60_000L);
     if (catalog instanceof Iterable) {
@@ -201,7 +209,7 @@ public final class CoverageChecker {
       run.current = name;
       Map<String, Object> row;
       try {
-        row = UiThread.sync(() -> checkComponent(name));
+        row = UiThread.sync(() -> checkComponent(name, compile), 120_000L);
       } catch (RuntimeException e) {
         // La UI no atendio a tiempo: el componente queda como fallido, no se aborta todo.
         row = new LinkedHashMap<>();
@@ -242,6 +250,9 @@ public final class CoverageChecker {
         if (Boolean.TRUE.equals(row.get("deleted"))) {
           deleted++;
         }
+        if (Boolean.TRUE.equals(row.get("compiles"))) {
+          run.compiled++;
+        }
       } else {
         failed++;
         run.failed = failed;
@@ -268,6 +279,8 @@ public final class CoverageChecker {
     result.put("deleted", deleted);
     result.put("failed", failed);
     result.put("saveFailed", run.saveFailed);
+    result.put("compile", compile);
+    result.put("compiled", run.compiled);
     result.put("cancelled", run.cancelRequested);
     result.put("components", results);
     return result;
@@ -299,7 +312,7 @@ public final class CoverageChecker {
   }
 
   /** Crea, configura, comprueba y borra un componente. Va siempre en la UI. */
-  private static Map<String, Object> checkComponent(String name) {
+  private static Map<String, Object> checkComponent(String name, boolean compile) {
     Map<String, Object> row = new LinkedHashMap<>();
     row.put("component", name);
     try {
@@ -374,6 +387,20 @@ public final class CoverageChecker {
         }
       }
       row.put("listed", found);
+
+      // L4: el codigo que Studio genera para este componente solo, compila.
+      if (compile) {
+        try {
+          Map<String, Object> checked = JobCompiler.check(jobSpecOf(JOB_NAME));
+          row.put("compiles", checked.get("compiles"));
+          if (checked.get("error") instanceof Map) {
+            row.put("compileError", ((Map<?, ?>) checked.get("error")).get("message"));
+          }
+        } catch (Exception e) {
+          row.put("compiles", false);
+          row.put("compileError", rootCause(e));
+        }
+      }
 
       // Y se borra, para no dejar el job lleno. Si no se puede borrar, el
       // componente sigue siendo valido: solo queda el job sucio.
