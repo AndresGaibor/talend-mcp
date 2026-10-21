@@ -186,6 +186,15 @@ public final class JobOperationsService {
   }
 
   /**
+   * Errores y avisos de diseno del job, los de la vista Problemas de Studio.
+   *
+   * @param spec `job` opcional.
+   */
+  public static Map<String, Object> problems(JsonObject spec) {
+    return run("problems", () -> JobProblems.list(spec));
+  }
+
+  /**
    * Progreso de la medicion de cobertura y, al terminar, su informe.
    *
    * @param spec opcionalmente `cancel: true`.

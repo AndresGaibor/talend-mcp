@@ -60,6 +60,7 @@ Orden obligatorio. Cada paso usa lo que devolvio el anterior (sobre todo los `un
 | 7 | `talend_job_connect_nodes` | Conecta por `uniqueName` (`FLOW` por defecto; tambien `REJECT`, triggers...) |
 | 8 | `talend_job_configure_node` / `talend_job_update_node` | Retocar parametros, tablas, schema o tMap de un nodo existente |
 | 9 | `talend_job_list_nodes` | Comprobar lo que hay en el job |
+| 9b | `talend_job_problems` | Errores y avisos de diseno (los de la vista Problemas) sin ejecutar nada. `clean: true` = abre sin avisos. Ejemplos: "No schema has been defined yet", "This component should have input link(s)" |
 | 10 | `talend_job_run_by_name` | Genera el codigo, compila y lanza el job en Studio. **No devuelve la salida** (va a la vista Run) |
 | 11 | `talend_job_execute` | Relanza el job ya compilado y **devuelve `exitCode` y la salida** (`stdout`, `lines`). Es como se comprueba el resultado |
 
@@ -105,7 +106,7 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
 
 Una operacion puede devolver `ok: true` y no haber escrito nada. Despues de escribir:
 
-1. `talend_job_list_nodes` y comparar con lo esperado.
+1. `talend_job_list_nodes` y comparar con lo esperado, y `talend_job_problems` para que no haya avisos.
 2. Mirar el `.item`: un job vacio pesa ~196 bytes; si no cambia de tamano tras anadir nodos, no
    llego al disco.
 3. Ejecutar con `talend_job_execute` y **comparar la salida contra lo que definiste antes de

@@ -172,6 +172,7 @@ final class BridgeServer {
       server.createContext("/automation/job/execute",
           exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.executeJob(readJsonBody(exchange)))));
       server.createContext("/automation/job/open", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "openJob")));
+      server.createContext("/automation/job/problems", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "problems")));
       server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
       server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
       server.createContext("/automation/nodes/update", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "updateNode")));
@@ -436,6 +437,8 @@ final class BridgeServer {
           return JobOperationsService.setSchema(body);
         case "configureNode":
           return JobOperationsService.configureNode(body);
+        case "problems":
+          return JobOperationsService.problems(body);
         default:
           return JobOperationsService.listNodes(body);
       }

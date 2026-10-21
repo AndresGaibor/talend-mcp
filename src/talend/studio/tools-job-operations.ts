@@ -382,6 +382,25 @@ export const jobOperationsTools = [
     },
   },
   {
+    name: "talend_job_problems",
+    description: "Errores y avisos de diseno de un job, los de la vista Problemas de Studio (por ejemplo 'No schema has been defined yet' o 'This component should have input link(s)'). Se calculan sin ejecutar el job: sirven para comprobar que abre sin avisos antes de compilarlo. 'clean' es true cuando no hay errores ni avisos.",
+    inputSchema: z.object({
+      job: z.string().optional().describe("Job a comprobar. Si se omite, el job activo"),
+    }),
+    handler: async ({ job }: { job?: string }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.jobProblems({ job });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/job/problems",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
     name: "talend_job_list_nodes",
     description: "Lista los nodos del job abierto en Studio.",
     inputSchema: z.object({

@@ -47,7 +47,7 @@ La cobertura reportaba los 1294 componentes como fallidos. Causas reales, reprod
 | 1 | **Identidad del job**: ~~cerrar el editor al borrar, titulo exacto~~ (hecho). Pendiente: resolver por id del job y avisar si hay editores duplicados | `create(replace)` + `list` nunca devuelve nodos viejos |
 | 2 | ~~`uniqueName` real~~ (ya lo era) + **alta verificada**: `add` falla si el nodo no entra (hecho) | El nombre devuelto siempre existe en el job |
 | 3 | ~~Arreglar la prueba de cobertura~~ (hecho) | El CSV deja de ser 100 % fallos |
-| 4 | **Leer los problemas del job** (errores y avisos de Studio) tras cada operacion y exponerlos como tool | "Abre sin avisos" y L4 se pueden comprobar sin ejecutar |
+| 4 | ~~Leer los problemas del job~~ (hecho: `talend_job_problems`, avisos de diseno). Pendiente: errores de **compilacion** del codigo generado sin ejecutar | "Abre sin avisos" ya se comprueba; falta L4 sin ejecutar |
 | 5 | **Matriz de dominio** por componente: L1/L2 hecho (`coverage.ts` + `coverage-summary.ts`). Pendiente L3 (conectar), L4 (compilar) y L5 (ejecutar) | Se sabe cuantos componentes estan al 100 %, y por que fallan los demas |
 | 6 | **Tests del bridge aislados**: separar los de integracion (ahora golpean el Studio real y usan rutas de otra maquina) y cubrir cada ruta con un contrato | `bun test` verde con y sin Studio |
 
@@ -121,7 +121,7 @@ Prioridad: cobertura de **toda** la familia mas usada antes de ir a la siguiente
 ## 7. Orden recomendado (los 5 siguientes pasos)
 
 1. ~~Identidad del job, alta verificada, cobertura que mide~~ (hecho).
-2. P0 #4: leer problemas del job (permite L4 sin ejecutar) y extender la matriz a L3-L5.
+2. Extender la matriz a L3-L5: conectar, generar codigo y compilar sin ejecutar, y ejecutar con salida esperada.
 3. Tipos de job (Spark, Streaming) y los runtimes que faltan.
 4. P1: conexiones/triggers y metadata del repositorio (abre los `tDB*`).
 5. P2: resolver el `tMap` (modulo) y el formato de las tablas de transformacion.

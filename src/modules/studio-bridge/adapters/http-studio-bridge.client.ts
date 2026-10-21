@@ -474,6 +474,14 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  /** Errores y avisos de diseno de un job (la vista Problemas de Studio). */
+  async jobProblems(options?: { job?: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/problems", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
   /** Progreso de la medicion de cobertura y, al terminar, su informe. */
   async coverageStatus(options?: { cancel?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/coverage/status", {

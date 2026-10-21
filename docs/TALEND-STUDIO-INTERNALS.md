@@ -1453,3 +1453,23 @@ Detalles de `UiThread.sync`:
 Al agregar una ruta nueva al bridge: si no toca widgets ni el modelo, no la envuelvas en
 `UiThread.sync`. Si necesita la UI varias veces, haz una llamada corta por unidad de trabajo,
 no una larga para todo.
+
+## 27. Problemas de diseno de un job
+
+Los avisos que Studio marca en el lienzo y lista en la vista Problemas (`No schema has been defined yet`,
+`This component should have input link(s)`) viven en la clase estatica
+`org.talend.designer.core.ui.views.problems.Problems`. La lista es **global** (todos los jobs abiertos) y
+Studio solo la recalcula al editar, asi que para leerla desde el bridge:
+
+1. `Problems.refreshProcessAllNodesStatus(process)` fuerza el recalculo del job.
+2. `Problems.getProblemsBySeverity(ProblemStatus)` (`ERROR`, `WARNING`, `INFO`) devuelve los problemas.
+3. Se filtran por `problem.getJobInfo().getJobName()`, porque la lista mezcla los jobs abiertos.
+4. De cada `Problem`: `getDescription()`, `getNodeName()`, `getComponentName()`, `getType()`.
+
+`JobProblems.java` lo hace y la tool es `talend_job_problems`. Verificado: un `tFileInputDelimited` sin
+conectar da 3 avisos (sin schema, sin salida, y el `tLogRow` sin entrada) y con schema, `FILENAME` y la
+conexion queda limpio. Son problemas de **diseno**; los de compilacion Java del codigo generado son
+otra cosa (ver `/problems/markers` y la seccion 14).
+
+Dato util al probar con `talend_studio_run_code`: `PlatformUI.getWorkbench().getActiveWorkbenchWindow()`
+es `null` cuando Studio no tiene el foco; usa `getWorkbenchWindows()[0]`.
