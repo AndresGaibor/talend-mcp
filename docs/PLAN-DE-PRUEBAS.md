@@ -41,7 +41,7 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 | 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`) |
 | 5 | Excel, posicional, JSON, Parquet | **Bloqueada**: `tFileInputPositional` y `tFileInputJSON` generan codigo que no compila en 8.0.1; el `.item` es correcto |
 | 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes). Sin probar: `tFileList`, triggers de error, `tDie` |
-| 7 | Bases de datos (`tDB*`, commit/rollback, insert/update/delete) | **Pendiente** |
+| 7 | Bases de datos (`tDB*`, commit/rollback, insert/update/delete) | **Parcial**: el `tPostgresqlInput` lee del Postgres de pruebas y la salida es la esperada. Sin probar: `tPostgresqlOutput`, commit/rollback, las acciones de salida |
 | 8 | Migracion de un programa SAS real, comparado fila por fila | **Pendiente** |
 | 9 | Robustez | Validada: componente inexistente da error claro; repetir la instruccion no duplica componentes; 16 componentes y 60 columnas |
 
@@ -133,6 +133,7 @@ el fichero que escribe). El informe queda en `testdata/resultados-l5.csv`.
 | `tFileInputDelimited` -> `tFileOutputDelimited` | Correcto: el fichero escrito tiene las cuatro filas |
 | `tFileInputDelimited` -> `tUniqRow` -> `tSortRow` -> `tLogRow` | Correcto: quita el duplicado y ordena por monto descendente |
 | `tPrejob` -> `tRunJob` (hijo) -> `tPostjob` | Correcto: el padre llama al hijo y su salida sale en la del padre |
+| `tPostgresqlConnection` -> `tPostgresqlInput` -> `tLogRow` | Correcto: lee las diez filas del Postgres de pruebas (ver INTERNALS 35) |
 | `tFileInputDelimited` -> `tAggregateRow` -> `tLogRow` | **Pendiente**: el `tAggregateRow` necesita dos tablas de metadata y al rellenar el schema se rompe la tabla que la conexion tiene asignada (ver INTERNALS 32) |
 
 Los pasos para ejecutar y leer la salida estan en INTERNALS 33: primero el Run de Studio (que genera y compila),

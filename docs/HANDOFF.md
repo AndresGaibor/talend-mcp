@@ -79,6 +79,11 @@ ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json`; e
 un CSV, el de transformaciones (`tUniqRow` + `tSortRow` sobre el CSV, quitando el duplicado y ordenando por
 importe) y el de orquestacion (un job padre con `tPrejob` + `tRunJob` + `tPostjob` que llama a un job hijo).
 
+Ademas, el de bases de datos: un `tPostgresqlConnection` + `tPostgresqlInput` que lee del Postgres de pruebas
+(Docker, `testdata/docker-compose.yml`, puerto 5433). Los tres detalles que hay que recordar estan en INTERNALS 35:
+el driver tiene que estar en el `.m2` de Studio con la version exacta, la `QUERY` necesita `literal: true` y la
+`CONNECTION` necesita `literal: false`.
+
 Un escenario puede declarar jobs auxiliares (`jobs`): se montan y compilan antes que el principal, que es lo que
 hace falta para que un `tRunJob` pueda llamar a su hijo.
 
@@ -94,13 +99,13 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
 | L3/L4 | Medidos por familias: 134 componentes de las nueve familias mas usadas, **134 se crean, guardan y borran, y 99 compilan (74 %)**. Los que no compilan: 12 son la mitad de un par (`tAggregateIn`, `tSortIn`...) y 17 necesitan una configuracion real (tablas, schema, contexto) |
-| L5 | 5 escenarios con la salida verificada (humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, orquestacion padre/hijo) |
+| L5 | 6 escenarios con la salida verificada (humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, bases de datos con Postgres, orquestacion padre/hijo) |
 
 ## Lo siguiente (por prioridad)
 
-1. **L5 por familias**: el arnes ya funciona con la familia de archivos, la de transformaciones y la de
-   orquestacion. Falta la de bases de datos (un Postgres de pruebas) y la de control de flujo (`tFileList`,
-   triggers de error, `tDie`/`tWarn`).
+1. **L5 por familias**: el arnes ya funciona con la familia de archivos, la de transformaciones, la de
+   orquestacion y la de bases de datos. Falta la de control de flujo (`tFileList`, triggers de error,
+   `tDie`/`tWarn`) y la de escritura en base de datos (`tPostgresqlOutput`, commit/rollback).
 2. **El `tAggregateRow`**: necesita dos tablas de metadata (la de entrada y la de salida, las dos en el conector
    `FLOW`) y al rellenar el schema del nodo se rompe la tabla que la conexion de entrada tiene asignada. Habria que
    fusionar el schema con el que ya tiene el nodo en vez de sustituirlo (ver INTERNALS 32).

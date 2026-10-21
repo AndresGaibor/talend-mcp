@@ -1809,4 +1809,31 @@ usuario (`prueba_3_Spark`) ni el del MCP abren, con "No se pudo resolver el Proc
 que el job este en el repositorio Talend activo". Es un estado del repositorio del proyecto (los items de Big
 Data no estan indexados), no del MCP. Los 397 componentes de Spark y Streaming siguen sin poder usarse.
 
+## 35. Conectar con una base de datos
+
+En Talend 8 la conexion se hace con **dos nodos**: un componente de conexion (`tPostgresqlConnection`,
+`tMysqlConnection`, `tJDBCConnection`...) y el componente que usa la conexion (`tPostgresqlInput`,
+`tMysqlOutput`...).
+
+| Nodo | Parametros |
+|---|---|
+| `tPostgresqlConnection` | `HOST`, `PORT`, `USER`, `PASS`, `DBNAME` (no `DATABASE`), `ENCODING` |
+| `tPostgresqlInput` | `USE_EXISTING_CONNECTION` a "true", `CONNECTION` con el nombre unico del nodo de conexion, `TABLE` o `QUERY` |
+
+Tres detalles que cuestan un rato:
+
+- **El driver tiene que estar en el `.m2` de Studio**, con la version exacta que pide el build. El build
+  avisa por el log ("missing jar:postgresql-42.7.13.jar") y sale un modal "Error found". Se instala con la
+  tool de artefactos (`talend_studio_install_artifact`, que deja el jar en
+  `<instalacion>/configuration/.m2/repository`).
+- **La `QUERY` es un memo** y los memos no se entrecomillan solos (el codigo Java del `tJavaRow` va en crudo).
+  Una consulta SQL si necesita comillas: hay que pedirlo con `literal: true`. Si no, el codigo generado sale
+  como `String dbquery = select id from clientes;` y no compila.
+- **La `CONNECTION` es una lista de componentes**: su valor va **en crudo**, sin comillas (`literal: false`). Con
+  comillas, el codigo sale como `globalMap.get("conn_"tDBConnection_2"")` y no compila.
+
+El Postgres de pruebas se levanta con Docker (`testdata/docker-compose.yml`, puerto 5433) y sus datos tienen una
+trampa a proposito: una transaccion que apunta a un cliente que no existe. La clave foranea se anade al final de
+la carga y "NOT VALID", para que la carga no falle.
+
 

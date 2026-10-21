@@ -278,6 +278,12 @@ public final class ComponentConfigurator {
   private static String valueOf(Object parameter, String value, Boolean literal) throws Exception {
     Object fieldType = parameter.getClass().getMethod("getFieldType").invoke(parameter);
     String kind = fieldType == null ? "" : String.valueOf(fieldType);
+    // Si se pide el valor entrecomillado, se hace: hay memos que si lo son
+    // (la consulta SQL de un tDBInput) y otros que no (el codigo Java del
+    // tJavaRow).
+    if (literal != null) {
+      return asLiteral(value, literal);
+    }
     if (kind.startsWith("MEMO") || kind.startsWith("PROPERTY") || kind.startsWith("EXPRESSION")) {
       return value;
     }

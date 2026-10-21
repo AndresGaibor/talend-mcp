@@ -242,6 +242,32 @@ async function compilarEnStudio(
   return { ok: true };
 }
 
+/**
+ * Espera a que un job este compilado.
+ *
+ * El Run de Studio es asincrono: lanza el build y sigue. La ejecucion solo
+ * funciona cuando el build ha terminado, asi que se reintenta.
+ */
+async function esperarCompilado(
+  bridge: Awaited<ReturnType<typeof createBridgeClient>>,
+  job: string,
+  intentos = 30,
+): Promise<{ ok: boolean; mensaje?: string }> {
+  for (let intento = 0; intento < intentos; intento++) {
+    const ejecutado = await bridge.executeJob({ name: job, timeoutMs: 120_000 });
+    const cuerpo = (ejecutado.data ?? {}) as {
+      result?: { error?: string };
+      error?: string;
+    };
+    const error = cuerpo.result?.error ?? cuerpo.error ?? "";
+    if (!error.includes("no esta compilado")) {
+      return { ok: true };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+  return { ok: false, mensaje: "el build no termino a tiempo" };
+}
+
 async function ejecutar(
   bridge: Awaited<ReturnType<typeof createBridgeClient>>,
   escenario: Escenario,
@@ -260,6 +286,16 @@ async function ejecutar(
         ejecutaOk: false,
         salidaCorrecta: false,
         mensaje: `no se pudo compilar el job auxiliar '${auxiliar.job}': ${compilado.mensaje}`,
+      };
+    }
+    // Y se espera a que este compilado: si no, el build del padre no lo
+    // encuentra y falla.
+    const listo = await esperarCompilado(bridge, auxiliar.job);
+    if (!listo.ok) {
+      return {
+        ejecutaOk: false,
+        salidaCorrecta: false,
+        mensaje: `el job auxiliar '${auxiliar.job}' no llego a compilarse: ${listo.mensaje}`,
       };
     }
   }
@@ -301,7 +337,15 @@ async function montarJob(
     ? Object.fromEntries(
         Object.entries(nodo.parameters).map(([clave, valor]) => [
           clave,
-          { value: conRutas(valor.value), literal: valor.literal },
+          {
+            // "@uniqueName:<nodo>" es el nombre unico de otro nodo del job
+            // (el tPostgresqlInput necesita el de su conexion).
+            value: conRutas(valor.value).replace(
+              /@uniqueName:([A-Za-z0-9_]+)/g,
+              (_, nombre: string) => nombres.get(nombre) ?? `@uniqueName:${nombre}`,
+            ),
+            literal: valor.literal,
+          },
         ]),
       )
     : undefined;
@@ -322,6 +366,9 @@ async function montarJob(
     result?: { uniqueName?: string };
   };
   const uniqueName = String(cuerpo.uniqueName ?? cuerpo.result?.uniqueName ?? "");
+  if (!uniqueName) {
+    return { ok: false, mensaje: `el bridge no devolvio el nombre del nodo ${nodo.type}` };
+  }
   if (nodo.nombre) nombres.set(nodo.nombre, uniqueName);
   if (nodo.columnas || nodo.columnasPorConector || nodo.esquemas) {
     if (nodo.values) {

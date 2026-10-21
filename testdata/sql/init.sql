@@ -1,4 +1,8 @@
 -- Carga inicial para las pruebas del MCP de Talend.
+--
+-- La clave foranea se anade al final y "NOT VALID": asi se puede dejar la
+-- fila trampa (una transaccion de un cliente que no existe) sin que la carga
+-- falle, que es justo lo que se quiere probar.
 CREATE TABLE IF NOT EXISTS clientes (
   id            integer PRIMARY KEY,
   nombre        varchar(120),
@@ -10,7 +14,7 @@ CREATE TABLE IF NOT EXISTS clientes (
 
 CREATE TABLE IF NOT EXISTS transacciones (
   id_tx        varchar(20) PRIMARY KEY,
-  id_cliente   integer NOT NULL REFERENCES clientes(id),
+  id_cliente   integer NOT NULL,
   monto        numeric(12,2) NOT NULL,
   fecha        date NOT NULL
 );
@@ -38,3 +42,10 @@ INSERT INTO transacciones (id_tx, id_cliente, monto, fecha) VALUES
   ('T008', 999, 300.00, '2023-06-08'),
   ('T009', 10, 45.99, '2023-06-09'),
   ('T010', 8, 1200.00, '2023-06-10');
+
+-- La clave foranea, despues de cargar los datos y sin validar las filas que
+-- ya estan: la transaccion T008 apunta a un cliente que no existe (es la
+-- trampa de las pruebas).
+ALTER TABLE transacciones
+  ADD CONSTRAINT transacciones_id_cliente_fkey
+  FOREIGN KEY (id_cliente) REFERENCES clientes(id) NOT VALID;

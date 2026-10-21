@@ -244,6 +244,49 @@
       }
     },
     {
+      "nombre": "bases de datos: leer de un Postgres",
+      "job": "MCP_L5_Postgres",
+      "nodos": [
+        {
+          "type": "tPostgresqlConnection",
+          "nombre": "conexion",
+          "parameters": {
+            "HOST": { "value": "localhost" },
+            "PORT": { "value": "5433" },
+            "USER": { "value": "talend" },
+            "PASS": { "value": "talend" },
+            "DBNAME": { "value": "talend_test" }
+          }
+        },
+        {
+          "type": "tPostgresqlInput",
+          "nombre": "lee",
+          "parameters": {
+            "USE_EXISTING_CONNECTION": { "value": "true" },
+            "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
+            "TABLE": { "value": "clientes" },
+            "QUERY": { "value": "select id, nombre, ciudad, monto from clientes order by id", "literal": true }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" }
+          ]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "lee", "destino": "salida" }
+      ],
+      "espera": {
+        "contiene": [
+          "1|Ana María Núñez|Bogotá|1500.5",
+          "10|Sofía Ramírez|Bogotá|750.25"
+        ]
+      }
+    },
+    {
       "nombre": "orquestacion: un job padre llama a un job hijo",
       "job": "MCP_L5_Padre",
       "jobs": [
