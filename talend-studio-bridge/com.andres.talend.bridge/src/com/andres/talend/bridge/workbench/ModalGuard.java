@@ -195,6 +195,11 @@ public final class ModalGuard {
       if (isProgress(title) && !isStuck(shell)) {
         continue;
       }
+      // Un dialogo de modulos faltantes tambien: da tiempo a que el MCP pida
+      // instalarlos (tool talend_studio_install_modules) antes de cerrarlo.
+      if (isMissingModules(title) && !isStuck(shell)) {
+        continue;
+      }
 
       String button = knownButtonFor(shell, title);
       if (button == null) {
@@ -208,6 +213,10 @@ public final class ModalGuard {
       }
       if (pressButton(shell, button)) {
         dialog.put("pressed", button);
+        List<String> content = textsOf(shell);
+        if (!content.isEmpty()) {
+          dialog.put("content", content);
+        }
         dismissed.add(dialog);
       } else {
         // Sin boton conocido se cierra el dialogo: es mejor dejar el IDE
@@ -264,6 +273,93 @@ public final class ModalGuard {
       return null;
     }
     return null;
+  }
+
+  /**
+   * Instala los modulos de terceros que Studio echa de menos.
+   *
+   * Cuando un job usa un componente cuyo runtime no esta descargado (los de
+   * "processing", por ejemplo), Studio abre un dialogo pidiendo los modulos.
+   * El guardian los cierra sin instalar, porque descargar es una decision de
+   * red; esta es la via explicita para si se quiere instalar.
+   *
+   * @return los modulos que se han pedido instalar.
+   */
+  public static Map<String, Object> installMissingModules() {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "high");
+    payload.put("endpoint", "/workbench/modules/install");
+
+    List<Map<String, Object>> installed = new ArrayList<>();
+    Display display = Display.getDefault();
+    if (display == null) {
+      payload.put("installed", installed);
+      return payload;
+    }
+    for (Shell shell : display.getShells()) {
+      if (shell == null || shell.isDisposed() || !shell.isVisible()) {
+        continue;
+      }
+      if (isWorkbenchShell(shell)) {
+        continue;
+      }
+      String title = shell.getText();
+      if (title == null || !isMissingModules(title)) {
+        continue;
+      }
+      Button target = findButton(shell, "Download and install all modules available");
+      if (target == null) {
+        target = findButton(shell, "Download and Install");
+      }
+      if (target != null) {
+        String button = target.getText();
+        pressButton(shell, button);
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("title", title);
+        item.put("pressed", button);
+        installed.add(item);
+      }
+    }
+    payload.put("installed", installed);
+    return payload;
+  }
+
+  /** El dialogo pide modulos de terceros que no estan instalados. */
+  private static boolean isMissingModules(String title) {
+    String normalized = title.trim().toLowerCase();
+    return normalized.contains("third part")
+        || normalized.contains("third-party")
+        || normalized.contains("missing third")
+        || normalized.contains("modulos de terceros");
+  }
+
+  /**
+   * Textos de un dialogo, para saber que decia cuando se cierra.
+   */
+  private static List<String> textsOf(Control control) {
+    List<String> texts = new ArrayList<>();
+    collectTexts(control, texts);
+    return texts;
+  }
+
+  private static void collectTexts(Control control, List<String> texts) {
+    try {
+      if (control instanceof org.eclipse.swt.widgets.Label) {
+        String text = ((org.eclipse.swt.widgets.Label) control).getText();
+        if (text != null && !text.trim().isEmpty()) {
+          texts.add(text.trim());
+        }
+      }
+      if (control instanceof Composite) {
+        for (Control child : ((Composite) control).getChildren()) {
+          collectTexts(child, texts);
+        }
+      }
+    } catch (RuntimeException e) {
+      // El dialogo se ha cerrado mientras se leia: no pasa nada.
+    }
   }
 
   /**

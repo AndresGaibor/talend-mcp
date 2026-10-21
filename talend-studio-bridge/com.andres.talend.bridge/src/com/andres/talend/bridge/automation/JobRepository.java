@@ -133,8 +133,61 @@ public final class JobRepository {
       return summary;
     }
     delete(repositoryFactory, project, viewObject);
+    // Ademas del item, se borra el proyecto Java que Studio dejo generado en
+    // el workspace (poms/jobs/process/<job>). Si no, al recrear el job
+    // Talend reutiliza ese proyecto, con su target y su .project viejos, y
+    // la ejecucion falla con "El recurso .../src/main/java/... no existe".
+    summary.put("generatedProjectRemoved", deleteGeneratedProject(name));
     summary.put("deleted", true);
     return summary;
+  }
+
+  /**
+   * Borra el proyecto Java que Studio genero para un job.
+   *
+   * Vive en el proyecto de Eclipse, bajo `poms/jobs/process`. Se busca en
+   * cualquier subcarpeta, porque el job puede estar dentro de una carpeta.
+   */
+  private static boolean deleteGeneratedProject(String name) {
+    try {
+      IProject iProject = TalendApi.resourceProject();
+      if (iProject == null) {
+        return false;
+      }
+      org.eclipse.core.resources.IFolder root = iProject.getFolder("poms/jobs/process");
+      if (!root.exists()) {
+        return false;
+      }
+      for (org.eclipse.core.resources.IResource member : root.members()) {
+        if (member instanceof org.eclipse.core.resources.IFolder
+            && name.equals(((org.eclipse.core.resources.IFolder) member).getName())) {
+          return deleteFolder((org.eclipse.core.resources.IFolder) member);
+        }
+        if (member instanceof org.eclipse.core.resources.IFolder) {
+          org.eclipse.core.resources.IFolder folder = (org.eclipse.core.resources.IFolder) member;
+          for (org.eclipse.core.resources.IResource child : folder.members()) {
+            if (child instanceof org.eclipse.core.resources.IFolder
+                && name.equals(((org.eclipse.core.resources.IFolder) child).getName())) {
+              return deleteFolder((org.eclipse.core.resources.IFolder) child);
+            }
+          }
+        }
+      }
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo borrar el proyecto generado del job '" + name + "'", e);
+    }
+    return false;
+  }
+
+  /** Borra una carpeta y todo su contenido. */
+  private static boolean deleteFolder(org.eclipse.core.resources.IFolder folder) {
+    try {
+      folder.delete(true, true, null);
+      return true;
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo borrar la carpeta " + folder.getName(), e);
+      return false;
+    }
   }
 
   /**

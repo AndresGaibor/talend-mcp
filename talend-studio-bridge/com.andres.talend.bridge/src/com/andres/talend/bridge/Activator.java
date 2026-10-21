@@ -28,6 +28,15 @@ public final class Activator extends AbstractUIPlugin {
     ModalGuard.startWatchdog();
 
     hotReloadService = new HotReloadService();
+    // Antes de recargar el bundle hay que soltar el servidor HTTP y el
+    // guardian: si siguen vivos, siguen usando el classloader descartado y
+    // Eclipse falla con "Invalid class loader from a refreshed bundle".
+    hotReloadService.setBeforeReload(() -> {
+      ModalGuard.stopWatchdog();
+      if (bridgeServer != null) {
+        bridgeServer.stop();
+      }
+    });
     hotReloadService.start(context.getBundle());
   }
 

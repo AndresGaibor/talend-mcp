@@ -592,6 +592,19 @@ export class TalendStudioBridgeClient {
   }
 
   /**
+   * Instala los modulos de terceros que Studio echa de menos.
+   *
+   * Necesario para los componentes cuyo runtime no esta descargado (los de
+   * "processing": tMap, tJavaRow, tSortRow, tAggregateRow...).
+   */
+  async installModules(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/modules/install", {
+      method: "POST",
+      body: {},
+    });
+  }
+
+  /**
    * Ejecuta codigo Java dentro de Studio.
    *
    * El codigo ve las mismas APIs que ve el IDE, asi que sirve para lo que no

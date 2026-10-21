@@ -368,6 +368,23 @@ export const jobOperationsTools = [
     },
   },
   {
+    name: "talend_studio_install_modules",
+    description: "Instala los modulos de terceros que Studio echa de menos. Necesario para los componentes cuyo runtime no esta descargado (tMap, tJavaRow, tSortRow, tAggregateRow...). Descarga de internet, asi que hay que pedirlo de forma explicita.",
+    inputSchema: z.object({}),
+    handler: async () => {
+      const bridge = await loadBridge();
+      const result = await bridge.installModules();
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/workbench/modules/install",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
     name: "talend_studio_run_code",
     description: "Compila y ejecuta codigo Java dentro de Talend Studio, con acceso a las APIs del IDE. El codigo debe tener una clase con 'public static Object run()'. Requiere unsafeActions=true en el bridge.",
     inputSchema: z.object({

@@ -29,6 +29,7 @@ public final class HotReloadService {
 
   private final AtomicBoolean running = new AtomicBoolean(false);
   private volatile Thread watcher;
+  private volatile Runnable beforeReload;
 
   public void start(Bundle bundle) {
     if (!running.compareAndSet(false, true)) return;
@@ -39,6 +40,18 @@ public final class HotReloadService {
     thread.start();
 
     BridgeLog.info("Carga en caliente activa: vigilando " + hotJarPath());
+  }
+
+  /**
+   * Accion que se ejecuta justo antes de recargar el bundle.
+   *
+   * Es el sitio donde hay que soltar lo que usa el classloader viejo: el
+   * servidor HTTP y los hilos del guardian. Si no, el servidor sigue
+   * atendiendo peticiones con las clases del bundle ya descartado y Eclipse
+   * falla con "Invalid class loader from a refreshed bundle is being used".
+   */
+  public void setBeforeReload(Runnable action) {
+    this.beforeReload = action;
   }
 
   public void stop() {
@@ -128,12 +141,40 @@ public final class HotReloadService {
 
   private void reload(Bundle bundle, byte[] bytes) {
     try {
+      // Antes de recargar hay que soltar lo que usa el classloader viejo: el
+      // servidor HTTP (que si no sigue atendiendo peticiones con las clases
+      // del bundle descartado) y los hilos del guardian.
+      stopBackgroundThreads();
       bundle.update(new ByteArrayInputStream(bytes));
       BridgeLog.info("Bundle recargado en caliente");
     } catch (org.osgi.framework.BundleException e) {
       BridgeLog.error("Fallo la recarga en caliente del bundle", e);
     } catch (RuntimeException e) {
       BridgeLog.error("Fallo la recarga en caliente del bundle", e);
+    }
+  }
+
+  /**
+   * Para lo que usa las clases del bundle que se va a recargar.
+   *
+   * Se hace por reflexion para no atar este servicio a las clases del
+   * guardian: si el bundle se recarga, la referencia a la clase vieja dejaria
+   * de valer.
+   */
+  private void stopBackgroundThreads() {
+    Runnable action = beforeReload;
+    if (action != null) {
+      try {
+        action.run();
+      } catch (RuntimeException e) {
+        BridgeLog.warn("No se pudieron soltar los recursos del bundle viejo", e);
+      }
+    }
+    try {
+      Class<?> guard = Class.forName("com.andres.talend.bridge.workbench.ModalGuard");
+      guard.getMethod("stopWatchdog").invoke(null);
+    } catch (Throwable t) {
+      // El guardian puede no estar: no es critico.
     }
   }
 

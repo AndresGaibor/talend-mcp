@@ -1176,6 +1176,89 @@ garantiza que el **generador de codigo** lo acepte. El `tFilterRow` y el
 no esta en el catalogo: solo estan los nombres de columna. Para esos
 componentes hay que mirar como los deja el IDE o usar el `tMap`.
 
+
+### 18.8 El codigo Java va tal cual, sin comillas
+
+Los memos (el `CODE` del `tJavaRow`, el `CLASS_CODE` del `tJava`) no son
+literales: el generador los escribe dentro del codigo, asi que **no se
+entrecomillan**. Si se entrecomillaran, el codigo no compilaria.
+
+```java
+// tal cual
+output_row.acumulado = acumulado;
+```
+
+Y las variables locales se declaran en el propio codigo: si no, el generador
+no las encuentra y falla con `acumulado cannot be resolved to a variable`.
+
+### 18.9 Los numeros llevan el sufijo de su tipo
+
+`100` es un int y no un Double. Al rellenar la tabla de datos de un
+`tFixedFlowInput` con una columna `id_Double`, el valor tiene que salir como
+`100.0`, o el codigo generado no compila con
+`Type mismatch: cannot convert from int to Double`.
+
+El bridge lo hace solo al formatear el literal:
+
+| Tipo | Valor | Literal |
+|---|---|---|
+| `id_Integer` | 100 | `100` |
+| `id_Long` | 100 | `100L` |
+| `id_Double` | 100 | `100.0` |
+| `id_BigDecimal` | 100 | `new java.math.BigDecimal("100")` |
+| `id_String` | Bogota | `"Bogota"` |
+| `id_Boolean` | true | `true` |
+| `id_Date` | 2023-01-15 | `new java.sql.Timestamp(1673740800000L)` |
+
+### 18.10 Al borrar un job hay que borrar su proyecto generado
+
+Studio deja por cada job un proyecto Java en el workspace, bajo
+`poms/jobs/process/<job>`. Si se borra el job del repositorio pero no esa
+carpeta, al recrearlo Talend reutiliza el proyecto viejo, con su `target` y su
+`.project` de antes, y la ejecucion falla con:
+
+```
+El recurso /PRJ_BANCOLOMBIA_MI_JOB_0.1/src/main/java/prj_bancolombia no existe
+```
+
+Por eso `talend_job_delete_in_studio` borra tambien esa carpeta.
+
+### 18.11 Instalar los modulos que faltan
+
+Los componentes de "processing" (tMap, tJavaRow, tSortRow, tAggregateRow,
+tFilterRow) usan un runtime que no viene con Studio: hay que descargarlo. Al
+ejecutar un job con ellos, Studio abre un dialogo pidiendo los modulos.
+
+El guardian **no los descarga solo** (es una decision de red), pero da tiempo:
+el dialogo se deja abierto 30 s. Con la tool
+`talend_studio_install_modules` se pulsa "Download and Install" de forma
+explicita.
+
+Sin los modulos, el `classpath.jar` del job sale vacio y al ejecutarlo a mano
+falla con `NoClassDefFoundError: routines/system/api/TalendJob`.
+
+## 21. La carga en caliente: lo que hay que soltar antes de recargar
+
+Cuando se recompila el plugin, `HotReloadService` recarga el bundle con
+`Bundle.update()`. OSGi descarta el classloader, para el Activator y lo
+vuelve a iniciar.
+
+**Si algo del bundle viejo sigue vivo, el IDE se queda con clases muertas** y
+la siguiente operacion falla con:
+
+```
+IllegalStateException: Invalid class loader from a refreshed bundle is being used
+```
+
+Lo que hay que soltar antes de recargar:
+
+- **el servidor HTTP**: si sigue escuchando, atiende las peticiones con las
+  clases del bundle descartado;
+- **el hilo del guardian de modales**: sigue vivo usando las clases viejas.
+
+Por eso el `Activator` registra en el `HotReloadService` un `beforeReload` que
+para las dos cosas.
+
 ## 19. Estructura del codigo del bridge
 
 El paquete `automation` del plugin quedo dividido por responsabilidades, para

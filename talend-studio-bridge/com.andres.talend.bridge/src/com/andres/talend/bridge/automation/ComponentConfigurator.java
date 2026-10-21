@@ -114,8 +114,24 @@ public final class ComponentConfigurator {
         }
       }
       parameter.getClass().getMethod("setValue", Object.class)
-          .invoke(parameter, asLiteral(value, literal));
+          .invoke(parameter, valueOf(parameter, value, literal));
     }
+  }
+
+  /**
+   * Valor final de un parametro.
+   *
+   * Los memos (el codigo Java del tJavaRow, el script del tJava) no son
+   * literales: se escriben tal cual en el codigo generado, asi que no se
+   * entrecomillan. El resto sigue la regla de los literales Java.
+   */
+  private static String valueOf(Object parameter, String value, Boolean literal) throws Exception {
+    Object fieldType = parameter.getClass().getMethod("getFieldType").invoke(parameter);
+    String kind = fieldType == null ? "" : String.valueOf(fieldType);
+    if (kind.startsWith("MEMO") || kind.startsWith("PROPERTY") || kind.startsWith("EXPRESSION")) {
+      return value;
+    }
+    return asLiteral(value, literal);
   }
 
   /**
@@ -424,7 +440,8 @@ public final class ComponentConfigurator {
    * Convierte un valor en el literal Java que espera el codigo generado.
    *
    * Las cadenas van entre comillas: el generador escribe el valor tal cual en
-   * el codigo, asi que un texto sin comillas no compila.
+   * el codigo, asi que un texto sin comillas no compila. Y los numeros llevan
+   * el sufijo de su tipo, porque `100` es un int y no un Double.
    */
   public static String javaLiteral(String value, String type) {
     if (value == null) {
@@ -445,6 +462,17 @@ public final class ComponentConfigurator {
     if (kind.startsWith("id_Date")) {
       Long millis = dateToMillis(trimmed);
       return millis == null ? "null" : "new java.sql.Timestamp(" + millis + "L)";
+    }
+    if (kind.startsWith("id_BigDecimal")) {
+      return "new java.math.BigDecimal(\"" + trimmed + "\")";
+    }
+    if (kind.startsWith("id_Long") && !trimmed.endsWith("L") && !trimmed.endsWith("l")) {
+      return trimmed + "L";
+    }
+    if ((kind.startsWith("id_Double") || kind.startsWith("id_Float"))
+        && !trimmed.contains(".") && !trimmed.contains("E") && !trimmed.contains("e")
+        && !trimmed.endsWith("d") && !trimmed.endsWith("f")) {
+      return trimmed + ".0";
     }
     return trimmed;
   }
