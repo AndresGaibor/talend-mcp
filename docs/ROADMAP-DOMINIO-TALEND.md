@@ -19,12 +19,13 @@ Estado de partida y guia de uso: [GUIA-AGENTE.md](GUIA-AGENTE.md). Pruebas por f
 | L4 Compilar | Studio genera codigo y compila sin errores ni avisos | Problemas del job vacios |
 | L5 Ejecutar | El job corre y la salida coincide con la esperada | `talend_job_execute` contra un resultado definido antes |
 
-Hoy: **L1/L2 medido en los 897 componentes Standard: 877 (98 %)**. L3 y L4 (conectar y compilar) se miden con
+Hoy: **L1/L2 medido en los 897 componentes Standard: 877 (98 %)**. L3 y L4 se miden con
 `scripts/coverage.ts`, que monta cada componente en un job minimo (origen y destino) y le rellena los
-parametros obligatorios que declara el XML de la instalacion: eso subio la compiles de la muestra `tFile*` del
-64 % al 100 % de los que no fallan por la version de Weka. L5 (ejecutar con la salida correcta) validados solo en
-muestras y en unos 8 componentes: tFixedFlowInput, tLogRow, tFileInputDelimited, tFileOutputDelimited, tJavaRow,
-tPrejob, tPostjob, tRunJob.
+parametros obligatorios que declara el XML de la instalacion. En las nueve familias mas usadas (134
+componentes) **134 se crean, guardan y borran, y 99 compilan (74 %)**: los que no compilan son, sobre todo, las
+mitades de un par (`tAggregateIn`, `tSortIn`...) que necesitan su pareja, y los que necesitan una configuracion
+real (tablas de transformacion, contexto). L5 (ejecutar con la salida correcta) esta validado con un arnes de
+escenarios: tres en verde (humo, leer un CSV, leer y escribir un CSV).
 
 ### Las definiciones de los componentes, sin abrir Studio
 

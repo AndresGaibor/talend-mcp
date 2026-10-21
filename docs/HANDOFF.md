@@ -82,8 +82,8 @@ ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json`; e
 | Nivel | Resultado |
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
-| L3/L4 | Se mide por familias con el montaje. Las muestras de archivo y transformaciones compilan; quedan como limite del entorno los de Weka (`tFileInputARFF`, `tFileInputXML`, `tFileOutputARFF`) y `tFileInputMSXML` |
-| L5 | 3 escenarios con la salida verificada. Pendiente el `tUniqRow` (el formato de su tabla `UNIQUE_KEY`) |
+| L3/L4 | Medidos por familias: 134 componentes de las nueve familias mas usadas, **134 se crean, guardan y borran, y 99 compilan (74 %)**. Los que no compilan: 12 son la mitad de un par (`tAggregateIn`, `tSortIn`...) y 17 necesitan una configuracion real (tablas, schema, contexto) |
+| L5 | 3 escenarios con la salida verificada (humo, leer un CSV, leer y escribir un CSV). Pendiente el `tUniqRow` (el formato de su tabla `UNIQUE_KEY`) |
 
 ## Lo siguiente (por prioridad)
 

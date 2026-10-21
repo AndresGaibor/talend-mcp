@@ -82,7 +82,24 @@ compilaban (88 %), y los 9 que no compilaban fallaban todos por lo mismo, "Missi
 X": son componentes de entrada de la generacion nueva (JDBC, Snowflake, DynamoDB, SQS) que no declaran sus
 conectores en el modelo y exigen tener una conexion de salida.
 
-Con el metodo nuevo (montaje + parametros del XML) las muestras dan:
+**Medicion por familias** (con el metodo nuevo: montaje + parametros del XML), 134 componentes de las familias
+`File/Input`, `File/Output`, `Processing`, `Processing/Fields`, `Misc`, `Technical`, `Logging_Errors`,
+`Orchestration` y `Custom_Code` (15 min):
+
+| | Resultado |
+|---|---|
+| Se crean, guardan, listan y borran | **134 de 134** |
+| Compilan (L4) | **99 de 134 (74 %)** |
+
+Los 35 que no compilan se agrupan en:
+
+| Causa | Cuantos | Que significa |
+|---|---|---|
+| Son la mitad de un par (`tAggregateIn`, `tSortIn`, `tArrayIn`, `tSurviveIn`...) | 12 | Necesitan su pareja conectada: solas no generan codigo |
+| Falta una configuracion real (tablas de transformacion, schema, contexto) | 17 | El plan pone los valores por defecto, pero hay que darle lo que el componente pide ("cannot be resolved", "Index 0 out of bounds") |
+| Version de libreria o artefacto que no encaja | 6 | Weka (`tFileOutputARFF`, `tFileInputXML`), SAP (`tSAPBapiOut`), el modulo de `tMap`... |
+
+Con el metodo viejo, ademas, fallaban componentes que ahora compilan:
 
 | Muestra | Antes | Ahora |
 |---|---|---|
@@ -92,9 +109,12 @@ Con el metodo nuevo (montaje + parametros del XML) las muestras dan:
 | `tFilterRow`, `tSortRow`, `tAggregateRow` | "El `.item` sale, no genera codigo" | Compilan |
 | `JDBCInput` | `Missing output connection` | Compila |
 
-Lo que queda como limite del entorno (no del MCP): `tFileInputARFF`, `tFileInputXML` y `tFileOutputARFF` estan
-escritos para otra version de Weka; `tFileInputMSXML` genera codigo con una llave sin cerrar; los componentes de
-base de datos necesitan una conexion real del repositorio.
+Lo que queda como limite del entorno: `tFileInputARFF`, `tFileInputXML` y `tFileOutputARFF` estan escritos para
+otra version de Weka; `tFileInputMSXML` genera codigo con una llave sin cerrar; los componentes de base de datos
+necesitan una conexion real del repositorio.
+
+El catalogo entero no se mide de una vez: los componentes sin artefacto en el `.m2` local tardan ~50 s cada uno
+(el generador busca el artefacto en Maven). Por eso se mide por familias.
 
 Esto es L1/L2/L3/L4 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista,
 acepte configuracion, se pueda conectar y compile. **No** dice que ejecute bien: eso es L5, y solo esta validado
