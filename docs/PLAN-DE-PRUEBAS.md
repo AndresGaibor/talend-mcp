@@ -37,7 +37,7 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 | 0 | `tFixedFlowInput` -> `tLogRow` (humo) | Validada: `1\|Bogota\|100.5`, `2\|Medellin\|200.25` |
 | 1 | `tFileInputDelimited` -> `tLogRow`; -> `tFileOutputDelimited` (separador y encoding) | Validada: respeta tildes, ñ y nulos; falla en fechas `dd/MM/yyyy` (la trampa); salida UTF-8 correcta |
 | 2 | `tMap` (renombrar, expresiones, filtros, rechazo, lookups, nulos, fechas, Var) | **Bloqueada por entorno**: el `.item` sale bien pero no compila sin `talend-tmap-dataset-1.2.16.jar` (Talend Exchange) |
-| 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Pendiente**: falta el formato interno de las tablas de condiciones/criterios (el catalogo solo da los nombres de columna) |
+| 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**; falta la fila real (que condicion poner) y probarlos con datos |
 | 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`) |
 | 5 | Excel, posicional, JSON, Parquet | **Bloqueada**: `tFileInputPositional` y `tFileInputJSON` generan codigo que no compila en 8.0.1; el `.item` es correcto |
 | 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada en lo probado: `tPrejob`/`tPostjob`/`tRunJob` (el padre llama al hijo). Sin probar: `tFileList`, triggers de error, `tDie` |
@@ -55,12 +55,17 @@ Orden recomendado para lo que falta: terminar la 3 (descubrir el formato de las 
 
 ## Cobertura del catalogo
 
-`bun run scripts/coverage.ts` crea, configura, guarda, lista y borra cada componente **Standard (DI)** del catalogo
+`bun run scripts/coverage.ts` crea, configura, **monta**, compila y borra cada componente **Standard (DI)** del catalogo
 (897 componentes unicos; las 397 variantes de Spark y Streaming solo valen en jobs de ese tipo, ver INTERNALS 29) en
 un job de pruebas (`MCP_Coverage`) y escribe `testdata/cobertura.csv`. Tarda ~5 min: arranca en el bridge y
-consulta el progreso (una peticion HTTP unica la cortaria el cliente a los 5 min). Opciones: `--filter`, `--max`,
-`--compile` (nivel L4, ~8 s mas por componente), `--cancel`. Tras cada fallo el job de pruebas se reinicia, para
+consulta el progreso (una peticion HTTP unica la cortaria el cliente a los 5 min). Opciones: `--filter`, `--family`,
+`--components`, `--max`, `--compile` (nivel L4), `--cancel`. Tras cada fallo el job de pruebas se reinicia, para
 que un componente roto no contamine a los siguientes. `bun run scripts/coverage-summary.ts` agrupa los fallos.
+
+**"Montar" es lo que hace que la medicion valga**: cada componente se mide dentro de un job minimo (un
+`tFixedFlowInput` con schema si consume, un `tLogRow` si el generador lo pide) y con sus parametros obligatorios
+rellenados segun el XML de la instalacion (ver INTERNALS 30). Sin eso, la mitad de los componentes no compila
+por falta de un `FILENAME` o por no tener a donde conectar.
 
 **Medicion L1/L2 (Talend 8.0.1):** 877 de 897 componentes Standard (98 %) pasan creacion, configuracion de
 parametros, guardado en el `.item`, presencia en el job y borrado. Fallan 20, todos por la misma causa:
@@ -72,10 +77,25 @@ parametros, guardado en el `.item`, presencia en el job y borrado. Fallan 20, to
 (Una medicion anterior daba 96 % de 1294 con 29 fallos "de Spark": mezclaba las variantes de Spark con las de
 Standard; ver INTERNALS 29.)
 
-**L4 (compila), muestra `tFile*`** (`coverage.ts --filter tFile --compile`): 64 de 77 compilan antes de rellenar los
-parametros obligatorios. Los fallos eran componentes de salida sin `FILENAME`, que en realidad la variante Standard
-declara con valor por defecto: el fallo venia de haber probado la variante de Spark. Pendiente repetirlo con la
-variante correcta.
+**L3 y L4 (conectar y compilar)**, con el metodo viejo (sin montaje ni parametros obligatorios): 66 de 75
+compilaban (88 %), y los 9 que no compilaban fallaban todos por lo mismo, "Missing output connection for component
+X": son componentes de entrada de la generacion nueva (JDBC, Snowflake, DynamoDB, SQS) que no declaran sus
+conectores en el modelo y exigen tener una conexion de salida.
 
-Esto es L1/L2 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista y acepte
-configuracion. **No** dice que compile ni que ejecute bien: eso son L4/L5.
+Con el metodo nuevo (montaje + parametros del XML) las muestras dan:
+
+| Muestra | Antes | Ahora |
+|---|---|---|
+| `tFileOutputDelimited` | No compilaba (`The constructor File() is undefined`) | Compila |
+| `tFileOutputRaw`, `tFileOutputLDIF`, `tFileOutputProperties` | No compilaban (el origen no traia el schema fijo del componente) | Compilan |
+| `tFileOutputPositional` | No compilaba (`Syntax error on token '<'`: la tabla `FORMATS` sin filas) | Compila |
+| `tFilterRow`, `tSortRow`, `tAggregateRow` | "El `.item` sale, no genera codigo" | Compilan |
+| `JDBCInput` | `Missing output connection` | Compila |
+
+Lo que queda como limite del entorno (no del MCP): `tFileInputARFF`, `tFileInputXML` y `tFileOutputARFF` estan
+escritos para otra version de Weka; `tFileInputMSXML` genera codigo con una llave sin cerrar; los componentes de
+base de datos necesitan una conexion real del repositorio.
+
+Esto es L1/L2/L3/L4 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista,
+acepte configuracion, se pueda conectar y compile. **No** dice que ejecute bien: eso es L5, y solo esta validado
+a mano en unos 8 componentes.

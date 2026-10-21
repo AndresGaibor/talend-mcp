@@ -52,6 +52,7 @@ Orden obligatorio. Cada paso usa lo que devolvio el anterior (sobre todo los `un
 | # | Tool | Para que |
 |---|---|---|
 | 1 | `talend_studio_list_components` | Saber que componentes hay: 897 de Standard (`paletteType` por defecto `DI`); las 397 variantes de Spark/Streaming solo valen en jobs de ese tipo |
+| 1b | `talend_components_definition` | Que exige cada componente: parametros obligatorios con su valor, conexiones, artefactos. Se lee del XML de la instalacion de Studio, **sin abrir Studio** |
 | 2 | `talend_studio_component_parameters` | Ver los parametros reales de un componente (tipo, defecto, columnas de sus tablas). **No adivines**: preguntalo |
 | 3 | `talend_job_delete_in_studio` | Si el job ya existe y quieres partir de cero |
 | 4 | `talend_job_create_in_studio` | Crea el job vacio (`replace: true` lo reemplaza). Lo deja abierto en el editor |
@@ -189,7 +190,8 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `bun run scripts/bridge-call.ts /ruta '<json>'` | Llamar directo a la API HTTP del bridge, sin MCP (seccion 8) |
 | `bun run scripts/studio-job.ts <cmd>` | Hablar directo con el bridge: `fase0`, `create`, `add`, `connect`, `schema`, `list`, `run`, `delete`, `dialogs` |
 | `bun run scripts/query-bridge.ts` | Volcado del estado de Studio (ping, job activo...) |
-| `bun run scripts/coverage.ts` | Mide cuantos componentes del catalogo se crean y configuran (`--filter`, `--max`, `--out`) |
+| `bun run scripts/coverage.ts` | Mide cuantos componentes del catalogo se crean, se configuran, se montan y compilan (`--filter`, `--family`, `--components`, `--max`, `--compile`, `--out`) |
+| `bun run scripts/component-definitions.ts` | Las definiciones de los componentes instalados (parametros obligatorios, conexiones) y el detalle de uno |
 | `bun run scripts/make-testdata.ts` | Regenera los datos de prueba de `testdata/` |
 | `bun run scripts/start.ts --install-bridge` | Compila y recarga el plugin Java en caliente |
 
@@ -212,10 +214,12 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | Tema | Estado |
 |---|---|
 | `tMap` | El `.item` sale correcto (expresiones, filtros, joins) pero **no compila** sin `talend-tmap-dataset-1.2.16.jar`, de Talend Exchange (no esta en Maven Central) |
-| `tFilterRow`, `tSortRow`, `tUniqRow`, `tAggregateRow` | El `.item` sale bien; el formato interno de las condiciones/criterios no esta en el catalogo y no genera codigo |
+| `tFilterRow`, `tSortRow`, `tUniqRow`, `tAggregateRow` | Se configuran con el plan de la definicion (sus tablas se rellenan con las columnas del schema) y **compilan**; falta probarlos con filas y condiciones reales |
 | `tFileInputPositional`, `tFileInputJSON` | Generan codigo que no compila en 8.0.1 (usan `onSubJobError` inexistente). Usa `tFileInputDelimited` si puedes |
+| `tFileOutputARFF`, `tFileInputARFF`, `tFileInputXML` | El componente esta escrito para otra version de Weka que la que trae Studio |
 | `tFileOutputDelimited` | Necesita librerias que pueden faltar en el `.m2` de Studio |
-| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Fallan 20 sin runtime de Maven. Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Compilar (L4) y ejecutar (L5) solo medidos en muestras; ver [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md) |
+| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, la mayoria compila (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) solo medido en muestras |
+| Componentes de la generacion nueva | Los 120 de los `.car` (AWS, JDBC, Snowflake...) no tienen XML: su definicion esta en el codigo Java y hay que preguntarsela a Studio (`talend_studio_component_parameters`) |
 | Salida de la vista Run | No se puede leer; por eso existe `talend_job_execute` |
 
 Estado fase por fase en [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md).

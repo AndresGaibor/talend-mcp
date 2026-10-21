@@ -1536,3 +1536,146 @@ trabajo `MCP_Scratch` (se crea la primera vez). El nodo no se anade al job. Los 
 `required` (`isRequired()`), `show` (`isShow(lista)`) y `readOnly`: `isRequired` es muy generoso (tambien marca
 casillas), asi que para rellenar se usa obligatorio **y** visible **y** editable **y** de tipo texto, archivo o
 carpeta **y** con valor vacio.
+
+## 30. La definicion de cada componente esta en el XML de la instalacion
+
+Cada componente deja su definicion en el disco de la instalacion de Studio:
+
+```
+<studio>/plugins/org.talend.designer.components.<proveedor>_<version>/components/<nombre>/<nombre>_java.xml
+```
+
+Los proveedores son `localprovider` (Standard), `bigdata`, `tisprovider`, `tdqprovider`, `ipaas`,
+`publish.cloud`, `sparkprovider`, `sparkstrprovider` y `structuredstreamprovider`. Cada uno trae su copia de
+`<nombre>_java.xml` y las plantillas `*.javajet` que generan el codigo. **El XML es la fuente autoritativa de lo
+que un componente exige**, y se puede leer sin abrir Studio.
+
+### Que se lee de cada XML
+
+| Que | Donde | Para que |
+|---|---|---|
+| Parametros | `<PARAMETERS>` y `<ADVANCED_PARAMETERS>` | Que hay que rellenar |
+| Obligatorio | `REQUIRED="true"` | Sin esto el codigo no compila |
+| Valor por defecto | `<DEFAULT>...</DEFAULT>` (elemento hijo, no atributo) | El valor con el que se rellena |
+| Visibilidad | `SHOW`, `SHOW_IF`, `NOT_SHOW_IF` | Que parametros se ven de verdad |
+| Valores de una lista | `<ITEMS><ITEM NAME= VALUE=/></ITEMS>` | Los valores posibles |
+| Conexiones | `<CONNECTORS><CONNECTOR NAME= CTYPE= MAX_INPUT= MAX_OUTPUT=/></CONNECTORS>` | Que conexiones admite |
+| Artefactos | `<CODEGENERATION><IMPORTS><IMPORT MVN= REQUIRED=/></IMPORTS>` | Lo que le hace falta instalado |
+| Columnas de salida | `<RETURNS><RETURN NAME= TYPE=/></RETURNS>` | Que devuelve |
+| Familia | `<FAMILIES><FAMILY>...</FAMILY></FAMILIES>` | En que grupo esta (puede estar en varias) |
+| Arranca un flujo | `HEADER STARTABLE="true"` | Si se puede usar como origen |
+
+Detalles que surprises y que costan tiempo:
+
+- **El valor por defecto es un elemento hijo**, `<DEFAULT>";"</DEFAULT>`, y ya es un literal de Java: lleva sus
+  comillas. Un `DEFAULT` de atributo es otra cosa (no existe en estos XML).
+- **El conector tiene dos nombres**: `NAME` es el que se usa al conectar (`FLOW`, `REJECT`, `ITERATE`,
+  `SUBJOB_OK`...) y `CTYPE` es el tipo de enlace. El conector principal no lleva `NAME`: se llama como su tipo.
+- **El `MAX_INPUT`/`MAX_OUTPUT` del conector principal**: `MAX_INPUT=0` significa que el componente no puede
+  recibir flujo (es un origen); `MAX_INPUT>=1` significa que consume. El `MAX_OUTPUT` del conector principal
+  siempre vale 1, asi que **no dice si el componente produce**: para eso hay que mirar si tiene conector
+  `REJECT` o el nombre del componente.
+- **Las macros de Talend** (`__COMP_DEFAULT_FILE_DIR__`) y las referencias a contexto (`${...}`) no sirven como
+  valor: hay que sustituirlas por una ruta real.
+- **Los componentes de la generacion nueva no estan en el XML**: vienen en archivos `.car` (AWS, JDBC, Snowflake,
+  Athena, Delta, DynamoDB, SQS...). Son 120 de los 897 Standard. Su definicion esta en el codigo Java, asi que
+  para ellos la unica fuente es la API de Studio.
+
+### Lo que dice el modelo de Studio, y como se compara con el XML
+
+- Los componentes "de siempre" son `org.talend.designer.core.model.components.EmfComponent`. Su
+  `getCONNECTORList()` devuelve los mismos conectores que el XML (`CONNECTORTypeImpl` con `getNAME`, `getCTYPE`,
+  `getMAXINPUT`, `getMAXOUTPUT`, `getSHOWIF`, `getNOTSHOWIF`, `getBASESCHEMA`).
+- Los de la generacion nueva son `org.talend.sdk.component.studio.ComponentModel` y su `getCONNECTORList()` es
+  **null**: no declaran conectores en el modelo. Por eso el generador se queja con
+  "Missing output connection for component JDBC#Input" cuando se compilan sueltos. La conexion se puede crear
+  igual (con `ConnectionCreateCommand`) y el componente compila: lo que falta es el `tLogRow` de destino.
+
+### Las tablas de los parametros (FORMATS, CONDITIONS, CRITERIA...)
+
+Los parametros de tipo `TABLE` son la parte que faltaba para configurar los componentes de transformacion. El
+XML los describe:
+
+```xml
+<PARAMETER NAME="FORMATS" FIELD="TABLE" REQUIRED="true" NUM_ROW="60" NB_LINES="5">
+  <ITEMS BASED_ON_SCHEMA="true">
+    <ITEM NAME="SIZE" VALUE="10" CONTEXT="LENGTH" />
+    <ITEM NAME="PADDING_CHAR" VALUE="' '" />
+    <ITEM NAME="ALIGN" FIELD="CLOSED_LIST">
+      <ITEMS DEFAULT="LEFT">
+        <ITEM NAME="LEFT" VALUE="'L'" />
+      </ITEMS>
+    </ITEM>
+  </ITEMS>
+</PARAMETER>
+```
+
+- `BASED_ON_SCHEMA="true"`: la tabla tiene **una fila por cada columna del schema**.
+- `NB_LINES`: numero de filas cuando no depende del schema.
+- Cada `ITEM` es una columna de la tabla, con su valor por defecto. Si es una lista cerrada (`FIELD="CLOSED_LIST"`),
+  su valor por defecto es el del `ITEM` que marca `DEFAULT`.
+
+**La tabla del nodo puede tener mas columnas que las del XML**: la `FORMATS` del `tFileOutputPositional` declara
+cuatro (SIZE, PADDING_CHAR, ALIGN, KEEP) y en el nodo hay cinco, con `SCHEMA_COLUMN` delante. Por eso las filas
+se tienen que alinear con los codigos del nodo (`getListItemsDisplayCodeName`), no con los del XML.
+
+Sin filas, el codigo generado sale con un hueco: el `tFileOutputPositional` genera
+`tempLengthBx<<` y da "Syntax error on token '<'". Con las filas puestas, compila.
+
+### El orden en que hay que montar un componente
+
+Para medir si un componente compila (L4), el componente no puede estar solo:
+
+1. Se anade el componente.
+2. Se rellenan sus parametros obligatorios (los del XML, con su valor por defecto cuando existe).
+3. Si **consume** (`MAX_INPUT >= 1`), se anade un `tFixedFlowInput` **con schema** y se conecta. El schema va
+   antes de conectar: al conectar, Talend rehace las tablas del componente con las del origen. Si el componente
+   tiene schema fijo (el `tFileOutputRaw`, que solo escribe una columna `content`), el origen tiene que traer
+   esas mismas columnas: si no, "content cannot be resolved or is not a field".
+4. Se rellenan las tablas del plan, ahora que ya se sabe cuantas columnas tiene el schema.
+5. Se compila. Si el fallo es "Missing output connection", se anade un `tLogRow` y se compila otra vez.
+6. Se borra todo.
+
+### Las condiciones de visibilidad
+
+`SHOW_IF` y `NOT_SHOW_IF` usan la sintaxis de expresiones de Talend: comparaciones de un parametro con un valor
+entrecomillado, unidas con `and` y `or`, agrupadas con parentesis. Se pueden evaluar en el MCP:
+
+```
+(APPEND=='false') and (SPLIT=='false')
+```
+
+Un parametro cuya condicion no se puede decidir (porque depende de otro que no se conoce) se rellena con su
+valor por defecto: es inofensivo.
+
+## 31. La cobertura con montaje: como se mide L3 y L4 de verdad
+
+`scripts/coverage.ts` mide el catalogo Standard (897 componentes). Cada componente se crea, se configura con sus
+parametros obligatorios, **se monta** (origen y destino), se compila y se borra. El plan de montaje lo calcula el
+MCP, leyendo el XML de la instalacion (`planMount`): que parametros van y si hace falta un origen.
+
+- `--family "File/Input,File/Output"`: mide solo esas familias.
+- `--components a,b,c`: mide los componentes indicados.
+- `--compile`: ademas genera el codigo y comprueba que compila (L4).
+- `--cancel`: para la medicion en marcha.
+
+El ritmo es de unos 4 s por componente (la primera medicion, sin montaje, iba a 19 s: lo que mas costa es
+generar el codigo y que el job se ensucie).
+
+Lo que se midio con el metodo viejo (sin parametros obligatorios ni montaje), y lo que se mide ahora:
+
+| | Antes | Ahora |
+|---|---|---|
+| `tFileOutputDelimited` | No compilaba (`The constructor File() is undefined`) | Compila |
+| `tFileOutputRaw`, `tFileOutputLDIF`, `tFileOutputProperties` | No compilaban (schema incompatible) | Compilan |
+| `tFileOutputPositional` | No compilaba (`Syntax error on token '<'`) | Compila |
+| `tFilterRow`, `tSortRow`, `tAggregateRow` | "El `.item` sale, no genera codigo" | Compilan |
+| `JDBCInput` y los demas de la generacion nueva | `Missing output connection` | Compilan (con el `tLogRow` de destino) |
+
+Lo que **no** se arregla con esto, y es un limite del entorno:
+
+- `tFileInputARFF`, `tFileInputXML`, `tFileOutputARFF`: el componente esta escrito para otra version de Weka
+  (`addStringValue(String)`, `initXPaths_0`) y la que trae Studio no encaja.
+- `tFileInputMSXML`: el codigo generado sale con una llave sin cerrar.
+- Los componentes de base de datos: necesitan una conexion real del repositorio para compilar.
+

@@ -19,7 +19,26 @@ Estado de partida y guia de uso: [GUIA-AGENTE.md](GUIA-AGENTE.md). Pruebas por f
 | L4 Compilar | Studio genera codigo y compila sin errores ni avisos | Problemas del job vacios |
 | L5 Ejecutar | El job corre y la salida coincide con la esperada | `talend_job_execute` contra un resultado definido antes |
 
-Hoy: **L1/L2 medido en los 897 componentes Standard: 877 (98 %)**. L4/L5 (compila y ejecuta con la salida correcta) validados solo en muestras y en unos 8 componentes: tFixedFlowInput, tLogRow, tFileInputDelimited, tFileOutputDelimited, tJavaRow, tPrejob, tPostjob, tRunJob.
+Hoy: **L1/L2 medido en los 897 componentes Standard: 877 (98 %)**. L3 y L4 (conectar y compilar) se miden con
+`scripts/coverage.ts`, que monta cada componente en un job minimo (origen y destino) y le rellena los
+parametros obligatorios que declara el XML de la instalacion: eso subio la compiles de la muestra `tFile*` del
+64 % al 100 % de los que no fallan por la version de Weka. L5 (ejecutar con la salida correcta) validados solo en
+muestras y en unos 8 componentes: tFixedFlowInput, tLogRow, tFileInputDelimited, tFileOutputDelimited, tJavaRow,
+tPrejob, tPostjob, tRunJob.
+
+### Las definiciones de los componentes, sin abrir Studio
+
+Lo que un componente exige esta en su XML (`<nombre>_java.xml`), en la instalacion de Studio. El indice de esas
+definiciones es lo que permite configurar cualquier componente sin adivinar:
+
+- `talend_components_definition` (tool) y `scripts/component-definitions.ts` (script) dicen que parametros son
+  obligatorios, con que valor se rellenan, que conexiones admite y que artefactos necesita.
+- El plan de montaje (`planMount`) se le pasa al bridge: con el, la cobertura mide L3 y L4 de verdad.
+- Las tablas de los parametros (`FORMATS`, `CONDITIONS`, `CRITERIA`) se rellenan con las columnas del schema:
+  con eso, `tFilterRow`, `tSortRow` y `tAggregateRow` ya compilan.
+
+Lo que no llega: los 120 componentes de la generacion nueva (los de los `.car`: AWS, JDBC, Snowflake...) no
+tienen XML, su definicion esta en el codigo Java. Para ellos hay que preguntar a Studio.
 
 ## 1. Lo que bloqueaba la medicion (resuelto)
 
@@ -48,8 +67,9 @@ La cobertura reportaba los 1294 componentes como fallidos. Causas reales, reprod
 | 2 | ~~`uniqueName` real~~ (ya lo era) + **alta verificada**: `add` falla si el nodo no entra (hecho) | El nombre devuelto siempre existe en el job |
 | 3 | ~~Arreglar la prueba de cobertura~~ (hecho) | El CSV deja de ser 100 % fallos |
 | 4 | ~~Leer los problemas del job~~ (hecho: `talend_job_problems`, avisos de diseno). Tambien hecho: **compilacion** sin ejecutar (`talend_job_compile`, `coverage --compile`) | "Abre sin avisos" y L4 se comprueban sin ejecutar |
-| 5 | **Matriz de dominio** por componente: L1/L2 hecho (`coverage.ts` + `coverage-summary.ts`). Pendiente L3 (conectar), L4 (compilar) y L5 (ejecutar) | Se sabe cuantos componentes estan al 100 %, y por que fallan los demas |
-| 6 | **Tests del bridge aislados**: separar los de integracion (ahora golpean el Studio real y usan rutas de otra maquina) y cubrir cada ruta con un contrato | `bun test` verde con y sin Studio |
+| 5 | **Matriz de dominio** por componente: L1/L2 hecho (`coverage.ts` + `coverage-summary.ts`). L3 y L4: se miden con el **montaje** (origen y destino) y los parametros obligatorios del XML. Pendiente L5 (ejecutar con la salida esperada) | Se sabe cuantos componentes estan al 100 %, y por que fallan los demas |
+| 6 | **Tests del bridge aislados**: hechos (hecho) | `bun test` verde con y sin Studio |
+| 7 | **Indice de definiciones de los componentes**: hecho (`talend_components_definition`, `scripts/component-definitions.ts`). Pendiente: que lo usen las tools que configuran (hoy es el plan de la cobertura) | Un agente sabe que poner en cada componente sin adivinar |
 
 ### Resultado de la primera medicion (L1/L2)
 
@@ -84,7 +104,7 @@ Hoy se crean nodos, conexiones FLOW, schema y parametros. Falta lo que hace un j
 |---|---|---|
 | Archivos delimitados y planos | Validado | Rendimiento (500 mil filas) y encodings |
 | `tMap` | `.item` correcto, no compila | Falta `talend-tmap-dataset-1.2.16.jar` (Talend Exchange). Probar `talend_studio_install_modules` y el repositorio de modulos de Talend; sin eso, no hay `tMap` |
-| Transformaciones (`tFilterRow`, `tSortRow`, `tAggregateRow`, `tUniqRow`, `tJoin`, `tUnite`, `tNormalize`...) | `.item` sale, no genera codigo | Descubrir el formato interno de las tablas `CONDITIONS`/`CRITERIA`: **leerlo de jobs reales del proyecto** y hacer `job -> spec declarativo` |
+| Transformaciones (`tFilterRow`, `tSortRow`, `tAggregateRow`, `tUniqRow`, `tJoin`, `tUnite`, `tNormalize`...) | Las tablas se rellenan con el plan (columnas y valores por defecto) y **compilan** | Falta la fila real: que condicion poner en cada fila (`CONDITIONS` del tFilterRow, `CRITERIA` del tSortRow) y como se ejecuta con la condicion |
 | Bases de datos (`tDB*`) | Sin probar | Postgres (en la nube o Docker), drivers, conexion compartida, commit/rollback, acciones de salida |
 | Excel, posicional, JSON, XML, Parquet, Avro | Posicional y JSON no compilan en 8.0.1 | Investigar `DIE_ON_ERROR` del catalogo vs el del nodo (seccion 24 de INTERNALS) y buscar el camino que si genera |
 | Control de flujo | `tPrejob`, `tPostjob`, `tRunJob` ok | `tFileList`, `tFlowToIterate`, `tDie`, `tWarn`, `tLogCatcher`, `tSetGlobalVar` |
@@ -120,10 +140,12 @@ Prioridad: cobertura de **toda** la familia mas usada antes de ir a la siguiente
 ## 7. Orden recomendado (los 5 siguientes pasos)
 
 1. ~~Identidad del job, alta verificada, cobertura que mide~~ (hecho).
-2. L3 (conectar) y L5 (ejecutar con salida esperada); L4 ya se mide (muestra `tFile*`: 83 %). Dar a cada componente sus parametros obligatorios al medir L4.
+2. L3 y L4 medidos con el montaje y los parametros obligatorios del XML. **L5** (ejecutar con la salida
+   esperada, por familias) es lo que falta: es el nivel que de verdad prueba que el job sirve.
 3. Tipos de job (Spark, Streaming) y los runtimes que faltan.
 4. P1: conexiones/triggers y metadata del repositorio (abre los `tDB*`).
-5. P2: resolver el `tMap` (modulo) y el formato de las tablas de transformacion.
+5. P2: el `tMap` (modulo) y las filas reales de las tablas de transformacion (las columnas ya se rellenan; falta
+   saber que condicion poner en cada fila).
 
 ## 8. Lo que hace falta de ti
 
