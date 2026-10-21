@@ -97,8 +97,9 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 
 1. **L5 por familias**: el arnes ya funciona con la familia de archivos y la de transformaciones. Falta la de
    bases de datos (un Postgres de pruebas) y la de orquestacion (`tPrejob`, `tPostjob`, `tRunJob`).
-2. **El `tAggregateRow` y el `tFilterRow`**: sus tablas ya se rellenan, pero falta el formato real de las filas
-   (el `tAggregateRow` necesita el schema de salida en su conector, como el `tUniqRow`).
+2. **El `tAggregateRow`**: necesita dos tablas de metadata (la de entrada y la de salida, las dos en el conector
+   `FLOW`) y al rellenar el schema del nodo se rompe la tabla que la conexion de entrada tiene asignada. Habria que
+   fusionar el schema con el que ya tiene el nodo en vez de sustituirlo (ver INTERNALS 32).
 3. **Tipos de job** (Spark Batch, Streaming): hoy `create` solo crea jobs Standard. Desbloquea las 397 variantes.
 4. **Metadata del repositorio** (conexiones de base de datos, esquemas de archivo), imprescindible para los `tDB*`.
 5. Otros, en el roadmap:

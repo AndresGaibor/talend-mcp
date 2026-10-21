@@ -1732,6 +1732,24 @@ Los dos detalles que mas costan:
   entrada) y `UNIQUE` (la salida), y su schema de salida va en `UNIQUE`. Si se deja vacio, el codigo generado no
   tiene struct de salida y no compila ("monto cannot be resolved or is not a field").
 
+### El `tAggregateRow`: dos tablas de metadata y una conexion que cambia de tabla
+
+El `tAggregateRow` es el caso dificil: tiene una tabla de entrada y otra de salida, y las dos van en el conector
+`FLOW`. Ademas, **la conexion guarda la tabla de metadata por referencia**: al rellenar el schema del nodo, la
+tabla que tiene la conexion de entrada se sustituye, y el generador deja de encontrar las columnas de entrada
+("inputColumn is null").
+
+Lo que se ha probado:
+
+- El schema de salida (las columnas que produce: las del `GROUPBYS` y las del `OPERATIONS`) tiene que estar en
+  el nodo, y **la primera** de las tablas: si no, el generador no encuentra la columna de salida ("outputColumn is
+  null").
+- La tabla de entrada tiene que traer las columnas del origen.
+
+Lo que falta: hacer que el relleno del schema **no** rompa la tabla que la conexion tiene asignada (habria que
+fusionar el schema con el que ya tiene el nodo en vez de sustituirlo) y saber que nombre espera el generador
+para la tabla de entrada. Queda como pendiente.
+
 ### El conector es el del origen, no tiene que existir en el destino
 
 El `connectorName` de la conexion es el conector **de salida del origen**. El destino usa su conector de

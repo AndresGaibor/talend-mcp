@@ -41,10 +41,26 @@ type Nodo = {
    * salida ("monto cannot be resolved or is not a field").
    */
   columnasPorConector?: Record<string, Columna[]>;
+  /**
+   * Tablas de metadata tal cual, para los componentes con varios conectores
+   * de datos (el `tAggregateRow` tiene la de entrada y la de salida).
+   *
+   * La tabla de entrada del `tAggregateRow` se llama como la conexion
+   * ("row1"), porque sus tablas la referencian asi ("row1.ciudad").
+   */
+  esquemas?: Array<{ conector: string; nombre: string; columnas: Columna[] }>;
   /** Filas del `tFixedFlowInput`. */
   values?: string[][];
   /** Tablas del componente (UNIQUE_KEY, GROUPBYS, CRITERIA...). */
   tablas?: Record<string, { columns?: string[]; rows: Array<string[] | Record<string, string>> }>;
+  /**
+   * Poner el schema despues de conectar.
+   *
+   * Lo necesitan los componentes con varias tablas de datos en el mismo
+   * conector (el `tAggregateRow`): al conectar, Talend rehace las tablas y
+   * deja vacia la de salida.
+   */
+  schemaDespuesDeConectar?: boolean;
 };
 
 type Escenario = {
@@ -240,6 +256,7 @@ async function ejecutar(
   // 2. Nodos, con sus parametros y su schema.
   const nombres = new Map<string, string>();
   const tablasPorNodo: Array<{ uniqueName: string; tablas: NonNullable<Nodo["tablas"]> }> = [];
+  const esquemasDespues: Array<{ uniqueName: string; schema: unknown[] }> = [];
   for (const nodo of escenario.nodos) {
     const parameters = nodo.parameters
       ? Object.fromEntries(
@@ -270,14 +287,14 @@ async function ejecutar(
     const uniqueName = String(cuerpo.uniqueName ?? cuerpo.result?.uniqueName ?? "");
     if (nodo.nombre) nombres.set(nodo.nombre, uniqueName);
 
-    if (nodo.columnas) {
+    if (nodo.columnas || nodo.columnasPorConector || nodo.esquemas) {
       if (nodo.values) {
         // El `tFixedFlowInput` lleva las filas en su tabla: se ponen con el
         // schema, que es como lo hace el IDE.
         const conDatos = await bridge.setNodeSchema({
           job: escenario.job,
           uniqueName,
-          columns: nodo.columnas,
+          columns: nodo.columnas ?? [],
           values: nodo.values,
         });
         if (!conDatos.ok) {
@@ -291,14 +308,22 @@ async function ejecutar(
         // El schema va en su conector y, si el nodo tiene mas de un conector
         // de datos, tambien en los demas: el `tUniqRow` tiene el de salida en
         // el conector UNIQUE.
-        const schema = [
-          { connector: "FLOW", name: uniqueName, columns: nodo.columnas },
-          ...Object.entries(nodo.columnasPorConector ?? {}).map(([connector, columnas]) => ({
-            connector,
-            name: uniqueName,
-            columns: columnas,
-          })),
-        ];
+        const schema = nodo.esquemas
+          ? nodo.esquemas.map((tabla) => ({
+              connector: tabla.conector,
+              // "@uniqueName" es el nombre unico del nodo.
+              name: tabla.nombre === "@uniqueName" ? uniqueName : tabla.nombre,
+              columns: tabla.columnas,
+            }))
+          : [
+              ...(nodo.columnas
+                ? [{ connector: "FLOW", name: uniqueName, columns: nodo.columnas }]
+                : []),              ...Object.entries(nodo.columnasPorConector ?? {}).map(([connector, columnas]) => ({
+                connector,
+                name: uniqueName,
+                columns: columnas,
+              })),
+            ];
         const conSchema = await bridge.configureNode({
           job: escenario.job,
           uniqueName,
@@ -310,6 +335,9 @@ async function ejecutar(
             salidaCorrecta: false,
             mensaje: `no se pudo poner el schema de ${nodo.type}: ${errorDe(conSchema)}`,
           };
+        }
+        if (nodo.schemaDespuesDeConectar) {
+          esquemasDespues.push({ uniqueName, schema });
         }
       }
     }
@@ -350,7 +378,23 @@ async function ejecutar(
   }
 
   // 3. Tablas: despues de conectar, que es cuando el componente ya sabe
-  // que columnas de entrada tiene.
+  // que columnas de entrada tiene. Y tambien el schema de los componentes que
+  // lo piden (el tAggregateRow pierde la tabla de salida al conectar).
+  for (const pendiente of esquemasDespues) {
+    const conSchema = await bridge.configureNode({
+      job: escenario.job,
+      uniqueName: pendiente.uniqueName,
+      schema: pendiente.schema as never,
+    });
+    if (!conSchema.ok) {
+      return {
+        ejecutaOk: false,
+        salidaCorrecta: false,
+        mensaje: `no se pudo poner el schema: ${errorDe(conSchema)}`,
+      };
+    }
+  }
+
   for (const pendiente of tablasPorNodo) {
     const conTablas = await bridge.configureNode({
       job: escenario.job,
