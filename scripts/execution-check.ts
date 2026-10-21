@@ -31,8 +31,16 @@ type Nodo = {
   /** Nombre con el que se le conoce en las conexiones. */
   nombre?: string;
   parameters?: Record<string, { value: string; literal?: boolean }>;
-  /** Columnas del nodo. */
+  /** Columnas del nodo, en su conector principal. */
   columnas?: Columna[];
+  /**
+   * Columnas en otros conectores del nodo.
+   *
+   * El `tUniqRow` saca sus filas por el conector `UNIQUE`, y su schema de
+   * salida va ahi: si no se pone, el codigo generado no tiene struct de
+   * salida ("monto cannot be resolved or is not a field").
+   */
+  columnasPorConector?: Record<string, Columna[]>;
   /** Filas del `tFixedFlowInput`. */
   values?: string[][];
   /** Tablas del componente (UNIQUE_KEY, GROUPBYS, CRITERIA...). */
@@ -280,10 +288,21 @@ async function ejecutar(
           };
         }
       } else {
+        // El schema va en su conector y, si el nodo tiene mas de un conector
+        // de datos, tambien en los demas: el `tUniqRow` tiene el de salida en
+        // el conector UNIQUE.
+        const schema = [
+          { connector: "FLOW", name: uniqueName, columns: nodo.columnas },
+          ...Object.entries(nodo.columnasPorConector ?? {}).map(([connector, columnas]) => ({
+            connector,
+            name: uniqueName,
+            columns: columnas,
+          })),
+        ];
         const conSchema = await bridge.configureNode({
           job: escenario.job,
           uniqueName,
-          schema: [{ connector: "FLOW", name: uniqueName, columns: nodo.columnas }],
+          schema,
         });
         if (!conSchema.ok) {
           return {

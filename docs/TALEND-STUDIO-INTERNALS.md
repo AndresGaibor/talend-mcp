@@ -1713,6 +1713,25 @@ la columna que forma la clave se marca con `KEY_ATTRIBUTE="true"`. La tabla del 
 valores de su XML: `SORT` es "num"/"alpha"/"date" y `ORDER` es "asc"/"desc" (en minusculas). Con otros valores, el
 generador falla con "Index 0 out of bounds for length 0".
 
+### El formato de las tablas de transformacion (resuelto)
+
+Con el job montado a mano y con estos valores, el `tUniqRow` y el `tSortRow` generan codigo que compila y
+ejecuta:
+
+| Componente | Tabla | Columnas | Filas |
+|---|---|---|---|
+| `tUniqRow` | `UNIQUE_KEY` | `SCHEMA_COLUMN`, `KEY_ATTRIBUTE`, `CASE_SENSITIVE` | Una por columna del schema. `SCHEMA_COLUMN` es **la conexion de entrada mas la columna** ("row1.id"), y `KEY_ATTRIBUTE` va a "true" en las columnas que forman la clave |
+| `tSortRow` | `CRITERIA` | `COLNAME`, `SORT`, `ORDER` | `COLNAME` es **solo el nombre de la columna** ("monto"), sin el prefijo de la conexion. `SORT` es "num"/"alpha"/"date" y `ORDER` es "asc"/"desc" |
+
+Los dos detalles que mas costan:
+
+- El prefijo de la conexion: en el `tUniqRow` va ("row1.id") y en el `tSortRow` no ("monto"). Con el prefijo
+  equivocado, el `tSortRow` falla con "Index 0 out of bounds for length 0" (busca la tabla del nombre de la
+  conexion y no la encuentra).
+- **El schema de salida va en el conector que le toca**: el `tUniqRow` tiene dos conectores de datos, `FLOW` (la
+  entrada) y `UNIQUE` (la salida), y su schema de salida va en `UNIQUE`. Si se deja vacio, el codigo generado no
+  tiene struct de salida y no compila ("monto cannot be resolved or is not a field").
+
 ### El conector es el del origen, no tiene que existir en el destino
 
 El `connectorName` de la conexion es el conector **de salida del origen**. El destino usa su conector de

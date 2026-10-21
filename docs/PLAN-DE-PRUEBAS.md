@@ -37,7 +37,7 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 | 0 | `tFixedFlowInput` -> `tLogRow` (humo) | Validada: `1\|Bogota\|100.5`, `2\|Medellin\|200.25` |
 | 1 | `tFileInputDelimited` -> `tLogRow`; -> `tFileOutputDelimited` (separador y encoding) | Validada: respeta tildes, ñ y nulos; falla en fechas `dd/MM/yyyy` (la trampa); salida UTF-8 correcta |
 | 2 | `tMap` (renombrar, expresiones, filtros, rechazo, lookups, nulos, fechas, Var) | **Bloqueada por entorno**: el `.item` sale bien pero no compila sin `talend-tmap-dataset-1.2.16.jar` (Talend Exchange) |
-| 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**; falta la fila real (que condicion poner) y probarlos con datos. El `tUniqRow` ademas exige el conector `UNIQUE` (no `FLOW`) y el nombre de la conexion en la tabla (`row1.id`) |
+| 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**. El `tUniqRow` y el `tSortRow` **se ejecutan bien** con su formato real de tabla (ver INTERNALS 32). Falta el `tAggregateRow` con filas y el `tFilterRow` con condiciones |
 | 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`) |
 | 5 | Excel, posicional, JSON, Parquet | **Bloqueada**: `tFileInputPositional` y `tFileInputJSON` generan codigo que no compila en 8.0.1; el `.item` es correcto |
 | 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada en lo probado: `tPrejob`/`tPostjob`/`tRunJob` (el padre llama al hijo). Sin probar: `tFileList`, triggers de error, `tDie` |
@@ -131,7 +131,7 @@ el fichero que escribe). El informe queda en `testdata/resultados-l5.csv`.
 | `tFixedFlowInput` -> `tLogRow` | Correcto: `1\|Bogota`, `2\|Medellin` |
 | `tFileInputDelimited` -> `tLogRow` | Correcto: las cuatro filas, con el separador y los decimales tal cual |
 | `tFileInputDelimited` -> `tFileOutputDelimited` | Correcto: el fichero escrito tiene las cuatro filas |
-| `tUniqRow` (quitar duplicados) | **Pendiente**: el codigo generado lee una columna suelta en vez de la de la conexion de entrada |
+| `tFileInputDelimited` -> `tUniqRow` -> `tSortRow` -> `tLogRow` | Correcto: quita el duplicado y ordena por monto descendente |
 
 Los pasos para ejecutar y leer la salida estan en INTERNALS 33: primero el Run de Studio (que genera y compila),
-despues el relanzamiento que devuelve las lineas.
+despues el relanzamiento que devuelve las lineas. El formato de las tablas de las transformaciones, en INTERNALS 32.

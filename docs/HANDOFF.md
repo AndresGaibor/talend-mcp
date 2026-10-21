@@ -75,7 +75,15 @@ codigo. Ademas, el **conector** no siempre es `FLOW`: el `tUniqRow` saca sus fil
 
 `scripts/execution-check.ts` monta un job, lo ejecuta y **compara la salida con la esperada** (declarada antes de
 ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json`; el informe sale en
-`testdata/resultados-l5.csv`. Tres escenarios en verde: el de humo, el de leer un CSV y el de leer y escribir.
+`testdata/resultados-l5.csv`. **Cuatro escenarios en verde**: el de humo, el de leer un CSV, el de leer y escribir
+un CSV, y el de transformaciones (`tUniqRow` + `tSortRow` sobre el CSV, quitando el duplicado y ordenando por
+importe).
+
+### Comprobacion de conexiones
+
+`talend_job_connect_nodes` comprueba, con las definiciones del XML, que el conector sea una salida del origen que
+pueda emitir y que el destino tenga entrada de datos. Conectar por un conector que el componente no usa no da
+error (el job compila y no sale ninguna fila), asi que la comprobacion evita un fallo silencioso.
 
 ## Resultados medidos
 
@@ -83,20 +91,17 @@ ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json`; e
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
 | L3/L4 | Medidos por familias: 134 componentes de las nueve familias mas usadas, **134 se crean, guardan y borran, y 99 compilan (74 %)**. Los que no compilan: 12 son la mitad de un par (`tAggregateIn`, `tSortIn`...) y 17 necesitan una configuracion real (tablas, schema, contexto) |
-| L5 | 3 escenarios con la salida verificada (humo, leer un CSV, leer y escribir un CSV). Pendiente el `tUniqRow` (el formato de su tabla `UNIQUE_KEY`) |
+| L5 | 4 escenarios con la salida verificada (humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`) |
 
 ## Lo siguiente (por prioridad)
 
-1. **L5 por familias**: el arnes ya funciona; faltan escenarios (el `tUniqRow`, el `tSortRow`, el `tAggregateRow`
-   con sus tablas reales) y un Postgres de pruebas para los `tDB*`.
-2. **Acabar el formato de las tablas de transformacion**: el `tUniqRow` sigue generando codigo que lee una
-   columna suelta ("id cannot be resolved"). Con el `tSortRow` hay que usar los valores de su XML (`SORT` = "num",
-   `ORDER` = "desc") y el prefijo de la conexion en el `COLNAME`.
+1. **L5 por familias**: el arnes ya funciona con la familia de archivos y la de transformaciones. Falta la de
+   bases de datos (un Postgres de pruebas) y la de orquestacion (`tPrejob`, `tPostjob`, `tRunJob`).
+2. **El `tAggregateRow` y el `tFilterRow`**: sus tablas ya se rellenan, pero falta el formato real de las filas
+   (el `tAggregateRow` necesita el schema de salida en su conector, como el `tUniqRow`).
 3. **Tipos de job** (Spark Batch, Streaming): hoy `create` solo crea jobs Standard. Desbloquea las 397 variantes.
 4. **Metadata del repositorio** (conexiones de base de datos, esquemas de archivo), imprescindible para los `tDB*`.
-5. **Validar conexiones en `connect`**: la tool acepta un texto libre; con el indice de definiciones puede
-   comprobar que el conector existe en el componente y que el nombre de la conexion es valido.
-6. Otros, en el roadmap:
+5. Otros, en el roadmap:
    - `tMap`: necesita `talend-tmap-dataset-1.2.16.jar` (de Talend Exchange).
    - Postgres de pruebas.
    - Los 120 componentes de la generacion nueva (los `.car`) no tienen XML: su definicion esta en el codigo Java.
