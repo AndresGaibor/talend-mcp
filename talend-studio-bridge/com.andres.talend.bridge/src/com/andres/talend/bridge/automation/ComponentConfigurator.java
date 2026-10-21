@@ -115,7 +115,64 @@ public final class ComponentConfigurator {
       }
       parameter.getClass().getMethod("setValue", Object.class)
           .invoke(parameter, valueOf(parameter, value, literal));
+      completeProcessReference(node, parameter, value);
     }
+  }
+
+  /**
+   * Completa la referencia a otro job.
+   *
+   * Los componentes que lanzan otro job (el tRunJob, el tRunRoutine) guardan
+   * la referencia en varios parametros: el `PROCESS` con la etiqueta, y tres
+   * parametros tecnicos con el contexto, el id interno del item y la version.
+   * Si solo se pone la etiqueta, el job hijo no se encuentra.
+   *
+   * @param parameter el parametro que se acaba de poner.
+   * @param value la etiqueta del job hijo.
+   */
+  private static void completeProcessReference(Object node, Object parameter, String value) {
+    try {
+      Object fieldType = parameter.getClass().getMethod("getFieldType").invoke(parameter);
+      if (!"PROCESS_TYPE".equals(String.valueOf(fieldType))) {
+        return;
+      }
+      String jobName = value == null ? null : value.replace("\"", "").trim();
+      if (jobName == null || jobName.isEmpty()) {
+        return;
+      }
+      String id = TalendApi.internalIdOf(jobName);
+      if (id == null) {
+        BridgeLog.warn("No se encontro el job '" + jobName + "' en el repositorio");
+        return;
+      }
+      String label = TalendApi.projectLabel();
+      setTechnical(node, "PROCESS:PROCESS_TYPE_CONTEXT", "Default");
+      setTechnical(node, "PROCESS:PROCESS_TYPE_PROCESS",
+          (label == null ? "" : label) + ":" + id);
+      setTechnical(node, "PROCESS:PROCESS_TYPE_VERSION", "Latest");
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo completar la referencia al job", e);
+    }
+  }
+
+  /** Pone el valor de un parametro tecnico, creandolo si hace falta. */
+  private static void setTechnical(Object node, String name, String value) throws Exception {
+    Object parameter = node.getClass().getMethod("getElementParameter", String.class)
+        .invoke(node, name);
+    if (parameter == null) {
+      parameter = createParameter(node, name, technical(name));
+    }
+    if (parameter != null) {
+      parameter.getClass().getMethod("setValue", Object.class).invoke(parameter, value);
+    }
+  }
+
+  /** Spec de un parametro tecnico, con su tipo de campo. */
+  private static JsonObject technical(String name) {
+    JsonObject definition = new JsonObject();
+    definition.addProperty("field", "TECHNICAL");
+    definition.addProperty("value", "");
+    return definition;
   }
 
   /**

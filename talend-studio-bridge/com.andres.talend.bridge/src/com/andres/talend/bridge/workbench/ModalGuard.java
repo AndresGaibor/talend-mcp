@@ -96,6 +96,14 @@ public final class ModalGuard {
   /** Segundos que un dialogo de progreso puede estar abierto antes de cancelarlo. */
   private static final long PROGRESS_TIMEOUT_MS = 30_000L;
 
+  /**
+   * Intentos seguidos con la interfaz ocupada antes de pulsar Enter.
+   *
+   * Tres intentos son unos 12 s: tiempo de sobra para un job en curso, y
+   * suficiente para desatascar un aviso de Talend.
+   */
+  private static final int NATIVE_DIALOG_ROUNDS = 3;
+
   /** Momento en el que se vio cada dialogo por primera vez. */
   private static final Map<Shell, Long> FIRST_SEEN = Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -118,6 +126,7 @@ public final class ModalGuard {
       return;
     }
     Thread thread = new Thread(() -> {
+      int blockedRounds = 0;
       while (!Thread.currentThread().isInterrupted()) {
         try {
           Thread.sleep(WATCHDOG_INTERVAL_MS);
@@ -128,6 +137,18 @@ public final class ModalGuard {
           if (result.get("dismissed") instanceof List
               && !((List<?>) result.get("dismissed")).isEmpty()) {
             BridgeLog.info("El guardian de modales cerro: " + result.get("dismissed"));
+          }
+          blockedRounds = 0;
+        } catch (IllegalStateException e) {
+          // La interfaz esta ocupada: puede ser un dialogo nativo (que no
+          // se ve desde SWT) o un job largo. Tras varios intentos seguidos se
+          // pulsa Enter, que es como se cierran los avisos de Talend.
+          blockedRounds++;
+          if (blockedRounds >= NATIVE_DIALOG_ROUNDS) {
+            blockedRounds = 0;
+            if (closeNativeDialog()) {
+              BridgeLog.info("El guardian pulso Enter para cerrar un dialogo nativo");
+            }
           }
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -359,6 +380,33 @@ public final class ModalGuard {
       }
     } catch (RuntimeException e) {
       // El dialogo se ha cerrado mientras se leia: no pasa nada.
+    }
+  }
+
+  /**
+   * Cierra un dialogo modal nativo pulsando Enter.
+   *
+   * Talend muestra algunos avisos (el "Jobname Error" y el de error de
+   * generacion) con el `MessageBox` nativo de Windows, no con un shell de
+   * SWT. Esos dialogos no aparecen en `Display.getShells()` y bloquean el
+   * hilo de la UI a nivel de sistema operativo, asi que no se pueden cerrar
+   * con la API de SWT.
+   *
+   * La unica forma de hacerlo desde Java es simular la tecla: se envia un
+   * Enter, que es el boton por defecto de esos avisos.
+   *
+   * @return true si se ha enviado la tecla.
+   */
+  public static boolean closeNativeDialog() {
+    try {
+      java.awt.Robot robot = new java.awt.Robot();
+      robot.delay(150);
+      robot.keyPress(java.awt.event.KeyEvent.VK_ENTER);
+      robot.keyRelease(java.awt.event.KeyEvent.VK_ENTER);
+      return true;
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo pulsar Enter en el dialogo nativo", e);
+      return false;
     }
   }
 

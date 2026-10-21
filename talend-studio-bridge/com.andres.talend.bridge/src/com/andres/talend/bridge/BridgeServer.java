@@ -100,6 +100,30 @@ final class BridgeServer {
   }
 
   void start() {
+    // Al recargar el bundle en caliente, el socket del servidor viejo puede
+    // tardar un instante en liberarse. Si no se reintenta, el bundle nuevo no
+    // arranca y el bridge se queda caido.
+    IOException lastError = null;
+    for (int intento = 1; intento <= 6; intento++) {
+      try {
+        startServer();
+        return;
+      } catch (IOException e) {
+        lastError = e;
+        BridgeLog.warn("El puerto " + config.port + " esta ocupado (intento " + intento + "), reintentando");
+        try {
+          Thread.sleep(500L * intento);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+    }
+    BridgeLog.error("No se pudo iniciar el bridge HTTP en el puerto " + config.port, lastError);
+    throw new IllegalStateException("No se pudo iniciar el bridge HTTP", lastError);
+  }
+
+  private void startServer() throws IOException {
     try {
       server = HttpServer.create(new InetSocketAddress("127.0.0.1", config.port), 0);
       server.createContext("/ping", exchange -> guarded(exchange, () -> respond(exchange, 200, pingPayload())));
@@ -162,8 +186,7 @@ final class BridgeServer {
       BridgeLog.info("Bridge escuchando en http://127.0.0.1:" + config.port
           + " (token en " + BridgeConfig.tokenPath() + ")");
     } catch (IOException e) {
-      BridgeLog.error("No se pudo iniciar el bridge HTTP en el puerto " + config.port, e);
-      throw new IllegalStateException("No se pudo iniciar el bridge HTTP", e);
+      throw e;
     }
   }
 

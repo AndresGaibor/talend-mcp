@@ -1259,6 +1259,64 @@ Lo que hay que soltar antes de recargar:
 Por eso el `Activator` registra en el `HotReloadService` un `beforeReload` que
 para las dos cosas.
 
+
+### 18.12 Llamar a otro job: el PROCESS_TYPE y sus tres parametros tecnicos
+
+Los componentes que lanzan otro job (el `tRunJob`, el `tRunRoutine`) guardan la
+referencia en cuatro parametros, y con solo la etiqueta no basta:
+
+```xml
+<elementParameter field="PROCESS_TYPE" name="PROCESS" value="&quot;MI_JOB_HIJO&quot;"/>
+<elementParameter field="TECHNICAL" name="PROCESS:PROCESS_TYPE_CONTEXT" value="Default"/>
+<elementParameter field="TECHNICAL" name="PROCESS:PROCESS_TYPE_PROCESS" value="PRJ-BANCOLOMBIA:_5fdc50e8993c"/>
+<elementParameter field="TECHNICAL" name="PROCESS:PROCESS_TYPE_VERSION" value="Latest"/>
+```
+
+El `PROCESS:PROCESS_TYPE_PROCESS` es `<etiqueta del proyecto>:<id interno del
+item>`, y el id interno es el atributo `id` del `.properties` del job hijo. Por
+eso el bridge, cuando el parametro es de tipo `PROCESS_TYPE`, completa solo los
+tres tecnicos: basta con pedir `PROCESS` con la etiqueta del job hijo.
+
+### 18.13 Los avisos de Talend son MessageBox nativos
+
+El "Jobname Error" y el aviso de error de generacion **no son shells de SWT**:
+son el `MessageBox` nativo de Windows (`org.eclipse.swt.internal.win32.OS`).
+Eso tiene dos consecuencias:
+
+- No aparecen en `Display.getShells()`, asi que el guardian no los ve.
+- Bloquean el hilo de la UI a nivel de sistema operativo: el bucle de mensajes
+  de SWT no se ejecuta y **ninguna** llamada al hilo de la UI responde (el
+  `UiThread.sync` se queda esperando hasta agotar el tiempo).
+
+La unica forma de cerrarlos desde Java es simular la tecla: el guardian
+detecta que la interfaz lleva unos segundos ocupada y pulsa Enter, que es el
+boton por defecto de esos avisos.
+
+Para diagnosis: un volcado de hilos muestra el hilo principal de Studio
+parado en `org.eclipse.swt.internal.win32.OS.MessageBox(Native Method)`.
+
+## 22. Lo que funciona y lo que no
+
+| Fase | Prueba | Estado |
+|---|---|---|
+| 0 | `tFixedFlowInput` -> `tLogRow` | funciona |
+| 1 | `tFileInputDelimited` -> `tLogRow` | funciona |
+| 1 | `tFileInputDelimited` -> `tFileOutputDelimited` | funciona |
+| 2 | `tMap` con transformaciones y filtro | el `.item` sale bien; no compila |
+| 3 | `tUniqRow`, `tAggregateRow`, `tSortRow` | el `.item` sale bien; no genera codigo |
+| 4 | `tJavaRow` con codigo propio | funciona |
+| 6 | `tPrejob`, `tPostjob`, `tRunJob` entre jobs | funciona |
+
+Las dos que no llegan a ejecutarse son por el entorno, no por el diseno:
+
+- La **Fase 2** necesita el modulo `talend-tmap-dataset-1.2.16.jar`, que es de
+  Talend Exchange y no esta en Maven Central ni en los repositorios publicos
+  de Talend. Sin el, el `classpath.jar` del job sale vacio.
+- La **Fase 3** falla porque el generador de las transformaciones resuelve el
+  valor de la condicion contra las columnas del schema y el formato interno
+  que espera no esta en el catalogo (solo los nombres de columna). Es la parte
+  que falta por descubrir: la forma exacta de la condicion.
+
 ## 19. Estructura del codigo del bridge
 
 El paquete `automation` del plugin quedo dividido por responsabilidades, para

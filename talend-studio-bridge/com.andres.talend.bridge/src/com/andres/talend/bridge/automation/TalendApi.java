@@ -167,4 +167,58 @@ public final class TalendApi {
       return null;
     }
   }
+
+  /**
+   * Id interno de un job del repositorio, por su etiqueta.
+   *
+   * Es el atributo `id` del `.properties`, y es lo que usan las referencias
+   * entre jobs (el `PROCESS` del tRunJob).
+   */
+  public static String internalIdOf(String jobName) throws Exception {
+    Object repositoryFactory = repositoryFactory();
+    if (repositoryFactory == null) {
+      return null;
+    }
+    Class<?> enumClass = repositoryFactory.getClass().getClassLoader()
+        .loadClass("org.talend.core.model.repository.ERepositoryObjectType");
+    Object processType = enumClass.getField("PROCESS").get(null);
+    java.lang.reflect.Method getAll = null;
+    for (java.lang.reflect.Method method : repositoryFactory.getClass().getMethods()) {
+      if ("getAll".equals(method.getName()) && method.getParameterTypes().length == 1
+          && method.getParameterTypes()[0].getName().equals(enumClass.getName())) {
+        getAll = method;
+        break;
+      }
+    }
+    if (getAll == null) {
+      return null;
+    }
+    Object all = getAll.invoke(repositoryFactory, processType);
+    if (!(all instanceof Iterable)) {
+      return null;
+    }
+    for (Object viewObject : (Iterable<?>) all) {
+      Object label = viewObject.getClass().getMethod("getLabel").invoke(viewObject);
+      if (!jobName.equals(label)) {
+        continue;
+      }
+      Object property = viewObject.getClass().getMethod("getProperty").invoke(viewObject);
+      if (property == null) {
+        return null;
+      }
+      Object id = property.getClass().getMethod("getId").invoke(property);
+      return id == null ? null : String.valueOf(id);
+    }
+    return null;
+  }
+
+  /** Etiqueta del proyecto de Talend abierto (por ejemplo PRJ_BANCOLOMBIA). */
+  public static String projectLabel() throws Exception {
+    Object project = currentProject();
+    if (project == null) {
+      return null;
+    }
+    Object label = project.getClass().getMethod("getLabel").invoke(project);
+    return label == null ? null : String.valueOf(label);
+  }
 }
