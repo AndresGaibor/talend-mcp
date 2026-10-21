@@ -69,6 +69,15 @@ type Escenario = {
   job: string;
   /** Escenario conocido pero todavia sin resolver: se informa y se salta. */
   pendiente?: string;
+  /**
+   * Jobs auxiliares (el hijo de un `tRunJob`, por ejemplo). Se montan antes
+   * del job principal.
+   */
+  jobs?: Array<{
+    job: string;
+    nodos: Nodo[];
+    conexiones: Array<{ origen: string; destino: string; tipo?: string }>;
+  }>;
   nodos: Nodo[];
   conexiones: Array<{ origen: string; destino: string; tipo?: string }>;
   /** Que se espera al ejecutar. */
@@ -98,8 +107,8 @@ function errorDe(respuesta: { error?: { message?: string }; rawText?: string }):
 }
 
 /** El tipo de componente de un nodo del escenario, por su nombre. */
-function tipoDeNodo(escenario: Escenario, nombre: string): string {
-  return escenario.nodos.find((nodo) => nodo.nombre === nombre)?.type ?? "";
+function tipoDeNodo(nodos: Nodo[], nombre: string): string {
+  return nodos.find((nodo) => nodo.nombre === nombre)?.type ?? "";
 }
 
 /**
@@ -237,178 +246,198 @@ async function ejecutar(
   bridge: Awaited<ReturnType<typeof createBridgeClient>>,
   escenario: Escenario,
 ): Promise<Resultado> {
-  // 1. Job limpio.
+  // Los jobs auxiliares (el hijo de un tRunJob) se montan antes que el
+  // principal, y se compilan: un job padre necesita su hijo generado para
+  // poder llamarlo.
+  for (const auxiliar of escenario.jobs ?? []) {
+    const montado = await montarJob(bridge, auxiliar);
+    if (!montado.ok) {
+      return { ejecutaOk: false, salidaCorrecta: false, mensaje: montado.mensaje };
+    }
+    const compilado = await compilarEnStudio(bridge, auxiliar.job);
+    if (!compilado.ok) {
+      return {
+        ejecutaOk: false,
+        salidaCorrecta: false,
+        mensaje: `no se pudo compilar el job auxiliar '${auxiliar.job}': ${compilado.mensaje}`,
+      };
+    }
+  }
+
+  const montado = await montarJob(bridge, escenario);
+  if (!montado.ok) {
+    return { ejecutaOk: false, salidaCorrecta: false, mensaje: montado.mensaje };
+  }
+
+/**
+ * Monta un job: lo borra, lo crea, anade los nodos con su configuracion y
+ * los conecta.
+ */
+async function montarJob(
+  bridge: Awaited<ReturnType<typeof createBridgeClient>>,
+  spec: { job: string; nodos: Nodo[]; conexiones: Escenario["conexiones"] },
+): Promise<{ ok: boolean; mensaje?: string }> {  // 1. Job limpio.
   const borrado = await reintentar(
-    () => bridge.deleteJob({ name: escenario.job }),
+    () => bridge.deleteJob({ name: spec.job }),
     (mensaje) => mensaje.includes("hilo de la interfaz") || mensaje.includes("ocupado"),
   );
   if (!borrado.ok && !/no existe|not found|no se/i.test(errorDe(borrado))) {
-    return { ejecutaOk: false, salidaCorrecta: false, mensaje: `no se pudo borrar: ${errorDe(borrado)}` };
+    return { ok: false, mensaje: `no se pudo borrar: ${errorDe(borrado)}` };
   }
   const creado = await reintentar(
-    () => bridge.createJob({ name: escenario.job, replace: true }),
+    () => bridge.createJob({ name: spec.job, replace: true }),
     (mensaje) => mensaje.includes("hilo de la interfaz") || mensaje.includes("ocupado"),
   );
   if (!creado.ok) {
-    return { ejecutaOk: false, salidaCorrecta: false, mensaje: `no se pudo crear: ${errorDe(creado)}` };
+    return { ok: false, mensaje: `no se pudo crear: ${errorDe(creado)}` };
   }
 
   // 2. Nodos, con sus parametros y su schema.
   const nombres = new Map<string, string>();
   const tablasPorNodo: Array<{ uniqueName: string; tablas: NonNullable<Nodo["tablas"]> }> = [];
   const esquemasDespues: Array<{ uniqueName: string; schema: unknown[] }> = [];
-  for (const nodo of escenario.nodos) {
-    const parameters = nodo.parameters
-      ? Object.fromEntries(
-          Object.entries(nodo.parameters).map(([clave, valor]) => [
-            clave,
-            { value: conRutas(valor.value), literal: valor.literal },
-          ]),
-        )
-      : undefined;
-
-    const anadido = await bridge.addNode({
-      type: nodo.type,
-      job: escenario.job,
-      parameters,
-    });
-    if (!anadido.ok) {
-      return {
-        ejecutaOk: false,
-        salidaCorrecta: false,
-        mensaje: `no se pudo anadir ${nodo.type}: ${errorDe(anadido)}`,
-      };
-    }
-    // El bridge envuelve la respuesta en `result`.
-    const cuerpo = (anadido.data ?? {}) as {
-      uniqueName?: string;
-      result?: { uniqueName?: string };
+  for (const nodo of spec.nodos) {
+  const parameters = nodo.parameters
+    ? Object.fromEntries(
+        Object.entries(nodo.parameters).map(([clave, valor]) => [
+          clave,
+          { value: conRutas(valor.value), literal: valor.literal },
+        ]),
+      )
+    : undefined;
+  const anadido = await bridge.addNode({
+    type: nodo.type,
+    job: spec.job,
+    parameters,
+  });
+  if (!anadido.ok) {
+    return {
+  ok: false,
+      mensaje: `no se pudo anadir ${nodo.type}: ${errorDe(anadido)}`,
     };
-    const uniqueName = String(cuerpo.uniqueName ?? cuerpo.result?.uniqueName ?? "");
-    if (nodo.nombre) nombres.set(nodo.nombre, uniqueName);
-
-    if (nodo.columnas || nodo.columnasPorConector || nodo.esquemas) {
-      if (nodo.values) {
-        // El `tFixedFlowInput` lleva las filas en su tabla: se ponen con el
-        // schema, que es como lo hace el IDE.
-        const conDatos = await bridge.setNodeSchema({
-          job: escenario.job,
-          uniqueName,
-          columns: nodo.columnas ?? [],
-          values: nodo.values,
-        });
-        if (!conDatos.ok) {
-          return {
-            ejecutaOk: false,
-            salidaCorrecta: false,
-            mensaje: `no se pudieron poner los datos a ${nodo.type}: ${errorDe(conDatos)}`,
-          };
-        }
-      } else {
-        // El schema va en su conector y, si el nodo tiene mas de un conector
-        // de datos, tambien en los demas: el `tUniqRow` tiene el de salida en
-        // el conector UNIQUE.
-        const schema = nodo.esquemas
-          ? nodo.esquemas.map((tabla) => ({
-              connector: tabla.conector,
-              // "@uniqueName" es el nombre unico del nodo.
-              name: tabla.nombre === "@uniqueName" ? uniqueName : tabla.nombre,
-              columns: tabla.columnas,
-            }))
-          : [
-              ...(nodo.columnas
-                ? [{ connector: "FLOW", name: uniqueName, columns: nodo.columnas }]
-                : []),              ...Object.entries(nodo.columnasPorConector ?? {}).map(([connector, columnas]) => ({
-                connector,
-                name: uniqueName,
-                columns: columnas,
-              })),
-            ];
-        const conSchema = await bridge.configureNode({
-          job: escenario.job,
-          uniqueName,
-          schema,
-        });
-        if (!conSchema.ok) {
-          return {
-            ejecutaOk: false,
-            salidaCorrecta: false,
-            mensaje: `no se pudo poner el schema de ${nodo.type}: ${errorDe(conSchema)}`,
-          };
-        }
-        if (nodo.schemaDespuesDeConectar) {
-          esquemasDespues.push({ uniqueName, schema });
-        }
+  }
+  // El bridge envuelve la respuesta en `result`.
+  const cuerpo = (anadido.data ?? {}) as {
+    uniqueName?: string;
+    result?: { uniqueName?: string };
+  };
+  const uniqueName = String(cuerpo.uniqueName ?? cuerpo.result?.uniqueName ?? "");
+  if (nodo.nombre) nombres.set(nodo.nombre, uniqueName);
+  if (nodo.columnas || nodo.columnasPorConector || nodo.esquemas) {
+    if (nodo.values) {
+      // El `tFixedFlowInput` lleva las filas en su tabla: se ponen con el
+      // schema, que es como lo hace el IDE.
+      const conDatos = await bridge.setNodeSchema({
+        job: spec.job,
+        uniqueName,
+        columns: nodo.columnas ?? [],
+        values: nodo.values,
+      });
+      if (!conDatos.ok) {
+        return {
+  ok: false,
+          mensaje: `no se pudieron poner los datos a ${nodo.type}: ${errorDe(conDatos)}`,
+        };
+      }
+    } else {
+      // El schema va en su conector y, si el nodo tiene mas de un conector
+      // de datos, tambien en los demas: el `tUniqRow` tiene el de salida en
+      // el conector UNIQUE.
+      const schema = nodo.esquemas
+        ? nodo.esquemas.map((tabla) => ({
+            connector: tabla.conector,
+            // "@uniqueName" es el nombre unico del nodo.
+            name: tabla.nombre === "@uniqueName" ? uniqueName : tabla.nombre,
+            columns: tabla.columnas,
+          }))
+        : [
+            ...(nodo.columnas
+              ? [{ connector: "FLOW", name: uniqueName, columns: nodo.columnas }]
+              : []),              ...Object.entries(nodo.columnasPorConector ?? {}).map(([connector, columnas]) => ({
+              connector,
+              name: uniqueName,
+              columns: columnas,
+            })),
+          ];
+      const conSchema = await bridge.configureNode({
+        job: spec.job,
+        uniqueName,
+        schema,
+      });
+      if (!conSchema.ok) {
+        return {
+  ok: false,
+          mensaje: `no se pudo poner el schema de ${nodo.type}: ${errorDe(conSchema)}`,
+        };
+      }
+      if (nodo.schemaDespuesDeConectar) {
+        esquemasDespues.push({ uniqueName, schema });
       }
     }
-    if (nodo.tablas) {
-      // Las tablas se ponen DESPUES de conectar: al conectar, Talend rehace
-      // las tablas del componente y se pierde lo que se habia puesto antes
-      // (es lo que pasa con el tMap y con el tAggregateRow).
-      tablasPorNodo.push({ uniqueName, tablas: nodo.tablas });
-    }
   }
-
-  // 3. Conexiones. El conector se saca de la definicion del componente de
-  // origen: el tUniqRow no saca sus filas por "FLOW", sino por "UNIQUE".
-  for (const conexion of escenario.conexiones) {
-    const origen = nombres.get(conexion.origen);
-    const destino = nombres.get(conexion.destino);
-    if (!origen || !destino) {
-      return {
-        ejecutaOk: false,
-        salidaCorrecta: false,
-        mensaje: `conexion sin nodos: ${conexion.origen} -> ${conexion.destino}`,
-      };
-    }
-    const tipo = conexion.tipo ?? conectorDeSalida(tipoDeNodo(escenario, conexion.origen));
-    const conectada = await bridge.connectNodes({
-      job: escenario.job,
-      source: origen,
-      target: destino,
-      type: tipo,
-    });
-    if (!conectada.ok) {
-      return {
-        ejecutaOk: false,
-        salidaCorrecta: false,
-        mensaje: `no se pudo conectar ${conexion.origen} -> ${conexion.destino}: ${errorDe(conectada)}`,
-      };
-    }
+  if (nodo.tablas) {
+    // Las tablas se ponen DESPUES de conectar: al conectar, Talend rehace
+    // las tablas del componente y se pierde lo que se habia puesto antes
+    // (es lo que pasa con el tMap y con el tAggregateRow).
+    tablasPorNodo.push({ uniqueName, tablas: nodo.tablas });
   }
-
-  // 3. Tablas: despues de conectar, que es cuando el componente ya sabe
-  // que columnas de entrada tiene. Y tambien el schema de los componentes que
-  // lo piden (el tAggregateRow pierde la tabla de salida al conectar).
-  for (const pendiente of esquemasDespues) {
-    const conSchema = await bridge.configureNode({
-      job: escenario.job,
-      uniqueName: pendiente.uniqueName,
-      schema: pendiente.schema as never,
-    });
-    if (!conSchema.ok) {
-      return {
-        ejecutaOk: false,
-        salidaCorrecta: false,
-        mensaje: `no se pudo poner el schema: ${errorDe(conSchema)}`,
-      };
-    }
+}
+// 3. Conexiones. El conector se saca de la definicion del componente de
+// origen: el tUniqRow no saca sus filas por "FLOW", sino por "UNIQUE".
+for (const conexion of spec.conexiones) {
+  const origen = nombres.get(conexion.origen);
+  const destino = nombres.get(conexion.destino);
+  if (!origen || !destino) {
+    return {
+  ok: false,
+      mensaje: `conexion sin nodos: ${conexion.origen} -> ${conexion.destino}`,
+    };
   }
-
-  for (const pendiente of tablasPorNodo) {
-    const conTablas = await bridge.configureNode({
-      job: escenario.job,
-      uniqueName: pendiente.uniqueName,
-      tables: pendiente.tablas,
-    });
-    if (!conTablas.ok) {
-      return {
-        ejecutaOk: false,
-        salidaCorrecta: false,
-        mensaje: `no se pudieron poner las tablas: ${errorDe(conTablas)}`,
-      };
-    }
+  const tipo = conexion.tipo ?? conectorDeSalida(tipoDeNodo(spec.nodos, conexion.origen));
+  const conectada = await bridge.connectNodes({
+    job: spec.job,
+    source: origen,
+    target: destino,
+    type: tipo,
+  });
+  if (!conectada.ok) {
+    return {
+  ok: false,
+      mensaje: `no se pudo conectar ${conexion.origen} -> ${conexion.destino}: ${errorDe(conectada)}`,
+    };
   }
+}
+// 3. Tablas: despues de conectar, que es cuando el componente ya sabe
+// que columnas de entrada tiene. Y tambien el schema de los componentes que
+// lo piden (el tAggregateRow pierde la tabla de salida al conectar).
+for (const pendiente of esquemasDespues) {
+  const conSchema = await bridge.configureNode({
+    job: spec.job,
+    uniqueName: pendiente.uniqueName,
+    schema: pendiente.schema as never,
+  });
+  if (!conSchema.ok) {
+    return {
+  ok: false,
+      mensaje: `no se pudo poner el schema: ${errorDe(conSchema)}`,
+    };
+  }
+}
+for (const pendiente of tablasPorNodo) {
+  const conTablas = await bridge.configureNode({
+    job: spec.job,
+    uniqueName: pendiente.uniqueName,
+    tables: pendiente.tablas,
+  });
+  if (!conTablas.ok) {
+    return {
+  ok: false,
+      mensaje: `no se pudieron poner las tablas: ${errorDe(conTablas)}`,
+    };
+  }
+}
+  return { ok: true };
+}
 
   // 4. Ejecucion. Primero hay que generarlo y compilarlo: eso es lo que hace
   // el Run de Studio (y lo que deja el `target/classpath.jar` que necesita la
