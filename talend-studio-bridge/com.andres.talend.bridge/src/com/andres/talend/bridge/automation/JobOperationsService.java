@@ -165,6 +165,18 @@ public final class JobOperationsService {
   }
 
   /**
+   * Descarga un artefacto de Maven al repositorio local de Studio.
+   *
+   * Hay componentes cuyo runtime no viene con Studio y sin el el build falla
+   * con "Missing artifact". Con esto se descargan de Maven Central.
+   *
+   * @param spec groupId, artifactId y version.
+   */
+  public static Map<String, Object> installArtifact(JsonObject spec) {
+    return run("install-artifact", () -> ArtifactInstaller.install(spec));
+  }
+
+  /**
    * Normaliza un tipo de columna al identificador Java de Talend.
    */
   public static String normalizeColumnType(String type) {

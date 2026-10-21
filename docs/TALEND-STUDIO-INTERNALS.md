@@ -1385,3 +1385,48 @@ estandar y la salida de error, con las lineas de la salida ya separadas.
 **Ojo**: el proceso se relanza, no se intercepta. El job ya se ha ejecutado
 una vez con `talend_job_run` (que compila y lanza); `talend_job_execute` lo
 ejecuta otra vez para poder leer su salida.
+## 24. Componentes que no generan codigo valido en Talend 8.0.1
+
+El `tFileInputPositional` y el `tFileInputJSON` generan un job que **no
+compila** cuando el job tiene un output con trigger de error:
+
+```
+The method tFileInputPositional_2_onSubJobError(Exception, String, Map<String,Object>)
+is undefined for the type MI_JOB
+```
+
+**Por que**: el output genera el handler `tLogRow_2_error`, que llama al
+metodo `onSubJobError` del componente que falla. Ese metodo solo se genera
+para los componentes que tienen trigger de error, y un input no lo tiene.
+
+Lo que decide es el `DIE_ON_ERROR` **del componente del catalogo**, que en
+estos dos componentes viene en `true` (en el `tFileInputDelimited` viene en
+`false`, y ese compila). El MCP pone el parametro del nodo a `false` (y el
+`.item` lo refleja), pero el generador consulta el componente, no el nodo, y
+el componente del catalogo es compartido: no se puede cambiar sin afectar a
+todos los jobs.
+
+**Como se salva**: usando el `tFileInputDelimited` en lugar de estos dos, o
+esperando a que Talend lo corrija. No es un problema del MCP: el `.item` que
+genera es correcto.
+
+## 25. Descargar artefactos de Maven
+
+Hay componentes cuyo runtime no viene con Studio. El `tFileInputJSON`, por
+ejemplo, necesita `com.jayway.jsonpath:json-path:2.9.0`, y sin el el build
+falla con:
+
+```
+El contenedor Maven Dependencies referencia biblioteca ...json-path-2.9.0.jar inexistente
+Offline / Missing artifact com.jayway.jsonpath:json-path:jar:2.9.0
+```
+
+Studio usa como repositorio local el de su propia instalacion
+(`<instalacion>/configuration/.m2/repository`), asi que descargar ahi es lo que
+hace que el build lo encuentre. La tool `talend_studio_install_artifact` lo
+hace desde Maven Central.
+
+**Ojo**: el `tMap` necesita el modulo `talend-tmap-dataset-1.2.16.jar`, que
+**no esta en Maven Central** (es de Talend Exchange y pide credenciales). Con el
+instalador se comprueba enseguida: devuelve 404 para todos los group id
+habituales (`org.talend.components`, `org.talend.libraries`, ...).

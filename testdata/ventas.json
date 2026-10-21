@@ -1,0 +1,7 @@
+{
+  "ventas": [
+    { "id": 1, "ciudad": "Bogota", "monto": 100.5 },
+    { "id": 2, "ciudad": "Medellin", "monto": 200.25 },
+    { "id": 3, "ciudad": "Cali", "monto": 50.0 }
+  ]
+}

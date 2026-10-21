@@ -310,6 +310,27 @@ export const jobOperationsTools = [
     },
   },
   {
+    name: "talend_studio_install_artifact",
+    description: "Descarga un artefacto de Maven Central al repositorio local de Talend Studio. Necesario para los componentes cuyo runtime no viene con Studio (por ejemplo el tFileInputJSON, que necesita com.jayway.jsonpath:json-path).",
+    inputSchema: z.object({
+      groupId: z.string().describe("Group id de Maven, por ejemplo com.jayway.jsonpath"),
+      artifactId: z.string().describe("Artifact id de Maven, por ejemplo json-path"),
+      version: z.string().describe("Version, por ejemplo 2.9.0"),
+    }),
+    handler: async ({ groupId, artifactId, version }: { groupId: string; artifactId: string; version: string }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.installArtifact({ groupId, artifactId, version });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/artifacts/install",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
     name: "talend_job_execute",
     description: "Ejecuta un job ya generado y devuelve su salida (las filas que imprime el tLogRow). Sirve para comprobar que el resultado es el esperado: la vista Run de Studio no se puede leer desde el MCP.",
     inputSchema: z.object({

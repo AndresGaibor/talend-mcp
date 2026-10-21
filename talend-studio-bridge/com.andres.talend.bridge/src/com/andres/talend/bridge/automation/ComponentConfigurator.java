@@ -56,6 +56,60 @@ public final class ComponentConfigurator {
     applyTables(node, spec);
     applySchema(node, spec);
     applyNodeData(node, spec);
+    fixErrorTrigger(node);
+  }
+
+  /**
+   * Un componente sin salida no puede tener el trigger de error.
+   *
+   * Con `DIE_ON_ERROR` a true, el generador escribe una llamada al metodo
+   * `onSubJobError` del componente, pero ese metodo solo se genera para los
+   * componentes que tienen salida. El codigo no compila:
+   *
+   * ```
+   * tFileInputPositional_2_onSubJobError(exception, errorComponent, globalMap);
+   * ```
+   *
+   * Por eso, en un componente que solo recibe, el trigger se deja apagado.
+   */
+  private static void fixErrorTrigger(Object node) {
+    try {
+      Object parameter = node.getClass().getMethod("getElementParameter", String.class)
+          .invoke(node, "DIE_ON_ERROR");
+      if (parameter == null) {
+        return;
+      }
+      Object value = parameter.getClass().getMethod("getValue").invoke(parameter);
+      if (!"true".equalsIgnoreCase(String.valueOf(value))) {
+        return;
+      }
+      if (!isInputComponent(node)) {
+        return;
+      }
+      parameter.getClass().getMethod("setValue", Object.class).invoke(parameter, "false");
+    } catch (Exception e) {
+      // Si no se puede decidir, se deja el valor tal cual.
+    }
+  }
+
+  /**
+   * Si el componente solo recibe (no produce).
+   *
+   * En Talend los componentes que solo leen se llaman `*Input`. Los que
+   * producen (los outputs y los de transformacion) tienen el trigger de
+   * error y por eso el metodo `onSubJobError` si se genera.
+   */
+  private static boolean isInputComponent(Object node) {
+    try {
+      Object component = node.getClass().getMethod("getComponent").invoke(node);
+      if (component == null) {
+        return false;
+      }
+      String name = String.valueOf(component.getClass().getMethod("getName").invoke(component));
+      return name.contains("Input");
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   // ---------------------------------------------------------------------

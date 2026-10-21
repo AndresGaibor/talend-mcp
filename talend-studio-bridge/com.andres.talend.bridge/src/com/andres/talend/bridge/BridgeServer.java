@@ -141,6 +141,7 @@ final class BridgeServer {
       server.createContext("/workbench/show-view", exchange -> guarded(exchange, () -> handleShowView(exchange)));
       server.createContext("/workbench/dialogs", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(ModalGuard::dismissBlockingDialogs))));
       server.createContext("/workbench/modules/install", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(ModalGuard::installMissingModules))));
+      server.createContext("/automation/artifacts/install", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(() -> JobOperationsService.installArtifact(readJsonBody(exchange))))));
       server.createContext("/workspace/state", exchange -> guarded(exchange, () -> respond(exchange, 200, WorkspaceService.state())));
       server.createContext("/workspace/refresh", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkspaceService::refresh))));
       server.createContext("/problems/markers", exchange -> guarded(exchange, () -> respond(exchange, 200, ProblemMarkerService.markers())));

@@ -460,6 +460,18 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  /** Descarga un artefacto de Maven al repositorio local de Studio. */
+  async installArtifact(options: {
+    groupId: string;
+    artifactId: string;
+    version: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/artifacts/install", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   /**
    * Ejecuta un job ya generado y devuelve su salida.
    *
