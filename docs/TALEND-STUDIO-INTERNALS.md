@@ -1037,3 +1037,136 @@ correctos.
   salida, pero hay que replicar el contexto y las opciones del run.
 - **El codigo de columna se serializa bien pero `MetadataColumn.getType()` sigue vacio**:
   hay que leer `getTalendType()`. No es un bug de Talend, pero conviene recordarlo.
+
+## 18. Configuracion declarativa de componentes
+
+Para que el MCP cubra **todos** los componentes y no solo los que se
+programaron a mano, la configuracion de un nodo se declara y se aplica con la
+misma API para todos. Hay cuatro bloques, y los cuatro son genericos:
+
+```json
+{
+  "type": "tFileInputDelimited",
+  "parameters": { "FILENAME": { "value": "C:/datos/clientes.csv" },
+                  "HEADER": { "value": "1" } },
+  "tables":     { "INTABLE": { "columns": ["id", "ciudad"],
+                               "rows": [["1", "Bogota"]] } },
+  "schema":     [ { "connector": "FLOW", "name": "tFileInputDelimited_1",
+                    "columns": [ { "name": "id", "type": "id_Integer" } ] } ],
+  "mapper":     { "inputs": [], "outputs": [], "vars": [] }
+}
+```
+
+- `parameters`: los parametros del componente. El valor puede venir como
+  texto o como objeto con `value`, `field` (tipo de campo) y `literal`.
+- `tables`: los parametros de tipo TABLE, con sus columnas y sus filas.
+- `schema`: el metadata del nodo, por conector y por nombre de tabla.
+- `mapper`: el modelo del tMap (transformaciones, filtros y joins). Es lo
+  unico especifico de un componente, y vive en su propio adaptador.
+
+### 18.1 Los valores de texto son literales Java
+
+El generador de Talend escribe el valor del parametro tal cual en el codigo.
+Una ruta tiene que ir entre comillas o el codigo no compila:
+
+```java
+Object filename_tFileInputDelimited_2 = C:\datos\clientes.csv;   // no compila
+Object filename_tFileInputDelimited_2 = "C:\datos\clientes.csv";  // correcto
+```
+
+La regla que aplica el bridge:
+
+- si el valor ya viene entrecomillado, se deja;
+- si es un booleano o un numero, se deja (en Talend esos no son cadenas);
+- en cualquier otro caso, se entrecomilla.
+
+Y los booleanos y los numeros se distinguen porque el valor por defecto del
+parametro en el catalogo ya lo dice. Ojo con `HEADER` del `tFileInputDelimited`:
+no es un booleano sino el **numero de lineas de cabecera** ("1"), y si se
+pone "true" el constructor de `FileInputDelimited` no cuadra y no compila.
+
+### 18.2 Parametros que el catalogo no declara
+
+Hay parametros que el componente no expone en el catalogo hasta que se
+configura: el `FILENAME` del `tFileOutputDelimited` no esta, pero un job real
+si lo tiene. Cuando el spec pide un parametro que no existe, el bridge lo
+crea con el tipo indicado (o deducido: una ruta es un `FILE`). Es lo que hace
+el IDE al migrar un job antiguo.
+
+### 18.3 El nombre de una tabla del tMap es el de la conexion
+
+El conversor del tMap empareja las tablas del modelo con las conexiones por
+nombre. Si el modelo declara la tabla "out1" y la conexion se llama "conn_1",
+las expresiones se pierden. Por eso el bridge usa **los nombres reales de las
+conexiones** del nodo, no los que declara el spec.
+
+### 18.4 El modelo del tMap se aplica al final
+
+Al conectar, Talend rehace las tablas del tMap segun las conexiones y se
+pierde lo que se hubiera puesto antes. El orden correcto es:
+
+1. crear los nodos;
+2. conectar;
+3. poner el schema;
+4. **el modelo del mapper, al final**.
+
+### 18.5 Como se guarda el `nodeData`
+
+El `nodeData` (el modelo del tMap) es un objeto EMF que puede seguir apuntando
+al recurso anterior. Si se guarda tal cual, el `.item` sale sin el. La
+solucion es la misma que usa Studio: **copia en profundidad** antes de
+colgarlo.
+
+```java
+Object copia = EcoreUtil.copy(nodeData);
+nodeType.setNodeData(copia);
+```
+
+### 18.6 Consultar el catalogo: la pieza que hace esto escalable
+
+El MCP no puede adivinar como se configura un componente. La tool
+`talend_studio_component_parameters` lee del catalogo que publica el propio
+Studio los parametros de un componente, con su tipo y su valor por defecto:
+
+```
+talend_studio_component_parameters {"name": "tSortRow"}
+  -> CRITERIA [TABLE] = []
+     PARALLELIZE_NUMBER [TEXT] = 2
+     ...
+```
+
+Con eso, configurar un componente nuevo es un paso de leer su ficha, no de
+adivinar: el nucleo no conoce ningun componente concreto y anadir soporte
+para uno nuevo es anadir un adaptador (`MapperConfigurer`), no tocar el nucleo.
+
+## 19. Estructura del codigo del bridge
+
+El paquete `automation` del plugin quedo dividido por responsabilidades, para
+que tocar una cosa no obliga a tocar todo lo demas:
+
+| Clase | Que hace |
+|---|---|
+| `JobOperationsService` | Fachada: coordina y envuelve en el sobre de respuesta. |
+| `JobRepository` | Crear, borrar y abrir jobs del repositorio de Talend. |
+| `NodeOperations` | Alta, edicion, conexion y borrado de componentes. |
+| `SchemaOperations` | Schema del nodo y tablas de datos de los componentes. |
+| `ComponentConfigurator` | Configuracion declarativa (parameters, tables, schema). |
+| `MapperConfigurer` | El modelo del tMap (adaptador del componente). |
+| `JobPersistence` | Guardar el modelo en el `.item`. |
+| `ComponentCatalog` | Parametros de los componentes del catalogo. |
+| `TalendApi` | Acceso al IDE por reflexion (editor, proceso, nodo, componente). |
+| `TalendClasses` | Carga de clases de Talend desde los bundles de OSGi. |
+| `JsonSpec` | Lectura del spec JSON de las operaciones. |
+| `ColumnTypes` | Tipos Java de columna y sus alias. |
+
+## 20. Instalar el plugin: caliente o con p2
+
+- **Con Studio corriendo**: `bun run scripts/start.ts --install-bridge`
+  publica el jar en `~/.talend-bridge/hot/bridge.jar` y el plugin lo recarga
+  solo.
+- **Con Studio parado**: el mismo comando lo instala con p2.
+
+**No hay que copiar el jar a mano** en `studio/plugins/`: el nombre del
+archivo tiene que coincidir con la version del MANIFEST, y si no, Eclipse
+carga el bundle sin resolver sus dependencias y todo falla con
+`ClassNotFoundException: org.eclipse.draw2d.geometry.Point cannot be found`.
