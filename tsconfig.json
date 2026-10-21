@@ -13,6 +13,9 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
+    // Con noEmit, tsc guarda aqui lo ya comprobado: el 2.o typecheck solo revisa lo que cambio.
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsc.tsbuildinfo",
 
     // Best practices
     "strict": true,

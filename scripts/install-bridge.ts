@@ -5,6 +5,8 @@ import { homedir, platform, tmpdir } from "node:os";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "url";
 
+import { buildBridgeFast } from "./fast-bridge-build";
+
 /**
  * Instalador del plugin Java del bridge (Talend Studio Bridge).
  *
@@ -154,11 +156,16 @@ function safeReaddir(dir: string): string[] {
   }
 }
 
+const javaVersions = new Map<string, string | null>();
+
+/** Cada `java -version` cuesta una JVM: se pregunta una sola vez por JDK. */
 function runJavaVersion(jdk: string): string | null {
+  if (javaVersions.has(jdk)) return javaVersions.get(jdk) ?? null;
   const result = spawnSync(join(jdk, "bin", IS_WIN ? "java.exe" : "java"), ["-version"], { encoding: "utf8" });
   const output = `${result.stderr ?? ""}${result.stdout ?? ""}`;
-  const match = output.match(/version "(\d+)/);
-  return match ? match[1]! : null;
+  const version = output.match(/version "(\d+)/)?.[1] ?? null;
+  javaVersions.set(jdk, version);
+  return version;
 }
 
 function studioCandidates(): string[] {
@@ -275,7 +282,23 @@ function p2Director(studio: StudioInstall, args: string[]): number {
   const result = spawnSync(studio.exe, args, { stdio: "inherit", shell: false });
   return result.status ?? 1;
 }
-function isStudioRunning(studio: StudioInstall): boolean {
+const BRIDGE_PING_URL = "http://127.0.0.1:3930/ping";
+
+/** Version del bundle que esta sirviendo el bridge ahora, o null si no responde. */
+async function runningBridgeVersion(): Promise<string | null> {
+  try {
+    const response = await fetch(BRIDGE_PING_URL, { signal: AbortSignal.timeout(1000) });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { plugin?: string; version?: string };
+    return payload.plugin === "com.andres.talend.bridge" ? (payload.version ?? "") : null;
+  } catch {
+    return null;
+  }
+}
+
+async function isStudioRunning(studio: StudioInstall): Promise<boolean> {
+  // Si el bridge contesta, Studio esta abierto: evita lanzar `tasklist` (~0,5 s).
+  if ((await runningBridgeVersion()) !== null) return true;
   if (IS_WIN) {
     // tasklist trunca el nombre de la imagen a 25 caracteres, asi que no se
     // puede filtrar por el nombre completo: se busca el prefijo.
@@ -593,27 +616,34 @@ function builtJarPath(projectRoot: string): string | undefined {
  * servidor HTTP: la respuesta llega con el mismo numero de version (la version
  * la fija el build), asi que se valida que el bridge siga respondiendo.
  */
-async function waitForHotReload(timeoutMs = 30_000): Promise<boolean> {
-  const url = "http://127.0.0.1:3930/ping";
-  const deadline = Date.now() + timeoutMs;
+async function waitForHotReload(expectedVersion?: string, timeoutMs = 30_000): Promise<boolean> {
+  const started = Date.now();
+  const deadline = started + timeoutMs;
   let sawDown = false;
+  let sawUp = false;
 
   while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 250));
 
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(2000) });
-      if (response.ok) {
-        const payload = (await response.json()) as { plugin?: string; version?: string };
-        if (payload.plugin === "com.andres.talend.bridge") {
-          if (sawDown) {
-            ok("El bridge se reinicio con el bundle nuevo.");
-          }
-          return true;
-        }
-      }
-    } catch {
+    const version = await runningBridgeVersion();
+    if (version === null) {
       sawDown = true;
+      // Si el bridge ni siquiera estaba arriba (Studio arrancando), no hay
+      // nada que recargar: el watcher tomara el jar cuando el plugin cargue.
+      if (!sawUp && Date.now() - started > 8_000) {
+        warn("El bridge no responde (¿Studio todavia arrancando?). Cargara el bundle nuevo al iniciar.");
+        return false;
+      }
+      continue;
+    }
+    sawUp = true;
+
+    // Con una version esperada (build rapido: lleva un calificador unico) se
+    // sabe exactamente cuando el bundle nuevo ya atiende. Sin ella, solo se
+    // puede confiar en haber visto el bridge caer y volver.
+    if (expectedVersion ? version === expectedVersion : sawDown) {
+      ok("El bridge se reinicio con el bundle nuevo.");
+      return true;
     }
   }
 
@@ -622,8 +652,54 @@ async function waitForHotReload(timeoutMs = 30_000): Promise<boolean> {
 
 // ─── Entry point ────────────────────────────────────────────────────────────
 
+/** Resultado de compilar: el jar y, si se conoce, la version que traera el bundle. */
+type Compiled = { jar: string; version?: string; reused?: boolean };
+
+function compileWithMaven(projectRoot: string, jdk: string): Compiled | null {
+  step("Compilando el plugin (Maven + Tycho)...");
+  if (!buildBridge(projectRoot, jdk)) {
+    fail("La compilacion fallo.");
+    return null;
+  }
+  ok("Plugin compilado.");
+
+  const jar = builtJarPath(projectRoot);
+  if (!jar) {
+    fail("No se encontro el jar compilado del bundle.");
+    return null;
+  }
+  return { jar };
+}
+
+function compileFast(projectRoot: string, jdk: string, force: boolean): Compiled | null | "fallback" {
+  step("Compilando el plugin (javac, sin Maven)...");
+  const started = Date.now();
+  const result = buildBridgeFast(projectRoot, jdk, force);
+
+  if (result.status === "unavailable") {
+    warn(`Compilacion rapida no disponible: ${result.reason}. Se usa Maven.`);
+    return "fallback";
+  }
+  if (result.status === "failed") {
+    fail("La compilacion fallo.");
+    console.error(result.errors);
+    return null;
+  }
+
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  if (result.build.reused) {
+    ok(`Sin cambios en las fuentes: se reutiliza el jar (${seconds} s).`);
+  } else {
+    ok(`Plugin compilado en ${seconds} s (version ${result.build.version}).`);
+  }
+  return { jar: result.build.jar, version: result.build.version, reused: result.build.reused };
+}
+
 export async function installBridge(): Promise<void> {
   const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const flags = new Set(process.argv.slice(2));
+  const useMaven = flags.has("--maven");
+  const force = flags.has("--force");
 
   banner("Talend Studio Bridge", [
     `  ${c("Compila el plugin y lo instala (o actualiza) en Talend Studio.", C.dim)}`,
@@ -646,25 +722,34 @@ export async function installBridge(): Promise<void> {
   ok(`Ejecutable: ${c(basename(studio.exe), C.cyan)}`);
   ok(`JDK: ${c(studio.jdk, C.cyan)} (Java ${runJavaVersion(studio.jdk)})`);
 
-  const studioRunning = isStudioRunning(studio);
+  const studioRunning = await isStudioRunning(studio);
   if (studioRunning) {
     info("Talend Studio esta corriendo: se usara carga en caliente (sin reiniciar).");
   }
 
   separador();
-  step("Compilando el plugin (Maven + Tycho)...");
-  if (!buildBridge(projectRoot, studio.jdk)) {
-    fail("La compilacion fallo.");
+  // Con Studio abierto solo hace falta el jar: se compila con javac. Maven
+  // queda para el update site de p2 (Studio cerrado) y como respaldo.
+  let compiled: Compiled | null;
+  if (studioRunning && !useMaven) {
+    const fast = compileFast(projectRoot, studio.jdk, force);
+    compiled = fast === "fallback" ? compileWithMaven(projectRoot, studio.jdk) : fast;
+  } else {
+    compiled = compileWithMaven(projectRoot, studio.jdk);
+  }
+  if (!compiled) {
     process.exitCode = 1;
     return;
   }
-  ok("Plugin compilado.");
+  const jar = compiled.jar;
 
-  const jar = builtJarPath(projectRoot);
-  if (!jar) {
-    fail("No se encontro el jar compilado del bundle.");
-    process.exitCode = 1;
-    return;
+  // Nada que recargar: las fuentes no cambiaron y Studio ya sirve esta version.
+  if (studioRunning && compiled.reused && compiled.version && !force) {
+    if ((await runningBridgeVersion()) === compiled.version) {
+      separador();
+      ok("El bridge ya esta actualizado: no hay nada que recargar.");
+      return;
+    }
   }
 
   // ── Carga en caliente ─────────────────────────────────────────────────────
@@ -678,7 +763,7 @@ export async function installBridge(): Promise<void> {
   }
 
   if (studioRunning) {
-    const reloaded = await waitForHotReload();
+    const reloaded = await waitForHotReload(compiled.version);
     separador();
     banner(reloaded ? "Actualizacion en caliente completada" : "Bundle publicado", [
       `  ${c("Plugin:", C.dim)} com.andres.talend.bridge`,
