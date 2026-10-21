@@ -501,7 +501,7 @@ public final class JobRepository {
   }
 
   /** Identificador unico con el formato que usa Talend. */
-  private static String generateId() {
+  static String generateId() {
     return "_" + Long.toHexString(System.nanoTime());
   }
 

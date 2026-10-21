@@ -183,6 +183,12 @@ final class BridgeServer {
       server.createContext("/automation/job/contexts/parameter", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setContextParameter")));
       server.createContext("/automation/job/contexts/parameter/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteContextParameter")));
       server.createContext("/automation/job/contexts/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteContext")));
+      // Los contextos del proyecto (los items de tipo Contexts del repositorio).
+      server.createContext("/automation/repository/contexts", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "repositoryContexts")));
+      server.createContext("/automation/repository/contexts/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createRepositoryContext")));
+      server.createContext("/automation/repository/contexts/parameter", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setRepositoryContextParameter")));
+      server.createContext("/automation/repository/contexts/parameter/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteRepositoryContextParameter")));
+      server.createContext("/automation/repository/contexts/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteRepositoryContext")));
       server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
       server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
       server.createContext("/automation/nodes/update", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "updateNode")));
@@ -459,6 +465,16 @@ final class BridgeServer {
           return JobOperationsService.deleteContextParameter(body);
         case "deleteContext":
           return JobOperationsService.deleteContext(body);
+        case "repositoryContexts":
+          return JobOperationsService.repositoryContexts(body);
+        case "createRepositoryContext":
+          return JobOperationsService.createRepositoryContext(body);
+        case "setRepositoryContextParameter":
+          return JobOperationsService.setRepositoryContextParameter(body);
+        case "deleteRepositoryContextParameter":
+          return JobOperationsService.deleteRepositoryContextParameter(body);
+        case "deleteRepositoryContext":
+          return JobOperationsService.deleteRepositoryContext(body);
         default:
           return JobOperationsService.listNodes(body);
       }

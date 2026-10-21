@@ -550,6 +550,61 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  /** Los contextos del proyecto (los items de tipo Contexts del repositorio). */
+  async repositoryContexts(options?: { project?: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/repository/contexts", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
+  /** Crea un contexto del proyecto. */
+  async createRepositoryContext(options: {
+    name: string;
+    version?: string;
+    context?: string;
+    parameters?: Array<{ name: string; value: string; type?: string }>;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/repository/contexts/create", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Crea o cambia una variable de un contexto del proyecto. */
+  async setRepositoryContextParameter(options: {
+    name: string;
+    context: string;
+    parameter: string;
+    value: string;
+    type?: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/repository/contexts/parameter", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Borra una variable de un contexto del proyecto. */
+  async deleteRepositoryContextParameter(options: {
+    name: string;
+    context: string;
+    parameter: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/repository/contexts/parameter/delete", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Borra un contexto del proyecto. */
+  async deleteRepositoryContext(options: { name: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/repository/contexts/delete", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   /** Progreso de la medicion de cobertura y, al terminar, su informe. */
   async coverageStatus(options?: { cancel?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/coverage/status", {

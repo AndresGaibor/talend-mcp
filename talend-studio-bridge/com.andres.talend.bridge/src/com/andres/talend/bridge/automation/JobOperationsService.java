@@ -249,6 +249,49 @@ public final class JobOperationsService {
   }
 
   /**
+   * Los contextos del proyecto (los items de tipo Contexts del repositorio).
+   */
+  public static Map<String, Object> repositoryContexts(JsonObject spec) {
+    return run("repository-contexts", () -> RepositoryContexts.list(spec));
+  }
+
+  /**
+   * Crea un contexto del proyecto.
+   *
+   * @param spec `name`, `version`, `context` y `parameters`.
+   */
+  public static Map<String, Object> createRepositoryContext(JsonObject spec) {
+    return run("create-repository-context", () -> RepositoryContexts.create(spec));
+  }
+
+  /**
+   * Crea o cambia una variable de un contexto del proyecto.
+   *
+   * @param spec `name`, `context`, `parameter`, `value` y `type` opcional.
+   */
+  public static Map<String, Object> setRepositoryContextParameter(JsonObject spec) {
+    return run("set-repository-context-parameter", () -> RepositoryContexts.setParameter(spec));
+  }
+
+  /**
+   * Borra una variable de un contexto del proyecto.
+   *
+   * @param spec `name`, `context` y `parameter`.
+   */
+  public static Map<String, Object> deleteRepositoryContextParameter(JsonObject spec) {
+    return run("delete-repository-context-parameter", () -> RepositoryContexts.deleteParameter(spec));
+  }
+
+  /**
+   * Borra un contexto del proyecto.
+   *
+   * @param spec `name`.
+   */
+  public static Map<String, Object> deleteRepositoryContext(JsonObject spec) {
+    return run("delete-repository-context", () -> RepositoryContexts.delete(spec));
+  }
+
+  /**
    * Progreso de la medicion de cobertura y, al terminar, su informe.
    *
    * @param spec opcionalmente `cancel: true`.
