@@ -22,11 +22,21 @@ public final class ComponentCatalog {
   /**
    * Lista los componentes del catalogo.
    *
+   * Cada componente existe en una variante por tipo de job (Standard "DI",
+   * Spark Batch, Spark Streaming...) con el mismo nombre y parametros distintos
+   * (el tFileOutputDelimited de Standard tiene FILENAME; el de Spark, FOLDER).
+   *
    * @param spec opcionalmente `filter` (texto que tiene que aparecer en el
-   *        nombre) y `limit`.
+   *        nombre), `limit` y `paletteType` (por defecto "DI", Standard; "*"
+   *        para todos).
    */
   public static Map<String, Object> list(JsonObject spec) throws Exception {
     String filter = JsonSpec.string(spec, "filter");
+    String paletteType = JsonSpec.string(spec, "paletteType");
+    if (paletteType == null || paletteType.trim().isEmpty()) {
+      paletteType = TalendApi.DEFAULT_PALETTE;
+    }
+    Map<String, Integer> byPalette = new LinkedHashMap<>();
     int limit = 100000;
     String rawLimit = JsonSpec.string(spec, "limit");
     if (rawLimit != null) {
@@ -38,8 +48,17 @@ public final class ComponentCatalog {
     }
 
     List<String> names = new ArrayList<>();
+    java.util.Set<String> seen = new java.util.HashSet<>();
     for (Object component : components()) {
       String name = String.valueOf(component.getClass().getMethod("getName").invoke(component));
+      String palette = String.valueOf(TalendApi.invokeOrNull(component, "getPaletteType"));
+      byPalette.merge(palette, 1, Integer::sum);
+      if (!"*".equals(paletteType) && !paletteType.equalsIgnoreCase(palette)) {
+        continue;
+      }
+      if (!seen.add(name + "|" + palette)) {
+        continue;
+      }
       if (filter != null && !filter.trim().isEmpty() && !name.toLowerCase().contains(filter.toLowerCase())) {
         continue;
       }
@@ -52,6 +71,8 @@ public final class ComponentCatalog {
 
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("count", names.size());
+    result.put("paletteType", paletteType);
+    result.put("byPaletteType", byPalette);
     result.put("components", names);
     return result;
   }
@@ -71,14 +92,18 @@ public final class ComponentCatalog {
     // Se crea un nodo con el componente: eso es lo que hace el palette al
     // soltar el componente, y deja el nodo con los parametros que tendra en
     // el job, con sus valores por defecto.
+    // El constructor de Node necesita un proceso (ver processForIntrospection).
+    Object process = TalendApi.processForIntrospection();
     Class<?> nodeClass = TalendClasses.load("org.talend.designer.core.ui.editor.nodes.Node");
     Object node = nodeClass
-        .getConstructor(TalendClasses.load("org.talend.core.model.components.IComponent"))
-        .newInstance(component);
+        .getConstructor(TalendClasses.load("org.talend.core.model.components.IComponent"),
+            TalendClasses.load("org.talend.core.model.process.IProcess2"))
+        .newInstance(component, process);
     createElementParameters(nodeClass, node);
 
+    List<?> nodeParameters = (List<?>) node.getClass().getMethod("getElementParameters").invoke(node);
     List<Map<String, Object>> parameters = new ArrayList<>();
-    for (Object parameter : (List<?>) node.getClass().getMethod("getElementParameters").invoke(node)) {
+    for (Object parameter : nodeParameters) {
       Map<String, Object> item = new LinkedHashMap<>();
       item.put("name", parameter.getClass().getMethod("getName").invoke(parameter));
       item.put("field", parameter.getClass().getMethod("getFieldType").invoke(parameter));
@@ -92,6 +117,15 @@ public final class ComponentCatalog {
       }
       if (displayName != null) {
         item.put("displayName", displayName);
+      }
+      // Lo que decide si el parametro hay que rellenarlo: obligatorio, visible
+      // (algunos solo se muestran segun otro valor) y editable.
+      item.put("required", flag(parameter, "isRequired", null));
+      item.put("show", flag(parameter, "isShow", nodeParameters));
+      item.put("readOnly", flag(parameter, "isReadOnly", null));
+      Object category = TalendApi.invokeOrNull(parameter, "getCategory");
+      if (category != null) {
+        item.put("category", String.valueOf(category));
       }
       // Los codigos de columna de las tablas: son los que hay que poner en
       // el spec para rellenar la tabla.
@@ -107,6 +141,22 @@ public final class ComponentCatalog {
     result.put("version", component.getClass().getMethod("getVersion").invoke(component));
     result.put("parameters", parameters);
     return result;
+  }
+
+  /**
+   * Resultado booleano de un metodo del parametro (isRequired, isShow...).
+   *
+   * @param context lista de parametros que pide isShow; null si el metodo no recibe nada.
+   */
+  private static boolean flag(Object parameter, String method, List<?> context) {
+    try {
+      Object value = context == null
+          ? parameter.getClass().getMethod(method).invoke(parameter)
+          : parameter.getClass().getMethod(method, List.class).invoke(parameter, context);
+      return Boolean.TRUE.equals(value);
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   /**

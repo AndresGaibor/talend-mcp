@@ -19,7 +19,7 @@ Estado de partida y guia de uso: [GUIA-AGENTE.md](GUIA-AGENTE.md). Pruebas por f
 | L4 Compilar | Studio genera codigo y compila sin errores ni avisos | Problemas del job vacios |
 | L5 Ejecutar | El job corre y la salida coincide con la esperada | `talend_job_execute` contra un resultado definido antes |
 
-Hoy: **L1/L2 medido en el catalogo entero: 1245 de 1294 (96 %)**. L4/L5 (compila y ejecuta con la salida correcta) validados solo en unos 8 componentes: tFixedFlowInput, tLogRow, tFileInputDelimited, tFileOutputDelimited, tJavaRow, tPrejob, tPostjob, tRunJob.
+Hoy: **L1/L2 medido en los 897 componentes Standard: 877 (98 %)**. L4/L5 (compila y ejecuta con la salida correcta) validados solo en muestras y en unos 8 componentes: tFixedFlowInput, tLogRow, tFileInputDelimited, tFileOutputDelimited, tJavaRow, tPrejob, tPostjob, tRunJob.
 
 ## 1. Lo que bloqueaba la medicion (resuelto)
 
@@ -53,13 +53,12 @@ La cobertura reportaba los 1294 componentes como fallidos. Causas reales, reprod
 
 ### Resultado de la primera medicion (L1/L2)
 
-Los 49 componentes que fallan tienen dos causas, y las dos apuntan a tareas nuevas:
+El catalogo (1294 entradas) incluye 397 variantes de Spark/Streaming; los 897 componentes Standard fallan solo por una causa:
 
 - **20 sin runtime** (`components-jdbc-runtime:0.37.61`, familias Athena, Databricks SQL, Redshift):
   Studio los resuelve desde un repositorio que aqui no responde. Hay que averiguar de donde los
   baja Studio (configuracion de Maven/Nexus de Talend) y si hace falta red o credenciales.
-- **29 de Spark/Big Data**: solo existen en jobs Spark. **Falta soporte para tipos de job**
-  (Standard, Spark Batch, Spark Streaming, Standard Streaming): hoy `create` solo crea jobs Standard.
+- **Variantes de Spark y Streaming** (397 de las 1294 entradas del catalogo): son otro tipo de job, no fallos. **Falta soporte para tipos de job** (Spark Batch, Spark Streaming, Structured Streaming); hoy `create` solo crea jobs Standard.
 
 ## 3. P1: el modelo completo de un job
 

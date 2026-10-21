@@ -286,6 +286,28 @@ public final class CoverageChecker {
     return result;
   }
 
+  /**
+   * Valor de prueba para un parametro obligatorio, o null si no se sabe darle uno
+   * sin romperlo (listas, casillas, tablas, numeros...).
+   */
+  private static String testValueFor(String field, String name, String defaultValue) {
+    boolean numeric = defaultValue != null && defaultValue.matches("-?\\d+(\\.\\d+)?");
+    boolean bool = "true".equals(defaultValue) || "false".equals(defaultValue);
+    if (numeric || bool) {
+      return null;
+    }
+    switch (field) {
+      case "FILE":
+        return "C:/tmp/mcp_coverage/" + name.toLowerCase() + ".dat";
+      case "DIRECTORY":
+        return "C:/tmp/mcp_coverage";
+      case "TEXT":
+        return "prueba";
+      default:
+        return null;
+    }
+  }
+
   /** Borra y crea de nuevo el job de pruebas, vacio. Va en la UI. */
   private static Object recreateJob() throws Exception {
     JsonObject deleteSpec = new JsonObject();
@@ -347,23 +369,50 @@ public final class CoverageChecker {
       configSpec.addProperty("job", JOB_NAME);
       JsonObject values = new JsonObject();
       int applied = 0;
+
+      // Primero los parametros que el componente exige (obligatorios, visibles
+      // y editables): sin ellos el codigo generado no compila (un
+      // tFileOutputDelimited sin FILENAME da "The constructor File() is
+      // undefined"). Solo los de texto y archivo: un CHECK a false puede
+      // desactivar el nodo y Talend lo saca del modelo, y un numero no admite
+      // una cadena.
       for (Map<String, Object> parameter : parameters) {
-        if (applied >= 2) {
-          break;
-        }
         String field = String.valueOf(parameter.get("field"));
-        // Solo se prueban los de texto: un CHECK a false puede desactivar
-        // el nodo, y Talend entonces lo saca del modelo.
-        if (!"TEXT".equals(field)) {
+        String parameterName = String.valueOf(parameter.get("name"));
+        if (INTERNAL_PARAMETERS.contains(parameterName)) {
           continue;
         }
-        if (INTERNAL_PARAMETERS.contains(String.valueOf(parameter.get("name")))) {
+        if (!Boolean.TRUE.equals(parameter.get("required"))
+            || !Boolean.TRUE.equals(parameter.get("show"))
+            || Boolean.TRUE.equals(parameter.get("readOnly"))) {
+          continue;
+        }
+        String testValue = testValueFor(field, parameterName, String.valueOf(parameter.get("default")));
+        if (testValue == null) {
           continue;
         }
         JsonObject value = new JsonObject();
-        value.addProperty("value", "prueba");
-        values.add(String.valueOf(parameter.get("name")), value);
+        value.addProperty("value", testValue);
+        values.add(parameterName, value);
         applied++;
+      }
+
+      // Sin obligatorios (o sin compilar) se mantiene la prueba original: dos
+      // parametros de texto cualquiera, para comprobar que se configura.
+      if (applied == 0 && !compile) {
+        for (Map<String, Object> parameter : parameters) {
+          if (applied >= 2) {
+            break;
+          }
+          String parameterName = String.valueOf(parameter.get("name"));
+          if (!"TEXT".equals(String.valueOf(parameter.get("field"))) || INTERNAL_PARAMETERS.contains(parameterName)) {
+            continue;
+          }
+          JsonObject value = new JsonObject();
+          value.addProperty("value", "prueba");
+          values.add(parameterName, value);
+          applied++;
+        }
       }
       if (applied > 0) {
         configSpec.add("parameters", values);

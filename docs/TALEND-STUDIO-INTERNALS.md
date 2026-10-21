@@ -1498,3 +1498,41 @@ Verificado: un `tFileInputDelimited` con `FILENAME` sin comillas da `Syntax erro
 **Lectura de los fallos:** un componente de salida a archivo sin `FILENAME` da `The constructor File() is
 undefined`: es un parametro obligatorio sin rellenar, no un fallo del MCP. Lo mismo `FileWriter()` en
 `tFileOutputJSON`. Al medir L4 hay que darle a cada componente sus parametros obligatorios.
+
+## 29. El catalogo tiene una variante de cada componente por tipo de job
+
+El catalogo de Studio (`IComponentsFactory.getComponents()`) devuelve **1294 entradas**, pero no son 1294
+componentes distintos: el mismo nombre aparece una vez por tipo de job, y `IComponent.getPaletteType()` dice cual.
+
+| `getPaletteType()` | Entradas | Para que job |
+|---|---|---|
+| `DI` | 897 | Standard (Data Integration) |
+| `SPARK` | 166 | Spark Batch |
+| `SPARKSTREAMING` | 171 | Spark Streaming |
+| `STRUCTUREDSTREAMING` | 60 | Structured Streaming |
+
+Las variantes **no son intercambiables**: tienen parametros distintos. Con `tFileOutputDelimited`, la variante
+Standard declara `FILENAME` (`REQUIRED="true"`, tipo `FILE`) y la de Spark declara `FOLDER`
+(`DIRECTORY_HADOOP`). Buscar "el primero que case" por nombre devolvia a veces la de Spark, y el job Standard
+quedaba con parametros que no son suyos. Por eso:
+
+- `TalendApi.findCatalogComponent(nombre)` busca la variante `DI` (con respaldo a la primera que case).
+- `ComponentCatalog.list` devuelve por defecto solo `DI` y sin duplicados; `paletteType: "*"` devuelve todas y
+  `byPaletteType` da el recuento.
+- Los componentes de Spark/Streaming solo tienen sentido en un job de ese tipo, que el MCP aun no crea.
+
+### Donde estan las definiciones
+
+Cada componente tiene su definicion en disco: `plugins/org.talend.designer.components.localprovider_*/components/<nombre>/`
+(Standard; tambien `sparkprovider` y `sparkstrprovider`), con `<nombre>_java.xml` (parametros, `REQUIRED`,
+`DEFAULT`, `SHOW_IF`) y las plantillas `*.javajet` que generan el codigo. Son la fuente mas fiable para saber que
+parametros exige un componente y como se usan, y se pueden leer sin abrir Studio.
+
+### Leer los parametros de un componente suelto
+
+`new Node(component)` necesita un proceso: su `init` le pide un nombre unico y da NPE si no lo hay. Se usa el
+constructor `Node(IComponent, IProcess2)` con el proceso del job activo o, si no hay ninguno, el del job de
+trabajo `MCP_Scratch` (se crea la primera vez). El nodo no se anade al job. Los parametros de cada elemento dicen
+`required` (`isRequired()`), `show` (`isShow(lista)`) y `readOnly`: `isRequired` es muy generoso (tambien marca
+casillas), asi que para rellenar se usa obligatorio **y** visible **y** editable **y** de tipo texto, archivo o
+carpeta **y** con valor vacio.

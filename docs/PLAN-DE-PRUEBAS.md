@@ -55,27 +55,27 @@ Orden recomendado para lo que falta: terminar la 3 (descubrir el formato de las 
 
 ## Cobertura del catalogo
 
-`bun run scripts/coverage.ts` crea, configura, guarda, lista y borra cada uno de los 1294 componentes
-del catalogo en un job de pruebas (`MCP_Coverage`) y escribe `testdata/cobertura.csv`. Tarda unos
-20 minutos: arranca en el bridge y consulta el progreso (una peticion HTTP unica la cortaria el
-cliente a los 5 min). `--filter`, `--max`, `--cancel`. Tras cada fallo el job de pruebas se
-reinicia, para que un componente roto no contamine a los siguientes.
+`bun run scripts/coverage.ts` crea, configura, guarda, lista y borra cada componente **Standard (DI)** del catalogo
+(897 componentes unicos; las 397 variantes de Spark y Streaming solo valen en jobs de ese tipo, ver INTERNALS 29) en
+un job de pruebas (`MCP_Coverage`) y escribe `testdata/cobertura.csv`. Tarda ~5 min: arranca en el bridge y
+consulta el progreso (una peticion HTTP unica la cortaria el cliente a los 5 min). Opciones: `--filter`, `--max`,
+`--compile` (nivel L4, ~8 s mas por componente), `--cancel`. Tras cada fallo el job de pruebas se reinicia, para
+que un componente roto no contamine a los siguientes. `bun run scripts/coverage-summary.ts` agrupa los fallos.
 
-`bun run scripts/coverage-summary.ts` agrupa los fallos por causa y por familia.
-
-**Primera medicion valida (Talend 8.0.1):** 1245 de 1294 componentes (96 %) pasan creacion,
-configuracion de parametros, guardado en el `.item`, presencia en el job y borrado. Fallan 49:
+**Medicion L1/L2 (Talend 8.0.1):** 877 de 897 componentes Standard (98 %) pasan creacion, configuracion de
+parametros, guardado en el `.item`, presencia en el job y borrado. Fallan 20, todos por la misma causa:
 
 | Causa | Componentes | Que significa |
 |---|---|---|
-| `ArtifactResolutionException`: falta `org.talend.components:components-jdbc-runtime:0.37.61` | 20 (Athena, Databricks SQL, Redshift...) | Studio no encuentra el runtime del componente; no esta en Maven Central ni en el Nexus publico de Talend |
-| `IndexOutOfBoundsException` al guardar (`evaluateSparkMode`) | 29 (Dynamo, Kinesis, Kudu, HDFS/Hive/Azure configuration, Avro...) | Son componentes de **Spark/Big Data**: no son validos en un job Standard |
+| `ArtifactResolutionException`: falta `org.talend.components:components-jdbc-runtime:0.37.61` | 20 (Athena, Databricks SQL, Delta, Single Store...) | Studio no encuentra el runtime de estos componentes; no esta en Maven Central ni en el Nexus publico de Talend |
 
-**L4 (compila), muestra de los 77 componentes `tFile*`** (`coverage.ts --filter tFile --compile`, 11 min):
-64 compilan (83 %). Los 13 que no son componentes de salida (`tFileOutputPositional`, `tFileOutputXML`,
-`tFileOutputDelimited`, `tFileOutputJSON`) a los que no se dio `FILENAME`, y `tFileInputMSXML`. Con `--compile` cada
-componente cuesta ~8 s (el catalogo entero serian ~3 h), por eso es opcional y se usa por familias.
+(Una medicion anterior daba 96 % de 1294 con 29 fallos "de Spark": mezclaba las variantes de Spark con las de
+Standard; ver INTERNALS 29.)
 
-Esto es L1/L2 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista y
-acepte configuracion. **No** dice que compile ni que ejecute bien: eso son L4/L5 y solo estan
-probados en los componentes de las fases validadas.
+**L4 (compila), muestra `tFile*`** (`coverage.ts --filter tFile --compile`): 64 de 77 compilan antes de rellenar los
+parametros obligatorios. Los fallos eran componentes de salida sin `FILENAME`, que en realidad la variante Standard
+declara con valor por defecto: el fallo venia de haber probado la variante de Spark. Pendiente repetirlo con la
+variante correcta.
+
+Esto es L1/L2 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista y acepte
+configuracion. **No** dice que compile ni que ejecute bien: eso son L4/L5.

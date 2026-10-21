@@ -148,6 +148,35 @@ public final class TalendApi {
     return closed;
   }
 
+  /** Job de trabajo que se abre cuando hace falta un proceso y no hay ninguno. */
+  public static final String SCRATCH_JOB = "MCP_Scratch";
+
+  /**
+   * Un proceso (job) con el que construir nodos sueltos.
+   *
+   * Leer los parametros de un componente exige crear un Node, y su
+   * constructor le pide al proceso un nombre unico: sin proceso da NPE. Se usa
+   * el del job que esta activo y, si no hay ninguno, el job de trabajo (que se
+   * crea la primera vez). El nodo no se anade al job, asi que no lo modifica.
+   */
+  public static Object processForIntrospection() throws Exception {
+    IEditorPart active = WorkbenchService.activeEditorPart();
+    if (active != null && invokeOrNull(active, "getDesignerEditor") != null) {
+      return processOf(designerOf(active));
+    }
+    JsonObject spec = new JsonObject();
+    spec.addProperty("job", SCRATCH_JOB);
+    try {
+      return processOf(designerEditor(spec));
+    } catch (IllegalStateException e) {
+      JsonObject create = new JsonObject();
+      create.addProperty("name", SCRATCH_JOB);
+      create.addProperty("replace", true);
+      JobRepository.create(create);
+      return processOf(designerEditor(spec));
+    }
+  }
+
   /** Editor grafico (el lienzo) de un editor de job. */
   private static Object designerOf(IEditorPart editor) throws Exception {
     Object designer = editor.getClass().getMethod("getDesignerEditor").invoke(editor);
@@ -223,19 +252,41 @@ public final class TalendApi {
    * El catalogo lo publica Talend con `IComponentsService`.
    */
   public static Object findCatalogComponent(String componentName) throws Exception {
+    return findCatalogComponent(componentName, DEFAULT_PALETTE);
+  }
+
+  /** Variante del catalogo que se usa en un job Standard. */
+  public static final String DEFAULT_PALETTE = "DI";
+
+  /**
+   * Componente del catalogo por nombre y tipo de job.
+   *
+   * El mismo nombre existe en varias variantes (Standard, Spark Batch, Spark
+   * Streaming...) con parametros distintos; devolver "la primera" daba a veces
+   * la de Spark. Si no hay variante de ese tipo, cae a la primera que case.
+   */
+  public static Object findCatalogComponent(String componentName, String paletteType) throws Exception {
     Class<?> serviceClass = TalendClasses.load("org.talend.core.model.components.IComponentsService");
     Object service = serviceClass.getMethod("get").invoke(null);
     Object factory = service.getClass().getMethod("getComponentsFactory").invoke(service);
     Object components = factory.getClass().getMethod("getComponents").invoke(factory);
+    Object fallback = null;
     if (components instanceof Set) {
       for (Object candidate : (Set<?>) components) {
         Object name = candidate.getClass().getMethod("getName").invoke(candidate);
-        if (componentName.equals(name)) {
+        if (!componentName.equals(name)) {
+          continue;
+        }
+        Object palette = invokeOrNull(candidate, "getPaletteType");
+        if (paletteType != null && paletteType.equalsIgnoreCase(String.valueOf(palette))) {
           return candidate;
+        }
+        if (fallback == null) {
+          fallback = candidate;
         }
       }
     }
-    return null;
+    return fallback;
   }
 
   /**

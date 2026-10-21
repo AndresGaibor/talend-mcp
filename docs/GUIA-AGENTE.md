@@ -51,7 +51,7 @@ Orden obligatorio. Cada paso usa lo que devolvio el anterior (sobre todo los `un
 
 | # | Tool | Para que |
 |---|---|---|
-| 1 | `talend_studio_list_components` | Saber que componentes hay (el catalogo trae 1294) |
+| 1 | `talend_studio_list_components` | Saber que componentes hay: 897 de Standard (`paletteType` por defecto `DI`); las 397 variantes de Spark/Streaming solo valen en jobs de ese tipo |
 | 2 | `talend_studio_component_parameters` | Ver los parametros reales de un componente (tipo, defecto, columnas de sus tablas). **No adivines**: preguntalo |
 | 3 | `talend_job_delete_in_studio` | Si el job ya existe y quieres partir de cero |
 | 4 | `talend_job_create_in_studio` | Crea el job vacio (`replace: true` lo reemplaza). Lo deja abierto en el editor |
@@ -215,7 +215,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `tFilterRow`, `tSortRow`, `tUniqRow`, `tAggregateRow` | El `.item` sale bien; el formato interno de las condiciones/criterios no esta en el catalogo y no genera codigo |
 | `tFileInputPositional`, `tFileInputJSON` | Generan codigo que no compila en 8.0.1 (usan `onSubJobError` inexistente). Usa `tFileInputDelimited` si puedes |
 | `tFileOutputDelimited` | Necesita librerias que pueden faltar en el `.m2` de Studio |
-| Cobertura de los 1294 componentes | Medida: 1245 (96 %) se crean, configuran, guardan y borran (L1/L2). Fallan 49: 20 sin runtime de Maven y 29 de Spark/Big Data (necesitan un job Spark). Compilar y ejecutar (L4/L5) solo esta probado en unas fases; ver [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md) |
+| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Fallan 20 sin runtime de Maven. Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Compilar (L4) y ejecutar (L5) solo medidos en muestras; ver [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md) |
 | Salida de la vista Run | No se puede leer; por eso existe `talend_job_execute` |
 
 Estado fase por fase en [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md).
