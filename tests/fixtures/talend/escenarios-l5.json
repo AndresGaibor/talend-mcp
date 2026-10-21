@@ -177,7 +177,7 @@
     {
       "nombre": "transformaciones: agregar por ciudad",
       "job": "MCP_L5_Agrega",
-      "pendiente": "",
+      "pendiente": "el tAggregateRow no propaga su schema (SCHEMA_AUTO_PROPAGATE=false): al poner sus columnas de salida, Talend las propaga hacia atras y el origen se queda con ellas en vez de las suyas, y el generador no encuentra la columna de entrada ('inputColumn is null')",
       "nodos": [
         {
           "type": "tAggregateRow",
@@ -283,8 +283,8 @@
       ],
       "espera": {
         "contiene": [
-          "1|Ana MarÃ­a NÃºÃ±ez|BogotÃ¡|1500.5",
-          "10|SofÃ­a RamÃ­rez|BogotÃ¡|750.25"
+          "1|Ana María Núñez|Bogotá|1500.5",
+          "10|Sofía Ramírez|Bogotá|750.25"
         ]
       }
     },

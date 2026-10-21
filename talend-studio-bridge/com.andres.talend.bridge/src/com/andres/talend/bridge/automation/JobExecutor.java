@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.andres.talend.bridge.BridgeLog;
+import com.andres.talend.bridge.UiThread;
 
 import com.google.gson.JsonObject;
 
@@ -99,6 +100,13 @@ public final class JobExecutor {
     command.add(classpathJar.toString());
     command.add(mainClass);
     command.add("--context=" + context);
+    // Los valores del contexto no viajan en el codigo generado: los inyecta
+    // el runtime, y aqui se le pasan como argumentos ("--context_type
+    // CLAVE=VALOR"). Sin esto, un job relanzado a mano no ve sus variables.
+    for (String value : contextValuesOf(name, context)) {
+      command.add("--context_type");
+      command.add(value);
+    }
 
     ProcessBuilder builder = new ProcessBuilder(command);
     builder.redirectErrorStream(false);
@@ -199,7 +207,63 @@ public final class JobExecutor {
   }
 
   /**
-   * Clase principal del job, deducida de las clases compiladas.
+   * Los valores de las variables del contexto, en formato "CLAVE=VALOR".
+   *
+   * Se leen del modelo del job (el que tiene abierto Studio). Si el job no
+   * esta abierto, se leen del fichero `contexts/<contexto>.properties` que
+   * deja el build.
+   */
+  private static List<String> contextValuesOf(String jobName, String context) {
+    List<String> values = new ArrayList<>();
+    try {
+      Object editor = UiThread.sync(() -> TalendApi.designerEditor(jobSpec(jobName)), 10_000L);
+      Object process = UiThread.sync(() -> TalendApi.processOf(editor), 10_000L);
+      Object manager = process.getClass().getMethod("getContextManager").invoke(process);
+      Object chosen = null;
+      for (Object candidate : contextsOf(manager)) {
+        String name = String.valueOf(candidate.getClass().getMethod("getName").invoke(candidate));
+        if (name.equals(context)) {
+          chosen = candidate;
+          break;
+        }
+      }
+      if (chosen == null) {
+        chosen = manager.getClass().getMethod("getDefaultContext").invoke(manager);
+      }
+      if (chosen == null) {
+        return values;
+      }
+      Object parameters = chosen.getClass().getMethod("getContextParameterList").invoke(chosen);
+      if (parameters instanceof Iterable) {
+        for (Object parameter : (Iterable<?>) parameters) {
+          String name = String.valueOf(parameter.getClass().getMethod("getName").invoke(parameter));
+          String value = String.valueOf(parameter.getClass().getMethod("getValue").invoke(parameter));
+          values.add(name + "=" + value);
+        }
+      }
+      return values;
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudieron leer los valores del contexto '" + context + "'", e);
+      return values;
+    }
+  }
+
+  /** El spec del job, para abrirlo en el editor. */
+  private static com.google.gson.JsonObject jobSpec(String jobName) {
+    com.google.gson.JsonObject spec = new com.google.gson.JsonObject();
+    spec.addProperty("job", jobName);
+    return spec;
+  }
+
+  /** Los contextos del job. */
+  @SuppressWarnings("unchecked")
+  private static List<Object> contextsOf(Object manager) throws Exception {
+    Object list = manager.getClass().getMethod("getListContext").invoke(manager);
+    return list instanceof List ? (List<Object>) list : new ArrayList<>();
+  }
+
+  /**
+   * Busca la clase principal del job, deducida de las clases compiladas.
    *
    * Se busca el fichero `<JobName>.class` en `target/classes`: su ruta
    * relativa es el paquete mas la clase.
