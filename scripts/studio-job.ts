@@ -19,7 +19,9 @@
  * comprueba el `.item` generado.
  */
 
-import { createBridgeClient } from "../src/modules/studio-bridge/adapters/http-studio-bridge.client";
+import { createBridgeClient, type TalendStudioBridgeClient } from "../src/modules/studio-bridge/adapters/http-studio-bridge.client";
+
+type Bridge = TalendStudioBridgeClient;
 
 type Columna = { name: string; type: string };
 
@@ -27,6 +29,15 @@ const COLUMNAS_FASE0: Columna[] = [
   { name: "id", type: "id_Integer" },
   { name: "ciudad", type: "id_String" },
   { name: "monto", type: "id_Double" },
+];
+
+const COLUMNAS_CLIENTES: Columna[] = [
+  { name: "id", type: "id_Integer" },
+  { name: "nombre", type: "id_String" },
+  { name: "fecha_alta", type: "id_Date" },
+  { name: "monto", type: "id_Double" },
+  { name: "estado", type: "id_String" },
+  { name: "ciudad", type: "id_String" },
 ];
 
 function imprimir(titulo: string, valor: unknown): void {
@@ -121,6 +132,22 @@ async function main(): Promise<void> {
       await fase0(bridge);
       break;
     }
+    case "fase1": {
+      await fase1(bridge);
+      break;
+    }
+    case "fase2": {
+      await fase2(bridge);
+      break;
+    }
+    case "fase1b": {
+      await fase1b(bridge);
+      break;
+    }
+    case "fase3": {
+      await fase3(bridge);
+      break;
+    }
     default:
       throw new Error(`Comando desconocido: ${comando}`);
   }
@@ -132,7 +159,7 @@ async function main(): Promise<void> {
  * Crea el job desde cero, arrastra los componentes de la paleta, define el
  * schema, conecta y comprueba el `.item`.
  */
-async function fase0(bridge: Awaited<ReturnType<typeof createBridgeClient>>): Promise<void> {
+async function fase0(bridge: Bridge): Promise<void> {
   const nombre = process.env.FASE0_JOB ?? "MCP_Fase0_Zero";
 
   imprimir("1. borrar el job si existe", (await bridge.deleteJob({ name: nombre })).data);
@@ -158,6 +185,287 @@ async function fase0(bridge: Awaited<ReturnType<typeof createBridgeClient>>): Pr
     (await bridge.connectNodes({ source: uniqueEntrada, target: uniqueSalida })).data);
 
   imprimir("7. nodos del job", (await bridge.listNodes()).data);
+}
+
+/**
+ * Fase 1: archivos de texto.
+ *
+ * `tFileInputDelimited` leyendo el CSV de prueba (separador `;`, con tildes y
+ * nulos) hacia un `tLogRow`. La configuracion es declarativa: parametros del
+ * componente y schema del nodo.
+ */
+async function fase1(bridge: Bridge): Promise<void> {
+  const nombre = process.env.FASE1_JOB ?? "MCP_Fase1_Archivos";
+  const fichero = process.env.FASE1_FILE ?? `${process.cwd()}/testdata/clientes.csv`;
+
+  imprimir("1. borrar el job si existe", (await bridge.deleteJob({ name: nombre })).data);
+  imprimir("2. crear el job", (await bridge.createJob({ name: nombre, replace: true })).data);
+
+  const entrada = await bridge.addNode({
+    type: "tFileInputDelimited",
+    label: "clientes",
+    position: { x: 200, y: 100 },
+    parameters: {
+      FILENAME: { value: fichero },
+      FIELDSEPARATOR: { value: ";" },
+      HEADER: { value: "1" },
+      ENCODING: { value: "UTF-8" },
+    },
+  });
+  imprimir("3. anadir tFileInputDelimited", entrada.data ?? entrada.error);
+  const uniqueEntrada = String((entrada.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+
+  const salida = await bridge.addNode({ type: "tLogRow", label: "salida", position: { x: 520, y: 100 } });
+  imprimir("4. anadir tLogRow", salida.data ?? salida.error);
+  const uniqueSalida = String((salida.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+
+  imprimir("5. schema de la entrada", (await bridge.configureNode({
+    uniqueName: uniqueEntrada,
+    schema: [{ connector: "FLOW", name: uniqueEntrada, columns: COLUMNAS_CLIENTES }],
+  })).data);
+
+  imprimir("6. schema de la salida", (await bridge.configureNode({
+    uniqueName: uniqueSalida,
+    schema: [{ connector: "FLOW", name: uniqueSalida, columns: COLUMNAS_CLIENTES }],
+  })).data);
+
+  imprimir("7. conectar", (await bridge.connectNodes({ source: uniqueEntrada, target: uniqueSalida })).data);
+  imprimir("8. nodos del job", (await bridge.listNodes()).data);
+}
+
+/**
+ * Fase 1b: leer un fichero y escribir otro.
+ *
+ * Comprueba que la configuracion declarativa funciona igual con un
+ * componente de escritura: `tFileOutputDelimited` con su fichero, su
+ * separador y su codificacion.
+ */
+async function fase1b(bridge: Bridge): Promise<void> {
+  const nombre = process.env.FASE1B_JOB ?? "MCP_Fase1b_EntradaSalida";
+  const entrada = process.env.FASE1B_ENTRADA ?? `${process.cwd()}/testdata/clientes.csv`;
+  const salida = process.env.FASE1B_SALIDA ?? `${process.cwd()}/testdata/salida_clientes.csv`;
+
+  imprimir("1. borrar el job si existe", (await bridge.deleteJob({ name: nombre })).data);
+  imprimir("2. crear el job", (await bridge.createJob({ name: nombre, replace: true })).data);
+
+  const lector = await bridge.addNode({
+    type: "tFileInputDelimited",
+    label: "lee",
+    position: { x: 160, y: 100 },
+    parameters: {
+      FILENAME: { value: entrada },
+      FIELDSEPARATOR: { value: ";" },
+      HEADER: { value: "1" },
+      ENCODING: { value: "UTF-8" },
+    },
+  });
+  const uniqueLector = String((lector.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("3. anadir tFileInputDelimited", lector.data ?? lector.error);
+
+  const escritor = await bridge.addNode({
+    type: "tFileOutputDelimited",
+    label: "escribe",
+    position: { x: 460, y: 100 },
+    parameters: {
+      FILENAME: { value: salida },
+      FIELDSEPARATOR: { value: ";" },
+      ENCODING: { value: "UTF-8" },
+      REPLACE_FILE: { value: "true" },
+      CREATE_HEADER: { value: "false" },
+    },
+  });
+  const uniqueEscritor = String((escritor.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("4. anadir tFileOutputDelimited", escritor.data ?? escritor.error);
+
+  imprimir("5. schema de la entrada", (await bridge.configureNode({
+    uniqueName: uniqueLector,
+    schema: [{ connector: "FLOW", name: uniqueLector, columns: COLUMNAS_CLIENTES }],
+  })).data);
+
+  imprimir("6. schema de la salida", (await bridge.configureNode({
+    uniqueName: uniqueEscritor,
+    schema: [{ connector: "FLOW", name: uniqueEscritor, columns: COLUMNAS_CLIENTES }],
+  })).data);
+
+  imprimir("7. conectar", (await bridge.connectNodes({ source: uniqueLector, target: uniqueEscritor })).data);
+  imprimir("8. nodos del job", (await bridge.listNodes()).data);
+}
+
+/**
+ * Fase 3: transformaciones clasicas.
+ *
+ * `tFilterRow` (filtrar por una condicion) y `tSortRow` (ordenar) sobre el
+ * CSV de prueba. Son componentes del runtime estandar: no piden modulos de
+ * terceros, a diferencia del tMap.
+ */
+async function fase3(bridge: Bridge): Promise<void> {
+  const nombre = process.env.FASE3_JOB ?? "MCP_Fase3_Transformaciones";
+  const fichero = process.env.FASE3_FILE ?? `${process.cwd()}/testdata/clientes.csv`;
+
+  imprimir("1. borrar el job si existe", (await bridge.deleteJob({ name: nombre })).data);
+  imprimir("2. crear el job", (await bridge.createJob({ name: nombre, replace: true })).data);
+
+  const lector = await bridge.addNode({
+    type: "tFileInputDelimited",
+    label: "lee",
+    position: { x: 120, y: 100 },
+    parameters: {
+      FILENAME: { value: fichero },
+      FIELDSEPARATOR: { value: ";" },
+      HEADER: { value: "1" },
+      ENCODING: { value: "UTF-8" },
+    },
+  });
+  const uniqueLector = String((lector.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("3. anadir tFileInputDelimited", lector.data ?? lector.error);
+
+  const filtro = await bridge.addNode({ type: "tFilterRow", label: "filtra", position: { x: 320, y: 100 } });
+  const uniqueFiltro = String((filtro.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("4. anadir tFilterRow", filtro.data ?? filtro.error);
+
+  const orden = await bridge.addNode({ type: "tSortRow", label: "ordena", position: { x: 520, y: 100 } });
+  const uniqueOrden = String((orden.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("5. anadir tSortRow", orden.data ?? orden.error);
+
+  const salida = await bridge.addNode({ type: "tLogRow", label: "salida", position: { x: 720, y: 100 } });
+  const uniqueSalida = String((salida.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("6. anadir tLogRow", salida.data ?? salida.error);
+
+  for (const [nodo, columnas] of [
+    [uniqueLector, COLUMNAS_CLIENTES],
+    [uniqueFiltro, COLUMNAS_CLIENTES],
+    [uniqueOrden, COLUMNAS_CLIENTES],
+    [uniqueSalida, COLUMNAS_CLIENTES],
+  ] as Array<[string, Columna[]]>) {
+    imprimir(`7. schema de ${nodo}`, (await bridge.configureNode({
+      uniqueName: nodo,
+      schema: [{ connector: "FLOW", name: nodo, columns: columnas }],
+    })).data);
+  }
+
+  imprimir("8. conectar", (await bridge.connectNodes({ source: uniqueLector, target: uniqueFiltro })).data);
+  imprimir("9. conectar", (await bridge.connectNodes({ source: uniqueFiltro, target: uniqueOrden })).data);
+  imprimir("10. conectar", (await bridge.connectNodes({ source: uniqueOrden, target: uniqueSalida })).data);
+
+  // El filtro: solo las filas activas.
+  imprimir("11. filtro", (await bridge.configureNode({
+    uniqueName: uniqueFiltro,
+    parameters: { CONDITION: { value: "row1.estado.equals(\"ACTIVO\")" } },
+  })).data);
+
+  // La ordenacion: por monto, de mayor a menor.
+  imprimir("12. orden", (await bridge.configureNode({
+    uniqueName: uniqueOrden,
+    parameters: {
+      SORT_COL: { value: "row1.monto" },
+      SORT_ORDER: { value: "DESC" },
+    },
+  })).data);
+
+  imprimir("13. nodos del job", (await bridge.listNodes()).data);
+}
+
+/**
+ * Fase 2: tMap.
+ *
+ * Un `tMap` que renombra columnas, calcula un importe con iva y filtra las
+ * filas que no estan activas. El modelo del tMap (entradas, salidas, filtros)
+ * se declara con el bloque `mapper`.
+ */
+async function fase2(bridge: Bridge): Promise<void> {
+  const nombre = process.env.FASE2_JOB ?? "MCP_Fase2_Map";
+  const fichero = process.env.FASE2_FILE ?? `${process.cwd()}/testdata/clientes.csv`;
+
+  imprimir("1. borrar el job si existe", (await bridge.deleteJob({ name: nombre })).data);
+  imprimir("2. crear el job", (await bridge.createJob({ name: nombre, replace: true })).data);
+
+  const entrada = await bridge.addNode({
+    type: "tFileInputDelimited",
+    label: "clientes",
+    position: { x: 160, y: 100 },
+    parameters: {
+      FILENAME: { value: fichero },
+      FIELDSEPARATOR: { value: ";" },
+      HEADER: { value: "1" },
+      ENCODING: { value: "UTF-8" },
+    },
+  });
+  const uniqueEntrada = String((entrada.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("3. anadir tFileInputDelimited", entrada.data ?? entrada.error);
+
+  const mapa = await bridge.addNode({
+    type: "tMap",
+    label: "mapeo",
+    position: { x: 400, y: 100 },
+  });
+  const uniqueMapa = String((mapa.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("4. anadir tMap", mapa.data ?? mapa.error);
+
+  const salida = await bridge.addNode({ type: "tLogRow", label: "salida", position: { x: 640, y: 100 } });
+  const uniqueSalida = String((salida.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("5. anadir tLogRow", salida.data ?? salida.error);
+
+  imprimir("6. schema de la entrada", (await bridge.configureNode({
+    uniqueName: uniqueEntrada,
+    schema: [{ connector: "FLOW", name: uniqueEntrada, columns: COLUMNAS_CLIENTES }],
+  })).data);
+
+  imprimir("7. schema de la salida del tMap", (await bridge.configureNode({
+    uniqueName: uniqueMapa,
+    schema: [{
+      connector: "FLOW",
+      name: "out1",
+      columns: [
+        { name: "id_cliente", type: "id_Integer" },
+        { name: "nombre", type: "id_String" },
+        { name: "monto_iva", type: "id_Double" },
+        { name: "estado", type: "id_String" },
+      ],
+    }],
+  })).data);
+
+  imprimir("8. schema de la salida", (await bridge.configureNode({
+    uniqueName: uniqueSalida,
+    schema: [{
+      connector: "FLOW",
+      name: uniqueSalida,
+      columns: [
+        { name: "id_cliente", type: "id_Integer" },
+        { name: "nombre", type: "id_String" },
+        { name: "monto_iva", type: "id_Double" },
+        { name: "estado", type: "id_String" },
+      ],
+    }],
+  })).data);
+
+  imprimir("9. conectar entrada -> tMap", (await bridge.connectNodes({ source: uniqueEntrada, target: uniqueMapa })).data);
+  imprimir("10. conectar tMap -> salida", (await bridge.connectNodes({ source: uniqueMapa, target: uniqueSalida })).data);
+
+  // El modelo del tMap se aplica AL FINAL: al conectar, Talend rehace las
+  // tablas del mapper segun las conexiones y se pierde lo que se puso antes.
+  imprimir("11. modelo del tMap", (await bridge.configureNode({
+    uniqueName: uniqueMapa,
+    mapper: {
+      inputs: [{
+        name: "row1",
+        matchingMode: "UNIQUE_MATCH",
+        lookupMode: "LOAD_ONCE",
+        columns: COLUMNAS_CLIENTES.map((columna) => ({ name: columna.name, type: columna.type })),
+      }],
+      outputs: [{
+        name: "out1",
+        columns: [
+          { name: "id_cliente", type: "id_Integer", expression: "row1.id" },
+          { name: "nombre", type: "id_String", expression: "row1.nombre" },
+          { name: "monto_iva", type: "id_Double", expression: "row1.monto * 1.12" },
+          { name: "estado", type: "id_String", expression: "row1.estado" },
+        ],
+        filter: "row1.estado.equals(\"ACTIVO\")",
+      }],
+    },
+  })).data);
+
+  imprimir("12. nodos del job", (await bridge.listNodes()).data);
 }
 
 await main();

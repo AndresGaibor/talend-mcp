@@ -2,9 +2,11 @@ package com.andres.talend.bridge.workbench;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 import com.andres.talend.bridge.BridgeLog;
 import com.andres.talend.bridge.UiThread;
@@ -54,8 +56,13 @@ public final class ModalGuard {
       {"Job Name Error", "Yes", "OK", "Si", "Sí"},
       // El nombre del job no es valido: se confirma para seguir.
       {"Invalid Job Name", "OK", "Yes"},
-      // El workspace tiene cambios sin guardar.
-      {"Save Resource", "Yes", "OK"},
+      // El workspace tiene cambios sin guardar: se guardan.
+      {"Save Resource", "Yes", "OK", "Save", "Guardar"},
+      {"Guardar recursos", "Guardar", "Yes", "OK"},
+      // Faltan modulos de terceros: se cierra sin descargarlos. Descargarlos
+      // es una decision de red que no se toma sola.
+      {"third party modules", "Cerrar", "Close", "Cancel", "Cancelar"},
+      {"modulos de terceros", "Cerrar", "Close", "Cancel", "Cancelar"},
   };
 
   /** Botones que cierran un dialogo sin decidir nada. */
@@ -69,10 +76,28 @@ public final class ModalGuard {
    * IDE ni el bridge pueden seguir. Por eso, si el dialogo tiene uno de estos
    * botones, se pulsa. Van en orden de menor a mayor consecuencia: primero los
    * que solo confirman y al final los que guardan.
+   *
+   * "Cancelar" no esta: cancelar puede dejar el job a medias.
    */
   private static final List<String> SAFE_BUTTONS = Arrays.asList(
       "Yes", "Si", "Sí", "OK", "Accept", "Aceptar", "Continue", "Continuar",
-      "Save", "Guardar", "Save All", "Guardar todo");
+      "Save", "Guardar", "Save All", "Guardar todo", "Close", "Cerrar");
+
+  /**
+   * Dialogos de progreso.
+   *
+   * El progreso es normal mientras compila: solo se cancela si lleva mucho
+   * tiempo abierto, que es cuando se ha quedado colgado.
+   */
+  private static final String[] PROGRESS_DIALOGS = {
+      "progress", "progreso", "building", "loading", "cargando", "compilando", "building job",
+  };
+
+  /** Segundos que un dialogo de progreso puede estar abierto antes de cancelarlo. */
+  private static final long PROGRESS_TIMEOUT_MS = 30_000L;
+
+  /** Momento en el que se vio cada dialogo por primera vez. */
+  private static final Map<Shell, Long> FIRST_SEEN = Collections.synchronizedMap(new WeakHashMap<>());
 
   /** Cada cuanto mira el guardian si hay dialogos bloqueando. */
   private static final long WATCHDOG_INTERVAL_MS = 1200L;
@@ -97,7 +122,9 @@ public final class ModalGuard {
         try {
           Thread.sleep(WATCHDOG_INTERVAL_MS);
           // Los shells de SWT solo se pueden tocar desde el hilo de la UI.
-          Map<String, Object> result = UiThread.sync(ModalGuard::dismissBlockingDialogs);
+          // Con poco tiempo de espera: si la UI esta ocupada compilando, el
+          // guardian sigue vivo y puede cerrar los dialogos que la bloquean.
+          Map<String, Object> result = UiThread.sync(ModalGuard::dismissBlockingDialogs, 3000);
           if (result.get("dismissed") instanceof List
               && !((List<?>) result.get("dismissed")).isEmpty()) {
             BridgeLog.info("El guardian de modales cerro: " + result.get("dismissed"));
@@ -163,6 +190,11 @@ public final class ModalGuard {
       dialog.put("title", title);
       dialog.put("class", shell.getClass().getName());
       found.add(dialog);
+
+      // Un dialogo de progreso es normal: se deja mientras avance.
+      if (isProgress(title) && !isStuck(shell)) {
+        continue;
+      }
 
       String button = knownButtonFor(shell, title);
       if (button == null) {
@@ -246,6 +278,33 @@ public final class ModalGuard {
     return null;
   }
 
+  /** El dialogo es de progreso (compilacion, carga). */
+  private static boolean isProgress(String title) {
+    if (title == null) {
+      return false;
+    }
+    String normalized = title.trim().toLowerCase();
+    for (String pattern : PROGRESS_DIALOGS) {
+      if (normalized.contains(pattern)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * El dialogo lleva demasiado tiempo abierto: se ha quedado colgado.
+   */
+  private static boolean isStuck(Shell shell) {
+    long now = System.currentTimeMillis();
+    Long first = FIRST_SEEN.get(shell);
+    if (first == null) {
+      FIRST_SEEN.put(shell, now);
+      return false;
+    }
+    return now - first > PROGRESS_TIMEOUT_MS;
+  }
+
   /**
    * Busca un boton por su texto dentro del shell.
    *
@@ -309,8 +368,20 @@ public final class ModalGuard {
     if (label == null || text == null) {
       return false;
     }
-    String clean = label.replace("&", "").trim();
-    return clean.equalsIgnoreCase(text.trim());
+    String clean = normalize(label);
+    String wanted = normalize(text);
+    if (clean.equals(wanted)) {
+      return true;
+    }
+    // Los botones de Studio a veces llevan el numero de recursos o de
+    // elementos ("Gu&ardar 3 de 3", "Seleccionar 2 de 5"). Se comparan por
+    // prefijo, sin espacios ni mnemonics.
+    return clean.length() > wanted.length() && clean.startsWith(wanted);
+  }
+
+  /** Quita el mnemonic y los espacios de un texto de boton. */
+  private static String normalize(String value) {
+    return value.replace("&", "").replaceAll("\\s+", "").trim();
   }
 
   /**

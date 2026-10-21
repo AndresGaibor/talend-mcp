@@ -17,12 +17,15 @@ describe("Tools de operaciones sobre el job de Studio", () => {
         "talend_job_delete_in_studio",
         "talend_job_open_in_studio",
         "talend_job_add_node",
+        "talend_job_configure_node",
         "talend_job_connect_nodes",
         "talend_job_update_node",
         "talend_job_set_schema",
         "talend_job_list_nodes",
         "talend_studio_run_code",
         "talend_studio_dismiss_dialogs",
+        "talend_studio_list_components",
+        "talend_studio_component_parameters",
       ];
       for (const nombre of esperadas) {
         expect(byName.has(nombre), `Falta la tool ${nombre}`).toBe(true);
@@ -72,6 +75,24 @@ describe("Tools de operaciones sobre el job de Studio", () => {
       expect(claves).toContain("columns");
       expect(claves).toContain("values");
       expect(claves).toContain("uniqueName");
+    });
+
+    test("anadir y configurar un nodo admiten la configuracion declarativa", () => {
+      for (const nombre of ["talend_job_add_node", "talend_job_configure_node"]) {
+        const forma = byName.get(nombre)?.inputSchema as { shape?: Record<string, unknown> } | undefined;
+        const claves = Object.keys(forma?.shape ?? {});
+        expect(claves, `${nombre} sin parameters`).toContain("parameters");
+        expect(claves, `${nombre} sin tables`).toContain("tables");
+        expect(claves, `${nombre} sin schema`).toContain("schema");
+        expect(claves, `${nombre} sin mapper`).toContain("mapper");
+      }
+    });
+
+    test("consultar el catalogo pide el nombre del componente", () => {
+      const forma = byName.get("talend_studio_component_parameters")?.inputSchema as
+        | { shape?: Record<string, unknown> }
+        | undefined;
+      expect(Object.keys(forma?.shape ?? {})).toContain("name");
     });
   });
 });

@@ -142,7 +142,10 @@ final class BridgeServer {
       server.createContext("/automation/nodes/copy", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "copyNode")));
       server.createContext("/automation/nodes/list", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "listNodes")));
       server.createContext("/automation/nodes/schema", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setSchema")));
+      server.createContext("/automation/nodes/configure", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "configureNode")));
       server.createContext("/automation/run-code", exchange -> guarded(exchange, () -> handleRunCode(exchange)));
+      server.createContext("/automation/components", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(() -> JobOperationsService.listComponents(readJsonBody(exchange))))));
+      server.createContext("/automation/components/parameters", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(() -> JobOperationsService.componentParameters(readJsonBody(exchange))))));
       server.createContext("/launch/runs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchTrackerService.runs())));
       server.createContext("/launch/run-status", exchange -> guarded(exchange, () -> handleLaunchRunStatus(exchange)));
       server.createContext("/launch/wait", exchange -> guarded(exchange, () -> handleLaunchWait(exchange)));
@@ -385,6 +388,8 @@ final class BridgeServer {
           return JobOperationsService.copyNode(body);
         case "setSchema":
           return JobOperationsService.setSchema(body);
+        case "configureNode":
+          return JobOperationsService.configureNode(body);
         default:
           return JobOperationsService.listNodes(body);
       }

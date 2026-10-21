@@ -497,9 +497,26 @@ export class TalendStudioBridgeClient {
     type: string;
     label?: string;
     position?: { x: number; y: number };
-    parameters?: Record<string, { value: string; field?: string }>;
+    parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
+    tables?: Record<string, { columns?: string[]; rows?: string[][] }>;
+    schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
+    mapper?: Record<string, unknown>;
   }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/nodes/add", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Configura un componente ya anadido: parametros, tablas, schema o mapper. */
+  async configureNode(options: {
+    uniqueName: string;
+    parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
+    tables?: Record<string, { columns?: string[]; rows?: string[][] }>;
+    schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
+    mapper?: Record<string, unknown>;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/nodes/configure", {
       method: "POST",
       body: options,
     });
@@ -522,7 +539,7 @@ export class TalendStudioBridgeClient {
   async updateNode(options: {
     uniqueName: string;
     label?: string;
-    parameters?: Record<string, { value: string; field?: string }>;
+    parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
   }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/nodes/update", {
       method: "POST",
@@ -555,6 +572,22 @@ export class TalendStudioBridgeClient {
     return await this.request<Record<string, unknown>>("/automation/nodes/list", {
       method: "POST",
       body: options ?? {},
+    });
+  }
+
+  /** Lista los componentes del catalogo de Talend. */
+  async listComponents(options?: { filter?: string; limit?: number }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/components", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
+  /** Parametros de un componente del catalogo, con su valor por defecto. */
+  async componentParameters(options: { name: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/components/parameters", {
+      method: "POST",
+      body: options,
     });
   }
 

@@ -12,7 +12,72 @@ import { bridgeOk, bridgeFail, loadBridge } from "./tools-base";
 const parameterSchema = z.object({
   value: z.string().describe("Valor del parametro"),
   field: z.string().optional().describe("Tipo de campo: TEXT, CHECK, RADIO, FILE..."),
+  literal: z
+    .boolean()
+    .optional()
+    .describe("Fuerza el valor entre comillas (literal Java). Por defecto se deduce del valor"),
 });
+
+const columnSpecSchema = z.object({
+  name: z.string().describe("Nombre de la columna"),
+  type: z.string().optional().describe("Tipo Java: id_String, id_Integer, id_Long, id_Double, id_BigDecimal, id_Boolean, id_Date"),
+  length: z.number().optional().describe("Longitud"),
+  precision: z.number().optional().describe("Precision"),
+  nullable: z.boolean().optional().describe("Admite nulos"),
+  key: z.boolean().optional().describe("Es clave"),
+  pattern: z.string().optional().describe("Patron de la fecha"),
+  comment: z.string().optional().describe("Comentario"),
+  sourceType: z.string().optional().describe("Tipo en el origen"),
+});
+
+const schemaTableSchema = z.object({
+  connector: z.string().optional().default("FLOW").describe("Conector: FLOW, REJECT, VAR..."),
+  name: z.string().describe("Nombre de la tabla. En FLOW suele ser el unique name del nodo"),
+  columns: z.array(columnSpecSchema).describe("Columnas de la tabla"),
+});
+
+const tableSpecSchema = z.object({
+  columns: z.array(z.string()).optional().describe("Codigos de columna de la tabla"),
+  rows: z.array(z.array(z.string())).optional().describe("Filas, una por registro"),
+});
+
+const mapperEntrySchema = z.object({
+  name: z.string().describe("Nombre de la columna"),
+  type: z.string().optional().describe("Tipo Java de la columna"),
+  expression: z.string().optional().describe("Expresion de la columna"),
+  nullable: z.boolean().optional().describe("Admite nulos"),
+});
+
+const mapperTableSchema = z.object({
+  name: z.string().describe("Nombre de la tabla: row1, out1, Var..."),
+  columns: z.array(mapperEntrySchema).optional().describe("Columnas de la tabla"),
+  filter: z.string().optional().describe("Filtro de la tabla"),
+  matchingMode: z.string().optional().describe("Modo de emparejado del lookup: UNIQUE_MATCH, MULTI_MATCH..."),
+  lookupMode: z.string().optional().describe("Modo de carga del lookup: LOAD_ONCE, LOAD_EACH..."),
+  innerJoin: z.boolean().optional().describe("El join es inner"),
+  reject: z.boolean().optional().describe("Es la tabla de rechazo"),
+  rejectInnerJoin: z.boolean().optional().describe("El rechazo es inner join"),
+  isJoinTableOf: z.string().optional().describe("Tabla principal del join"),
+});
+
+const mapperSchema = z.object({
+  inputs: z.array(mapperTableSchema).optional().describe("Tablas de entrada"),
+  outputs: z.array(mapperTableSchema).optional().describe("Tablas de salida"),
+  vars: z.array(mapperTableSchema).optional().describe("Variables de la seccion Var"),
+});
+
+/**
+ * Configuracion declarativa de un componente.
+ *
+ * Es la misma para todos los componentes: parametros, tablas, schema y, para
+ * los que lo tienen (el tMap), su modelo propio.
+ */
+const componentSpecShape = {
+  parameters: z.record(z.string(), parameterSchema).optional().describe("Parametros del componente"),
+  tables: z.record(z.string(), tableSpecSchema).optional().describe("Tablas del componente (parametros de tipo TABLE)"),
+  schema: z.array(schemaTableSchema).optional().describe("Metadata del nodo, por conector y por tabla"),
+  mapper: mapperSchema.optional().describe("Modelo del tMap: transformaciones, filtros y joins"),
+};
 
 const columnSchema = z.object({
   name: z.string().describe("Nombre de la columna"),
@@ -106,28 +171,57 @@ export const jobOperationsTools = [
   },
   {
     name: "talend_job_add_node",
-    description: "Anade un componente al job abierto. El componente se crea con la API de Studio, con todos sus parametros por defecto.",
+    description: "Anade un componente al job abierto. El componente se crea con la API de Studio, con todos sus parametros por defecto, y se configura de forma declarativa (parametros, tablas, schema y, en el tMap, sus transformaciones).",
     inputSchema: z.object({
-      type: z.string().describe("Nombre del componente: tFileInputDelimited, tLogRow, tMysqlOutput..."),
+      type: z.string().describe("Nombre del componente: tFileInputDelimited, tLogRow, tMap, tMysqlOutput..."),
       label: z.string().optional().describe("Etiqueta del componente"),
       position: z.object({ x: z.number(), y: z.number() }).optional().describe("Posicion en el lienzo"),
-      parameters: z.record(z.string(), parameterSchema).optional().describe("Parametros a cambiar"),
+      ...componentSpecShape,
       job: z.string().optional().describe("Job a abrir si no hay ninguno abierto"),
     }),
-    handler: async ({ type, label, position, parameters, job }: {
+    handler: async ({ type, label, position, parameters, tables, schema, mapper, job }: {
       type: string;
       label?: string;
       position?: { x: number; y: number };
-      parameters?: Record<string, { value: string; field?: string }>;
+      parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
+      tables?: Record<string, { columns?: string[]; rows?: string[][] }>;
+      schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
+      mapper?: Record<string, unknown>;
       job?: string;
     }) => {
       const bridge = await loadBridge();
-      const result = await bridge.addNode({ type, label, position, parameters });
+      const result = await bridge.addNode({ type, label, position, parameters, tables, schema, mapper });
       return bridgeOk({
         ok: result.ok,
         source: result.source,
         confidence: result.confidence,
         endpoint: "/automation/nodes/add",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
+    name: "talend_job_configure_node",
+    description: "Configura un componente ya anadido al job: sus parametros, sus tablas, su schema o las transformaciones de un tMap. Es la via para retocar un job existente sin recrearlo.",
+    inputSchema: z.object({
+      uniqueName: z.string().describe("Unique name del nodo"),
+      ...componentSpecShape,
+    }),
+    handler: async ({ uniqueName, parameters, tables, schema, mapper }: {
+      uniqueName: string;
+      parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
+      tables?: Record<string, { columns?: string[]; rows?: string[][] }>;
+      schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
+      mapper?: Record<string, unknown>;
+    }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.configureNode({ uniqueName, parameters, tables, schema, mapper });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/nodes/configure",
         data: result.data,
         error: result.error,
       });
@@ -171,7 +265,7 @@ export const jobOperationsTools = [
     handler: async ({ uniqueName, label, parameters }: {
       uniqueName: string;
       label?: string;
-      parameters?: Record<string, { value: string; field?: string }>;
+      parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
     }) => {
       const bridge = await loadBridge();
       const result = await bridge.updateNode({ uniqueName, label, parameters });
@@ -226,6 +320,45 @@ export const jobOperationsTools = [
         source: result.source,
         confidence: result.confidence,
         endpoint: "/automation/nodes/list",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
+    name: "talend_studio_list_components",
+    description: "Lista los componentes del catalogo de Talend Studio. Sirve para saber que componentes hay disponibles antes de crear un job.",
+    inputSchema: z.object({
+      filter: z.string().optional().describe("Texto que tiene que aparecer en el nombre del componente"),
+      limit: z.number().optional().describe("Maximo de componentes a devolver"),
+    }),
+    handler: async ({ filter, limit }: { filter?: string; limit?: number }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.listComponents({ filter, limit });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/components",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
+    name: "talend_studio_component_parameters",
+    description: "Devuelve los parametros de un componente del catalogo de Talend, con su tipo y su valor por defecto. Es la forma de saber como se configura un componente sin adivinar.",
+    inputSchema: z.object({
+      name: z.string().describe("Nombre del componente"),
+    }),
+    handler: async ({ name }: { name: string }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.componentParameters({ name });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/components/parameters",
         data: result.data,
         error: result.error,
       });
