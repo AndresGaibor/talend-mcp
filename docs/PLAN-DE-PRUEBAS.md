@@ -113,8 +113,17 @@ Lo que queda como limite del entorno: `tFileInputARFF`, `tFileInputXML` y `tFile
 otra version de Weka; `tFileInputMSXML` genera codigo con una llave sin cerrar; los componentes de base de datos
 necesitan una conexion real del repositorio.
 
-El catalogo entero no se mide de una vez: los componentes sin artefacto en el `.m2` local tardan ~50 s cada uno
-(el generador busca el artefacto en Maven). Por eso se mide por familias.
+El catalogo entero no se mide de una vez: los componentes sin artefacto en el `.m2` de Studio tardan ~50 s cada uno
+(el generador busca el artefacto en Maven). Por eso se mide por familias, y hay familias que no se pueden medir
+todavia:
+
+| Familia | Que pasa |
+|---|---|
+| `Big Data/HDFS`, `File/Hadoop` | Faltan los jars de Hadoop en el `.m2` ("missing jar:hadoop-hdfs-client-3.3.4.jar"): el build se queda esperando y el hilo de la UI de Studio se agota |
+| `ELT/Connections` | Faltan los artefactos del runtime de ELT |
+| `Databases/DB Specifics/*` | Cada motor necesita su driver (el de PostgreSQL si se ha instalado con `talend_studio_install_artifact`, con la version exacta que pide el build) |
+
+Esto es lo que hace lento el catalogo completo: no es la medicion, es la red.
 
 Esto es L1/L2/L3/L4 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista,
 acepte configuracion, se pueda conectar y compile. **No** dice que ejecute bien: eso es L5, y solo esta validado

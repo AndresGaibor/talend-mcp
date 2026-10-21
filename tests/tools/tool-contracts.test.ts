@@ -27,7 +27,7 @@ function getPropertyDefault(schema: unknown, field: string): unknown {
 
 describe("Tool Contracts — campos con default no son required", () => {
   test("talend_jobs_list: limit y offset tienen default y no deben ser required", () => {
-    const tool = createListJobsTool({} as never);
+    const tool = createListJobsTool();
     const schema = convertInputSchema(tool.inputSchema) as JsonSchema;
 
     const required = getRequiredFields(schema);
@@ -38,7 +38,7 @@ describe("Tool Contracts — campos con default no son required", () => {
   });
 
   test("talend_jobs_list acepta {} como input válido", () => {
-    const tool = createListJobsTool({} as never);
+    const tool = createListJobsTool();
     const schema = convertInputSchema(tool.inputSchema);
     const required = getRequiredFields(schema);
 

@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { JobXmlRepository } from "../../../infrastructure/repositories/job-xml.repository";
+import { TalendJobRepository } from "../../../modules/jobs/adapters/talend-job.repository";
 import { okResult, errorResult } from "../common/result";
 
 const ReadJobSchema = z.object({
@@ -7,24 +7,46 @@ const ReadJobSchema = z.object({
   folderPath: z.string().optional().describe("Carpeta del job"),
 });
 
+/**
+ * Lee un job del proyecto.
+ *
+ * Se leen del proyecto (los `.item` y sus `.properties`), asi que no hace
+ * falta que Talend Studio este abierto. Devuelve el job con sus componentes y
+ * sus conexiones, y el XML del `.item`.
+ */
 export function createReadJobTool() {
+  const repository = new TalendJobRepository();
+
   return {
     name: "talend_jobs_read",
-    description: "Lee y retorna el contenido XML de un job Talend.",
+    description:
+      "Lee un job de Talend: sus componentes, sus conexiones y el XML del .item. Se lee del proyecto, sin necesidad de que Studio este abierto.",
     inputSchema: ReadJobSchema,
     handler: async (input: z.infer<typeof ReadJobSchema>) => {
       try {
-        const projectPath = process.env.TALEND_PROJECT;
-        if (!projectPath) return errorResult("read-job", "NO_PROJECT", "No se detectó TALEND_PROJECT.");
-        const repo = new JobXmlRepository();
-        const jobs = await repo.listJobs(projectPath);
-        const jobPath = jobs.find((j: string) => {
-          const nameFromPath = j.split("/").pop()?.replace(/_\d+\.\d+\.item$/, "") ?? "";
-          return nameFromPath === input.jobName;
-        });
-        if (!jobPath) return errorResult("read-job", "JOB_NOT_FOUND", `Job no encontrado: ${input.jobName}`);
-        const xml = await repo.findJob(jobPath);
-        return okResult({ jobName: input.jobName, itemPath: jobPath, xml }, "read-job");
+        const job = await repository.findByName(input.jobName, input.folderPath);
+        if (!job) {
+          return errorResult("read-job", "JOB_NOT_FOUND", `Job no encontrado: ${input.jobName}`);
+        }
+        return okResult(
+          {
+            jobName: job.name,
+            version: job.version,
+            itemPath: job.path,
+            propertiesPath: job.path.replace(/\.item$/, ".properties"),
+            description: job.description,
+            modified: job.modifiedAt.toISOString(),
+            components: job.components.map((component) => ({
+              id: component.id,
+              name: component.name,
+              type: component.type,
+              position: component.position,
+              parameters: component.configuration,
+            })),
+            connections: job.connections,
+          },
+          "read-job",
+        );
       } catch (err) {
         return errorResult("read-job", "READ_JOB_ERROR", `Error leyendo job: ${err}`);
       }

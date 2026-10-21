@@ -18,6 +18,8 @@ import { talendReportGenerateSnippetsTool } from "../modules/jobs/tools/report-g
 import { createRequirementsAnalyzeTool } from "../modules/requirements/tools/requirements-analyze.tool";
 import { createRequirementsBuildChecklistTool } from "../modules/requirements/tools/requirements-build-checklist.tool";
 import { createJobsDetectAntipatternsTool } from "../modules/jobs/tools/jobs-detect-antipatterns.tool";
+import { createJobsValidatePipelineSpecTool } from "../modules/jobs/tools/jobs-validate-pipeline-spec.tool";
+import { createJobsPreviewPipelineSpecTool } from "../modules/jobs/tools/jobs-preview-pipeline-spec.tool";
 import { createEvidencePackBuildTool } from "../modules/evidence-pack/tools/evidence-pack-build.tool";
 import { talendCanReadProjectTool, talendCanReadProcessTool, talendCanReadMetadataTool } from "../modules/jobs/tools/doctor-can-read.tool";
 import { talendJobsListPatternsTool } from "../modules/jobs/tools/jobs-list-patterns.tool";
@@ -70,6 +72,8 @@ function getModuleTools(): RuntimeTool[] {
     createRequirementsAnalyzeTool(),
     createRequirementsBuildChecklistTool(),
     createJobsDetectAntipatternsTool(),
+    createJobsValidatePipelineSpecTool(),
+    createJobsPreviewPipelineSpecTool(),
     createEvidencePackBuildTool(),
     talendCanReadProjectTool,
     talendCanReadProcessTool,

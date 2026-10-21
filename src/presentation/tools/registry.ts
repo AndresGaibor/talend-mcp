@@ -1,6 +1,5 @@
 import { JobXmlRepository } from "../../infrastructure/repositories/job-xml.repository";
 import { AnalyzeJobUseCase } from "../../application/jobs/analyze-job.usecase";
-import { ListJobsUseCase } from "../../application/jobs/list-jobs.usecase";
 import { CreateJobUseCase } from "../../application/jobs/create-job.usecase";
 
 import { createAnalyzeJobTool } from "./jobs/analyze-job.tool";
@@ -75,7 +74,6 @@ import { createListOpenEditorsTool, createGetProbableActiveJobTool } from "./stu
 
 const jobRepo = new JobXmlRepository();
 const analyzeJobUseCase = new AnalyzeJobUseCase(jobRepo);
-const listJobsUseCase = new ListJobsUseCase(jobRepo);
 const createJobUseCase = new CreateJobUseCase(jobRepo);
 
 export const allTools = [
@@ -87,7 +85,7 @@ export const allTools = [
   createDeleteJobTool(),
   createDuplicateJobTool(),
   createListComponentsTool(),
-  createListJobsTool(listJobsUseCase),
+  createListJobsTool(),
   createMoveJobTool(),
   createReadContextsTool(),
   createReadJobTool(),

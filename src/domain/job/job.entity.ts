@@ -73,6 +73,12 @@ export type TalendJobResource = {
   folderPath?: string;
   purpose?: string;
   description?: string;
+  /** Estado del item en el repositorio (`statusCode` de las propiedades). */
+  statusCode?: string;
+  /** Fecha de creacion (de las propiedades del item). */
+  createdDate?: string;
+  /** Fecha de la ultima modificacion (de las propiedades del item). */
+  modifiedDate?: string;
   itemPath: string;
   propertiesPath: string;
 };

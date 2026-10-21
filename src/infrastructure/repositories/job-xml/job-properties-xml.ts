@@ -1,5 +1,5 @@
 import { basename, dirname, join } from "node:path";
-import { parseXml } from "../../xml/xml-utils";
+import { parseXml, asArray } from "../../xml/xml-utils";
 import { readTextFile, listFilesRecursive } from "../../filesystem/file-reader";
 import { splitPortable } from "../../../platform/path-bridge";
 import type { TalendJobResource } from "../../../domain/job/job.entity";
@@ -15,12 +15,21 @@ export function parseJobProperties(xml: string, propertiesPath: string): TalendJ
   const itemFile = href.split("#")[0] ?? "";
   const folderPath = itemState?.["@_path"] ?? "";
 
+  // Las fechas y el estado vienen en las propiedades adicionales del item.
+  const adicionales = asArray(
+    property?.additionalProperties as Record<string, string> | Record<string, string>[] | undefined,
+  ) as Record<string, string>[];
+  const porClave = new Map(adicionales.map((item) => [item["@_key"] ?? "", item["@_value"] ?? ""]));
+
   return {
     label: property?.["@_label"] ?? "",
     version: property?.["@_version"] ?? "",
     folderPath: folderPath || undefined,
     purpose: property?.["@_purpose"],
     description: property?.["@_description"],
+    statusCode: property?.["@_statusCode"],
+    createdDate: porClave.get("created_date"),
+    modifiedDate: porClave.get("modified_date"),
     itemPath: join(dirname(propertiesPath), itemFile),
     propertiesPath,
   };

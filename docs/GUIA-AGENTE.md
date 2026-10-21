@@ -29,8 +29,13 @@ Dos familias de tools, con reglas distintas:
 - **Lectura y analisis sobre disco** (`talend_jobs_list`, `talend_jobs_read`, `talend_errors_*`,
   `talend_validation_*`, `talend_secrets_*`...). No necesitan Studio abierto.
 - **Operar Studio en vivo** (`talend_job_*_in_studio`, `talend_job_add_node`,
-  `talend_job_connect_nodes`, `talend_studio_*`, `talend_bridge_*`). **Necesitan Studio abierto
-  con el bridge cargado.** Son las que crean y modifican jobs.
+  `talend_job_connect_nodes`, `talend_jobs_create`, `talend_studio_*`, `talend_bridge_*`). **Necesitan Studio
+  abierto con el bridge cargado.** Son las que crean y modifican jobs.
+
+`talend_jobs_list` y `talend_jobs_read` leen el proyecto del disco (no hace falta Studio): la lista trae nombre,
+version, carpeta, fecha, tamano y numero de componentes de cada job, y la lectura trae los componentes con sus
+parametros y las conexiones. `talend_jobs_create` **si** necesita Studio: crea el job con la API del IDE, no
+escribiendo el `.item` a mano.
 
 ## 2. Antes de empezar: comprobar el entorno
 
