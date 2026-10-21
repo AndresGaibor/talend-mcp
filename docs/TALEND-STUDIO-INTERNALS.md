@@ -1139,6 +1139,43 @@ Con eso, configurar un componente nuevo es un paso de leer su ficha, no de
 adivinar: el nucleo no conoce ningun componente concreto y anadir soporte
 para uno nuevo es anadir un adaptador (`MapperConfigurer`), no tocar el nucleo.
 
+
+### 18.7 Las columnas de las tablas tambien salen del catalogo
+
+Un componente con tablas (el `tFilterRow`, el `tSortRow`, el `tUniqRow`, el
+`tAggregateRow`) tiene sus propias columnas, y saber cuales son es
+indispensable para rellenarlas. La tool las devuelve:
+
+```
+talend_studio_component_parameters {"name": "tSortRow"}
+  -> CRITERIA [TABLE] columnas: [COLNAME, SORT, ORDER]
+
+talend_studio_component_parameters {"name": "tUniqRow"}
+  -> UNIQUE_KEY [TABLE] columnas: [SCHEMA_COLUMN, KEY_ATTRIBUTE, CASE_SENSITIVE]
+
+talend_studio_component_parameters {"name": "tAggregateRow"}
+  -> GROUPBYS   [TABLE] columnas: [OUTPUT_COLUMN, INPUT_COLUMN]
+  -> OPERATIONS [TABLE] columnas: [OUTPUT_COLUMN, FUNCTION, INPUT_COLUMN, IGNORE_NULL]
+```
+
+Con eso, la tabla se rellena con el formato de `elementValue` que usa Talend:
+
+```xml
+<elementParameter field="TABLE" name="CRITERIA">
+  <elementValue elementRef="COLNAME" value="row1.monto" id="0"/>
+  <elementValue elementRef="SORT" value="" id="1"/>
+  <elementValue elementRef="ORDER" value="DESC" id="2"/>
+</elementParameter>
+```
+
+**Ojo**: con esto se puede generar el `.item` de cualquier componente, pero no
+garantiza que el **generador de codigo** lo acepte. El `tFilterRow` y el
+`tUniqRow` resuelven el valor de la condicion contra las columnas del schema
+(`rightColumn`, `inputColumn`) y si no lo encuentra petan con un
+`NullPointerException` al generar el codigo. El formato que espera el generador
+no esta en el catalogo: solo estan los nombres de columna. Para esos
+componentes hay que mirar como los deja el IDE o usar el `tMap`.
+
 ## 19. Estructura del codigo del bridge
 
 El paquete `automation` del plugin quedo dividido por responsabilidades, para

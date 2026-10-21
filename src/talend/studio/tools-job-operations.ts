@@ -38,7 +38,10 @@ const schemaTableSchema = z.object({
 
 const tableSpecSchema = z.object({
   columns: z.array(z.string()).optional().describe("Codigos de columna de la tabla"),
-  rows: z.array(z.array(z.string())).optional().describe("Filas, una por registro"),
+  rows: z
+    .array(z.union([z.array(z.string()), z.record(z.string(), z.string())]))
+    .optional()
+    .describe("Filas de la tabla: una por registro, como array o como objeto con las claves de columna"),
 });
 
 const mapperEntrySchema = z.object({
@@ -184,7 +187,7 @@ export const jobOperationsTools = [
       label?: string;
       position?: { x: number; y: number };
       parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
-      tables?: Record<string, { columns?: string[]; rows?: string[][] }>;
+      tables?: Record<string, { columns?: string[]; rows?: Array<string[] | Record<string, string>> }>;
       schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
       mapper?: Record<string, unknown>;
       job?: string;
@@ -211,7 +214,7 @@ export const jobOperationsTools = [
     handler: async ({ uniqueName, parameters, tables, schema, mapper }: {
       uniqueName: string;
       parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
-      tables?: Record<string, { columns?: string[]; rows?: string[][] }>;
+      tables?: Record<string, { columns?: string[]; rows?: Array<string[] | Record<string, string>> }>;
       schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
       mapper?: Record<string, unknown>;
     }) => {

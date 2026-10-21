@@ -498,7 +498,7 @@ export class TalendStudioBridgeClient {
     label?: string;
     position?: { x: number; y: number };
     parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
-    tables?: Record<string, { columns?: string[]; rows?: string[][] }>;
+    tables?: Record<string, { columns?: string[]; rows?: Array<string[] | Record<string, string>> }>;
     schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
     mapper?: Record<string, unknown>;
   }): Promise<BridgeResult<Record<string, unknown>>> {
@@ -512,7 +512,7 @@ export class TalendStudioBridgeClient {
   async configureNode(options: {
     uniqueName: string;
     parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
-    tables?: Record<string, { columns?: string[]; rows?: string[][] }>;
+    tables?: Record<string, { columns?: string[]; rows?: Array<string[] | Record<string, string>> }>;
     schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
     mapper?: Record<string, unknown>;
   }): Promise<BridgeResult<Record<string, unknown>>> {

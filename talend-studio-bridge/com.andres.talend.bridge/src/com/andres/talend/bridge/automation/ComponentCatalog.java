@@ -87,6 +87,12 @@ public final class ComponentCatalog {
       if (displayName != null) {
         item.put("displayName", displayName);
       }
+      // Los codigos de columna de las tablas: son los que hay que poner en
+      // el spec para rellenar la tabla.
+      List<String> columns = tableColumns(parameter);
+      if (!columns.isEmpty()) {
+        item.put("columns", columns);
+      }
       parameters.add(item);
     }
 
@@ -97,9 +103,29 @@ public final class ComponentCatalog {
     return result;
   }
 
+  /**
+   * Codigos de columna de un parametro de tipo TABLE.
+   *
+   * Las tablas del componente (las del tFilterRow, el tSortRow...) tienen sus
+   * propias columnas, y hay que conocerlas para rellenar la tabla.
+   */
+  private static List<String> tableColumns(Object parameter) {
+    List<String> columns = new ArrayList<>();
+    try {
+      Object codes = parameter.getClass().getMethod("getListItemsDisplayCodeName").invoke(parameter);
+      if (codes instanceof Object[]) {
+        for (Object code : (Object[]) codes) {
+          columns.add(String.valueOf(code));
+        }
+      }
+    } catch (Exception e) {
+      // El parametro no tiene columnas de tabla.
+    }
+    return columns;
+  }
+
   /** Componentes del catalogo de Studio. */
-  private static Iterable<?> components() throws Exception {
-    Class<?> serviceClass = TalendClasses.load("org.talend.core.model.components.IComponentsService");
+  private static Iterable<?> components() throws Exception {    Class<?> serviceClass = TalendClasses.load("org.talend.core.model.components.IComponentsService");
     Object service = serviceClass.getMethod("get").invoke(null);
     Object factory = service.getClass().getMethod("getComponentsFactory").invoke(service);
     Object components = factory.getClass().getMethod("getComponents").invoke(factory);

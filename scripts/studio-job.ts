@@ -319,50 +319,90 @@ async function fase3(bridge: Bridge): Promise<void> {
   const uniqueLector = String((lector.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
   imprimir("3. anadir tFileInputDelimited", lector.data ?? lector.error);
 
-  const filtro = await bridge.addNode({ type: "tFilterRow", label: "filtra", position: { x: 320, y: 100 } });
+  const filtro = await bridge.addNode({ type: "tUniqRow", label: "unicos", position: { x: 300, y: 100 } });
   const uniqueFiltro = String((filtro.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
-  imprimir("4. anadir tFilterRow", filtro.data ?? filtro.error);
+  imprimir("4. anadir tUniqRow", filtro.data ?? filtro.error);
 
-  const orden = await bridge.addNode({ type: "tSortRow", label: "ordena", position: { x: 520, y: 100 } });
+  const agregado = await bridge.addNode({ type: "tAggregateRow", label: "agrega", position: { x: 480, y: 100 } });
+  const uniqueAgregado = String((agregado.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
+  imprimir("5. anadir tAggregateRow", agregado.data ?? agregado.error);
+
+  const orden = await bridge.addNode({ type: "tSortRow", label: "ordena", position: { x: 660, y: 100 } });
   const uniqueOrden = String((orden.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
-  imprimir("5. anadir tSortRow", orden.data ?? orden.error);
+  imprimir("6. anadir tSortRow", orden.data ?? orden.error);
 
-  const salida = await bridge.addNode({ type: "tLogRow", label: "salida", position: { x: 720, y: 100 } });
+  const salida = await bridge.addNode({ type: "tLogRow", label: "salida", position: { x: 840, y: 100 } });
   const uniqueSalida = String((salida.data as { result?: { uniqueName?: string } })?.result?.uniqueName ?? "");
-  imprimir("6. anadir tLogRow", salida.data ?? salida.error);
+  imprimir("7. anadir tLogRow", salida.data ?? salida.error);
+
+  const COLUMNAS_AGREGADO = [
+    { name: "estado", type: "id_String" },
+    { name: "total_monto", type: "id_Double" },
+    { name: "num_clientes", type: "id_Integer" },
+  ];
 
   for (const [nodo, columnas] of [
     [uniqueLector, COLUMNAS_CLIENTES],
     [uniqueFiltro, COLUMNAS_CLIENTES],
-    [uniqueOrden, COLUMNAS_CLIENTES],
-    [uniqueSalida, COLUMNAS_CLIENTES],
+    [uniqueAgregado, COLUMNAS_AGREGADO],
+    [uniqueOrden, COLUMNAS_AGREGADO],
+    [uniqueSalida, COLUMNAS_AGREGADO],
   ] as Array<[string, Columna[]]>) {
-    imprimir(`7. schema de ${nodo}`, (await bridge.configureNode({
+    imprimir(`8. schema de ${nodo}`, (await bridge.configureNode({
       uniqueName: nodo,
       schema: [{ connector: "FLOW", name: nodo, columns: columnas }],
     })).data);
   }
 
-  imprimir("8. conectar", (await bridge.connectNodes({ source: uniqueLector, target: uniqueFiltro })).data);
-  imprimir("9. conectar", (await bridge.connectNodes({ source: uniqueFiltro, target: uniqueOrden })).data);
-  imprimir("10. conectar", (await bridge.connectNodes({ source: uniqueOrden, target: uniqueSalida })).data);
+  imprimir("9. conectar", (await bridge.connectNodes({ source: uniqueLector, target: uniqueFiltro })).data);
+  imprimir("10. conectar", (await bridge.connectNodes({ source: uniqueFiltro, target: uniqueAgregado })).data);
+  imprimir("11. conectar", (await bridge.connectNodes({ source: uniqueAgregado, target: uniqueOrden })).data);
+  imprimir("12. conectar", (await bridge.connectNodes({ source: uniqueOrden, target: uniqueSalida })).data);
 
-  // El filtro: solo las filas activas.
-  imprimir("11. filtro", (await bridge.configureNode({
+  // Los duplicados: la clave de unicidad. La tabla del tUniqRow tiene las
+  // columnas que diga el catalogo del componente.
+  imprimir("13. unicos", (await bridge.configureNode({
     uniqueName: uniqueFiltro,
-    parameters: { CONDITION: { value: "row1.estado.equals(\"ACTIVO\")" } },
-  })).data);
-
-  // La ordenacion: por monto, de mayor a menor.
-  imprimir("12. orden", (await bridge.configureNode({
-    uniqueName: uniqueOrden,
-    parameters: {
-      SORT_COL: { value: "row1.monto" },
-      SORT_ORDER: { value: "DESC" },
+    tables: {
+      UNIQUE_KEY: {
+        columns: ["SCHEMA_COLUMN", "KEY_ATTRIBUTE", "CASE_SENSITIVE"],
+        rows: [{ SCHEMA_COLUMN: "row1.id", KEY_ATTRIBUTE: "false", CASE_SENSITIVE: "true" }],
+      },
     },
   })).data);
 
-  imprimir("13. nodos del job", (await bridge.listNodes()).data);
+  // La agregacion: agrupar por estado y sumar el monto (el equivalente a un
+  // PROC SUMMARY).
+  imprimir("14. agregacion", (await bridge.configureNode({
+    uniqueName: uniqueAgregado,
+    tables: {
+      GROUPBYS: {
+        columns: ["OUTPUT_COLUMN", "INPUT_COLUMN"],
+        rows: [{ OUTPUT_COLUMN: "estado", INPUT_COLUMN: "row1.estado" }],
+      },
+      OPERATIONS: {
+        columns: ["OUTPUT_COLUMN", "FUNCTION", "INPUT_COLUMN", "IGNORE_NULL"],
+        rows: [
+          { OUTPUT_COLUMN: "total_monto", FUNCTION: "SUM", INPUT_COLUMN: "row1.monto", IGNORE_NULL: "true" },
+          { OUTPUT_COLUMN: "num_clientes", FUNCTION: "COUNT", INPUT_COLUMN: "row1.id", IGNORE_NULL: "true" },
+        ],
+      },
+    },
+  })).data);
+
+  // La ordenacion: por total, de mayor a menor. La tabla del tSortRow tiene
+  // las columnas COLNAME, SORT y ORDER.
+  imprimir("15. orden", (await bridge.configureNode({
+    uniqueName: uniqueOrden,
+    tables: {
+      CRITERIA: {
+        columns: ["COLNAME", "SORT", "ORDER"],
+        rows: [{ COLNAME: "row1.total_monto", SORT: "", ORDER: "DESC" }],
+      },
+    },
+  })).data);
+
+  imprimir("16. nodos del job", (await bridge.listNodes()).data);
 }
 
 /**
