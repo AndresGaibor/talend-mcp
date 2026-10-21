@@ -101,8 +101,9 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
   **al final** (despues de crear y conectar), porque al conectar Talend rehace sus tablas.
 - **Conexiones:** el tipo de conexion es el **conector** del componente (`FLOW`, `UNIQUE`, `REJECT`,
   `ITERATE`...), no un texto libre: el `tUniqRow` saca sus filas por `UNIQUE`, y conectar por `FLOW`
-  compila pero no sale ninguna fila. El **nombre** de la conexion lo pone el bridge (`row1`, `row2`...),
-  y es el que usan las tablas de los componentes (`row1.monto`). Ver INTERNALS 32.
+  compila pero no sale ninguna fila. `talend_job_connect_nodes` lo comprueba antes de conectar y avisa
+  del conector que toca. El **nombre** de la conexion lo pone el bridge (`row1`, `row2`...), y es el que
+  usan las tablas de los componentes (`row1.monto`). Ver INTERNALS 32.
 - **Parametros que el catalogo no declara** (p. ej. `FILENAME` de `tFileOutputDelimited`): el bridge
   los crea con el tipo indicado o deducido.
 - Detalle y justificacion en [TALEND-STUDIO-INTERNALS.md](TALEND-STUDIO-INTERNALS.md) seccion 18.

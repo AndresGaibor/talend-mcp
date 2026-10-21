@@ -10,6 +10,7 @@ import {
 } from "../../src/modules/component-definitions/application/plan-required-parameters.use-case";
 import { DefinitionIndexRepository } from "../../src/modules/component-definitions/infrastructure/definition-index.repository";
 import { GetComponentDefinitionsUseCase } from "../../src/modules/component-definitions/application/get-component-definitions.use-case";
+import { ValidateConnectionUseCase } from "../../src/modules/component-definitions/application/validate-connection.use-case";
 
 const CONTEXTO = {
   name: "tEjemplo",
@@ -153,6 +154,81 @@ describe("Plan de relleno de los parametros obligatorios", () => {
     expect(plan.source).toBe(true);
     const planned = plan.parameters.FILENAME;
     expect(planned && "literal" in planned ? planned.literal : false).toBe(true);
+  });
+});
+
+describe("Comprobacion de conexiones", () => {
+  /** Definiciones de un tUniqRow y un tLogRow, como los de Studio. */
+  const UNIQ = `<COMPONENT>
+    <HEADER NAME="tUniqRow" VERSION="0.1" STARTABLE="false"/>
+    <FAMILIES><FAMILY>Data_Quality</FAMILY></FAMILIES>
+    <CONNECTORS>
+      <CONNECTOR CTYPE="FLOW" MAX_OUTPUT="0" MAX_INPUT="1"/>
+      <CONNECTOR NAME="UNIQUE" CTYPE="FLOW" MAX_OUTPUT="1"/>
+      <CONNECTOR NAME="DUPLICATE" CTYPE="FLOW" MAX_OUTPUT="1"/>
+      <CONNECTOR CTYPE="ITERATE" MAX_OUTPUT="1" MAX_INPUT="1"/>
+      <CONNECTOR CTYPE="SUBJOB_OK" MAX_INPUT="1"/>
+    </CONNECTORS>
+    <PARAMETERS/>
+  </COMPONENT>`;
+  const LOG = `<COMPONENT>
+    <HEADER NAME="tLogRow" VERSION="0.1" STARTABLE="false"/>
+    <FAMILIES><FAMILY>Logs_Errors</FAMILY></FAMILIES>
+    <CONNECTORS>
+      <CONNECTOR CTYPE="FLOW" MAX_INPUT="1" MAX_OUTPUT="1"/>
+      <CONNECTOR CTYPE="ITERATE" MAX_OUTPUT="0" MAX_INPUT="0"/>
+      <CONNECTOR CTYPE="SUBJOB_OK" MAX_INPUT="1"/>
+    </CONNECTORS>
+    <PARAMETERS/>
+  </COMPONENT>`;
+
+  const CIERRE = `<COMPONENT>
+    <HEADER NAME="tClose" VERSION="0.1" STARTABLE="false"/>
+    <FAMILIES><FAMILY>Orchestration</FAMILY></FAMILIES>
+    <CONNECTORS>
+      <CONNECTOR CTYPE="SUBJOB_OK" MAX_INPUT="1"/>
+      <CONNECTOR CTYPE="COMPONENT_OK"/>
+    </CONNECTORS>
+    <PARAMETERS/>
+  </COMPONENT>`;
+
+  async function validador(): Promise<ValidateConnectionUseCase> {
+    const raiz = mkdtempSync(join(tmpdir(), "talend-conexiones-"));
+    const plugins = join(raiz, "plugins");
+    const escribir = (plugin: string, nombre: string, xml: string) => {
+      const dir = join(plugins, plugin, "components", nombre);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${nombre}_java.xml`), xml);
+    };
+    escribir("org.talend.designer.components.localprovider_1.0", "tUniqRow", UNIQ);
+    escribir("org.talend.designer.components.localprovider_1.0", "tLogRow", LOG);
+    escribir("org.talend.designer.components.localprovider_1.0", "tClose", CIERRE);
+    const repositorio = new DefinitionIndexRepository({
+      pluginsDir: plugins,
+      cacheDir: join(raiz, "cache"),
+    });
+    return new ValidateConnectionUseCase(repositorio);
+  }
+
+  test("avisa cuando el conector no puede emitir filas", async () => {
+    const check = await (await validador()).validate("tUniqRow", "tLogRow", "FLOW");
+    expect(check.ok).toBe(false);
+    // El tUniqRow saca sus filas por UNIQUE, no por FLOW.
+    expect(check.sourceConnector).toBe("UNIQUE");
+    expect(check.errors.join(" ")).toContain("UNIQUE");
+  });
+
+  test("deja conectar por el conector que el componente usa", async () => {
+    const check = await (await validador()).validate("tUniqRow", "tLogRow", "UNIQUE");
+    expect(check.ok).toBe(true);
+    // El destino no tiene un conector UNIQUE: entra por su principal.
+    expect(check.warnings.join(" ")).toContain("conector principal");
+  });
+
+  test("avisa si el destino no tiene entradas de datos", async () => {
+    const check = await (await validador()).validate("tLogRow", "tClose", "FLOW");
+    expect(check.ok).toBe(false);
+    expect(check.errors.join(" ")).toContain("tClose");
   });
 });
 

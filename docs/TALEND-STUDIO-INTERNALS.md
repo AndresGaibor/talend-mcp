@@ -1570,11 +1570,12 @@ Detalles que surprises y que costan tiempo:
 - **El valor por defecto es un elemento hijo**, `<DEFAULT>";"</DEFAULT>`, y ya es un literal de Java: lleva sus
   comillas. Un `DEFAULT` de atributo es otra cosa (no existe en estos XML).
 - **El conector tiene dos nombres**: `NAME` es el que se usa al conectar (`FLOW`, `REJECT`, `ITERATE`,
-  `SUBJOB_OK`...) y `CTYPE` es el tipo de enlace. El conector principal no lleva `NAME`: se llama como su tipo.
+  `UNIQUE`...) y `CTYPE` es el tipo de enlace. El conector principal no lleva `NAME`: se llama como su tipo.
 - **El `MAX_INPUT`/`MAX_OUTPUT` del conector principal**: `MAX_INPUT=0` significa que el componente no puede
   recibir flujo (es un origen); `MAX_INPUT>=1` significa que consume. El `MAX_OUTPUT` del conector principal
-  siempre vale 1, asi que **no dice si el componente produce**: para eso hay que mirar si tiene conector
-  `REJECT` o el nombre del componente.
+  suele valer 1, asi que **no dice por si solo si el componente produce**: hay que mirar si tiene un conector
+  propio (`REJECT`, `UNIQUE`, `DUPLICATE`...). El `FLOW` del `tUniqRow` tiene `MAX_OUTPUT="0"`: sus filas salen
+  por `UNIQUE`.
 - **Las macros de Talend** (`__COMP_DEFAULT_FILE_DIR__`) y las referencias a contexto (`${...}`) no sirven como
   valor: hay que sustituirlas por una ruta real.
 - **Los componentes de la generacion nueva no estan en el XML**: vienen en archivos `.car` (AWS, JDBC, Snowflake,
@@ -1712,7 +1713,20 @@ la columna que forma la clave se marca con `KEY_ATTRIBUTE="true"`. La tabla del 
 valores de su XML: `SORT` es "num"/"alpha"/"date" y `ORDER` es "asc"/"desc" (en minusculas). Con otros valores, el
 generador falla con "Index 0 out of bounds for length 0".
 
-### Las tablas se ponen despues de conectar
+### El conector es el del origen, no tiene que existir en el destino
+
+El `connectorName` de la conexion es el conector **de salida del origen**. El destino usa su conector de
+entrada principal, que no tiene por que llamarse igual: el `REJECT` del `tFileInputDelimited` entra en el
+`FLOW` de un `tLogRow`, y el `UNIQUE` del `tUniqRow` tambien.
+
+Por eso, al conectar, hay que mirar:
+- que el conector sea una salida **del origen** (y que pueda emitir: el `FLOW` del `tUniqRow` tiene
+  `MAX_OUTPUT="0"`);
+- que el destino tenga algun conector de entrada.
+
+Conectar por un conector que el origen no tiene (o que no puede emitir) **no da error**: el job se guarda,
+compila y no sale ninguna fila. La tool `talend_job_connect_nodes` lo comprueba con las definiciones del XML
+y avisa (con `skipValidation` se puede saltarse).
 
 Al conectar, Talend rehace las tablas del componente con las del origen y se pierde lo que se habia puesto antes.
 Es lo que pasa con el `tMap` (su modelo se aplica al final) y con las tablas de transformacion: se conectan los
