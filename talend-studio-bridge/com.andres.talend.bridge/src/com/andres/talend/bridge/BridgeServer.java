@@ -159,6 +159,7 @@ final class BridgeServer {
       server.createContext("/automation/run-active-job", exchange -> guarded(exchange, () -> handleAutomationRunActiveJob(exchange)));
       server.createContext("/automation/job/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createJob")));
       server.createContext("/automation/job/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteJob")));
+      server.createContext("/automation/job/execute", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "executeJob")));
       server.createContext("/automation/job/open", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "openJob")));
       server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
       server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
@@ -398,6 +399,8 @@ final class BridgeServer {
           return JobOperationsService.createJob(body);
         case "deleteJob":
           return JobOperationsService.deleteJob(body);
+        case "executeJob":
+          return JobOperationsService.executeJob(body);
         case "openJob":
           return JobOperationsService.openJob(body);
         case "addNode":

@@ -107,6 +107,10 @@ public final class NodeOperations {
       throw new IllegalStateException("No existe el nodo '" + uniqueName + "'");
     }
     ComponentConfigurator.configure(node, spec);
+    String label = JsonSpec.string(spec, "label");
+    if (label != null) {
+      node.getClass().getMethod("setLabel", String.class).invoke(node, label);
+    }
     TalendApi.markModified(process);
     JobPersistence.persist(process);
     return summary(node);

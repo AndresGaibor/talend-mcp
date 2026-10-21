@@ -460,6 +460,25 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  /**
+   * Ejecuta un job ya generado y devuelve su salida.
+   *
+   * Es la forma de comprobar que el resultado es el esperado: la salida del
+   * job (las filas que imprime el tLogRow) llega aqui, cosa que con la vista
+   * Run de Studio no se puede leer.
+   */
+  async executeJob(options: {
+    name: string;
+    version?: string;
+    context?: string;
+    timeoutMs?: number;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/execute", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   /** Borra un job del repositorio de Talend, con sus archivos. */
   async deleteJob(options: { name: string; version?: string }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/job/delete", {
@@ -511,6 +530,7 @@ export class TalendStudioBridgeClient {
   /** Configura un componente ya anadido: parametros, tablas, schema o mapper. */
   async configureNode(options: {
     uniqueName: string;
+    label?: string;
     parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
     tables?: Record<string, { columns?: string[]; rows?: Array<string[] | Record<string, string>> }>;
     schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;

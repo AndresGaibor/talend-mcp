@@ -1348,3 +1348,40 @@ que tocar una cosa no obliga a tocar todo lo demas:
 archivo tiene que coincidir con la version del MANIFEST, y si no, Eclipse
 carga el bundle sin resolver sus dependencias y todo falla con
 `ClassNotFoundException: org.eclipse.draw2d.geometry.Point cannot be found`.
+## 23. Ejecutar un job y leer su salida
+
+Talend ejecuta cada job en una JVM aparte y muestra el resultado en la vista Run,
+que no se puede leer desde el bridge. Pero el codigo generado queda en el
+workspace, en:
+
+```
+poms/jobs/process/<job>/<job>_<version>/
+  target/classpath.jar      <- con el Class-Path completo en su MANIFEST
+  target/classes/...        <- las clases compiladas
+```
+
+El `classpath.jar` lleva en su MANIFEST el `Class-Path` con las routines, las
+librerias y las clases del job, asi que basta ponerlo en el classpath para
+tener el entorno completo. Y la clase principal se deduce de las clases
+compiladas: el fichero `<JobName>.class` dentro de `target/classes` dice el
+paquete.
+
+Con eso el bridge relanza el job y devuelve su salida, que es lo que hace
+falta para comprobar que el resultado es el esperado (el plan de pruebas lo
+pide explicitamente: "la salida coincide con lo esperado, que defines tu
+antes de ejecutar").
+
+```java
+java -Xms256M -Xmx1024M -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 \
+  -cp <job>/target/classpath.jar \
+  prj_bancolombia.mi_job_0_1.MI_JOB --context=Default
+```
+
+El `java` es el del propio runtime de Studio (`java.home`).
+
+La tool es `talend_job_execute`, y devuelve el codigo de salida, la salida
+estandar y la salida de error, con las lineas de la salida ya separadas.
+
+**Ojo**: el proceso se relanza, no se intercepta. El job ya se ha ejecutado
+una vez con `talend_job_run` (que compila y lanza); `talend_job_execute` lo
+ejecuta otra vez para poder leer su salida.

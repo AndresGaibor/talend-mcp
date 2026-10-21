@@ -310,6 +310,33 @@ export const jobOperationsTools = [
     },
   },
   {
+    name: "talend_job_execute",
+    description: "Ejecuta un job ya generado y devuelve su salida (las filas que imprime el tLogRow). Sirve para comprobar que el resultado es el esperado: la vista Run de Studio no se puede leer desde el MCP.",
+    inputSchema: z.object({
+      name: z.string().describe("Nombre del job"),
+      version: z.string().optional().default("0.1").describe("Version del job"),
+      context: z.string().optional().default("Default").describe("Contexto con el que se ejecuta"),
+      timeoutMs: z.number().optional().describe("Tiempo maximo de espera en milisegundos"),
+    }),
+    handler: async ({ name, version, context, timeoutMs }: {
+      name: string;
+      version?: string;
+      context?: string;
+      timeoutMs?: number;
+    }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.executeJob({ name, version, context, timeoutMs });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/job/execute",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
     name: "talend_job_list_nodes",
     description: "Lista los nodos del job abierto en Studio.",
     inputSchema: z.object({

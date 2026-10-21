@@ -152,6 +152,19 @@ public final class JobOperationsService {
   }
 
   /**
+   * Ejecuta un job ya generado y devuelve su salida.
+   *
+   * Es la forma de comprobar que el resultado es el esperado: la salida del
+   * job (las filas que imprime el tLogRow) llega aqui, cosa que con la vista
+   * Run de Studio no se puede leer.
+   *
+   * @param spec name, version, context y timeoutMs.
+   */
+  public static Map<String, Object> executeJob(JsonObject spec) {
+    return run("execute-job", () -> JobExecutor.execute(spec));
+  }
+
+  /**
    * Normaliza un tipo de columna al identificador Java de Talend.
    */
   public static String normalizeColumnType(String type) {
