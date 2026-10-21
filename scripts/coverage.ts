@@ -19,6 +19,8 @@
 
 import { writeFileSync } from "node:fs";
 import { createBridgeClient } from "../src/modules/studio-bridge/adapters/http-studio-bridge.client";
+import { DefinitionIndexRepository } from "../src/modules/component-definitions/infrastructure/definition-index.repository";
+import { planMount } from "../src/modules/component-definitions/application/plan-required-parameters.use-case";
 
 const args = process.argv.slice(2);
 
@@ -67,7 +69,9 @@ function desenvolver(data: unknown): Estado {
 }
 
 function guardarCsv(salida: string, filas: Fila[]): void {
-  const lineas = ["componente,creado,configurado,guardado,en_el_job,borrado,parametros,unique_name,error,compila,error_compilacion"];
+  const lineas = [
+    "componente,creado,configurado,guardado,en_el_job,borrado,parametros,montado,unique_name,error,compila,error_compilacion",
+  ];
   for (const fila of filas) {
     lineas.push([
       String(fila.component ?? ""),
@@ -77,6 +81,7 @@ function guardarCsv(salida: string, filas: Fila[]): void {
       fila.listed === true ? "si" : "no",
       fila.deleted === true ? "si" : "no",
       String(fila.parametersApplied ?? 0),
+      String(fila.mounted ?? 0),
       String(fila.uniqueName ?? ""),
       `"${String(fila.error ?? fila.deleteError ?? "").replace(/"/g, '""')}"`,
       fila.compiles === undefined ? "" : fila.compiles === true ? "si" : "no",
@@ -84,6 +89,66 @@ function guardarCsv(salida: string, filas: Fila[]): void {
     ].join(","));
   }
   writeFileSync(salida, `${lineas.join("\n")}\n`, "utf8");
+}
+
+/**
+ * Plan de montaje de los componentes del catalogo.
+ *
+ * Lo saca de las definiciones XML de la instalacion de Studio: cada
+ * componente declara que parametros son obligatorios (con su valor por
+ * defecto y cuando se ven) y que conectores admite.
+ */
+async function buildMountPlan(): Promise<Record<string, unknown>> {
+  const repository = new DefinitionIndexRepository();
+  const index = await repository.load();
+  const mount: Record<string, unknown> = {};
+  for (const definition of index.components) {
+    if (definition.palette !== "DI") continue;
+    mount[definition.name] = planMount(definition);
+  }
+  return mount;
+}
+
+/**
+ * Los componentes a medir.
+ *
+ * Con `--family` se miden los de esa familia (los de "File/Input", "File/
+ * Output"...); con `--components`, los que se pidan separados por comas. Sin
+ * ninguna de las dos, se mide el catalogo Standard entero (lo filtra el
+ * bridge).
+ */
+async function selectComponents(mount: Record<string, unknown>): Promise<string[] | undefined> {
+  const family = valorDe("--family");
+  const explicit = valorDe("--components");
+  if (explicit) {
+    return explicit
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+  }
+  if (!family && !args.includes("--con-definicion")) {
+    return undefined;
+  }
+  const repository = new DefinitionIndexRepository();
+  const index = await repository.load();
+  if (args.includes("--con-definicion")) {
+    // Los componentes que tienen definicion XML: son los que se pueden
+    // configurar con el plan. Los otros (los de la generacion nueva) tardan
+    // minutos cada uno porque el generador busca su artefacto en Maven.
+    return Object.keys(mount);
+  }
+  const wanted = (family ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item.length > 0);
+  return index.components
+    .filter(
+      (definition) =>
+        definition.palette === "DI" &&
+        definition.families.some((item) => wanted.includes(item.toLowerCase())),
+    )
+    .map((definition) => definition.name)
+    .filter((name) => name in mount);
 }
 
 async function main(): Promise<void> {
@@ -101,7 +166,23 @@ async function main(): Promise<void> {
   const compile = args.includes("--compile");
   const inicio = Date.now();
 
-  const arranque = await bridge.coverage({ filter, max: max ? Number(max) : undefined, compile });
+  // El plan de montaje de cada componente: que parametros obligatorios hay que
+  // rellenar (los saca de la definicion XML de Studio) y si hay que
+  // conectarle un origen o un destino. Sin destino, los componentes de la
+  // generacion nueva fallan con "Missing output connection".
+  const mount = await buildMountPlan();
+
+  // Los componentes a medir: por defecto, los del catalogo Standard; con
+  // --family, los de esa familia; con --components, los que se pidan.
+  const components = await selectComponents(mount);
+
+  const arranque = await bridge.coverage({
+    filter,
+    max: max ? Number(max) : undefined,
+    compile,
+    mount,
+    components,
+  });
   if (!arranque.ok) {
     console.error("No se pudo arrancar la medicion:", arranque.error?.message ?? arranque.rawText?.slice(0, 400));
     process.exit(1);

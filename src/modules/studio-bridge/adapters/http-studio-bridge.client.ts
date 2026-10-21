@@ -467,7 +467,13 @@ export class TalendStudioBridgeClient {
    * job de pruebas, lo configura con dos de sus parametros y lo borra.
    * Arranca la medicion y devuelve enseguida: el progreso se consulta con `coverageStatus`.
    */
-  async coverage(options?: { filter?: string; max?: number; compile?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
+  async coverage(options?: {
+    filter?: string;
+    max?: number;
+    compile?: boolean;
+    mount?: Record<string, unknown>;
+    components?: string[];
+  }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/coverage", {
       method: "POST",
       body: options ?? {},
@@ -564,6 +570,8 @@ export class TalendStudioBridgeClient {
   /** Anade un componente al job abierto, con los parametros que pidio Studio. */
   async addNode(options: {
     type: string;
+    /** Job en el que se anade. Sin esto, se usa el que este abierto. */
+    job?: string;
     label?: string;
     position?: { x: number; y: number };
     parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
@@ -580,6 +588,8 @@ export class TalendStudioBridgeClient {
   /** Configura un componente ya anadido: parametros, tablas, schema o mapper. */
   async configureNode(options: {
     uniqueName: string;
+    /** Job en el que esta el componente. Sin esto, se usa el que este abierto. */
+    job?: string;
     label?: string;
     parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
     tables?: Record<string, { columns?: string[]; rows?: Array<string[] | Record<string, string>> }>;
@@ -596,6 +606,8 @@ export class TalendStudioBridgeClient {
   async connectNodes(options: {
     source: string;
     target: string;
+    /** Job en el que estan los nodos. Sin esto, se usa el que este abierto. */
+    job?: string;
     type?: string;
     name?: string;
   }): Promise<BridgeResult<Record<string, unknown>>> {
@@ -620,6 +632,8 @@ export class TalendStudioBridgeClient {
   /** Define el schema (las columnas) de un nodo del job abierto. */
   async setNodeSchema(options: {
     uniqueName: string;
+    /** Job en el que esta el nodo. Sin esto, se usa el que este abierto. */
+    job?: string;
     connector?: string;
     columns: Array<{
       name: string;

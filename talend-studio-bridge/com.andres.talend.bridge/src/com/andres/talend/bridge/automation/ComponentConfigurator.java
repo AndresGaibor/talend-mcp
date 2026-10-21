@@ -52,11 +52,50 @@ public final class ComponentConfigurator {
    * @param spec configuracion declarada.
    */
   public static void configure(Object node, JsonObject spec) throws Exception {
-    applyParameters(node, spec);
+    if (JsonSpec.booleanOf(spec, "onlyIfEmpty", false)) {
+      applyParametersIfEmpty(node, spec);
+    } else {
+      applyParameters(node, spec);
+    }
     applyTables(node, spec);
     applySchema(node, spec);
     applyNodeData(node, spec);
     fixErrorTrigger(node);
+  }
+
+  /**
+   * Aplica los parametros solo donde el nodo todavia no tiene valor.
+   *
+   * El plan de relleno lo calcula el MCP leyendo la definicion del
+   * componente (el XML de Studio): si el nodo ya trae un valor (el que Studio
+   * pone por defecto), se respeta y no se pisa.
+   */
+  public static void applyParametersIfEmpty(Object node, JsonObject spec) throws Exception {
+    JsonObject parameters = JsonSpec.objectOf(spec, "parameters");
+    JsonObject onlyEmpty = new JsonObject();
+    for (Map.Entry<String, JsonElement> entry : parameters.entrySet()) {
+      if (isEmptyValue(node, entry.getKey())) {
+        onlyEmpty.add(entry.getKey(), entry.getValue());
+      }
+    }
+    if (onlyEmpty.size() > 0) {
+      applyParameters(node, onlyEmpty);
+    }
+  }
+
+  /** Si el parametro no existe o esta vacio. */
+  private static boolean isEmptyValue(Object node, String name) {
+    try {
+      Object parameter = node.getClass().getMethod("getElementParameter", String.class)
+          .invoke(node, name);
+      if (parameter == null) {
+        return true;
+      }
+      Object value = parameter.getClass().getMethod("getValue").invoke(parameter);
+      return value == null || String.valueOf(value).trim().isEmpty();
+    } catch (Exception e) {
+      return true;
+    }
   }
 
   /**
