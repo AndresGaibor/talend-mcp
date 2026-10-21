@@ -1,0 +1,192 @@
+{
+  "escenarios": [
+    {
+      "nombre": "humo: entrada fija a log",
+      "job": "MCP_L5_Humo",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "ciudad", "type": "id_String" }
+          ],
+          "values": [["1", "Bogota"], ["2", "Medellin"]]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "entrada", "destino": "salida" }],
+      "espera": {
+        "lineas": ["1|Bogota", "2|Medellin"]
+      }
+    },
+    {
+      "nombre": "archivos: leer un CSV y volcarlo al log",
+      "job": "MCP_L5_Leer",
+      "nodos": [
+        {
+          "type": "tFileInputDelimited",
+          "nombre": "lector",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_clientes.csv" },
+            "FIELDSEPARATOR": { "value": ";" },
+            "HEADER": { "value": "1" },
+            "ENCODING": { "value": "UTF-8" }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" }
+          ]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "lector", "destino": "salida" }],
+      "espera": {
+        "lineas": [
+          "1|Ana|Bogota|100.5",
+          "2|Jose|Medellin|200.25",
+          "3|Lucia|Cali|300.0",
+          "4|Ana|Bogota|100.5"
+        ]
+      }
+    },
+    {
+      "nombre": "archivos: leer un CSV y escribir otro",
+      "job": "MCP_L5_Escribir",
+      "nodos": [
+        {
+          "type": "tFileInputDelimited",
+          "nombre": "lector",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_clientes.csv" },
+            "FIELDSEPARATOR": { "value": ";" },
+            "HEADER": { "value": "1" },
+            "ENCODING": { "value": "UTF-8" }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" }
+          ]
+        },
+        {
+          "type": "tFileOutputDelimited",
+          "nombre": "escritor",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_salida.csv" },
+            "FIELDSEPARATOR": { "value": ";" },
+            "ENCODING": { "value": "UTF-8" },
+            "REPLACE_FILE": { "value": "true" },
+            "CREATE_HEADER": { "value": "false" }
+          }
+        }
+      ],
+      "conexiones": [{ "origen": "lector", "destino": "escritor" }],
+      "espera": {
+        "fichero": {
+          "ruta": "@TESTDATA@/l5_salida.csv",
+          "lineas": 4,
+          "contiene": ["1;Ana;Bogota;100.5", "2;Jose;Medellin;200.25"]
+        }
+      }
+    },
+    {
+      "nombre": "transformaciones: quitar duplicados, agregar y ordenar",
+      "job": "MCP_L5_Transformaciones",
+      "nodos": [
+        {
+          "type": "tFileInputDelimited",
+          "nombre": "lector",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_clientes.csv" },
+            "FIELDSEPARATOR": { "value": ";" },
+            "HEADER": { "value": "1" },
+            "ENCODING": { "value": "UTF-8" }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" }
+          ]
+        },
+        {
+          "type": "tUniqRow",
+          "nombre": "unicos",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" }
+          ],
+          "tablas": {
+            "UNIQUE_KEY": {
+              "columns": ["SCHEMA_COLUMN", "KEY_ATTRIBUTE", "CASE_SENSITIVE"],
+              "rows": [{ "SCHEMA_COLUMN": "row1.id", "KEY_ATTRIBUTE": "false", "CASE_SENSITIVE": "true" }]
+            }
+          }
+        },
+        {
+          "type": "tAggregateRow",
+          "nombre": "agrega",
+          "columnas": [
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "total_monto", "type": "id_Double" },
+            { "name": "num_clientes", "type": "id_Integer" }
+          ],
+          "tablas": {
+            "GROUPBYS": {
+              "columns": ["OUTPUT_COLUMN", "INPUT_COLUMN"],
+              "rows": [{ "OUTPUT_COLUMN": "ciudad", "INPUT_COLUMN": "row1.ciudad" }]
+            },
+            "OPERATIONS": {
+              "columns": ["OUTPUT_COLUMN", "FUNCTION", "INPUT_COLUMN", "IGNORE_NULL"],
+              "rows": [
+                {
+                  "OUTPUT_COLUMN": "total_monto",
+                  "FUNCTION": "SUM",
+                  "INPUT_COLUMN": "row1.monto",
+                  "IGNORE_NULL": "true"
+                },
+                {
+                  "OUTPUT_COLUMN": "num_clientes",
+                  "FUNCTION": "COUNT",
+                  "INPUT_COLUMN": "row1.id",
+                  "IGNORE_NULL": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "tSortRow",
+          "nombre": "ordena",
+          "columnas": [
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "total_monto", "type": "id_Double" },
+            { "name": "num_clientes", "type": "id_Integer" }
+          ],
+          "tablas": {
+            "CRITERIA": {
+              "columns": ["COLNAME", "SORT", "ORDER"],
+              "rows": [{ "COLNAME": "row1.total_monto", "SORT": "", "ORDER": "DESC" }]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "lector", "destino": "unicos" },
+        { "origen": "unicos", "destino": "agrega" },
+        { "origen": "agrega", "destino": "ordena" },
+        { "origen": "ordena", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": ["Cali|300.0|1", "Medellin|200.25|1", "Bogota|100.5|1"]
+      }
+    }
+  ]
+}

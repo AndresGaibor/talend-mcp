@@ -361,6 +361,23 @@ INSERT INTO transacciones (id_tx, id_cliente, monto, fecha) VALUES
 
 const RESULTADOS_HEADER = "fase,prueba,prompt_usado,genera_ok,abre_ok,ejecuta_ok,salida_correcta,tiempo_min,notas\n";
 
+/**
+ * CSV limpio para las pruebas de ejecucion (L5).
+ *
+ * A proposito no lleva trampas: el harness de ejecucion compara la salida
+ * exacta, y una fila duplicada es lo que usa el `tUniqRow` para proving.
+ */
+function l5ClientesCsv(): string {
+  return [
+    "id;nombre;ciudad;monto",
+    "1;Ana;Bogota;100.5",
+    "2;Jose;Medellin;200.25",
+    "3;Lucia;Cali;300",
+    "4;Ana;Bogota;100.5",
+    "",
+  ].join("\n");
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 function main(): void {
@@ -379,9 +396,10 @@ function main(): void {
   writeFileSync(join(dir, "docker-compose.yml"), DOCKER_COMPOSE, "utf8");
   writeFileSync(join(dir, "sql", "init.sql"), INIT_SQL, "utf8");
   writeFileSync(join(dir, "resultados.csv"), RESULTADOS_HEADER, "utf8");
+  writeFileSync(join(dir, "l5_clientes.csv"), l5ClientesCsv(), "utf8");
 
   console.log("testdata generado en:", dir);
-  for (const file of ["clientes.csv", "transacciones.csv", "productos.xlsx", "ancho_fijo.txt", "config.json", "clientes_grande.csv", "docker-compose.yml", "sql/init.sql", "resultados.csv"]) {
+  for (const file of ["clientes.csv", "transacciones.csv", "productos.xlsx", "ancho_fijo.txt", "config.json", "clientes_grande.csv", "docker-compose.yml", "sql/init.sql", "resultados.csv", "l5_clientes.csv"]) {
     console.log("  " + file);
   }
 }
