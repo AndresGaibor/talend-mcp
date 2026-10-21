@@ -23,7 +23,7 @@ import org.osgi.framework.Bundle;
  * reinicio posterior de Studio arranca con la misma version.
  */
 public final class HotReloadService {
-  private static final long POLL_INTERVAL_MS = 2000;
+  private static final long POLL_INTERVAL_MS = 500;
   private static final String HOT_DIR_ENV = "TALEND_BRIDGE_HOT_DIR";
   private static final String HOT_FILE_NAME = "bridge.jar";
 

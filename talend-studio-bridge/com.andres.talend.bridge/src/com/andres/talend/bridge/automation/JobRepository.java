@@ -196,6 +196,18 @@ public final class JobRepository {
   public static Map<String, Object> open(JsonObject spec) throws Exception {
     String name = JsonSpec.required(spec, "name");
     String version = version(spec);
+
+    // Si el job ya esta abierto, se activa el editor que hay. Abrirlo otra
+    // vez crea un segundo editor, con su propio proceso en memoria, y las
+    // operaciones pueden acabar en el que no toca.
+    org.eclipse.ui.IEditorPart existing = TalendApi.editorOfJob(name);
+    if (existing != null) {
+      Map<String, Object> result = new LinkedHashMap<>();
+      result.put("opened", true);
+      result.put("editorTitle", existing.getTitle());
+      return result;
+    }
+
     org.eclipse.core.resources.IFile file = itemFile(name, version);
     if (file == null || !file.exists()) {
       throw new IllegalStateException("No existe el job '" + name + "' en el proyecto");

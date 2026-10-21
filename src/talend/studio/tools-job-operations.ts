@@ -310,6 +310,26 @@ export const jobOperationsTools = [
     },
   },
   {
+    name: "talend_studio_coverage",
+    description: "Mide quantos componentes del catalogo de Talend se pueden crear y configurar con el MCP. Recorre el catalogo entero y devuelve el informe.",
+    inputSchema: z.object({
+      filter: z.string().optional().describe("Texto que tiene que aparecer en el nombre del componente"),
+      max: z.number().optional().describe("Maximo de componentes que probar"),
+    }),
+    handler: async ({ filter, max }: { filter?: string; max?: number }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.coverage({ filter, max });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/coverage",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
     name: "talend_studio_install_artifact",
     description: "Descarga un artefacto de Maven Central al repositorio local de Talend Studio. Necesario para los componentes cuyo runtime no viene con Studio (por ejemplo el tFileInputJSON, que necesita com.jayway.jsonpath:json-path).",
     inputSchema: z.object({

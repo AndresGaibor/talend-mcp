@@ -460,6 +460,19 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  /**
+   * Mide quantos componentes del catalogo se pueden crear y configurar.
+   *
+   * Recorre el catalogo entero de Talend Studio: anade cada componente a un
+   * job de pruebas, lo configura con dos de sus parametros y lo borra.
+   */
+  async coverage(options?: { filter?: string; max?: number }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/coverage", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
   /** Descarga un artefacto de Maven al repositorio local de Studio. */
   async installArtifact(options: {
     groupId: string;

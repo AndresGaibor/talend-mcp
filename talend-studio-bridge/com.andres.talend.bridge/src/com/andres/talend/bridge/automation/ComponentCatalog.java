@@ -27,9 +27,15 @@ public final class ComponentCatalog {
    */
   public static Map<String, Object> list(JsonObject spec) throws Exception {
     String filter = JsonSpec.string(spec, "filter");
-    int limit = JsonSpec.string(spec, "limit") != null
-        ? Integer.parseInt(JsonSpec.string(spec, "limit"))
-        : 200;
+    int limit = 100000;
+    String rawLimit = JsonSpec.string(spec, "limit");
+    if (rawLimit != null) {
+      try {
+        limit = Integer.parseInt(rawLimit);
+      } catch (NumberFormatException e) {
+        limit = 100000;
+      }
+    }
 
     List<String> names = new ArrayList<>();
     for (Object component : components()) {

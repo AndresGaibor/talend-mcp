@@ -28,6 +28,18 @@ public final class NodeOperations {
   private NodeOperations() {}
 
   /**
+   * Ejecuta una operacion en el hilo de la interfaz de Studio.
+   *
+   * Todas las operaciones de nodos tocan el editor y el modelo EMF, asi que
+   * tienen que ir en la UI. Y en trozos cortos: el bucle que recorre el
+   * catalogo llama a esta clase componente a componente, en vez de meter el
+   * bucle entero en la UI (que congelaria Studio).
+   */
+  private static <T> T onUi(java.util.concurrent.Callable<T> action) {
+    return com.andres.talend.bridge.UiThread.sync(action);
+  }
+
+  /**
    * Anade un componente al job abierto.
    *
    * @param spec type, label, position y la configuracion declarativa.
@@ -273,13 +285,11 @@ public final class NodeOperations {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);
     List<Map<String, Object>> nodes = new ArrayList<>();
-    // `getGraphicalNodes` son los nodos del lienzo, que incluyen los que
-    // no son nodos de proceso (los subjobs, por ejemplo).
-    Object processNodes = process.getClass().getMethod("getGraphicalNodes").invoke(process);
-    if (processNodes instanceof Iterable) {
-      for (Object node : (Iterable<?>) processNodes) {
-        nodes.add(summary(node));
-      }
+    // Se listan todos los contenedores, no solo los del lienzo: los nodos de
+    // conexion (tDBConnection, tFTPConnection) no aparecen en el lienzo pero
+    // forman parte del job.
+    for (Object node : TalendApi.allNodes(process)) {
+      nodes.add(summary(node));
     }
     return nodes;
   }

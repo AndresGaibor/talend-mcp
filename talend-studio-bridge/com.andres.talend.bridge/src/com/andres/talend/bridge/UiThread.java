@@ -1,6 +1,8 @@
 package com.andres.talend.bridge;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -12,10 +14,14 @@ import org.eclipse.swt.widgets.Display;
  * Los widgets de SWT (los shells, los dialogos) solo se pueden tocar desde el
  * hilo de la UI. Estas operaciones se lanzan ahi.
  *
- * La espera tiene un tiempo maximo: si el hilo de la UI esta ocupado (por
- * ejemplo, compilando un job), la llamada se devuelve con un error en vez de
- * colgarse. Sin eso, el bridge entero se queda bloqueado y el guardian de
- * modales deja de poder cerrar los dialogos que bloquean al IDE.
+ * Dos reglas importantes:
+ *
+ * - El hilo de la UI no puede quedarse bloqueado: si se espera ahi mas de
+ *   `timeoutMs`, la accion se **descarta** (no se ejecuta tarde, que es peor:
+ *   tocaria el modelo cuando ya no toca).
+ * - Solo entra en la UI lo que toca widgets o el modelo del job, y en trozos
+ *   cortos. Recorrer el catalogo entero o esperar un proceso se hace en el
+ *   hilo de trabajo HTTP.
  */
 public final class UiThread {
 
@@ -35,7 +41,7 @@ public final class UiThread {
    * Ejecuta una accion en el hilo de la UI y espera su resultado.
    *
    * @param timeoutMs tiempo maximo de espera. Si el hilo de la UI no queda
-   *        libre, se lanza una excepcion.
+   *        libre, se lanza una excepcion y la accion se descarta.
    */
   public static <T> T sync(Callable<T> action, long timeoutMs) {
     if (Display.getCurrent() != null) {
@@ -44,29 +50,36 @@ public final class UiThread {
 
     AtomicReference<T> result = new AtomicReference<>();
     AtomicReference<RuntimeException> error = new AtomicReference<>();
-    AtomicBoolean done = new AtomicBoolean(false);
+    AtomicBoolean cancelled = new AtomicBoolean(false);
+    CountDownLatch done = new CountDownLatch(1);
 
     Display display = Display.getDefault();
     display.asyncExec(() -> {
       try {
+        // Si el tiempo se acabo mientras esta en la cola, la accion se
+        // descarta: ejecutarla tarde tocaria el modelo cuando ya no toca.
+        if (cancelled.get()) {
+          return;
+        }
         result.set(call(action));
       } catch (RuntimeException e) {
         error.set(e);
       } finally {
-        done.set(true);
+        done.countDown();
       }
     });
 
-    long deadline = System.currentTimeMillis() + timeoutMs;
-    while (!done.get() && System.currentTimeMillis() < deadline) {
-      try {
-        Thread.sleep(20);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
-      }
+    boolean finished;
+    try {
+      finished = done.await(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      cancelled.set(true);
+      throw new IllegalStateException("Se interrumpio la espera al hilo de la interfaz de Studio");
     }
-    if (!done.get()) {
+
+    if (!finished) {
+      cancelled.set(true);
       throw new IllegalStateException(
           "El hilo de la interfaz de Studio esta ocupado (se acabo el tiempo de espera)");
     }

@@ -177,6 +177,15 @@ public final class JobOperationsService {
   }
 
   /**
+   * Mide quantos componentes del catalogo se pueden crear y configurar.
+   *
+   * @param spec opcionalmente `filter` y `max`.
+   */
+  public static Map<String, Object> coverage(JsonObject spec) {
+    return run("coverage", () -> CoverageChecker.check(spec));
+  }
+
+  /**
    * Normaliza un tipo de columna al identificador Java de Talend.
    */
   public static String normalizeColumnType(String type) {

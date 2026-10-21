@@ -1,5 +1,7 @@
 package com.andres.talend.bridge.automation;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import com.andres.talend.bridge.BridgeLog;
@@ -31,28 +33,76 @@ public final class TalendApi {
   /**
    * Editor grafico del job abierto.
    *
-   * Si no hay ninguno y el spec dice que job es, se abre.
+   * Si el spec dice que job es, se opera sobre ese, no sobre el que este
+   * activo: con varios jobs abiertos en Studio, operar sobre el activo
+   * modificaria el job equivocado.
    */
   public static Object designerEditor(JsonObject spec) throws Exception {
+    String jobName = JsonSpec.string(spec, "job");
+    if (jobName != null && !jobName.trim().isEmpty()) {
+      IEditorPart editor = editorOfJob(jobName);
+      if (editor == null) {
+        JsonObject jobSpec = new JsonObject();
+        jobSpec.addProperty("name", jobName);
+        String version = JsonSpec.string(spec, "version");
+        if (version != null) {
+          jobSpec.addProperty("version", version);
+        }
+        JobOperationsService.openJob(jobSpec);
+        editor = editorOfJob(jobName);
+      }
+      if (editor == null) {
+        throw new IllegalStateException("No se pudo abrir el job '" + jobName + "' en el editor");
+      }
+      return designerOf(editor);
+    }
+
     IEditorPart editor = WorkbenchService.activeEditorPart();
     if (editor == null) {
-      String jobName = JsonSpec.string(spec, "job");
-      if (jobName == null) {
-        throw new IllegalStateException(
-            "No hay ningun job abierto: indica 'job' en la peticion");
+      throw new IllegalStateException(
+          "No hay ningun job abierto: indica 'job' en la peticion");
+    }
+    return designerOf(editor);
+  }
+
+  /**
+   * Editor abierto de un job, por su nombre.
+   *
+   * Se devuelve el primero que hay. Los duplicados no se cierran aqui: al
+   * cerrarlos se descarta el proceso del editor, y con el se van los nodos
+   * que se hubieron anadido y no estaban en el disco.
+   */
+  public static IEditorPart editorOfJob(String jobName) {
+    org.eclipse.ui.IWorkbenchPage page = WorkbenchService.activePageOrNull();
+    if (page == null) {
+      return null;
+    }
+    IEditorPart found = null;
+    for (org.eclipse.ui.IEditorReference reference : page.getEditorReferences()) {
+      if (!reference.getTitle().contains(jobName)) {
+        continue;
       }
-      JsonObject jobSpec = new JsonObject();
-      jobSpec.addProperty("name", jobName);
-      String version = JsonSpec.string(spec, "version");
-      if (version != null) {
-        jobSpec.addProperty("version", version);
-      }
-      JobOperationsService.openJob(jobSpec);
-      editor = WorkbenchService.activeEditorPart();
-      if (editor == null) {
-        throw new IllegalStateException("No se pudo abrir el job en el editor");
+      try {
+        IEditorPart editor = reference.getEditor(true);
+        if (editor != null && found == null) {
+          found = editor;
+        }
+      } catch (Exception e) {
+        // El editor no se puede abrir: se sigue con el siguiente.
       }
     }
+    if (found != null) {
+      try {
+        page.activate(found);
+      } catch (Exception e) {
+        // Si no se puede activar, se sigue con el que hay.
+      }
+    }
+    return found;
+  }
+
+  /** Editor grafico (el lienzo) de un editor de job. */
+  private static Object designerOf(IEditorPart editor) throws Exception {
     Object designer = editor.getClass().getMethod("getDesignerEditor").invoke(editor);
     return designer != null ? designer : editor;
   }
@@ -107,7 +157,7 @@ public final class TalendApi {
   // ---------------------------------------------------------------------
 
   /** Nodo del proceso por su unique name. */
-  public static Object nodeByUniqueName(Object process, String uniqueName) throws Exception {
+  public static Object nodeByUniqueNameLegacy(Object process, String uniqueName) throws Exception {
     Object nodes = process.getClass().getMethod("getGraphicalNodes").invoke(process);
     if (nodes instanceof Iterable) {
       for (Object node : (Iterable<?>) nodes) {
@@ -158,6 +208,60 @@ public final class TalendApi {
   // ---------------------------------------------------------------------
   // Utilidades
   // ---------------------------------------------------------------------
+
+  /**
+   * Nodo del proceso por su unique name.
+   *
+   * Se usa el metodo oficial de Talend (`Process.getNodeByUniqueName`) porque
+   * `getGraphicalNodes` no incluye los nodos de conexion (el tDBConnection,
+   * el tFTPConnection...), que si estan en el job pero no en el lienzo.
+   */
+  public static Object nodeByUniqueName(Object process, String uniqueName) throws Exception {
+    Object found = invokeOrNull(process, "getNodeByUniqueName");
+    if (found != null) {
+      // El metodo oficial devuelve el nodo, pero hay que comprobar que es
+      // el pedido (puede devolver null).
+      Object name = invokeOrNull(found, "getUniqueName");
+      if (name != null && uniqueName.equals(name)) {
+        return found;
+      }
+    }
+    Object nodes = invokeOrNull(process, "getGraphicalNodes");
+    if (nodes instanceof Iterable) {
+      for (Object node : (Iterable<?>) nodes) {
+        Object name = invokeOrNull(node, "getUniqueName");
+        if (uniqueName.equals(name)) {
+          return node;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Todos los nodos del proceso, incluidos los de conexion.
+   */
+  public static List<Object> allNodes(Object process) throws Exception {
+    List<Object> nodes = new ArrayList<>();
+    Object containers = invokeOrNull(process, "getAllNodeContainers");
+    if (containers instanceof Iterable) {
+      for (Object container : (Iterable<?>) containers) {
+        Object node = invokeOrNull(container, "getNode");
+        if (node != null) {
+          nodes.add(node);
+        }
+      }
+    }
+    if (nodes.isEmpty()) {
+      Object graphical = invokeOrNull(process, "getGraphicalNodes");
+      if (graphical instanceof Iterable) {
+        for (Object node : (Iterable<?>) graphical) {
+          nodes.add(node);
+        }
+      }
+    }
+    return nodes;
+  }
 
   /** Invoca un metodo y devuelve su resultado, o null si falla. */
   public static Object invokeOrNull(Object target, String method) {

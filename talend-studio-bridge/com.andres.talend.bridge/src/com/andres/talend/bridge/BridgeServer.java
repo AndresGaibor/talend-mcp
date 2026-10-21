@@ -141,7 +141,12 @@ final class BridgeServer {
       server.createContext("/workbench/show-view", exchange -> guarded(exchange, () -> handleShowView(exchange)));
       server.createContext("/workbench/dialogs", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(ModalGuard::dismissBlockingDialogs))));
       server.createContext("/workbench/modules/install", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(ModalGuard::installMissingModules))));
-      server.createContext("/automation/artifacts/install", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(() -> JobOperationsService.installArtifact(readJsonBody(exchange))))));
+      // Descarga de la red: no toca ningun widget, asi que no entra en la UI.
+      server.createContext("/automation/artifacts/install", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.installArtifact(readJsonBody(exchange)))));
+      // La cobertura recorre el catalogo entero. El bucle corre en este hilo de
+      // trabajo y solo cede a la UI componente a componente (ver CoverageChecker):
+      // si todo fuera en la UI, Studio quedaria congelado durante minutos.
+      server.createContext("/automation/coverage", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.coverage(readJsonBody(exchange)))));
       server.createContext("/workspace/state", exchange -> guarded(exchange, () -> respond(exchange, 200, WorkspaceService.state())));
       server.createContext("/workspace/refresh", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkspaceService::refresh))));
       server.createContext("/problems/markers", exchange -> guarded(exchange, () -> respond(exchange, 200, ProblemMarkerService.markers())));
@@ -160,7 +165,11 @@ final class BridgeServer {
       server.createContext("/automation/run-active-job", exchange -> guarded(exchange, () -> handleAutomationRunActiveJob(exchange)));
       server.createContext("/automation/job/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createJob")));
       server.createContext("/automation/job/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteJob")));
-      server.createContext("/automation/job/execute", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "executeJob")));
+      // Estas tres no tocan widgets ni el modelo: van en el hilo de trabajo
+      // HTTP, que si no congela Studio. Ver docs/TALEND-STUDIO-INTERNALS.md
+      // seccion 26.
+      server.createContext("/automation/job/execute",
+          exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.executeJob(readJsonBody(exchange)))));
       server.createContext("/automation/job/open", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "openJob")));
       server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
       server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
@@ -394,6 +403,14 @@ final class BridgeServer {
    */
   private void handleNodeOperation(HttpExchange exchange, String operation) throws IOException {
     JsonObject body = readJsonBody(exchange);
+
+    // Ejecutar el job lanza una JVM aparte y espera su salida (hasta minutos):
+    // en el hilo de la UI congelaria Studio. Solo lee el workspace, sin widgets.
+    if ("executeJob".equals(operation)) {
+      respond(exchange, 200, JobOperationsService.executeJob(body));
+      return;
+    }
+
     respond(exchange, 200, UiThread.sync(() -> {
       switch (operation) {
         case "createJob":
