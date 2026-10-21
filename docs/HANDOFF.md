@@ -15,13 +15,13 @@ L4 compila, L5 ejecuta con la salida esperada).
 
 1. `docs/GUIA-AGENTE.md`: como usar el MCP, el flujo, los errores y los limites.
 2. `docs/ROADMAP-DOMINIO-TALEND.md`: el plan priorizado (P0 a P4).
-3. `docs/TALEND-STUDIO-INTERNALS.md`: las secciones 26 a 33 son las nuevas.
+3. `docs/TALEND-STUDIO-INTERNALS.md`: las secciones 26 a 37 son las nuevas.
 4. `docs/PLAN-DE-PRUEBAS.md`: el estado por fase y por familia.
 5. `AGENTS.md`: reglas del repo.
 
 ## Estado del repo
 
-- Rama `main`, al dia con el remoto. `bun test` verde (301 tests). `bun x tsc --noEmit` pasa.
+- Rama `main`, al dia con el remoto. `bun test` verde (304 tests). `bun x tsc --noEmit` pasa.
 - Los tests de integracion contra el Studio real solo corren con `TALEND_BRIDGE_INTEGRATION=1`
   (`tests/integration/`). Con y sin Studio, `bun test` es verde.
 
@@ -38,6 +38,8 @@ L4 compila, L5 ejecuta con la salida esperada).
 - Llamar al bridge directo: `bun run scripts/bridge-call.ts /ruta @archivo.json`. En PowerShell hay que pasar el
   JSON por archivo, porque las comillas en linea se pierden.
 - Para editar codigo Java con `\\` usa la herramienta Edit (las plantillas JS y `sed` pierden las barras).
+- **No recompiles el bridge con una medicion en marcha**: al recargar el plugin se pierde el estado en memoria de
+  la medicion y se acaba ("La medicion termino en estado 'none'").
 
 ## Lo que se ha hecho en esta sesion
 
