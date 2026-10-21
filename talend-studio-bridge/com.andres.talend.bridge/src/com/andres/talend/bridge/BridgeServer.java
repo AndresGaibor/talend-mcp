@@ -176,6 +176,13 @@ final class BridgeServer {
       // varios segundos: de ahi el tiempo de espera largo.
       server.createContext("/automation/job/compile", exchange -> guarded(exchange, () -> handleCompile(exchange)));
       server.createContext("/automation/job/problems", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "problems")));
+      // Los contextos (entornos) del job: se editan con la API de Studio, no
+      // escribiendo el XML a mano.
+      server.createContext("/automation/job/contexts", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "contexts")));
+      server.createContext("/automation/job/contexts/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createContext")));
+      server.createContext("/automation/job/contexts/parameter", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setContextParameter")));
+      server.createContext("/automation/job/contexts/parameter/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteContextParameter")));
+      server.createContext("/automation/job/contexts/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteContext")));
       server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
       server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
       server.createContext("/automation/nodes/update", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "updateNode")));
@@ -442,6 +449,16 @@ final class BridgeServer {
           return JobOperationsService.configureNode(body);
         case "problems":
           return JobOperationsService.problems(body);
+        case "contexts":
+          return JobOperationsService.contexts(body);
+        case "createContext":
+          return JobOperationsService.createContext(body);
+        case "setContextParameter":
+          return JobOperationsService.setContextParameter(body);
+        case "deleteContextParameter":
+          return JobOperationsService.deleteContextParameter(body);
+        case "deleteContext":
+          return JobOperationsService.deleteContext(body);
         default:
           return JobOperationsService.listNodes(body);
       }

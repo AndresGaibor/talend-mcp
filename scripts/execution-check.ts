@@ -70,6 +70,18 @@ type Escenario = {
   /** Escenario conocido pero todavia sin resolver: se informa y se salta. */
   pendiente?: string;
   /**
+   * Contextos (entornos) del job y sus variables.
+   *
+   * Se crean con la API de Studio: el job se guarda con sus entornos y sus
+   * valores, como si los hubiera hecho el IDE.
+   */
+  contextos?: Array<{
+    nombre: string;
+    variables?: Array<{ nombre: string; valor: string; tipo?: string }>;
+  }>;
+  /** Contexto con el que se ejecuta el job (por defecto, el de Studio). */
+  contexto?: string;
+  /**
    * Jobs auxiliares (el hijo de un `tRunJob`, por ejemplo). Se montan antes
    * del job principal.
    */
@@ -88,6 +100,11 @@ type Escenario = {
     contiene?: string[];
     /** Fichero que el job escribe. */
     fichero?: { ruta: string; lineas?: number; contiene?: string[] };
+    /** Los contextos que tiene que tener el job, con sus variables. */
+    contextos?: Array<{
+      nombre: string;
+      variables: Array<{ nombre: string; valor: string }>;
+    }>;
   };
 };
 
@@ -272,6 +289,9 @@ async function ejecutar(
   bridge: Awaited<ReturnType<typeof createBridgeClient>>,
   escenario: Escenario,
 ): Promise<Resultado> {
+  // Los contextos del job los crea `montarJob`, al crear el job: sus variables
+  // las puede usar el job (un tContextLoad las lleva al flujo).
+
   // Los jobs auxiliares (el hijo de un tRunJob) se montan antes que el
   // principal, y se compilan: un job padre necesita su hijo generado para
   // poder llamarlo.
@@ -309,9 +329,55 @@ async function ejecutar(
  * Monta un job: lo borra, lo crea, anade los nodos con su configuracion y
  * los conecta.
  */
+/**
+ * Crea los contextos (entornos) del job y sus variables.
+ *
+ * Se hace con la API de Studio: el job se guarda con sus entornos, tal y como
+ * los dejaria el IDE. El entorno por defecto ya existe, asi que solo se le
+ * anaden las variables.
+ */
+async function crearContextos(
+  bridge: Awaited<ReturnType<typeof createBridgeClient>>,
+  job: string,
+  contextos: Escenario["contextos"],
+): Promise<{ ok: boolean; mensaje?: string }> {
+  for (const contexto of contextos ?? []) {
+    if (contexto.nombre !== "Default") {
+      const creado = await bridge.createJobContext({ job, name: contexto.nombre });
+      if (!creado.ok) {
+        return {
+          ok: false,
+          mensaje: `no se pudo crear el contexto '${contexto.nombre}': ${errorDe(creado)}`,
+        };
+      }
+    }
+    for (const variable of contexto.variables ?? []) {
+      const puesta = await bridge.setJobContextParameter({
+        job,
+        context: contexto.nombre,
+        name: variable.nombre,
+        value: variable.valor,
+        type: variable.tipo,
+      });
+      if (!puesta.ok) {
+        return {
+          ok: false,
+          mensaje: `no se pudo poner la variable '${variable.nombre}' en '${contexto.nombre}': ${errorDe(puesta)}`,
+        };
+      }
+    }
+  }
+  return { ok: true };
+}
+
 async function montarJob(
   bridge: Awaited<ReturnType<typeof createBridgeClient>>,
-  spec: { job: string; nodos: Nodo[]; conexiones: Escenario["conexiones"] },
+  spec: {
+    job: string;
+    nodos: Nodo[];
+    conexiones: Escenario["conexiones"];
+    contextos?: Escenario["contextos"];
+  },
 ): Promise<{ ok: boolean; mensaje?: string }> {  // 1. Job limpio.
   const borrado = await reintentar(
     () => bridge.deleteJob({ name: spec.job }),
@@ -326,6 +392,12 @@ async function montarJob(
   );
   if (!creado.ok) {
     return { ok: false, mensaje: `no se pudo crear: ${errorDe(creado)}` };
+  }
+
+  // Los contextos (entornos) del job, con sus variables.
+  const contextsOk = await crearContextos(bridge, spec.job, spec.contextos);
+  if (!contextsOk.ok) {
+    return contextsOk;
   }
 
   // 2. Nodos, con sus parametros y su schema.
@@ -504,7 +576,11 @@ for (const pendiente of tablasPorNodo) {
     if (existsSync(ruta)) rmSync(ruta, { force: true });
   }
 
-  let ejecutado = await bridge.executeJob({ name: escenario.job, timeoutMs: 180_000 });
+  let ejecutado = await bridge.executeJob({
+    name: escenario.job,
+    context: escenario.contexto,
+    timeoutMs: 180_000,
+  });
   for (let intento = 0; intento < 24; intento++) {
     const cuerpo = ((ejecutado.data ?? {}) as { result?: { error?: string }; error?: string });
     const error = cuerpo.result?.error ?? cuerpo.error ?? "";
@@ -543,6 +619,32 @@ for (const pendiente of tablasPorNodo) {
   // 5. Comparacion con lo esperado.
   const espera = escenario.espera ?? {};
   const fallos: string[] = [];
+
+  // Los contextos del job: se comprueba lo que se declaro.
+  if (espera.contextos) {
+    const listados = await bridge.jobContexts({ job: escenario.job });
+    const contextos = (
+      (listados.data?.result as { contexts?: Array<{ name: string; parameters?: Array<{ name: string; value: string }> }> })
+        ?.contexts ?? []
+    );
+    for (const esperado of espera.contextos) {
+      const contexto = contextos.find((item) => item.name === esperado.nombre);
+      if (!contexto) {
+        fallos.push(`el job no tiene el contexto '${esperado.nombre}'`);
+        continue;
+      }
+      for (const variable of esperado.variables) {
+        const encontrada = (contexto.parameters ?? []).find((item) => item.name === variable.nombre);
+        if (!encontrada) {
+          fallos.push(`el contexto '${esperado.nombre}' no tiene la variable '${variable.nombre}'`);
+        } else if (encontrada.value !== variable.valor) {
+          fallos.push(
+            `en '${esperado.nombre}', '${variable.nombre}' vale '${encontrada.value}' y se esperaba '${variable.valor}'`,
+          );
+        }
+      }
+    }
+  }
 
   if (espera.lineas) {
     const mismo =

@@ -1836,4 +1836,36 @@ El Postgres de pruebas se levanta con Docker (`testdata/docker-compose.yml`, pue
 trampa a proposito: una transaccion que apunta a un cliente que no existe. La clave foranea se anade al final de
 la carga y "NOT VALID", para que la carga no falle.
 
+## 36. Los contextos (los entornos) de un job
+
+Un job tiene contextos: "Default", "produccion"... Cada contexto tiene las mismas variables con **su propio
+valor**. Son lo que se edita en la pestana Contexts de Studio.
+
+La API de Studio (paquete `org.talend.core.model.context`):
+
+| Que | Como |
+|---|---|
+| El gestor | `process.getContextManager()` -> `JobContextManager` |
+| Los contextos | `manager.getListContext()` (un `ArrayList` mutable) |
+| El entorno por defecto | `manager.getDefaultContext()` |
+| Un contexto | `manager.getContext(indice)`, `context.getName()`, `context.setName(n)` |
+| Crear un contexto | `new JobContext(nombre)` (el constructor recibe el nombre) |
+| Las variables | `context.getContextParameterList()`, `context.getContextParameter(nombre)` |
+| Crear una variable | `new JobContextParameter()` y `setName`/`setType`/`setValue` |
+| Avisar del cambio | `manager.setModified(true)` y `manager.fireContextsChangedEvent()` |
+
+El MCP los edita con esa API (no escribiendo el XML a mano) y guarda el job con `JobPersistence.persist`, asi que
+el `.item` queda como lo dejaria el IDE:
+
+```xml
+<context confirmationNeeded="false" hide="false" name="produccion">
+  <contextParameter name="DB_HOST" promptNeeded="false" repositoryContextId="" type="id_String" value="db.produccion.local" internalId="..."/>
+</context>
+```
+
+**Los valores no viajan en el codigo generado**: la clase `ContextProperties` del job generado declara los campos
+("will be instanciated by MS") y los injecta el runtime. Por eso un job relanzado a mano (`java -cp classpath.jar`)
+no ve los valores del contexto, aunque su build tenga el `contexts/Default.properties` con ellos. Para comprobar
+un contexto hay que leerlo del modelo (`talend_job_contexts_list`), no de la salida del job.
+
 

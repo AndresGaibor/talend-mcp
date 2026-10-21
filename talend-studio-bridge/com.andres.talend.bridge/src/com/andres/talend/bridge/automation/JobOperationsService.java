@@ -204,6 +204,51 @@ public final class JobOperationsService {
   }
 
   /**
+   * Los contextos (entornos) del job con sus variables.
+   *
+   * @param spec `job` opcional.
+   */
+  public static Map<String, Object> contexts(JsonObject spec) {
+    return run("contexts", () -> JobContexts.list(spec));
+  }
+
+  /**
+   * Crea un contexto (un entorno) en el job.
+   *
+   * @param spec `job` y `name`.
+   */
+  public static Map<String, Object> createContext(JsonObject spec) {
+    return run("create-context", () -> JobContexts.createContext(spec));
+  }
+
+  /**
+   * Crea o cambia una variable de un contexto.
+   *
+   * @param spec `job`, `context`, `name`, `value` y `type` opcional.
+   */
+  public static Map<String, Object> setContextParameter(JsonObject spec) {
+    return run("set-context-parameter", () -> JobContexts.setParameter(spec));
+  }
+
+  /**
+   * Borra una variable de un contexto.
+   *
+   * @param spec `job`, `context` y `name`.
+   */
+  public static Map<String, Object> deleteContextParameter(JsonObject spec) {
+    return run("delete-context-parameter", () -> JobContexts.deleteParameter(spec));
+  }
+
+  /**
+   * Borra un contexto del job.
+   *
+   * @param spec `job` y `name`.
+   */
+  public static Map<String, Object> deleteContext(JsonObject spec) {
+    return run("delete-context", () -> JobContexts.deleteContext(spec));
+  }
+
+  /**
    * Progreso de la medicion de cobertura y, al terminar, su informe.
    *
    * @param spec opcionalmente `cancel: true`.

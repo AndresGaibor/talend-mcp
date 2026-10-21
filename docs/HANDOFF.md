@@ -87,6 +87,16 @@ el driver tiene que estar en el `.m2` de Studio con la version exacta, la `QUERY
 Un escenario puede declarar jobs auxiliares (`jobs`): se montan y compilan antes que el principal, que es lo que
 hace falta para que un `tRunJob` pueda llamar a su hijo.
 
+### Contextos (entornos) de un job
+
+El MCP ya edita los contextos de un job con la API de Studio: listarlos, crear un entorno, poner o cambiar una
+variable (con su valor en ese entorno) y borrarlos. Las tools son `talend_job_contexts_list`,
+`talend_job_context_create`, `talend_job_context_set`, `talend_job_context_delete` y
+`talend_job_context_delete_variable`. El `.item` queda como lo dejaria el IDE (INTERNALS 36).
+
+Ojo: los valores de un contexto **no viajan en el codigo generado** (los inyecta el runtime), asi que un job
+relanzado a mano no los ve. Para comprobar un contexto hay que leerlo del modelo, no de la salida del job.
+
 ### Comprobacion de conexiones
 
 `talend_job_connect_nodes` comprueba, con las definiciones del XML, que el conector sea una salida del origen que

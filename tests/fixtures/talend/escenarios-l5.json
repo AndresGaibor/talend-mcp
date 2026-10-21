@@ -177,11 +177,12 @@
     {
       "nombre": "transformaciones: agregar por ciudad",
       "job": "MCP_L5_Agrega",
-      "pendiente": "el tAggregateRow no propaga su schema (SCHEMA_AUTO_PROPAGATE=false): al poner sus columnas de salida, Talend las propaga hacia atras y el origen se queda con ellas en vez de las suyas, y el generador no encuentra la columna de entrada ('inputColumn is null')",
+      "pendiente": "",
       "nodos": [
         {
           "type": "tAggregateRow",
           "nombre": "agrega",
+          "schemaDespuesDeConectar": true,
           "esquemas": [
             {
               "conector": "FLOW",
@@ -220,6 +221,7 @@
         {
           "type": "tFileInputDelimited",
           "nombre": "lector",
+          "schemaDespuesDeConectar": true,
           "parameters": {
             "FILENAME": { "value": "@TESTDATA@/l5_clientes.csv" },
             "FIELDSEPARATOR": { "value": ";" },
@@ -281,8 +283,38 @@
       ],
       "espera": {
         "contiene": [
-          "1|Ana María Núñez|Bogotá|1500.5",
-          "10|Sofía Ramírez|Bogotá|750.25"
+          "1|Ana MarÃ­a NÃºÃ±ez|BogotÃ¡|1500.5",
+          "10|SofÃ­a RamÃ­rez|BogotÃ¡|750.25"
+        ]
+      }
+    },
+    {
+      "nombre": "contextos: cada entorno tiene su valor",
+      "job": "MCP_L5_Contextos",
+      "contexto": "produccion",
+      "contextos": [
+        {
+          "nombre": "Default",
+          "variables": [{ "nombre": "L5_VALOR", "valor": "hola", "tipo": "id_String" }]
+        },
+        {
+          "nombre": "produccion",
+          "variables": [{ "nombre": "L5_VALOR", "valor": "adios", "tipo": "id_String" }]
+        }
+      ],
+      "nodos": [
+        {
+          "type": "tContextLoad",
+          "nombre": "contexto",
+          "columnas": [{ "name": "L5_VALOR", "type": "id_String" }]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "contexto", "destino": "salida" }],
+      "espera": {
+        "contextos": [
+          { "nombre": "Default", "variables": [{ "nombre": "L5_VALOR", "valor": "hola" }] },
+          { "nombre": "produccion", "variables": [{ "nombre": "L5_VALOR", "valor": "adios" }] }
         ]
       }
     },

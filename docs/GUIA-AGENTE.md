@@ -63,6 +63,8 @@ Orden obligatorio. Cada paso usa lo que devolvio el anterior (sobre todo los `un
 | 9 | `talend_job_list_nodes` | Comprobar lo que hay en el job |
 | 9b | `talend_job_problems` | Errores y avisos de diseno (los de la vista Problemas) sin ejecutar nada. `clean: true` = abre sin avisos. Ejemplos: "No schema has been defined yet", "This component should have input link(s)" |
 | 9c | `talend_job_compile` | Genera el codigo y comprueba que **compila**, sin ejecutar. Devuelve `compiles` y, si falla, `error.line` y `error.message` (p. ej. `no_comillas cannot be resolved to a variable`). ~2 s; ocupa la UI mientras genera, igual que un Run |
+| 9d | `talend_job_contexts_list` | Los contextos (entornos) del job y sus variables, con el valor de cada variable en cada entorno |
+| 9e | `talend_job_context_create` / `talend_job_context_set` / `talend_job_context_delete` / `talend_job_context_delete_variable` | Crear un entorno, poner o cambiar una variable (con su valor en ese entorno), y borrarlos. Todo con la API de Studio, y el job se guarda |
 | 10 | `talend_job_run_by_name` | Genera el codigo, compila y lanza el job en Studio. **No devuelve la salida** (va a la vista Run) |
 | 11 | `talend_job_execute` | Relanza el job ya compilado y **devuelve `exitCode` y la salida** (`stdout`, `lines`). Es como se comprueba el resultado |
 Ejemplo minimo (humo): `tFixedFlowInput` -> `tLogRow`.

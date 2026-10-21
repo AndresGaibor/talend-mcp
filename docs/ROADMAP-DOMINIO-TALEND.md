@@ -87,9 +87,13 @@ Hoy se crean nodos, conexiones FLOW, schema y parametros. Falta lo que hace un j
 
 - **Conexiones y triggers**: tipos `FLOW`, `REJECT`, `FILTER`, `ITERATE`, `LOOKUP`; triggers
   `OnSubjobOk/Error`, `OnComponentOk/Error`, `RunIf`; validar que la conexion es legal para el
-  par de componentes; subjobs y nodos de inicio.
-- **Contextos en vivo**: grupos, variables, tipos, valores por entorno, `tContextLoad`. Hoy las
-  tools de contexto leen archivos; falta editarlos con la API de Studio.
+  par de componentes; subjobs y nodos de inicio. **El validador de conector esta hecho**
+  (`talend_job_connect_nodes` lo comprueba contra la definicion del componente, INTERNALS 32).
+- **Contextos en vivo**: grupos, variables, tipos, valores por entorno, `tContextLoad`. **Hecho**: los
+  contextos de un job se listan, crean, editan y borran con la API de Studio
+  (`talend_job_contexts_list`, `talend_job_context_create`, `talend_job_context_set`,
+  `talend_job_context_delete`, `talend_job_context_delete_variable`). Falta el `tContextLoad`
+  ejecutandose con los valores del entorno (los inyecta el runtime, no el codigo generado).
 - **Metadata del repositorio**: conexiones a base de datos, esquemas de archivo (delimitado,
   Excel, JSON, XML), esquemas genericos, y **usarlos en los nodos** (propiedad "Repository" en vez
   de "Built-in"). Es indispensable para todos los `tDB*`.

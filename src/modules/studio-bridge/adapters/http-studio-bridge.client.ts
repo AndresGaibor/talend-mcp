@@ -500,6 +500,56 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  /** Los contextos (entornos) del job con sus variables. */
+  async jobContexts(options?: { job?: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/contexts", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
+  /** Crea un contexto (un entorno) en el job. */
+  async createJobContext(options: { job?: string; name: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/contexts/create", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Crea o cambia una variable de un contexto. */
+  async setJobContextParameter(options: {
+    job?: string;
+    context: string;
+    name: string;
+    value: string;
+    type?: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/contexts/parameter", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Borra una variable de un contexto. */
+  async deleteJobContextParameter(options: {
+    job?: string;
+    context: string;
+    name: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/contexts/parameter/delete", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Borra un contexto del job. */
+  async deleteJobContext(options: { job?: string; name: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/contexts/delete", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   /** Progreso de la medicion de cobertura y, al terminar, su informe. */
   async coverageStatus(options?: { cancel?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/coverage/status", {
