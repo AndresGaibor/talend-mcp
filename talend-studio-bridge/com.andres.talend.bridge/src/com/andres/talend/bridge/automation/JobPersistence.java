@@ -28,26 +28,26 @@ public final class JobPersistence {
   /**
    * Guarda el modelo del proceso en el `.item` del job.
    */
-  public static void persist(Object process) {
+  public static boolean persist(Object process) {
     try {
       Object nuevo = process.getClass().getMethod("saveXmlFile").invoke(process);
       if (nuevo == null) {
-        return;
+        return false;
       }
       Object item = itemOf(process);
       if (item == null) {
         BridgeLog.warn("El proceso no tiene item: no se puede guardar");
-        return;
+        return false;
       }
       Object enlazado = item.getClass().getMethod("getProcess").invoke(item);
       if (enlazado == null) {
         BridgeLog.warn("El item no tiene ProcessType: no se puede guardar");
-        return;
+        return false;
       }
       Object resource = enlazado.getClass().getMethod("eResource").invoke(enlazado);
       if (resource == null) {
         BridgeLog.warn("El job no esta enlazado a un recurso EMF: no se puede guardar");
-        return;
+        return false;
       }
 
       // El ProcessType enlazado al recurso tiene los nodos (el modelo
@@ -71,8 +71,10 @@ public final class JobPersistence {
       adoptNodeData(nuevo);
 
       resource.getClass().getMethod("save", Map.class).invoke(resource, new HashMap());
+      return true;
     } catch (Exception e) {
       BridgeLog.warn("No se pudo guardar el job en el .item", e);
+      return false;
     }
   }
 

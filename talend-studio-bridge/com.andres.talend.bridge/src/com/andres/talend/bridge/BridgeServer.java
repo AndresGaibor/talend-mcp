@@ -147,6 +147,7 @@ final class BridgeServer {
       // trabajo y solo cede a la UI componente a componente (ver CoverageChecker):
       // si todo fuera en la UI, Studio quedaria congelado durante minutos.
       server.createContext("/automation/coverage", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.coverage(readJsonBody(exchange)))));
+      server.createContext("/automation/coverage/status", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.coverageStatus(readJsonBody(exchange)))));
       server.createContext("/workspace/state", exchange -> guarded(exchange, () -> respond(exchange, 200, WorkspaceService.state())));
       server.createContext("/workspace/refresh", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkspaceService::refresh))));
       server.createContext("/problems/markers", exchange -> guarded(exchange, () -> respond(exchange, 200, ProblemMarkerService.markers())));

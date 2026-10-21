@@ -52,7 +52,8 @@ function readToken(): string {
 
 let body: string | undefined = positional[1];
 if (body?.startsWith("@")) {
-  body = readFileSync(body.slice(1), "utf8");
+  // Windows PowerShell escribe los archivos UTF-8 con BOM: JSON.parse no lo admite.
+  body = readFileSync(body.slice(1), "utf8").replace(/^﻿/, "");
 }
 if (body !== undefined) {
   try {

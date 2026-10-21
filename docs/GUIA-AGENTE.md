@@ -213,7 +213,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `tFilterRow`, `tSortRow`, `tUniqRow`, `tAggregateRow` | El `.item` sale bien; el formato interno de las condiciones/criterios no esta en el catalogo y no genera codigo |
 | `tFileInputPositional`, `tFileInputJSON` | Generan codigo que no compila en 8.0.1 (usan `onSubJobError` inexistente). Usa `tFileInputDelimited` si puedes |
 | `tFileOutputDelimited` | Necesita librerias que pueden faltar en el `.m2` de Studio |
-| Cobertura de los 1294 componentes | **Sin medir todavia**: `scripts/coverage.ts` reporta los 1294 como fallidos (`No existe el nodo 'tXxx_N'`); el fallo esta en la propia medicion y falta investigarlo. No afirmes "cubre todos los componentes" |
+| Cobertura de los 1294 componentes | Medida: 1245 (96 %) se crean, configuran, guardan y borran (L1/L2). Fallan 49: 20 sin runtime de Maven y 29 de Spark/Big Data (necesitan un job Spark). Compilar y ejecutar (L4/L5) solo esta probado en unas fases; ver [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md) |
 | Salida de la vista Run | No se puede leer; por eso existe `talend_job_execute` |
 
 Estado fase por fase en [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md).
@@ -221,6 +221,7 @@ Estado fase por fase en [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md).
 ## 12. Documentacion relacionada
 
 - [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md): fases, criterios y estado.
+- [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md): que falta para automatizar Talend al 100 %.
 - [TALEND-STUDIO-INTERNALS.md](TALEND-STUDIO-INTERNALS.md): APIs internas de Studio, recetas y trampas.
 - [ARQUITECTURA.md](ARQUITECTURA.md): capas del repo y del plugin.
 - [PLAN-DE-TRABAJO.md](PLAN-DE-TRABAJO.md): recetas para cambiar el repo.

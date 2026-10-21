@@ -25,8 +25,115 @@ public final class CoverageChecker {
 
   private CoverageChecker() {}
 
+  /** Estado de una medicion en marcha o terminada. */
+  private static final class Run {
+    final String id = java.util.UUID.randomUUID().toString().substring(0, 8);
+    final long startedAt = System.currentTimeMillis();
+    volatile long finishedAt;
+    volatile String state = "running";
+    volatile int catalogSize;
+    volatile int total;
+    volatile int tested;
+    volatile int created;
+    volatile int failed;
+    volatile int saveFailed;
+    volatile int resets;
+    volatile String current;
+    volatile boolean cancelRequested;
+    volatile String error;
+    volatile Map<String, Object> result;
+
+    Map<String, Object> snapshot(boolean withResult) {
+      Map<String, Object> out = new LinkedHashMap<>();
+      out.put("runId", id);
+      out.put("state", state);
+      out.put("catalogSize", catalogSize);
+      out.put("total", total);
+      out.put("tested", tested);
+      out.put("created", created);
+      out.put("failed", failed);
+      out.put("saveFailed", saveFailed);
+      out.put("resets", resets);
+      out.put("current", current);
+      long end = finishedAt != 0 ? finishedAt : System.currentTimeMillis();
+      out.put("elapsedMs", end - startedAt);
+      if (error != null) {
+        out.put("error", error);
+      }
+      if (withResult && result != null) {
+        out.put("result", result);
+      }
+      return out;
+    }
+  }
+
+  /** La medicion actual o la ultima: solo hay una a la vez. */
+  private static volatile Run active;
+
+  /**
+   * Arranca la medicion en un hilo aparte y devuelve enseguida.
+   *
+   * Recorre mil y pico componentes y tarda minutos: una peticion HTTP no
+   * aguanta tanto (los clientes cortan a los 5 min), asi que el resultado se
+   * consulta con {@link #status}. Si ya hay una en marcha, devuelve esa.
+   */
+  public static synchronized Map<String, Object> start(JsonObject spec) {
+    Run current = active;
+    if (current != null && "running".equals(current.state)) {
+      Map<String, Object> out = current.snapshot(false);
+      out.put("alreadyRunning", true);
+      return out;
+    }
+
+    Run run = new Run();
+    active = run;
+    Thread thread = new Thread(() -> {
+      try {
+        run.result = measure(spec, run);
+        run.state = run.cancelRequested ? "cancelled" : "done";
+      } catch (Throwable t) {
+        run.state = "failed";
+        run.error = t.getMessage() != null ? t.getMessage() : t.toString();
+        BridgeLog.warn("Fallo la medicion de cobertura", t);
+      } finally {
+        run.finishedAt = System.currentTimeMillis();
+      }
+    }, "talend-bridge-coverage");
+    thread.setDaemon(true);
+    thread.start();
+    return run.snapshot(false);
+  }
+
+  /**
+   * Progreso de la medicion y, cuando termina, su informe.
+   *
+   * @param spec opcionalmente `cancel: true` para pedir que pare.
+   */
+  public static Map<String, Object> status(JsonObject spec) {
+    Run run = active;
+    if (run == null) {
+      Map<String, Object> out = new LinkedHashMap<>();
+      out.put("state", "none");
+      out.put("message", "No hay ninguna medicion de cobertura: arranca una con talend_studio_coverage");
+      return out;
+    }
+    if (spec != null && spec.has("cancel") && spec.get("cancel").getAsBoolean()) {
+      run.cancelRequested = true;
+    }
+    return run.snapshot(true);
+  }
+
   /** Nombre del job donde se hace la medicion. */
   private static final String JOB_NAME = "MCP_Coverage";
+
+  /**
+   * Parametros internos de todo componente: identifican al nodo o describen la
+   * definicion. Tocarlos no prueba nada del componente y UNIQUE_NAME renombra
+   * el nodo (la prueba lo perdia de vista).
+   */
+  private static final java.util.Set<String> INTERNAL_PARAMETERS = new java.util.HashSet<>(
+      java.util.Arrays.asList("UNIQUE_NAME", "COMPONENT_NAME", "VERSION", "FAMILY", "LABEL",
+          "HINT", "CONNECTION_FORMAT", "INFORMATION", "STARTABLE", "SUBTREE_START"));
 
   /** Spec que apunta al job de la medicion. */
   private static JsonObject jobSpecOf(String name) {
@@ -42,7 +149,7 @@ public final class CoverageChecker {
    * @param spec opcionalmente `filter` (texto que tiene que aparecer en el
    *        nombre) y `max` (maximo de componentes a probar).
    */
-  public static Map<String, Object> check(JsonObject spec) throws Exception {
+  private static Map<String, Object> measure(JsonObject spec, Run run) throws Exception {
     String filter = JsonSpec.string(spec, "filter");
     int max = 100000;
     String rawMax = JsonSpec.string(spec, "max");
@@ -75,16 +182,11 @@ public final class CoverageChecker {
       }
     }
 
+    run.total = selected.size();
+    run.catalogSize = components.size();
+
     // El job donde se prueba.
-    UiThread.sync(() -> {
-      JsonObject deleteSpec = new JsonObject();
-      deleteSpec.addProperty("name", JOB_NAME);
-      JobRepository.delete(deleteSpec);
-      JsonObject createSpec = new JsonObject();
-      createSpec.addProperty("name", JOB_NAME);
-      createSpec.addProperty("replace", true);
-      return JobRepository.create(createSpec);
-    }, 60_000L);
+    UiThread.sync(CoverageChecker::recreateJob, 60_000L);
 
     List<Map<String, Object>> results = new ArrayList<>();
     int created = 0;
@@ -93,6 +195,10 @@ public final class CoverageChecker {
     int deleted = 0;
     int failed = 0;
     for (String name : selected) {
+      if (run.cancelRequested) {
+        break;
+      }
+      run.current = name;
       Map<String, Object> row;
       try {
         row = UiThread.sync(() -> checkComponent(name));
@@ -104,8 +210,29 @@ public final class CoverageChecker {
         row.put("error", e.getMessage() != null ? e.getMessage() : e.toString());
       }
       results.add(row);
+      run.tested = results.size();
+
+      // Un componente que falla puede dejar el job en un estado que rompe el
+      // guardado y el borrado de todos los siguientes (se vio: tras el primer
+      // fallo, los mil siguientes salian "no guardado"). Se parte de un job
+      // limpio para que cada componente se mida por separado.
+      boolean dirty = !Boolean.TRUE.equals(row.get("ok"))
+          || Boolean.FALSE.equals(row.get("saved"))
+          || !Boolean.TRUE.equals(row.get("deleted"));
+      if (dirty) {
+        try {
+          UiThread.sync(CoverageChecker::recreateJob, 60_000L);
+          run.resets++;
+        } catch (RuntimeException e) {
+          BridgeLog.warn("No se pudo reiniciar el job de cobertura", e);
+        }
+      }
       if (Boolean.TRUE.equals(row.get("ok"))) {
         created++;
+        run.created = created;
+        if (Boolean.FALSE.equals(row.get("saved"))) {
+          run.saveFailed++;
+        }
         if (row.get("parametersApplied") != null) {
           configured++;
         }
@@ -117,6 +244,7 @@ public final class CoverageChecker {
         }
       } else {
         failed++;
+        run.failed = failed;
       }
     }
 
@@ -139,8 +267,35 @@ public final class CoverageChecker {
     result.put("listed", listed);
     result.put("deleted", deleted);
     result.put("failed", failed);
+    result.put("saveFailed", run.saveFailed);
+    result.put("cancelled", run.cancelRequested);
     result.put("components", results);
     return result;
+  }
+
+  /** Borra y crea de nuevo el job de pruebas, vacio. Va en la UI. */
+  private static Object recreateJob() throws Exception {
+    JsonObject deleteSpec = new JsonObject();
+    deleteSpec.addProperty("name", JOB_NAME);
+    JobRepository.delete(deleteSpec);
+    JsonObject createSpec = new JsonObject();
+    createSpec.addProperty("name", JOB_NAME);
+    createSpec.addProperty("replace", true);
+    return JobRepository.create(createSpec);
+  }
+
+  /**
+   * Mensaje de la causa raiz. Los metodos se invocan por reflexion, asi que lo
+   * que llega es un InvocationTargetException sin mensaje: lo util esta debajo.
+   */
+  private static String rootCause(Throwable error) {
+    Throwable cause = error;
+    while (cause.getCause() != null && cause.getCause() != cause) {
+      cause = cause.getCause();
+    }
+    String message = cause.getMessage();
+    String name = cause.getClass().getSimpleName();
+    return message == null || message.isEmpty() ? name : name + ": " + message;
   }
 
   /** Crea, configura, comprueba y borra un componente. Va siempre en la UI. */
@@ -156,6 +311,9 @@ public final class CoverageChecker {
       Map<String, Object> added = NodeOperations.add(addSpec);
       Object uniqueName = added.get("uniqueName");
       row.put("uniqueName", uniqueName);
+      // Studio puede crear el nodo y no poder guardarlo (los de Spark revientan
+      // al evaluar sus expresiones de modo en saveXmlFile).
+      row.put("saved", added.get("saved"));
 
       // Se configura con dos parametros de texto del componente.
       List<Map<String, Object>> parameters = new ArrayList<>();
@@ -186,6 +344,9 @@ public final class CoverageChecker {
         if (!"TEXT".equals(field)) {
           continue;
         }
+        if (INTERNAL_PARAMETERS.contains(String.valueOf(parameter.get("name")))) {
+          continue;
+        }
         JsonObject value = new JsonObject();
         value.addProperty("value", "prueba");
         values.add(String.valueOf(parameter.get("name")), value);
@@ -193,8 +354,14 @@ public final class CoverageChecker {
       }
       if (applied > 0) {
         configSpec.add("parameters", values);
-        NodeOperations.configure(configSpec);
+        Map<String, Object> configuredNode = NodeOperations.configure(configSpec);
         row.put("parametersApplied", applied);
+        // Configurar no puede cambiar la identidad del nodo.
+        Object after = configuredNode.get("uniqueName");
+        if (after != null && !String.valueOf(uniqueName).equals(String.valueOf(after))) {
+          throw new IllegalStateException("Configurar cambio el nombre del nodo: "
+              + uniqueName + " -> " + after);
+        }
       }
 
       // Y se comprueba que el nodo esta en el job.
@@ -220,12 +387,12 @@ public final class CoverageChecker {
         row.put("deleted", true);
       } catch (Exception e) {
         row.put("deleted", false);
-        row.put("deleteError", e.getMessage());
+        row.put("deleteError", rootCause(e));
       }
       row.put("ok", true);
     } catch (Exception e) {
       row.put("ok", false);
-      row.put("error", e.getMessage() != null ? e.getMessage() : e.toString());
+      row.put("error", rootCause(e));
       BridgeLog.warn("Fallo la cobertura del componente '" + name + "'", e);
     }
     return row;

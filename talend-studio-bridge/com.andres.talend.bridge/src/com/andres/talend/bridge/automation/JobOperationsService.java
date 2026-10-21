@@ -182,7 +182,16 @@ public final class JobOperationsService {
    * @param spec opcionalmente `filter` y `max`.
    */
   public static Map<String, Object> coverage(JsonObject spec) {
-    return run("coverage", () -> CoverageChecker.check(spec));
+    return run("coverage", () -> CoverageChecker.start(spec));
+  }
+
+  /**
+   * Progreso de la medicion de cobertura y, al terminar, su informe.
+   *
+   * @param spec opcionalmente `cancel: true`.
+   */
+  public static Map<String, Object> coverageStatus(JsonObject spec) {
+    return run("coverage-status", () -> CoverageChecker.status(spec));
   }
 
   /**

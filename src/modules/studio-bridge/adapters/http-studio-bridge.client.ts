@@ -465,9 +465,18 @@ export class TalendStudioBridgeClient {
    *
    * Recorre el catalogo entero de Talend Studio: anade cada componente a un
    * job de pruebas, lo configura con dos de sus parametros y lo borra.
+   * Arranca la medicion y devuelve enseguida: el progreso se consulta con `coverageStatus`.
    */
   async coverage(options?: { filter?: string; max?: number }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/coverage", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
+  /** Progreso de la medicion de cobertura y, al terminar, su informe. */
+  async coverageStatus(options?: { cancel?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/coverage/status", {
       method: "POST",
       body: options ?? {},
     });

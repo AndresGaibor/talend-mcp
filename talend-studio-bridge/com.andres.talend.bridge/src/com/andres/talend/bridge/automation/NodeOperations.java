@@ -45,6 +45,10 @@ public final class NodeOperations {
    * @param spec type, label, position y la configuracion declarativa.
    */
   public static Map<String, Object> add(JsonObject spec) throws Exception {
+    return onUi(() -> addOnUi(spec));
+  }
+
+  private static Map<String, Object> addOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     String componentName = JsonSpec.required(spec, "type");
     Object catalogComponent = TalendApi.findCatalogComponent(componentName);
@@ -56,9 +60,7 @@ public final class NodeOperations {
     // Node(component) es lo que hace el palette de Studio al soltar el
     // componente: crea el nodo con la definicion del componente.
     Class<?> nodeClass = TalendClasses.load("org.talend.designer.core.ui.editor.nodes.Node");
-    Object node = nodeClass
-        .getConstructor(TalendClasses.load("org.talend.core.model.components.IComponent"))
-        .newInstance(catalogComponent);
+    Object node = createNode(nodeClass, catalogComponent);
 
     // El nodo nace sin parametros: hay que pedirle al componente que los
     // cree. Es lo que hace el editor al soltar el componente en el lienzo, y
@@ -84,11 +86,20 @@ public final class NodeOperations {
     Command command = (Command) commandClass
         .getConstructor(TalendClasses.load("org.talend.designer.core.ui.editor.process.Process"),
             containerClass, Point.class)
-        .newInstance(process, nodeContainer, positionOf(spec));
+        .newInstance(process, nodeContainer, positionFor(spec, process));
 
     // El command stack es quien registra el nodo en el modelo y lo dibuja.
     Object commandStack = editor.getClass().getMethod("getCommandStack").invoke(editor);
     commandStack.getClass().getMethod("execute", Command.class).invoke(commandStack, command);
+
+    // GEF ignora en silencio un comando que no se puede ejecutar (por ejemplo
+    // porque la posicion esta ocupada) y el nodo no llega a entrar. Sin esta
+    // comprobacion el alta respondia "ok" con un nombre que no existe.
+    String assigned = String.valueOf(node.getClass().getMethod("getUniqueName").invoke(node));
+    if (TalendApi.nodeByUniqueName(process, assigned) == null) {
+      throw new IllegalStateException("Studio rechazo el alta de '" + componentName
+          + "': el nodo no esta en el job (posicion ocupada o job de solo lectura)");
+    }
 
     // La configuracion del componente es declarativa: parametros, tablas,
     // schema y modelo propio. El nucleo no conoce ningun componente
@@ -101,8 +112,12 @@ public final class NodeOperations {
       node.getClass().getMethod("setLabel", String.class).invoke(node, label);
     }
     TalendApi.markModified(process);
-    JobPersistence.persist(process);
-    return summary(node);
+    boolean saved = JobPersistence.persist(process);
+    Map<String, Object> added = summary(node);
+    // Si Studio no pudo guardar el job con este nodo, el nodo esta en memoria
+    // pero no en el .item: quien llama debe saberlo.
+    added.put("saved", saved);
+    return added;
   }
 
   /**
@@ -111,6 +126,10 @@ public final class NodeOperations {
    * @param spec uniqueName del nodo y la configuracion.
    */
   public static Map<String, Object> configure(JsonObject spec) throws Exception {
+    return onUi(() -> configureOnUi(spec));
+  }
+
+  private static Map<String, Object> configureOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);
     String uniqueName = JsonSpec.required(spec, "uniqueName");
@@ -134,6 +153,10 @@ public final class NodeOperations {
    * @param spec source, target, type y name.
    */
   public static Map<String, Object> connect(JsonObject spec) throws Exception {
+    return onUi(() -> connectOnUi(spec));
+  }
+
+  private static Map<String, Object> connectOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);
     String sourceName = JsonSpec.required(spec, "source");
@@ -190,6 +213,10 @@ public final class NodeOperations {
    * @param spec uniqueName, label y parameters.
    */
   public static Map<String, Object> update(JsonObject spec) throws Exception {
+    return onUi(() -> updateOnUi(spec));
+  }
+
+  private static Map<String, Object> updateOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);
     String uniqueName = JsonSpec.required(spec, "uniqueName");
@@ -213,6 +240,10 @@ public final class NodeOperations {
    * @param spec uniqueNames de los nodos a borrar.
    */
   public static Map<String, Object> delete(JsonObject spec) throws Exception {
+    return onUi(() -> deleteOnUi(spec));
+  }
+
+  private static Map<String, Object> deleteOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);
 
@@ -250,6 +281,10 @@ public final class NodeOperations {
    * @param spec uniqueName del nodo.
    */
   public static Map<String, Object> copy(JsonObject spec) throws Exception {
+    return onUi(() -> copyOnUi(spec));
+  }
+
+  private static Map<String, Object> copyOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);
     String uniqueName = JsonSpec.required(spec, "uniqueName");
@@ -282,6 +317,10 @@ public final class NodeOperations {
    * Lista los nodos del job abierto.
    */
   public static List<Map<String, Object>> list(JsonObject spec) throws Exception {
+    return onUi(() -> listOnUi(spec));
+  }
+
+  private static List<Map<String, Object>> listOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);
     List<Map<String, Object>> nodes = new ArrayList<>();
@@ -387,6 +426,57 @@ public final class NodeOperations {
       // El resumen es informativo: si falla, no se rompe la operacion.
     }
     return result;
+  }
+
+  /**
+   * Node(component): lo que hace el palette de Studio al soltar el componente.
+   * Si el constructor falla, el error de Studio se propaga con su causa real.
+   */
+  private static Object createNode(Class<?> nodeClass, Object catalogComponent) throws Exception {
+    return nodeClass
+        .getConstructor(TalendClasses.load("org.talend.core.model.components.IComponent"))
+        .newInstance(catalogComponent);
+  }
+
+  /** Separacion de la rejilla de colocacion automatica, en pixeles. */
+  private static final int GRID_X = 200;
+  private static final int GRID_Y = 120;
+  private static final int GRID_COLUMNS = 6;
+
+  /**
+   * Posicion del nodo: la pedida, o el primer hueco libre de la rejilla.
+   *
+   * Studio descarta el nodo cuando cae sobre otro, asi que sin posicion
+   * explicita no vale un valor fijo: cada alta buscaria el mismo sitio.
+   */
+  private static Point positionFor(JsonObject spec, Object process) throws Exception {
+    JsonObject position = JsonSpec.objectOf(spec, "position");
+    if (position.has("x") || position.has("y")) {
+      return positionOf(spec);
+    }
+
+    List<Point> taken = new ArrayList<>();
+    for (Object existing : TalendApi.allNodes(process)) {
+      Object location = TalendApi.invokeOrNull(existing, "getLocation");
+      if (location instanceof Point) {
+        taken.add((Point) location);
+      }
+    }
+
+    for (int index = 0; index < 400; index++) {
+      Point candidate = new Point(128 + (index % GRID_COLUMNS) * GRID_X, 128 + (index / GRID_COLUMNS) * GRID_Y);
+      boolean free = true;
+      for (Point other : taken) {
+        if (Math.abs(other.x - candidate.x) < GRID_X / 2 && Math.abs(other.y - candidate.y) < GRID_Y / 2) {
+          free = false;
+          break;
+        }
+      }
+      if (free) {
+        return candidate;
+      }
+    }
+    return positionOf(spec);
   }
 
   /** Posicion del nodo en el lienzo. */

@@ -311,19 +311,23 @@ export const jobOperationsTools = [
   },
   {
     name: "talend_studio_coverage",
-    description: "Mide quantos componentes del catalogo de Talend se pueden crear y configurar con el MCP. Recorre el catalogo entero y devuelve el informe.",
+    description: "Mide cuantos componentes del catalogo de Talend se pueden crear, configurar y borrar con el MCP. Tarda minutos, asi que no espera: 'start' la arranca y devuelve enseguida; 'status' da el progreso y, al terminar, el informe; 'cancel' la para.",
     inputSchema: z.object({
-      filter: z.string().optional().describe("Texto que tiene que aparecer en el nombre del componente"),
-      max: z.number().optional().describe("Maximo de componentes que probar"),
+      action: z.enum(["start", "status", "cancel"]).optional().default("start").describe("start (por defecto), status o cancel"),
+      filter: z.string().optional().describe("Solo con start: texto que tiene que aparecer en el nombre del componente"),
+      max: z.number().optional().describe("Solo con start: maximo de componentes que probar"),
     }),
-    handler: async ({ filter, max }: { filter?: string; max?: number }) => {
+    handler: async ({ action, filter, max }: { action?: "start" | "status" | "cancel"; filter?: string; max?: number }) => {
       const bridge = await loadBridge();
-      const result = await bridge.coverage({ filter, max });
+      const mode = action ?? "start";
+      const result = mode === "start"
+        ? await bridge.coverage({ filter, max })
+        : await bridge.coverageStatus({ cancel: mode === "cancel" });
       return bridgeOk({
         ok: result.ok,
         source: result.source,
         confidence: result.confidence,
-        endpoint: "/automation/coverage",
+        endpoint: mode === "start" ? "/automation/coverage" : "/automation/coverage/status",
         data: result.data,
         error: result.error,
       });

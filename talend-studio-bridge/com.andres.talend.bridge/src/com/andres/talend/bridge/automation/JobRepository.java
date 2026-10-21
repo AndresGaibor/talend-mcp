@@ -124,9 +124,14 @@ public final class JobRepository {
     if (repositoryFactory == null) {
       throw new IllegalStateException("El repositorio de Talend no esta disponible");
     }
+    // El editor del job no se cierra solo al borrarlo (ni existe ya el item
+    // cuando es un resto de un borrado anterior): se cierra siempre, para que
+    // no quede un editor obsoleto con el nombre que se va a reutilizar.
+    int editorsClosed = TalendApi.closeEditorsOfJob(name);
     Object viewObject = findByLabel(repositoryFactory, name);
     Map<String, Object> summary = new LinkedHashMap<>();
     summary.put("jobName", name);
+    summary.put("editorsClosed", editorsClosed);
     if (viewObject == null) {
       summary.put("deleted", false);
       summary.put("message", "No habia ningun job con esa etiqueta");

@@ -55,9 +55,22 @@ Orden recomendado para lo que falta: terminar la 3 (descubrir el formato de las 
 
 ## Cobertura del catalogo
 
-`bun run scripts/coverage.ts` crea, configura, lista y borra cada uno de los 1294 componentes del
-catalogo en un job de pruebas (`MCP_Coverage`) y escribe `testdata/cobertura.csv`.
+`bun run scripts/coverage.ts` crea, configura, guarda, lista y borra cada uno de los 1294 componentes
+del catalogo en un job de pruebas (`MCP_Coverage`) y escribe `testdata/cobertura.csv`. Tarda unos
+20 minutos: arranca en el bridge y consulta el progreso (una peticion HTTP unica la cortaria el
+cliente a los 5 min). `--filter`, `--max`, `--cancel`. Tras cada fallo el job de pruebas se
+reinicia, para que un componente roto no contamine a los siguientes.
 
-**Todavia no hay una medicion valida:** las corridas reportan los 1294 como fallidos con
-`No existe el nodo 'tXxx_N'` (el nodo se crea pero la operacion siguiente no lo encuentra). Hasta
-corregirlo, la cobertura real es desconocida y no debe afirmarse.
+`bun run scripts/coverage-summary.ts` agrupa los fallos por causa y por familia.
+
+**Primera medicion valida (Talend 8.0.1):** 1245 de 1294 componentes (96 %) pasan creacion,
+configuracion de parametros, guardado en el `.item`, presencia en el job y borrado. Fallan 49:
+
+| Causa | Componentes | Que significa |
+|---|---|---|
+| `ArtifactResolutionException`: falta `org.talend.components:components-jdbc-runtime:0.37.61` | 20 (Athena, Databricks SQL, Redshift...) | Studio no encuentra el runtime del componente; no esta en Maven Central ni en el Nexus publico de Talend |
+| `IndexOutOfBoundsException` al guardar (`evaluateSparkMode`) | 29 (Dynamo, Kinesis, Kudu, HDFS/Hive/Azure configuration, Avro...) | Son componentes de **Spark/Big Data**: no son validos en un job Standard |
+
+Esto es L1/L2 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista y
+acepte configuracion. **No** dice que compile ni que ejecute bien: eso son L4/L5 y solo estan
+probados en los componentes de las fases validadas.

@@ -2,15 +2,18 @@
  * Mide la cobertura de componentes de Talend que tiene el MCP.
  *
  *   bun run scripts/coverage.ts                    # todos los componentes
- *   bun run scripts/coverage.ts --filter tFile     # solo los queAccepted
+ *   bun run scripts/coverage.ts --filter tFile     # solo los que contienen ese texto
  *   bun run scripts/coverage.ts --max 50           # solo los primeros 50
  *   bun run scripts/coverage.ts --out informe.csv  # guarda el detalle
+ *   bun run scripts/coverage.ts --cancel           # para la medicion en marcha
  *
- * El informe sale en `testdata/cobertura.csv` con una fila por componente:
- * si se pudo crear, si acepto los parametros y con que fallo.
+ * El informe sale en `testdata/cobertura.csv` con una fila por componente: si se pudo
+ * crear, configurar, guardar en el job y borrar, y con que fallo. Para agrupar los
+ * fallos por causa: `bun run scripts/coverage-summary.ts`.
  *
- * La medicion la hace el bridge (que va al catalogo de Studio y monta un job
- * de pruebas), porque por HTTP seria mil y pico llamadas.
+ * La medicion corre dentro de Studio (el bridge recorre el catalogo y monta un job de
+ * pruebas) y tarda varios minutos. Se arranca y se consulta el progreso cada pocos
+ * segundos: una sola peticion HTTP larga la cortaria el cliente a los 5 minutos.
  */
 
 import { writeFileSync } from "node:fs";
@@ -26,60 +29,116 @@ function valorDe(flag: string): string | undefined {
   return args[index + 1];
 }
 
-async function main(): Promise<void> {
-  const filter = valorDe("--filter");
-  const max = valorDe("--max");
-  const salida = valorDe("--out") ?? "testdata/cobertura.csv";
+type Fila = Record<string, unknown>;
+type Informe = {
+  catalogSize?: number;
+  tested?: number;
+  created?: number;
+  configured?: number;
+  listed?: number;
+  deleted?: number;
+  failed?: number;
+  saveFailed?: number;
+  cancelled?: boolean;
+  components?: Fila[];
+};
+type Estado = {
+  state?: string;
+  total?: number;
+  tested?: number;
+  created?: number;
+  failed?: number;
+  saveFailed?: number;
+  current?: string;
+  elapsedMs?: number;
+  error?: string;
+  message?: string;
+  alreadyRunning?: boolean;
+  result?: Informe;
+};
 
-  const bridge = await createBridgeClient({ config: { timeoutMs: 900_000 } });
+/** El bridge envuelve la respuesta en `result`; los tests de humo tambien la dan plana. */
+function desenvolver(data: unknown): Estado {
+  const envelope = data as { result?: Estado } | undefined;
+  return (envelope?.result ?? envelope ?? {}) as Estado;
+}
 
-  console.log("Midiendo la cobertura de componentes (esto tarda unos minutos)...");
-  const inicio = Date.now();
-  const result = await bridge.coverage({
-    filter,
-    max: max ? Number(max) : undefined,
-  });
-
-  const envelope = result.data as { result?: Record<string, unknown> } | undefined;
-  const data = (envelope?.result ?? envelope) as {
-    catalogSize?: number;
-    tested?: number;
-    created?: number;
-    configured?: number;
-    listed?: number;
-    deleted?: number;
-    failed?: number;
-    components?: Array<Record<string, unknown>>;
-  } | undefined;
-
-  if (!data) {
-    console.error("La medicion no ha devuelto datos:", result.rawText?.slice(0, 400) ?? result.error);
-    process.exit(1);
-  }
-
-  const filas = ["componente,creado,configurado,en_el_job,borrado,parametros,unique_name,error"];
-  for (const fila of data.components ?? []) {
-    filas.push([
+function guardarCsv(salida: string, filas: Fila[]): void {
+  const lineas = ["componente,creado,configurado,guardado,en_el_job,borrado,parametros,unique_name,error"];
+  for (const fila of filas) {
+    lineas.push([
       String(fila.component ?? ""),
-      String(fila.ok === true ? "si" : "no"),
-      String(fila.parametersApplied ? "si" : "no"),
-      String(fila.listed === true ? "si" : "no"),
-      String(fila.deleted === true ? "si" : "no"),
+      fila.ok === true ? "si" : "no",
+      fila.parametersApplied ? "si" : "no",
+      fila.saved === false ? "no" : "si",
+      fila.listed === true ? "si" : "no",
+      fila.deleted === true ? "si" : "no",
       String(fila.parametersApplied ?? 0),
       String(fila.uniqueName ?? ""),
       `"${String(fila.error ?? fila.deleteError ?? "").replace(/"/g, '""')}"`,
     ].join(","));
   }
-  writeFileSync(salida, `${filas.join("\n")}\n`, "utf8");
+  writeFileSync(salida, `${lineas.join("\n")}\n`, "utf8");
+}
+
+async function main(): Promise<void> {
+  const salida = valorDe("--out") ?? "testdata/cobertura.csv";
+  const bridge = await createBridgeClient({ config: { timeoutMs: 60_000 } });
+
+  if (args.includes("--cancel")) {
+    const parada = await bridge.coverageStatus({ cancel: true });
+    console.log(`Cancelacion pedida: ${JSON.stringify(desenvolver(parada.data))}`);
+    return;
+  }
+
+  const filter = valorDe("--filter");
+  const max = valorDe("--max");
+  const inicio = Date.now();
+
+  const arranque = await bridge.coverage({ filter, max: max ? Number(max) : undefined });
+  if (!arranque.ok) {
+    console.error("No se pudo arrancar la medicion:", arranque.error?.message ?? arranque.rawText?.slice(0, 400));
+    process.exit(1);
+  }
+  const primero = desenvolver(arranque.data);
+  if (primero.alreadyRunning) {
+    console.log("Ya habia una medicion en marcha: se sigue esa.");
+  }
+  console.log("Midiendo la cobertura de componentes...");
+
+  let estado: Estado = primero;
+  while (estado.state === "running") {
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    const respuesta = await bridge.coverageStatus();
+    if (!respuesta.ok) {
+      console.error(`\nSe perdio el contacto con el bridge: ${respuesta.error?.message}`);
+      process.exit(1);
+    }
+    estado = desenvolver(respuesta.data);
+    const hechos = estado.tested ?? 0;
+    const total = estado.total ?? 0;
+    const segundos = Math.round((Date.now() - inicio) / 1000);
+    process.stdout.write(`\r  ${hechos}/${total} componentes, ${estado.failed ?? 0} fallidos, ${segundos} s   ${estado.current ?? ""}`.padEnd(100));
+  }
+  console.log("");
+
+  const data = estado.result;
+  if (estado.state === "failed" || !data) {
+    console.error(`La medicion termino en estado '${estado.state}':`, estado.error ?? estado.message ?? "sin datos");
+    process.exit(1);
+  }
+
+  guardarCsv(salida, data.components ?? []);
 
   const segundos = Math.round((Date.now() - inicio) / 1000);
   console.log("");
   console.log(`Catalogo de Talend:        ${data.catalogSize} componentes`);
-  console.log(`Probados:                  ${data.tested}`);
+  console.log(`Probados:                  ${data.tested}${data.cancelled ? " (cancelada)" : ""}`);
   console.log(`Creados:                   ${data.created}`);
   console.log(`Con parametros aplicados:  ${data.configured}`);
+  console.log(`Guardados sin error:       ${(data.created ?? 0) - (data.saveFailed ?? 0)}`);
   console.log(`En el job (listados):      ${data.listed}`);
-  console.log(`Borrados del job:         ${data.deleted}`);
+  console.log(`Borrados del job:          ${data.deleted}`);
   console.log(`Fallidos:                  ${data.failed}`);
   console.log(`Detalle en:                ${salida}`);
   console.log(`Tiempo:                    ${segundos} s`);

@@ -79,7 +79,7 @@ public final class TalendApi {
     }
     IEditorPart found = null;
     for (org.eclipse.ui.IEditorReference reference : page.getEditorReferences()) {
-      if (!reference.getTitle().contains(jobName)) {
+      if (!isEditorOfJob(reference.getTitle(), jobName)) {
         continue;
       }
       try {
@@ -99,6 +99,53 @@ public final class TalendApi {
       }
     }
     return found;
+  }
+
+  /**
+   * Si el titulo de un editor es el de ese job ("Job MCP_X 0.1", con un
+   * asterisco delante cuando tiene cambios sin guardar).
+   *
+   * Coincidencia exacta del nombre: con "contains", MCP_Fase1 casaba tambien
+   * con MCP_Fase10 y las operaciones acababan en el job equivocado.
+   */
+  static boolean isEditorOfJob(String title, String jobName) {
+    if (title == null) {
+      return false;
+    }
+    String clean = title.startsWith("*") ? title.substring(1) : title;
+    String prefix = "Job " + jobName;
+    return clean.equals(prefix) || clean.startsWith(prefix + " ");
+  }
+
+  /**
+   * Cierra, sin guardar, todos los editores de un job.
+   *
+   * Hay que hacerlo al borrar el job: el editor sigue abierto con el modelo
+   * del job que ya no existe, y al recrearlo con el mismo nombre las
+   * operaciones podian caer en ese editor obsoleto.
+   *
+   * @return cuantos editores se cerraron.
+   */
+  public static int closeEditorsOfJob(String jobName) {
+    org.eclipse.ui.IWorkbenchPage page = WorkbenchService.activePageOrNull();
+    if (page == null) {
+      return 0;
+    }
+    int closed = 0;
+    for (org.eclipse.ui.IEditorReference reference : page.getEditorReferences()) {
+      if (!isEditorOfJob(reference.getTitle(), jobName)) {
+        continue;
+      }
+      try {
+        IEditorPart editor = reference.getEditor(false);
+        if (editor != null && page.closeEditor(editor, false)) {
+          closed++;
+        }
+      } catch (Exception e) {
+        // Si un editor no se deja cerrar, se sigue con los demas.
+      }
+    }
+    return closed;
   }
 
   /** Editor grafico (el lienzo) de un editor de job. */
