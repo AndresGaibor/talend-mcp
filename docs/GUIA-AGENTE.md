@@ -65,6 +65,7 @@ Orden obligatorio. Cada paso usa lo que devolvio el anterior (sobre todo los `un
 | 9c | `talend_job_compile` | Genera el codigo y comprueba que **compila**, sin ejecutar. Devuelve `compiles` y, si falla, `error.line` y `error.message` (p. ej. `no_comillas cannot be resolved to a variable`). ~2 s; ocupa la UI mientras genera, igual que un Run |
 | 9d | `talend_job_contexts_list` | Los contextos (entornos) del job y sus variables, con el valor de cada variable en cada entorno |
 | 9e | `talend_job_context_create` / `talend_job_context_set` / `talend_job_context_delete` / `talend_job_context_delete_variable` | Crear un entorno, poner o cambiar una variable (con su valor en ese entorno), y borrarlos. Todo con la API de Studio, y el job se guarda |
+| 9f | `talend_list_repository_contexts` / `talend_read_repository_context` / `talend_delete_repository_context` | Los contextos **del proyecto** (los items de tipo Contexts): listar y leer con sus entornos y variables, y borrar. Crear un contexto del proyecto todavia no es posible: Studio no deja enganchar el entorno a un item recien creado |
 | 10 | `talend_job_run_by_name` | Genera el codigo, compila y lanza el job en Studio. **No devuelve la salida** (va a la vista Run) |
 | 11 | `talend_job_execute` | Relanza el job ya compilado y **devuelve `exitCode` y la salida** (`stdout`, `lines`). Es como se comprueba el resultado |
 Ejemplo minimo (humo): `tFixedFlowInput` -> `tLogRow`.

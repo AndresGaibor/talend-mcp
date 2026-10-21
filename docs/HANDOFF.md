@@ -95,7 +95,19 @@ variable (con su valor en ese entorno) y borrarlos. Las tools son `talend_job_co
 `talend_job_context_delete_variable`. El `.item` queda como lo dejaria el IDE (INTERNALS 36).
 
 Ojo: los valores de un contexto **no viajan en el codigo generado** (los inyecta el runtime), asi que un job
-relanzado a mano no los ve. Para comprobar un contexto hay que leerlo del modelo, no de la salida del job.
+relanzado a mano no los ve. Para comprobar un contexto hay que leerlo del modelo, no de la salida del job. El
+relanzamiento les pasa los valores como argumentos (`--context_type CLAVE=VALOR`).
+
+### Contextos del proyecto
+
+Las tools de contexto del repositorio eran huecas (devolvian una lista vacia y no creaban nada). Ahora
+`talend_list_repository_contexts` y `talend_read_repository_context` listan los items de tipo Contexts con sus
+entornos y variables (los entornos se leen del `.item`, porque la API del repositorio no llega a ellos), y
+`talend_delete_repository_context` borra el item y sus archivos.
+
+**Crear o editar un contexto del proyecto sigue sin poder**: Studio no deja enganchar el entorno a un item recien
+creado (las referencias del item solo admiten cambios cuando ya esta guardado), y el item se queda sin
+variables. La tool falla con un error claro y borra lo que habia creado, en vez de dejar basura en el proyecto.
 
 ### Comprobacion de conexiones
 

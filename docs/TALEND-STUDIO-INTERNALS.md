@@ -1868,4 +1868,33 @@ el `.item` queda como lo dejaria el IDE:
 no ve los valores del contexto, aunque su build tenga el `contexts/Default.properties` con ellos. Para comprobar
 un contexto hay que leerlo del modelo (`talend_job_contexts_list`), no de la salida del job.
 
+El runtime los acepta como argumentos: `--context=NOMBRE` y `--context_type CLAVE=VALOR` (por cada variable). El
+bridge los lee del modelo y se los pasa al relanzar, asi que un job con contextos si se puede comprobar.
+
+## 37. Los contextos del proyecto (los items de tipo "Contexts")
+
+Son los items de la carpeta `context` del proyecto: un `.item` con un `ContextType` por entorno (y sus
+`contextParameter`) y un `.properties` con las referencias (`<context href="...#xmi:id"/>`).
+
+| Que | Como |
+|---|---|
+| El tipo del item | `ERepositoryObjectType.CONTEXT` ("Contexts") |
+| El item del repositorio | `PropertiesFactory.createContextItem()` |
+| Un entorno | `TalendFileFactory.createContextType()` |
+| Una variable | `TalendFileFactory.createContextParameterType()` |
+| Las variables de un entorno | No estan en la contencion: estan en la caracteristica `contextParameter` del `ContextType` (con `eGet`), y la lista solo admite cambios cuando el item ya esta guardado |
+
+Dos cosas que se-ahead por el camino:
+
+- **El `eGet` hay que buscarlo por el tipo de su argumento**: `eGet` tiene sobrecargas (por indice y por
+  caracteristica), y la clase del modelo puede venir de otro classloader (el del plugin y el del puente), asi que
+  buscar el metodo por nombre y llamarlo con la caracteristica falla con "argument type mismatch".
+- **Crear un contexto del proyecto por la API no funciona**: el item se registra (el `.properties` sale) pero el
+  entorno no se puede enganchar (las referencias del item solo admiten cambios cuando ya esta guardado y no hay
+  forma de forzarlo). Por eso la tool falla con un error claro y borra lo creado, en vez de dejar un contexto
+  vacio en el proyecto. Crear y leer si se pueden hacer con la API; los entornos y sus variables se leen del
+  `.item` de cada item.
+
+Y el orden de los entornos: el que trae `defaultContext="Default"` en el `.properties` es el de por defecto.
+
 
