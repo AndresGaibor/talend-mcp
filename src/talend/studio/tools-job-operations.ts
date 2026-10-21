@@ -108,17 +108,31 @@ const columnSchema = z.object({
 export const jobOperationsTools = [
   {
     name: "talend_job_create_in_studio",
-    description: "Crea un job vacio en el repositorio de Talend y lo abre en el editor. El job se crea con la API del IDE, no escribiendo el XML a mano.",
+    description:
+      "Crea un job vacio en el repositorio de Talend y lo abre en el editor. El job se crea con la API del IDE, no escribiendo el XML a mano. Con jobType se elige el tipo de job (Standard, Big_Data_Batch para Spark Batch, Big_Data_Stream para Spark Streaming), que decide que paleta de componentes usa el editor.",
     inputSchema: z.object({
       name: z.string().describe("Nombre del job. Solo letras, digitos y guion bajo"),
       version: z.string().optional().default("0.1").describe("Version del job"),
       folder: z.string().optional().default("").describe("Carpeta dentro de process/"),
       description: z.string().optional().describe("Descripcion del job"),
       replace: z.boolean().optional().default(false).describe("Reemplaza el job si ya existe con esa etiqueta"),
+      jobType: z
+        .string()
+        .optional()
+        .describe("Tipo de job: Standard (por defecto), Big_Data_Batch (Spark Batch), Big_Data_Stream (Spark Streaming)"),
+      framework: z.string().optional().describe("Framework del job: Spark, Storm, MapReduce"),
     }),
-    handler: async ({ name, version, folder, description, replace }: { name: string; version?: string; folder?: string; description?: string; replace?: boolean }) => {
+    handler: async ({ name, version, folder, description, replace, jobType, framework }: {
+      name: string;
+      version?: string;
+      folder?: string;
+      description?: string;
+      replace?: boolean;
+      jobType?: string;
+      framework?: string;
+    }) => {
       const bridge = await loadBridge();
-      const result = await bridge.createJob({ name, version, folder, description, replace });
+      const result = await bridge.createJob({ name, version, folder, description, replace, jobType, framework });
       return bridgeOk({
         ok: result.ok,
         source: result.source,

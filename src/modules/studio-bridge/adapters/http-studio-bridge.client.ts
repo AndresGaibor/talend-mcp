@@ -453,6 +453,10 @@ export class TalendStudioBridgeClient {
     folder?: string;
     description?: string;
     replace?: boolean;
+    /** Tipo de job: Standard, Big_Data_Batch (Spark Batch), Big_Data_Stream... */
+    jobType?: string;
+    /** Framework del job: Spark, Storm, MapReduce. */
+    framework?: string;
   }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/job/create", {
       method: "POST",

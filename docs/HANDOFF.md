@@ -100,7 +100,11 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 2. **El `tAggregateRow`**: necesita dos tablas de metadata (la de entrada y la de salida, las dos en el conector
    `FLOW`) y al rellenar el schema del nodo se rompe la tabla que la conexion de entrada tiene asignada. Habria que
    fusionar el schema con el que ya tiene el nodo en vez de sustituirlo (ver INTERNALS 32).
-3. **Tipos de job** (Spark Batch, Streaming): hoy `create` solo crea jobs Standard. Desbloquea las 397 variantes.
+3. **Tipos de job (Spark Batch, Streaming)**: el MCP ya los crea con la estructura correcta (el `.item` con
+   `jobType="Big_Data_Batch" framework="Spark"`, el item de MapReduce en el repositorio y el `FRAMEWORK=Spark` en
+   las propiedades; INTERNALS 34), pero **este workspace no los abre**: ni el job de Spark del usuario
+   (`prueba_3_Spark`) ni los del MCP ("No se pudo resolver el ProcessItem"). Es un estado del repositorio del
+   proyecto, no del MCP. Habria que mirar por que el repositorio no indexa los items de Big Data.
 4. **Metadata del repositorio** (conexiones de base de datos, esquemas de archivo), imprescindible para los `tDB*`.
 5. Otros, en el roadmap:
    - `tMap`: necesita `talend-tmap-dataset-1.2.16.jar` (de Talend Exchange).

@@ -495,6 +495,12 @@ public final class ComponentConfigurator {
     if (raw == null || !raw.isJsonArray()) {
       return;
     }
+    List<Object> actuales = new ArrayList<>();
+    Object listaActual = node.getClass().getMethod("getMetadataList").invoke(node);
+    if (listaActual instanceof List) {
+      actuales.addAll((List<?>) listaActual);
+    }
+
     List<Object> tables = new ArrayList<>();
     for (JsonElement entry : raw.getAsJsonArray()) {
       if (!entry.isJsonObject()) {
@@ -507,12 +513,71 @@ public final class ComponentConfigurator {
       if (columns == null || !columns.isJsonArray()) {
         continue;
       }
-      tables.add(createMetadataTable(connector, name, columns.getAsJsonArray()));
+      // Si el nodo ya tiene una tabla con ese nombre, se actualiza esa: la
+      // sustitucion rompe las referencias que tienen las conexiones (el
+      // tAggregateRow se queda sin las columnas de entrada: "inputColumn is
+      // null").
+      Object existente = tableNamed(actuales, name);
+      if (existente != null) {
+        setColumnsOf(existente, columns.getAsJsonArray());
+        tables.add(existente);
+      } else {
+        tables.add(createMetadataTable(connector, name, columns.getAsJsonArray()));
+      }
     }
     if (tables.isEmpty()) {
       return;
     }
+    // Las tablas que ya tenia el nodo y no pide el spec se conservan: puede
+    // que una conexion las tenga asignadas.
+    for (Object actual : actuales) {
+      if (!tables.contains(actual)) {
+        tables.add(actual);
+      }
+    }
     node.getClass().getMethod("setMetadataList", List.class).invoke(node, tables);
+  }
+
+  /** La tabla del nodo que tiene ese nombre, si la hay. */
+  private static Object tableNamed(List<Object> tables, String name) {
+    if (name == null) {
+      return null;
+    }
+    for (Object table : tables) {
+      try {
+        Object tableName = table.getClass().getMethod("getTableName").invoke(table);
+        if (name.equals(String.valueOf(tableName))) {
+          return table;
+        }
+      } catch (Exception e) {
+        // Sin nombre: no es la que buscamos.
+      }
+    }
+    return null;
+  }
+
+  /** Cambia las columnas de una tabla que ya existe. */
+  private static void setColumnsOf(Object table, JsonArray columns) throws Exception {
+    Class<?> columnClass = talendClass("org.talend.core.model.metadata.MetadataColumn");
+    List<Object> columnas = new ArrayList<>();
+    for (JsonElement raw : columns) {
+      if (!raw.isJsonObject()) {
+        continue;
+      }
+      JsonObject definition = raw.getAsJsonObject();
+      String columnName = JsonSpec.string(definition, "name");
+      if (columnName == null) {
+        continue;
+      }
+      Object column = columnClass.getConstructor().newInstance();
+      column.getClass().getMethod("setLabel", String.class).invoke(column, columnName);
+      column.getClass().getMethod("setId", String.class).invoke(column, columnName);
+      String type = ColumnTypes.normalize(JsonSpec.string(definition, "type"));
+      column.getClass().getMethod("setType", String.class).invoke(column, type);
+      column.getClass().getMethod("setTalendType", String.class).invoke(column, type);
+      columnas.add(column);
+    }
+    table.getClass().getMethod("setListColumns", List.class).invoke(table, columnas);
   }
 
   /**

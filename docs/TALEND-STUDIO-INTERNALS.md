@@ -1785,4 +1785,28 @@ Para comprobar el resultado de un job (L5) hacen falta dos pasos, porque la vist
 El script `scripts/execution-check.ts` hace los dos y compara la salida con la esperada. Los escenarios estan en
 `tests/fixtures/talend/escenarios-l5.json`.
 
+## 34. Los jobs de Big Data (Spark)
+
+Un job de Spark no es un job Standard con otros componentes: se declara en tres sitios a la vez.
+
+| Donde | Que |
+|---|---|
+| El `.item` | `<talendfile:ProcessType ... jobType="Big_Data_Batch" framework="Spark">` |
+| El `.properties` | El item es un `<MapRedProperties:MapReduceProcessItem>` (no un `ProcessItem`) y la propiedad lleva `<additionalProperties key="FRAMEWORK" value="Spark"/>` |
+| El repositorio | El item se registra con el tipo `PROCESS_MR` ("Big Data Batch"), no con `PROCESS` ("Job Designs") |
+
+Y sus archivos van en `process_mr`, **sin carpeta propia**: `process_mr/<job>_<version>.item`, al lado de los demas.
+Los jobs normales van en `process/<job>/<job>_<version>.item`.
+
+El item de Big Data no lo crea el modelo base: es
+`org.talend.designer.mapreduce.mapRedProperties.MapRedPropertiesFactory` (plugin `org.talend.designer.mapreduce`).
+Y el mapa de propiedades de EMF (`EcoreEMap`) **no es un `java.util.Map`**: para anadir el `FRAMEWORK` hay que
+llamarle al `put` por reflexion.
+
+El MCP ya crea estos jobs con `jobType` y `framework` (`talend_job_create_in_studio`), y los archivos salen
+identicos a los de un job de Spark hecho a mano. **Pero este workspace no los puede abrir**: ni el job de Spark del
+usuario (`prueba_3_Spark`) ni el del MCP abren, con "No se pudo resolver el ProcessItem para ...item. Verifique
+que el job este en el repositorio Talend activo". Es un estado del repositorio del proyecto (los items de Big
+Data no estan indexados), no del MCP. Los 397 componentes de Spark y Streaming siguen sin poder usarse.
+
 

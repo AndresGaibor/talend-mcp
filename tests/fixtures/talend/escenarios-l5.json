@@ -177,8 +177,46 @@
     {
       "nombre": "transformaciones: agregar por ciudad",
       "job": "MCP_L5_Agrega",
-      "pendiente": "el tAggregateRow necesita dos tablas de metadata (la de entrada y la de salida) y la tabla que guarda en la conexion se cambia al rellenar el schema: el generador no encuentra la columna de entrada ('inputColumn is null')",
+      "pendiente": "el tAggregateRow no propaga su schema (SCHEMA_AUTO_PROPAGATE=false): al poner sus columnas de salida, Talend las propaga hacia atras y el origen se queda con ellas en vez de las suyas, y el generador no encuentra la columna de entrada ('inputColumn is null')",
       "nodos": [
+        {
+          "type": "tAggregateRow",
+          "nombre": "agrega",
+          "esquemas": [
+            {
+              "conector": "FLOW",
+              "nombre": "@uniqueName",
+              "columnas": [
+                { "name": "ciudad", "type": "id_String" },
+                { "name": "total_monto", "type": "id_Double" },
+                { "name": "num_clientes", "type": "id_Integer" }
+              ]
+            }
+          ],
+          "tablas": {
+            "GROUPBYS": {
+              "columns": ["OUTPUT_COLUMN", "INPUT_COLUMN"],
+              "rows": [{ "OUTPUT_COLUMN": "ciudad", "INPUT_COLUMN": "row1.ciudad" }]
+            },
+            "OPERATIONS": {
+              "columns": ["OUTPUT_COLUMN", "FUNCTION", "INPUT_COLUMN", "IGNORE_NULL"],
+              "rows": [
+                {
+                  "OUTPUT_COLUMN": "total_monto",
+                  "FUNCTION": "SUM",
+                  "INPUT_COLUMN": "row1.monto",
+                  "IGNORE_NULL": "true"
+                },
+                {
+                  "OUTPUT_COLUMN": "num_clientes",
+                  "FUNCTION": "COUNT",
+                  "INPUT_COLUMN": "row1.id",
+                  "IGNORE_NULL": "true"
+                }
+              ]
+            }
+          }
+        },
         {
           "type": "tFileInputDelimited",
           "nombre": "lector",
@@ -194,55 +232,6 @@
             { "name": "ciudad", "type": "id_String" },
             { "name": "monto", "type": "id_Double" }
           ]
-        },
-        {
-          "type": "tAggregateRow",
-          "nombre": "agrega",
-          "schemaDespuesDeConectar": true,
-          "esquemas": [
-            {
-              "conector": "FLOW",
-              "nombre": "@uniqueName",
-              "columnas": [
-                { "name": "ciudad", "type": "id_String" },
-                { "name": "total_monto", "type": "id_Double" },
-                { "name": "num_clientes", "type": "id_Integer" }
-              ]
-            },
-            {
-              "conector": "FLOW",
-              "nombre": "row1",
-              "columnas": [
-                { "name": "id", "type": "id_Integer" },
-                { "name": "nombre", "type": "id_String" },
-                { "name": "ciudad", "type": "id_String" },
-                { "name": "monto", "type": "id_Double" }
-              ]
-            }
-          ],
-          "tablas": {
-            "GROUPBYS": {
-              "columns": ["OUTPUT_COLUMN", "INPUT_COLUMN"],
-              "rows": [{ "OUTPUT_COLUMN": "ciudad", "INPUT_COLUMN": "ciudad" }]
-            },
-            "OPERATIONS": {
-              "columns": ["OUTPUT_COLUMN", "FUNCTION", "INPUT_COLUMN", "IGNORE_NULL"],
-              "rows": [
-                {
-                  "OUTPUT_COLUMN": "total_monto",
-                  "FUNCTION": "SUM",
-                  "INPUT_COLUMN": "monto",
-                  "IGNORE_NULL": "true"
-                },
-                {
-                  "OUTPUT_COLUMN": "num_clientes",
-                  "FUNCTION": "COUNT",
-                  "INPUT_COLUMN": "id",
-                  "IGNORE_NULL": "true"
-                }
-              ]
-            }
-          }
         },
         { "type": "tLogRow", "nombre": "salida" }
       ],

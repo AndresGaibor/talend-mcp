@@ -70,18 +70,46 @@ public final class JobRepository {
     Object xmiResourceManager = TalendApi.xmiResourceManager();
     IProject iProject = TalendApi.resourceProject();
     Class<?> typeClass = TalendClasses.load("org.talend.core.model.repository.ERepositoryObjectType");
+    // Un job de Big Data se registra como "Big Data Batch" (PROCESS_MR), no como
+    // "Job Designs": el editor usa ese tipo para saber que paleta mostrar.
     Object jobType = typeClass.getField("PROCESS").get(null);
-    Object itemResource = xmiResourceManager.getClass()
+    String framework = JsonSpec.string(spec, "framework");
+    if (framework != null && !framework.trim().isEmpty()) {
+      try {
+        jobType = typeClass.getField("PROCESS_MR").get(null);
+      } catch (Exception e) {
+        BridgeLog.warn("El repositorio no tiene el tipo de job de Big Data", e);
+      }
+    }    Object itemResource = xmiResourceManager.getClass()
         .getMethod("createItemResource", TalendClasses.load("org.eclipse.core.resources.IProject"),
             TalendClasses.load("org.talend.core.model.properties.Item"),
             org.eclipse.core.runtime.IPath.class, typeClass, boolean.class)
-        .invoke(xmiResourceManager, iProject, processItem, itemResourcePath(folder, name), jobType, false);
+        .invoke(xmiResourceManager, iProject, processItem,
+            "process_mr".equals(jobFolder(spec))
+                ? mapReduceItemResourcePath(folder, name)
+                : itemResourcePath(folder, name),
+            jobType, false);
 
     // El ProcessType va dentro del recurso, no suelto.
     Object talendFileFactory = TalendClasses
         .load("org.talend.designer.core.model.utils.emf.talendfile.TalendFileFactory")
         .getField("eINSTANCE").get(null);
     Object processType = talendFileFactory.getClass().getMethod("createProcessType").invoke(talendFileFactory);
+
+    // El tipo de job decide que paleta de componentes usa el editor: un job
+    // "Big_Data_Batch" con framework "Spark" es un job de Spark Batch, y en el
+    // catalogo hay 166 componentes que solo valen en jobs de ese tipo.
+    String tipoDeJob = JsonSpec.string(spec, "jobType");
+    if (tipoDeJob != null && !tipoDeJob.trim().isEmpty()) {
+      processType.getClass().getMethod("setJobType", String.class).invoke(processType, tipoDeJob.trim());
+    }
+    if (framework != null && !framework.trim().isEmpty()) {
+      try {
+        processType.getClass().getMethod("setFramework", String.class).invoke(processType, framework.trim());
+      } catch (Exception e) {
+        BridgeLog.warn("El ProcessType no admite el framework '" + framework + "'", e);
+      }
+    }
     @SuppressWarnings("unchecked")
     java.util.List<Object> contents = (java.util.List<Object>) itemResource.getClass()
         .getMethod("getContents").invoke(itemResource);
@@ -92,12 +120,17 @@ public final class JobRepository {
         .invoke(processItem, processType);
 
     // Registrar el item en el repositorio: `create` lo deja con su recurso
-    // y escribe los tres archivos del job.
+    // y escribe los tres archivos del job. Los jobs de Big Data van con la
+    // carpeta vacia: sus archivos quedan en `process_mr` directamente, no en
+    // una carpeta por job.
+    org.eclipse.core.runtime.IPath ruta = "process_mr".equals(jobFolder(spec))
+        ? mapReduceProcessPath(folder)
+        : processPath(folder, name);
     repositoryFactory.getClass()
         .getMethod("create", TalendClasses.load("org.talend.core.model.general.Project"),
             TalendClasses.load("org.talend.core.model.properties.Item"),
             org.eclipse.core.runtime.IPath.class, boolean[].class)
-        .invoke(repositoryFactory, project, processItem, processPath(folder, name), new boolean[0]);
+        .invoke(repositoryFactory, project, processItem, ruta, new boolean[0]);
 
     Map<String, Object> opened = openCreatedJob(name, version);
     if (!Boolean.TRUE.equals(opened.get("opened"))) {
@@ -107,6 +140,10 @@ public final class JobRepository {
     Map<String, Object> summary = new LinkedHashMap<>();
     summary.put("jobName", name);
     summary.put("version", version);
+    summary.put("jobType", tipoDeJob == null ? "Standard" : tipoDeJob);
+    if (framework != null && !framework.trim().isEmpty()) {
+      summary.put("framework", framework.trim());
+    }
     summary.put("editorTitle", opened.get("editorTitle"));
     return summary;
   }
@@ -243,7 +280,22 @@ public final class JobRepository {
       property.getClass().getMethod("setDescription", String.class).invoke(property, description);
     }
 
-    Object processItem = factoryClass.getMethod("createProcessItem").invoke(factory);
+    // Los jobs de Big Data (Spark Batch, Spark Streaming) no son un `ProcessItem`
+    // normal: son un `MapReduceProcessItem`, y su propiedad lleva el framework
+    // (FRAMEWORK=Spark). Sin esto, el editor abre el job como Standard y no
+    // deja usar los componentes de Spark.
+    String framework = JsonSpec.string(spec, "framework");
+    boolean bigData = framework != null && !framework.trim().isEmpty();
+    if (bigData) {
+      addAdditionalProperty(property, "FRAMEWORK", framework.trim());
+    }
+
+    Object processItem;
+    if (bigData) {
+      processItem = createMapReduceProcessItem();
+    } else {
+      processItem = factoryClass.getMethod("createProcessItem").invoke(factory);
+    }
     processItem.getClass().getMethod("setProperty",
         TalendClasses.load("org.talend.core.model.properties.Property")).invoke(processItem, property);
 
@@ -253,6 +305,49 @@ public final class JobRepository {
     processItem.getClass().getMethod("setState",
         TalendClasses.load("org.talend.core.model.properties.ItemState")).invoke(processItem, state);
     return processItem;
+  }
+
+  /**
+   * Item de un job de Big Data.
+   *
+   * Vive en el plugin del designer de MapReduce, no en el modelo base: si el
+   * plugin no esta instalado, se avisa y se sigue con el item normal.
+   */
+  private static Object createMapReduceProcessItem() throws Exception {
+    Class<?> factoryClass;
+    try {
+      factoryClass = TalendClasses.load("org.talend.designer.mapreduce.mapRedProperties.MapRedPropertiesFactory");
+    } catch (Exception e) {
+      BridgeLog.warn("No esta el plugin de MapReduce: el job se creara como Standard", e);
+      Class<?> base = TalendClasses.load("org.talend.core.model.properties.PropertiesFactory");
+      return base.getMethod("createProcessItem").invoke(base.getField("eINSTANCE").get(null));
+    }
+    Object factory = factoryClass.getField("eINSTANCE").get(null);
+    for (java.lang.reflect.Method method : factoryClass.getMethods()) {
+      if (method.getName().toLowerCase().contains("processitem") && method.getParameterCount() == 0) {
+        return method.invoke(factory);
+      }
+    }
+    throw new IllegalStateException("No se encontro el item de MapReduce");
+  }
+
+  /**
+   * Anade una propiedad adicional a la propiedad del item (FRAMEWORK...).
+   *
+   * El mapa de propiedades de EMF (`EcoreEMap`) no es un `java.util.Map`: hay
+   * que llamarle al `put` por reflexion.
+   */
+  private static void addAdditionalProperty(Object property, String key, String value) {
+    try {
+      Object additional = property.getClass().getMethod("getAdditionalProperties").invoke(property);
+      if (additional == null) {
+        return;
+      }
+      additional.getClass().getMethod("put", Object.class, Object.class)
+          .invoke(additional, key, value);
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo anadir la propiedad '" + key + "' al item", e);
+    }
   }
 
   /** Job del proyecto por su etiqueta. */
@@ -329,10 +424,42 @@ public final class JobRepository {
   /**
    * Ruta completa del item, con la carpeta del tipo de objeto.
    *
-   * Es la que espera `XmiResourceManager.createItemResource`.
+   * Es la que espera `XmiResourceManager.createItemResource`. Los jobs de Big
+   * Data van en `process_mr`, no en `process`.
    */
   private static org.eclipse.core.runtime.IPath itemResourcePath(String folder, String name) {
     return org.eclipse.core.runtime.Path.fromOSString("process").append(processPath(folder, name));
+  }
+
+  /**
+   * Ruta completa del item de un job de Big Data (`process_mr`).
+   */
+  private static org.eclipse.core.runtime.IPath mapReduceItemResourcePath(String folder, String name) {
+    return org.eclipse.core.runtime.Path.fromOSString("process_mr").append(processPath(folder, name));
+  }
+
+  /**
+   * Ruta del item de un job de Big Data dentro de `process_mr`.
+   *
+   * Los jobs de Big Data no tienen carpeta propia: sus tres archivos quedan
+   * en `process_mr` con el nombre del job.
+   */
+  private static org.eclipse.core.runtime.IPath mapReduceProcessPath(String folder) {
+    org.eclipse.core.runtime.IPath path = org.eclipse.core.runtime.Path.fromOSString("");
+    if (folder != null && !folder.trim().isEmpty()) {
+      for (String part : folder.split("/")) {
+        if (!part.trim().isEmpty()) {
+          path = path.append(part);
+        }
+      }
+    }
+    return path;
+  }
+
+  /** Carpeta del proyecto donde viven los jobs, segun su tipo. */
+  private static String jobFolder(JsonObject spec) {
+    String framework = JsonSpec.string(spec, "framework");
+    return framework != null && !framework.trim().isEmpty() ? "process_mr" : "process";
   }
 
   /** Archivo `.item` de un job del proyecto. */
@@ -342,9 +469,23 @@ public final class JobRepository {
     if (iProject == null) {
       return null;
     }
-    org.eclipse.core.resources.IFolder jobFolder = iProject.getFolder("process").getFolder(name);
-    jobFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
-    return jobFolder.getFile(name + "_" + version + ".item");
+    // Los jobs de Big Data estan en `process_mr` y sin carpeta propia; los
+    // normales, en `process` y con una carpeta por job.
+    for (String base : new String[] {"process", "process_mr"}) {
+      org.eclipse.core.resources.IFolder root = iProject.getFolder(base);
+      root.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
+      org.eclipse.core.resources.IFile file = root.getFile(name + "_" + version + ".item");
+      if (file.exists()) {
+        return file;
+      }
+      org.eclipse.core.resources.IFolder jobFolder = root.getFolder(name);
+      jobFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
+      file = jobFolder.getFile(name + "_" + version + ".item");
+      if (file.exists()) {
+        return file;
+      }
+    }
+    return null;
   }
 
   /** Abre el job recien creado en el editor. */
