@@ -10,19 +10,30 @@ archivo. `CLAUDE.md` solo guarda el detalle de Bun y apunta aqui.
 Servidor MCP (Model Context Protocol) que analiza y edita proyectos de **Qlik Talend Studio**
 sobre los archivos `.item` y `.properties` de un workspace de Talend.
 
-El servidor expone ~200 herramientas MCP. No tiene interfaz grafica propia: la consumes desde
+El servidor expone ~220 herramientas MCP. No tiene interfaz grafica propia: la consumes desde
 un cliente MCP.
+
+**Dos formas de trabajar aqui, dos puntos de entrada:**
+
+| Vas a... | Lee primero |
+|---|---|
+| **Usar** el MCP para crear, editar, ejecutar y verificar jobs en un Talend Studio abierto | [docs/GUIA-AGENTE.md](docs/GUIA-AGENTE.md) (flujo, reglas de configuracion, errores, limites) y [docs/PLAN-DE-PRUEBAS.md](docs/PLAN-DE-PRUEBAS.md) |
+| **Cambiar** el codigo del repo o el plugin Java | Este archivo, [docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md) y [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) |
+
+Regla de fondo para quien usa el MCP: los jobs se crean y modifican **con las tools que usan la
+API de Studio** (`talend_job_*_in_studio`, `talend_job_add_node`...), nunca escribiendo el
+`.item` a mano.
 
 ## 2. Stack y comandos
 
 | Comando | Que hace |
 |---|---|
 | `bun install` | Instala dependencias. **Nunca** uses npm, yarn o pnpm. |
-| `bun test` | Suite completa (280+ tests). Solo corre `tests/`. |
+| `bun test` | Suite completa (290+ tests). Solo corre `tests/`. |
 | `bun run typecheck` | `tsc --noEmit`. Debe terminar sin errores. |
 | `bun run start:server` | Levanta el servidor MCP en `http://127.0.0.1:3927/mcp`. |
 | `bun run start` | Igual que `start:server`, ademas libera el puerto 3927 si esta ocupado. |
-| `bun run scripts/start.ts --install-bridge` | Compila y publica el plugin Java. Si Talend Studio esta corriendo, se recarga en caliente. |
+| `bun run scripts/start.ts --install-bridge` | Compila y publica el plugin Java. Si Talend Studio esta corriendo, se compila con `javac` (~8 s, 0 s sin cambios) y se recarga en caliente; espera a que el bridge sirva la version nueva, sin `Start-Sleep`. `--maven` fuerza Maven/Tycho (lento, ~25-40 s); `--force` recompila y recarga aunque no haya cambios. |
 | `bun run jobs ...` / `bun run contexts ...` | CLI local para jobs y contextos. |
 
 Reglas de Bun (proyecto, no Node):
@@ -53,6 +64,15 @@ Reglas de Bun (proyecto, no Node):
 - **El plugin Java se recarga en caliente.** `bun run scripts/start.ts --install-bridge`
   publica el bundle en `~/.talend-bridge/hot/bridge.jar` y el plugin lo detecta y se
   recarga solo (`Bundle.update`). No reinicies Talend Studio para aplicar cambios.
+- **Nada lento ni bloqueante en el hilo de UI del bridge.** `UiThread.sync` es solo para tocar
+  widgets o el modelo del job, y en trozos cortos. Ejecutar jobs, descargar artefactos, recorrer
+  el catalogo entero o esperar procesos va en el hilo de trabajo HTTP; si no, Talend Studio se
+  congela. Detalle en `docs/TALEND-STUDIO-INTERNALS.md` seccion 26.
+- **Probar Java sin recompilar el bridge:** `talend_studio_run_code` ejecuta Java dentro de Studio
+  (requiere `unsafeActions`). Usalo para explorar APIs; lo que funcione se lleva al bridge como
+  operacion con su tool, para que quien clone el repo la tenga.
+- **Documenta lo que aprendas.** Cada trampa de Studio descubierta va a
+  `docs/TALEND-STUDIO-INTERNALS.md`; cada limite o estado de fase, a `docs/PLAN-DE-PRUEBAS.md`.
 
 ## 4. Reglas de oro
 

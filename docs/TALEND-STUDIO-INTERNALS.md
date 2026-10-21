@@ -1027,10 +1027,8 @@ correctos.
 
 ## 17. Lo que queda sin resolver
 
-- **La salida de la consola del run no esta expuesta por el bridge.** El job imprime las filas
-  en la vista Run de Studio y no en el log de la plataforma. Para comprobar la salida de
-  forma automatica hay dos vias: leer el `StyledText` del `ProcessComposite` (API restringida
-  de Talend) o ejecutar el jar generado a mano con el comando que Talend deja en el log.
+- **La salida de la consola del run (vista Run) sigue sin poder leerse.** Se resolvio por otra
+  via: `talend_job_execute` relanza el job generado y devuelve su salida (seccion 23).
 - **El fin de ejecucion se detecta por sondeo del proceso del sistema operativo**, con el
   limite de los jobs que duran menos de 50 ms. La via limpia seria llamar a
   `Processor.run()`, que devuelve el `java.lang.Process` con su salida y su codigo de
@@ -1383,7 +1381,7 @@ La tool es `talend_job_execute`, y devuelve el codigo de salida, la salida
 estandar y la salida de error, con las lineas de la salida ya separadas.
 
 **Ojo**: el proceso se relanza, no se intercepta. El job ya se ha ejecutado
-una vez con `talend_job_run` (que compila y lanza); `talend_job_execute` lo
+una vez con `talend_job_run_by_name` (que compila y lanza); `talend_job_execute` lo
 ejecuta otra vez para poder leer su salida.
 ## 24. Componentes que no generan codigo valido en Talend 8.0.1
 
@@ -1430,3 +1428,28 @@ hace desde Maven Central.
 **no esta en Maven Central** (es de Talend Exchange y pide credenciales). Con el
 instalador se comprueba enseguida: devuelve 404 para todos los group id
 habituales (`org.talend.components`, `org.talend.libraries`, ...).
+## 26. Que no puede entrar al hilo de la UI
+
+Todo lo que corre en `UiThread.sync` ocupa el hilo de la interfaz de Studio: mientras dura, Studio
+no pinta, no responde y los modales no se pueden cerrar (el sistema lo marca "No responde"). Por
+eso la regla es: **al hilo de la UI solo entra lo que toca widgets o el modelo del job, y en
+trozos de milisegundos.**
+
+| Operacion | Donde corre | Por que |
+|---|---|---|
+| Alta, conexion, edicion, borrado de nodos; crear, abrir y borrar jobs | UI (trozo corto) | Tocan el editor y el modelo EMF |
+| `talend_job_execute` (lanza una JVM y espera hasta minutos) | Hilo de trabajo HTTP | Solo lee el workspace; en la UI congelaba Studio todo lo que durara el job |
+| `talend_studio_install_artifact` (descarga de Maven Central) | Hilo de trabajo HTTP | Es red y disco, sin widgets |
+| `talend_studio_coverage` (1294 componentes) | Hilo de trabajo; **una llamada corta a la UI por componente** | Si el bucle entero iba en la UI, Studio quedaba congelado minutos |
+
+Detalles de `UiThread.sync`:
+
+- Espera con un `CountDownLatch`: despierta en el instante en que la UI termina (antes sondeaba
+  cada 20 ms y eso se sumaba a cada llamada).
+- Tiene tiempo maximo (10 s por defecto). Si vence, la accion que seguia en cola **se descarta**
+  en vez de ejecutarse tarde.
+- Si ya se esta en el hilo de la UI (`Display.getCurrent() != null`), ejecuta directo.
+
+Al agregar una ruta nueva al bridge: si no toca widgets ni el modelo, no la envuelvas en
+`UiThread.sync`. Si necesita la UI varias veces, haz una llamada corta por unidad de trabajo,
+no una larga para todo.

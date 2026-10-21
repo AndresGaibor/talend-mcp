@@ -128,6 +128,21 @@ modo solo lectura por defecto.
 - `talend_duplicate_job` acepta `sourceFolderPath` y `targetFolderPath`
 - `talend_move_job_to_folder` mueve `*.item` y `*.properties` y actualiza `TalendProperties:ItemState path`
 
+### Automatizacion de Talend Studio en vivo (requiere Studio abierto con el bridge)
+
+Crean y editan jobs con la API nativa de Studio, no escribiendo el `.item`. Flujo, reglas de
+configuracion y errores frecuentes en [docs/GUIA-AGENTE.md](docs/GUIA-AGENTE.md).
+
+- `talend_studio_list_components` / `talend_studio_component_parameters` - catalogo de Studio y parametros de cada componente
+- `talend_job_create_in_studio` / `talend_job_open_in_studio` / `talend_job_delete_in_studio` - ciclo de vida del job
+- `talend_job_add_node` / `talend_job_configure_node` / `talend_job_update_node` / `talend_job_connect_nodes` / `talend_job_set_schema` / `talend_job_list_nodes` - nodos, conexiones y schema
+- `talend_job_run_by_name` - compila y lanza el job en Studio; `talend_job_execute` - lo relanza y devuelve su salida
+- `talend_studio_run_code` - ejecuta Java dentro de Studio (requiere `unsafeActions`)
+- `talend_studio_dismiss_dialogs` / `talend_studio_install_artifact` / `talend_studio_install_modules` / `talend_studio_coverage` - utilidades
+- `talend_bridge_*` - estado y control del IDE (editores, vistas, comandos, launches)
+
+Tambien se puede llamar la API del bridge directo: `bun run scripts/bridge-call.ts /ping`.
+
 ### Gestion de repositorios git
 
 - `talend_repo_setup` - clona y activa un repo como proyecto
