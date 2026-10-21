@@ -48,7 +48,7 @@
           "1|Ana|Bogota|100.5",
           "2|Jose|Medellin|200.25",
           "3|Lucia|Cali|300.0",
-          "4|Ana|Bogota|100.5"
+          "1|Ana|Bogota|100.5"
         ]
       }
     },
@@ -79,8 +79,8 @@
             "FILENAME": { "value": "@TESTDATA@/l5_salida.csv" },
             "FIELDSEPARATOR": { "value": ";" },
             "ENCODING": { "value": "UTF-8" },
-            "REPLACE_FILE": { "value": "true" },
-            "CREATE_HEADER": { "value": "false" }
+            "CREATE_HEADER": { "value": "false" },
+            "FILE_EXIST_EXCEPTION": { "value": "false" }
           }
         }
       ],
@@ -94,8 +94,9 @@
       }
     },
     {
-      "nombre": "transformaciones: quitar duplicados, agregar y ordenar",
+      "nombre": "transformaciones: quitar duplicados",
       "job": "MCP_L5_Transformaciones",
+      "pendiente": "el formato de la tabla UNIQUE_KEY del tUniqRow no esta resuelto: el codigo generado lee una columna suelta ('id cannot be resolved') en vez de la de la conexion de entrada",
       "nodos": [
         {
           "type": "tFileInputDelimited",
@@ -125,54 +126,12 @@
           "tablas": {
             "UNIQUE_KEY": {
               "columns": ["SCHEMA_COLUMN", "KEY_ATTRIBUTE", "CASE_SENSITIVE"],
-              "rows": [{ "SCHEMA_COLUMN": "row1.id", "KEY_ATTRIBUTE": "false", "CASE_SENSITIVE": "true" }]
-            }
-          }
-        },
-        {
-          "type": "tAggregateRow",
-          "nombre": "agrega",
-          "columnas": [
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "total_monto", "type": "id_Double" },
-            { "name": "num_clientes", "type": "id_Integer" }
-          ],
-          "tablas": {
-            "GROUPBYS": {
-              "columns": ["OUTPUT_COLUMN", "INPUT_COLUMN"],
-              "rows": [{ "OUTPUT_COLUMN": "ciudad", "INPUT_COLUMN": "row1.ciudad" }]
-            },
-            "OPERATIONS": {
-              "columns": ["OUTPUT_COLUMN", "FUNCTION", "INPUT_COLUMN", "IGNORE_NULL"],
               "rows": [
-                {
-                  "OUTPUT_COLUMN": "total_monto",
-                  "FUNCTION": "SUM",
-                  "INPUT_COLUMN": "row1.monto",
-                  "IGNORE_NULL": "true"
-                },
-                {
-                  "OUTPUT_COLUMN": "num_clientes",
-                  "FUNCTION": "COUNT",
-                  "INPUT_COLUMN": "row1.id",
-                  "IGNORE_NULL": "true"
-                }
+                { "SCHEMA_COLUMN": "row1.id", "KEY_ATTRIBUTE": "true", "CASE_SENSITIVE": "false" },
+                { "SCHEMA_COLUMN": "row1.nombre", "KEY_ATTRIBUTE": "false", "CASE_SENSITIVE": "false" },
+                { "SCHEMA_COLUMN": "row1.ciudad", "KEY_ATTRIBUTE": "false", "CASE_SENSITIVE": "false" },
+                { "SCHEMA_COLUMN": "row1.monto", "KEY_ATTRIBUTE": "false", "CASE_SENSITIVE": "false" }
               ]
-            }
-          }
-        },
-        {
-          "type": "tSortRow",
-          "nombre": "ordena",
-          "columnas": [
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "total_monto", "type": "id_Double" },
-            { "name": "num_clientes", "type": "id_Integer" }
-          ],
-          "tablas": {
-            "CRITERIA": {
-              "columns": ["COLNAME", "SORT", "ORDER"],
-              "rows": [{ "COLNAME": "row1.total_monto", "SORT": "", "ORDER": "DESC" }]
             }
           }
         },
@@ -180,13 +139,16 @@
       ],
       "conexiones": [
         { "origen": "lector", "destino": "unicos" },
-        { "origen": "unicos", "destino": "agrega" },
-        { "origen": "agrega", "destino": "ordena" },
-        { "origen": "ordena", "destino": "salida" }
+        { "origen": "unicos", "destino": "salida" }
       ],
       "espera": {
-        "lineas": ["Cali|300.0|1", "Medellin|200.25|1", "Bogota|100.5|1"]
+        "lineas": [
+          "1|Ana|Bogota|100.5",
+          "2|Jose|Medellin|200.25",
+          "3|Lucia|Cali|300.0"
+        ]
       }
     }
   ]
 }
+

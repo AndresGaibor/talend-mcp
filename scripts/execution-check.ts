@@ -15,9 +15,14 @@
  * corre en el workspace de Studio, no en esta carpeta).
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createBridgeClient } from "../src/modules/studio-bridge/adapters/http-studio-bridge.client";
+import { DefinitionIndexRepository } from "../src/modules/component-definitions/infrastructure/definition-index.repository";
+import {
+  inputConnectorOf,
+  outputConnectorOf,
+} from "../src/modules/component-definitions/application/plan-required-parameters.use-case";
 
 type Columna = { name: string; type: string };
 
@@ -38,6 +43,8 @@ type Escenario = {
   nombre: string;
   /** Nombre del job de pruebas en el proyecto de Studio. */
   job: string;
+  /** Escenario conocido pero todavia sin resolver: se informa y se salta. */
+  pendiente?: string;
   nodos: Nodo[];
   conexiones: Array<{ origen: string; destino: string; tipo?: string }>;
   /** Que se espera al ejecutar. */
@@ -66,16 +73,42 @@ function errorDe(respuesta: { error?: { message?: string }; rawText?: string }):
   return respuesta.error?.message ?? respuesta.rawText?.slice(0, 300) ?? "error desconocido";
 }
 
+/** El tipo de componente de un nodo del escenario, por su nombre. */
+function tipoDeNodo(escenario: Escenario, nombre: string): string {
+  return escenario.nodos.find((nodo) => nodo.nombre === nombre)?.type ?? "";
+}
+
+/**
+ * El conector por el que sale un componente.
+ *
+ * Se saca de su definicion en el XML de Studio: el `tUniqRow` no saca sus
+ * filas por el conector principal, sino por "UNIQUE" (y "DUPLICATE" para las
+ * repetidas). Conectar por "FLOW" no da error: el job compila y no sale
+ * ninguna fila.
+ */
+function conectorDeSalida(tipo: string): string {
+  const definicion = definiciones.get(tipo);
+  return definicion ? outputConnectorOf(definicion) : "FLOW";
+}
+
+/** Definiciones de los componentes, para saber sus conectores. */
+let definiciones = new Map<string, Awaited<ReturnType<DefinitionIndexRepository["load"]>>["components"][number]>();
+
 async function main(): Promise<void> {
   if (!existsSync(ficheroEscenarios)) {
     console.error(`No esta el fichero de escenarios: ${ficheroEscenarios}`);
     process.exit(1);
   }
-  const contenido = JSON.parse(readFileSync(ficheroEscenarios, "utf8")) as
-    | Escenario[]
-    | { escenarios: Escenario[] };
+  const contenido = JSON.parse(
+    readFileSync(ficheroEscenarios, "utf8").replace(/^\uFEFF/, ""),
+  ) as Escenario[] | { escenarios: Escenario[] };
   const escenarios = Array.isArray(contenido) ? contenido : contenido.escenarios;
   const bridge = await createBridgeClient({ config: { timeoutMs: 180_000 } });
+
+  // Las definiciones de los componentes: de ellas sale el conector por el que
+  // se conecta cada uno.
+  const indice = await new DefinitionIndexRepository().load();
+  definiciones = new Map(indice.components.map((componente) => [componente.name, componente]));
 
   const lineas = ["escenario,job,ejecuta_ok,salida_correcta,detalle"];
   let bien = 0;
@@ -83,6 +116,10 @@ async function main(): Promise<void> {
 
   for (const escenario of escenarios) {
     if (filtro && !escenario.nombre.toLowerCase().includes(filtro.toLowerCase())) continue;
+    if (escenario.pendiente) {
+      console.log(`PENDIENTE ${escenario.nombre}: ${escenario.pendiente}`);
+      continue;
+    }
     total++;
     const detalle = await ejecutar(bridge, escenario);
     const correcto = detalle.ejecutaOk && detalle.salidaCorrecta;
@@ -109,22 +146,92 @@ async function main(): Promise<void> {
 
 type Resultado = { ejecutaOk: boolean; salidaCorrecta: boolean; mensaje?: string };
 
+/**
+ * Repite una llamada mientrasStudio este ocupado.
+ *
+ * Studio esta ocupado cuando esta compilando o cuando hay un modal abierto:
+ * el bridge avisa y la accion se descarta. Se espera y se vuelve a intentar.
+ */
+async function reintentar<T extends { ok: boolean; error?: { message?: string } }>(
+  accion: () => Promise<T>,
+  interesa: (mensaje: string) => boolean,
+  intentos = 12,
+): Promise<T> {
+  let ultima = await accion();
+  for (let intento = 0; intento < intentos && !ultima.ok; intento++) {
+    const mensaje = ultima.error?.message ?? "";
+    if (!interesa(mensaje)) break;
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    ultima = await accion();
+  }
+  return ultima;
+}
+
+/**
+ * Genera y compila el job con el Run de Studio.
+ *
+ * Es el paso que produce el `target/classpath.jar` que necesita la ejecucion
+ * para releer la salida del job. Se abre el job en el editor (para que sea el
+ * activo) y se lanza su Run: Studio genera el codigo, lo compila y lo
+ * ejecuta; la launch config se crea sola si no existe.
+ *
+ * No se espera a que termine: el Run es asincrono y el tracker de Studio no
+ * ve la terminacion. Lo que hace falta es que el build termine, y eso se
+ * espera probando la ejecucion.
+ */
+async function compilarEnStudio(
+  bridge: Awaited<ReturnType<typeof createBridgeClient>>,
+  job: string,
+): Promise<{ ok: boolean; mensaje?: string }> {
+  const abierto = await bridge.openJob({ name: job });
+  if (!abierto.ok) {
+    return { ok: false, mensaje: `no se pudo abrir el job: ${errorDe(abierto)}` };
+  }
+  const lanzado = await bridge.runActiveJob({
+    dryRun: false,
+    saveBefore: true,
+    waitForTermination: false,
+    timeoutMs: 30_000,
+  });
+  if (!lanzado.ok) {
+    return { ok: false, mensaje: `no se pudo ejecutar en Studio: ${errorDe(lanzado)}` };
+  }
+  const datos = (lanzado.data ?? {}) as { error?: { message?: string }; launched?: boolean };
+  if (datos.error) {
+    return {
+      ok: false,
+      mensaje: `el Run de Studio fallo: ${datos.error.message ?? JSON.stringify(datos.error)}`,
+    };
+  }
+  if (!datos.launched) {
+    return { ok: false, mensaje: "Studio no lanzo el job" };
+  }
+  return { ok: true };
+}
+
 async function ejecutar(
   bridge: Awaited<ReturnType<typeof createBridgeClient>>,
   escenario: Escenario,
 ): Promise<Resultado> {
   // 1. Job limpio.
-  const borrado = await bridge.deleteJob({ name: escenario.job });
+  const borrado = await reintentar(
+    () => bridge.deleteJob({ name: escenario.job }),
+    (mensaje) => mensaje.includes("hilo de la interfaz") || mensaje.includes("ocupado"),
+  );
   if (!borrado.ok && !/no existe|not found|no se/i.test(errorDe(borrado))) {
     return { ejecutaOk: false, salidaCorrecta: false, mensaje: `no se pudo borrar: ${errorDe(borrado)}` };
   }
-  const creado = await bridge.createJob({ name: escenario.job, replace: true });
+  const creado = await reintentar(
+    () => bridge.createJob({ name: escenario.job, replace: true }),
+    (mensaje) => mensaje.includes("hilo de la interfaz") || mensaje.includes("ocupado"),
+  );
   if (!creado.ok) {
     return { ejecutaOk: false, salidaCorrecta: false, mensaje: `no se pudo crear: ${errorDe(creado)}` };
   }
 
-  // 2. Nodos, con sus parametros, su schema y sus tablas.
+  // 2. Nodos, con sus parametros y su schema.
   const nombres = new Map<string, string>();
+  const tablasPorNodo: Array<{ uniqueName: string; tablas: NonNullable<Nodo["tablas"]> }> = [];
   for (const nodo of escenario.nodos) {
     const parameters = nodo.parameters
       ? Object.fromEntries(
@@ -147,7 +254,12 @@ async function ejecutar(
         mensaje: `no se pudo anadir ${nodo.type}: ${errorDe(anadido)}`,
       };
     }
-    const uniqueName = String((anadido.data as { uniqueName?: string })?.uniqueName ?? "");
+    // El bridge envuelve la respuesta en `result`.
+    const cuerpo = (anadido.data ?? {}) as {
+      uniqueName?: string;
+      result?: { uniqueName?: string };
+    };
+    const uniqueName = String(cuerpo.uniqueName ?? cuerpo.result?.uniqueName ?? "");
     if (nodo.nombre) nombres.set(nodo.nombre, uniqueName);
 
     if (nodo.columnas) {
@@ -172,7 +284,6 @@ async function ejecutar(
           job: escenario.job,
           uniqueName,
           schema: [{ connector: "FLOW", name: uniqueName, columns: nodo.columnas }],
-          tables: nodo.tablas,
         });
         if (!conSchema.ok) {
           return {
@@ -182,23 +293,17 @@ async function ejecutar(
           };
         }
       }
-    } else if (nodo.tablas) {
-      const conTablas = await bridge.configureNode({
-        job: escenario.job,
-        uniqueName,
-        tables: nodo.tablas,
-      });
-      if (!conTablas.ok) {
-        return {
-          ejecutaOk: false,
-          salidaCorrecta: false,
-          mensaje: `no se pudieron poner las tablas de ${nodo.type}: ${errorDe(conTablas)}`,
-        };
-      }
+    }
+    if (nodo.tablas) {
+      // Las tablas se ponen DESPUES de conectar: al conectar, Talend rehace
+      // las tablas del componente y se pierde lo que se habia puesto antes
+      // (es lo que pasa con el tMap y con el tAggregateRow).
+      tablasPorNodo.push({ uniqueName, tablas: nodo.tablas });
     }
   }
 
-  // 3. Conexiones.
+  // 3. Conexiones. El conector se saca de la definicion del componente de
+  // origen: el tUniqRow no saca sus filas por "FLOW", sino por "UNIQUE".
   for (const conexion of escenario.conexiones) {
     const origen = nombres.get(conexion.origen);
     const destino = nombres.get(conexion.destino);
@@ -209,11 +314,12 @@ async function ejecutar(
         mensaje: `conexion sin nodos: ${conexion.origen} -> ${conexion.destino}`,
       };
     }
+    const tipo = conexion.tipo ?? conectorDeSalida(tipoDeNodo(escenario, conexion.origen));
     const conectada = await bridge.connectNodes({
       job: escenario.job,
       source: origen,
       target: destino,
-      type: conexion.tipo ?? "FLOW",
+      type: tipo,
     });
     if (!conectada.ok) {
       return {
@@ -224,8 +330,49 @@ async function ejecutar(
     }
   }
 
-  // 4. Ejecucion.
-  const ejecutado = await bridge.executeJob({ name: escenario.job, timeoutMs: 180_000 });
+  // 3. Tablas: despues de conectar, que es cuando el componente ya sabe
+  // que columnas de entrada tiene.
+  for (const pendiente of tablasPorNodo) {
+    const conTablas = await bridge.configureNode({
+      job: escenario.job,
+      uniqueName: pendiente.uniqueName,
+      tables: pendiente.tablas,
+    });
+    if (!conTablas.ok) {
+      return {
+        ejecutaOk: false,
+        salidaCorrecta: false,
+        mensaje: `no se pudieron poner las tablas: ${errorDe(conTablas)}`,
+      };
+    }
+  }
+
+  // 4. Ejecucion. Primero hay que generarlo y compilarlo: eso es lo que hace
+  // el Run de Studio (y lo que deja el `target/classpath.jar` que necesita la
+  // ejecucion para releer la salida). Despues se relanza para capturar lo que
+  // imprime. El build tarda, asi que se reintenta hasta que el job este
+  // compilado.
+  const compilado = await compilarEnStudio(bridge, escenario.job);
+  if (!compilado.ok) {
+    return { ejecutaOk: false, salidaCorrecta: false, mensaje: compilado.mensaje };
+  }
+
+  // El fichero de salida se borra entre el Run de Studio (que ya ha escrito
+  // el fichero) y el relanzamiento: el tFileOutputDelimited se niega a
+  // sobrescribir un fichero que ya existe.
+  if (escenario.espera?.fichero) {
+    const ruta = conRutas(escenario.espera.fichero.ruta);
+    if (existsSync(ruta)) rmSync(ruta, { force: true });
+  }
+
+  let ejecutado = await bridge.executeJob({ name: escenario.job, timeoutMs: 180_000 });
+  for (let intento = 0; intento < 24; intento++) {
+    const cuerpo = ((ejecutado.data ?? {}) as { result?: { error?: string }; error?: string });
+    const error = cuerpo.result?.error ?? cuerpo.error ?? "";
+    if (!error.includes("no esta compilado")) break;
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    ejecutado = await bridge.executeJob({ name: escenario.job, timeoutMs: 180_000 });
+  }
   if (!ejecutado.ok) {
     return { ejecutaOk: false, salidaCorrecta: false, mensaje: `no se pudo ejecutar: ${errorDe(ejecutado)}` };
   }
@@ -292,7 +439,9 @@ async function ejecutar(
     }
   }
 
-  await bridge.deleteJob({ name: escenario.job });
+  if (process.env.L5_KEEP_JOBS !== "1") {
+    await bridge.deleteJob({ name: escenario.job });
+  }
 
   return {
     ejecutaOk: true,

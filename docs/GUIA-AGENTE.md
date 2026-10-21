@@ -65,7 +65,6 @@ Orden obligatorio. Cada paso usa lo que devolvio el anterior (sobre todo los `un
 | 9c | `talend_job_compile` | Genera el codigo y comprueba que **compila**, sin ejecutar. Devuelve `compiles` y, si falla, `error.line` y `error.message` (p. ej. `no_comillas cannot be resolved to a variable`). ~2 s; ocupa la UI mientras genera, igual que un Run |
 | 10 | `talend_job_run_by_name` | Genera el codigo, compila y lanza el job en Studio. **No devuelve la salida** (va a la vista Run) |
 | 11 | `talend_job_execute` | Relanza el job ya compilado y **devuelve `exitCode` y la salida** (`stdout`, `lines`). Es como se comprueba el resultado |
-
 Ejemplo minimo (humo): `tFixedFlowInput` -> `tLogRow`.
 
 ```
@@ -100,6 +99,10 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
 - **`tLogRow` hereda el schema** del componente que le manda el flujo; no se lo pongas a mano.
 - **`tMap`:** el nombre de cada tabla del modelo es el de **su conexion**, y el modelo se aplica
   **al final** (despues de crear y conectar), porque al conectar Talend rehace sus tablas.
+- **Conexiones:** el tipo de conexion es el **conector** del componente (`FLOW`, `UNIQUE`, `REJECT`,
+  `ITERATE`...), no un texto libre: el `tUniqRow` saca sus filas por `UNIQUE`, y conectar por `FLOW`
+  compila pero no sale ninguna fila. El **nombre** de la conexion lo pone el bridge (`row1`, `row2`...),
+  y es el que usan las tablas de los componentes (`row1.monto`). Ver INTERNALS 32.
 - **Parametros que el catalogo no declara** (p. ej. `FILENAME` de `tFileOutputDelimited`): el bridge
   los crea con el tipo indicado o deducido.
 - Detalle y justificacion en [TALEND-STUDIO-INTERNALS.md](TALEND-STUDIO-INTERNALS.md) seccion 18.

@@ -1679,3 +1679,59 @@ Lo que **no** se arregla con esto, y es un limite del entorno:
 - `tFileInputMSXML`: el codigo generado sale con una llave sin cerrar.
 - Los componentes de base de datos: necesitan una conexion real del repositorio para compilar.
 
+## 32. Conectar bien: el nombre de la conexion y el del conector
+
+Conectar dos nodos tiene **dos** nombres, y confundirlos rompe el job de formas muy distintas:
+
+| Que | Donde | Ejemplo |
+|---|---|---|
+| El **conector** | El atributo `connectorName` de la conexion, y el `NAME` del `<CONNECTOR>` del XML | `FLOW`, `UNIQUE`, `DUPLICATE`, `REJECT`, `ITERATE`, `SUBJOB_OK` |
+| El **nombre** de la conexion | El `label` de la conexion: es la variable de la fila en el codigo generado | `row1`, `row2`, `OnComponentOk`, `If`, `Iterate` |
+
+### El nombre de la conexion es `row1`, `row2`... y es global al job
+
+Es la variable de la fila en el codigo generado, y las tablas de los componentes la referencian: el
+`tAggregateRow` guarda "row1.monto" en su tabla `OPERATIONS`, y el `tUniqRow` "row1.id" en su `UNIQUE_KEY`.
+
+- El numero es **del job**, no del nodo: la numeracion se hace con las conexiones que ya tiene el proceso, no
+  con las del nodo de destino. En los jobs reales se ve como "row1", "row2" repartidas por todo el job.
+- Los triggers tienen nombre fijo: `COMPONENT_OK` -> "OnComponentOk", `SUBJOB_OK` -> "OnSubjobOk", `RUN_IF` ->
+  "If", `ITERATE` -> "Iterate".
+- **El nombre tiene que ser distinto del de la conexion de entrada del nodo.** El `tUniqRow` libera la fila de su
+  conexion de salida (`<salida> = null;`) antes de leer la de entrada: si las dos se llaman "row1", el codigo
+  generado lee una variable nula ("Cannot read field \"id\" because \"row1\" is null").
+
+### No todos los componentes sacan las filas por el conector principal
+
+El `tUniqRow` declara `<CONNECTOR CTYPE="FLOW" MAX_OUTPUT="0" MAX_INPUT="1"/>` (el principal, que no puede
+emitir) y luego dos conectores mas: `UNIQUE` (las filas unicas) y `DUPLICATE` (las repetidas). Conectar la salida
+por "FLOW" **no da error**: el job compila y no sale ninguna fila. El conector se saca del XML del componente.
+
+Lo mismo pasa con las tablas: el `tUniqRow` tiene una tabla por columna del schema (`BASED_ON_SCHEMA="true"`), y
+la columna que forma la clave se marca con `KEY_ATTRIBUTE="true"`. La tabla del `tSortRow` (`CRITERIA`) usa los
+valores de su XML: `SORT` es "num"/"alpha"/"date" y `ORDER` es "asc"/"desc" (en minusculas). Con otros valores, el
+generador falla con "Index 0 out of bounds for length 0".
+
+### Las tablas se ponen despues de conectar
+
+Al conectar, Talend rehace las tablas del componente con las del origen y se pierde lo que se habia puesto antes.
+Es lo que pasa con el `tMap` (su modelo se aplica al final) y con las tablas de transformacion: se conectan los
+nodos y despues se rellenan las tablas.
+
+## 33. Ejecutar un job y leer su salida
+
+Para comprobar el resultado de un job (L5) hacen falta dos pasos, porque la vista Run de Studio no se puede leer:
+
+1. **Generar y compilar**: el Run de Studio (`/automation/run-active-job`) genera el codigo, lo compila y lo
+   ejecuta. Deja el job compilado en `<proyecto>/poms/jobs/process/<job>/<job>_<version>/`, con un
+   `target/classpath.jar` que lleva el classpath completo en su MANIFEST.
+   - El Run es **asincrono** y el tracker del bridge no ve la terminacion: no hay que esperarlo (`waitForTermination`
+     se queda esperando el tiempo entero).
+   - La launch config se crea sola si no existe (`MCP_L5_Humo 0.1`).
+2. **Relanzar para leer la salida**: `/automation/job/execute` ejecuta el job ya compilado en otra JVM y devuelve
+   su `exitCode` y sus lineas.
+
+El script `scripts/execution-check.ts` hace los dos y compara la salida con la esperada. Los escenarios estan en
+`tests/fixtures/talend/escenarios-l5.json`.
+
+

@@ -566,8 +566,12 @@ public final class CoverageChecker {
     boolean source = entry.has("source")
         ? JsonSpec.booleanOf(entry, "source", false)
         : componentName.endsWith("Output");
+    // El conector por el que se entra y el por el que sale: no todos los
+    // componentes usan el principal (el tUniqRow saca sus filas por "UNIQUE").
+    String input = entry.has("input") ? JsonSpec.string(entry, "input") : "FLOW";
+    String output = entry.has("output") ? JsonSpec.string(entry, "output") : "FLOW";
     if (source) {
-      added.add(addSource(targetName));
+      added.add(addSource(targetName, input));
     }
     return added;
   }
@@ -607,7 +611,7 @@ public final class CoverageChecker {
    * tFileOutputRaw, que solo escribe una columna "content"), el origen tiene
    * que traer las mismas columnas: si no, el codigo no compila.
    */
-  private static String addSource(String targetName) throws Exception {
+  private static String addSource(String targetName, String inputConnector) throws Exception {
     JsonObject addSpec = new JsonObject();
     addSpec.addProperty("type", "tFixedFlowInput");
     addSpec.addProperty("job", JOB_NAME);
@@ -636,7 +640,7 @@ public final class CoverageChecker {
     connectSpec.addProperty("job", JOB_NAME);
     connectSpec.addProperty("source", sourceName);
     connectSpec.addProperty("target", targetName);
-    connectSpec.addProperty("type", "FLOW");
+    connectSpec.addProperty("type", inputConnector);
     NodeOperations.connect(connectSpec);
     return sourceName;
   }
