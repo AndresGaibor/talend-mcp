@@ -115,6 +115,13 @@ type Escenario = {
   }>;
   nodos: Nodo[];
   conexiones: Array<{ origen: string; destino: string; tipo?: string }>;
+  /**
+   * SQL que se ejecuta en el Postgres de pruebas **antes** del job.
+   *
+   * Sirve para dejar la tabla como el escenario la necesita: el UPDATE y el
+   * DELETE solo tienen sentido si ya hay filas.
+   */
+  prepara?: string[];
   /** Que se espera al ejecutar. */
   espera?: {
     /** Lineas exactas de la salida del job, o solo cuantas lineas. */
@@ -175,6 +182,30 @@ async function consultar(sqlTexto: string): Promise<string | number | null> {
     }
   } catch (error) {
     return null;
+  }
+}
+
+/**
+ * Deja la base de datos de pruebas como el escenario la necesita.
+ *
+ * Se ejecutan las sentencias en orden y, si una falla, el escenario no se
+ * ejecuta: una tabla a medio preparar da un resultado que no significa nada.
+ */
+async function preparar(sentencias: string[]): Promise<{ ok: boolean; mensaje?: string }> {
+  const url =
+    process.env.L5_POSTGRES_URL ??
+    "postgres://talend:talend@127.0.0.1:5433/talend_test";
+  const sql = new Bun.SQL(url);
+  try {
+    for (const sentencia of sentencias) {
+      await sql.unsafe(sentencia);
+    }
+    return { ok: true };
+  } catch (error) {
+    const mensaje = error instanceof Error ? error.message : String(error);
+    return { ok: false, mensaje: `la preparacion de la base fallo: ${mensaje}` };
+  } finally {
+    await sql.close();
   }
 }
 
@@ -256,6 +287,22 @@ async function main(): Promise<void> {
 type Resultado = { ejecutaOk: boolean; salidaCorrecta: boolean; mensaje?: string };
 
 /**
+ * Los fallos de Studio que se pasan solos.
+ *
+ * Esta ocupado compilando, hay un modal abierto o el editor del job no
+ * responde a la primera: el bridge avisa, se espera y se repite la accion.
+ * El aviso "No se pudo abrir el job ... en el editor" aparece tambien con
+ * jobs del usuario, asi que no es un problema del escenario.
+ */
+function transitorioDeStudio(mensaje: string): boolean {
+  return (
+    mensaje.includes("No se pudo abrir el job") ||
+    mensaje.includes("hilo de la interfaz") ||
+    mensaje.includes("ocupado")
+  );
+}
+
+/**
  * Repite una llamada mientrasStudio este ocupado.
  *
  * Studio esta ocupado cuando esta compilando o cuando hay un modal abierto:
@@ -292,7 +339,10 @@ async function compilarEnStudio(
   bridge: Awaited<ReturnType<typeof createBridgeClient>>,
   job: string,
 ): Promise<{ ok: boolean; mensaje?: string }> {
-  const abierto = await bridge.openJob({ name: job });
+  const abierto = await reintentar(
+    () => bridge.openJob({ name: job }),
+    transitorioDeStudio,
+  );
   if (!abierto.ok) {
     return { ok: false, mensaje: `no se pudo abrir el job: ${errorDe(abierto)}` };
   }
@@ -319,6 +369,20 @@ async function compilarEnStudio(
 }
 
 /**
+ * Los mensajes que da el bridge mientras el build sigue en marcha.
+ *
+ * Sin `classpath.jar` el job no ha empezado a empaquetarse, y sin la clase
+ * principal esta a medio compilar. En los dos casos hay que esperar y
+ * reintentar: no es un fallo del job.
+ */
+function compilando(error: string): boolean {
+  return (
+    error.includes("no esta compilado") ||
+    error.includes("No se encontro la clase principal")
+  );
+}
+
+/**
  * Espera a que un job este compilado.
  *
  * El Run de Studio es asincrono: lanza el build y sigue. La ejecucion solo
@@ -336,7 +400,7 @@ async function esperarCompilado(
       error?: string;
     };
     const error = cuerpo.result?.error ?? cuerpo.error ?? "";
-    if (!error.includes("no esta compilado")) {
+    if (!compilando(error)) {
       return { ok: true };
     }
     await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -382,6 +446,13 @@ async function ejecutar(
   const montado = await montarJob(bridge, escenario);
   if (!montado.ok) {
     return { ejecutaOk: false, salidaCorrecta: false, mensaje: montado.mensaje };
+  }
+
+  if (escenario.prepara && escenario.prepara.length > 0) {
+    const preparado = await preparar(escenario.prepara);
+    if (!preparado.ok) {
+      return { ejecutaOk: false, salidaCorrecta: false, mensaje: preparado.mensaje };
+    }
   }
 
 /**
@@ -440,14 +511,14 @@ async function montarJob(
 ): Promise<{ ok: boolean; mensaje?: string }> {  // 1. Job limpio.
   const borrado = await reintentar(
     () => bridge.deleteJob({ name: spec.job }),
-    (mensaje) => mensaje.includes("hilo de la interfaz") || mensaje.includes("ocupado"),
+    transitorioDeStudio,
   );
   if (!borrado.ok && !/no existe|not found|no se/i.test(errorDe(borrado))) {
     return { ok: false, mensaje: `no se pudo borrar: ${errorDe(borrado)}` };
   }
   const creado = await reintentar(
     () => bridge.createJob({ name: spec.job, replace: true }),
-    (mensaje) => mensaje.includes("hilo de la interfaz") || mensaje.includes("ocupado"),
+    transitorioDeStudio,
   );
   if (!creado.ok) {
     return { ok: false, mensaje: `no se pudo crear: ${errorDe(creado)}` };
@@ -457,6 +528,17 @@ async function montarJob(
   const contextsOk = await crearContextos(bridge, spec.job, spec.contextos);
   if (!contextsOk.ok) {
     return contextsOk;
+  }
+
+  // El job tiene que estar abierto en el editor antes de anadir nodos. Studio
+  // a veces contesta "No se pudo abrir el job ... en el editor" (le pasa
+  // tambien con jobs del usuario): es transitorio y se reintenta.
+  const abierto = await reintentar(
+    () => bridge.openJob({ name: spec.job }),
+    transitorioDeStudio,
+  );
+  if (!abierto.ok) {
+    return { ok: false, mensaje: `no se pudo abrir el job: ${errorDe(abierto)}` };
   }
 
   // 2. Nodos, con sus parametros y su schema.
@@ -489,25 +571,44 @@ async function montarJob(
         ]),
       )
     : undefined;
-  const anadido = await bridge.addNode({
+  let anadido = await bridge.addNode({
     type: nodo.type,
     job: spec.job,
     parameters,
   });
-  if (!anadido.ok) {
-    return {
-  ok: false,
-      mensaje: `no se pudo anadir ${nodo.type}: ${errorDe(anadido)}`,
-    };
+  let uniqueName = "";
+  // Dos fallos transitorios de Studio: contesta `ok` sin el nodo (esta
+  // terminando un build) o no consigue abrir el job en el editor. En los dos
+  // casos se reabre el job y se reintenta antes de dar el escenario por
+  // perdido.
+  for (let intento = 0; intento < 6; intento++) {
+    if (anadido.ok) {
+      // El bridge envuelve la respuesta en `result`.
+      const cuerpo = (anadido.data ?? {}) as {
+        uniqueName?: string;
+        result?: { uniqueName?: string };
+      };
+      uniqueName = String(cuerpo.uniqueName ?? cuerpo.result?.uniqueName ?? "");
+      if (uniqueName) break;
+    } else if (!transitorioDeStudio(errorDe(anadido))) {
+      return {
+        ok: false,
+        mensaje: `no se pudo anadir ${nodo.type}: ${errorDe(anadido)}`,
+      };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await bridge.openJob({ name: spec.job });
+    anadido = await bridge.addNode({
+      type: nodo.type,
+      job: spec.job,
+      parameters,
+    });
   }
-  // El bridge envuelve la respuesta en `result`.
-  const cuerpo = (anadido.data ?? {}) as {
-    uniqueName?: string;
-    result?: { uniqueName?: string };
-  };
-  const uniqueName = String(cuerpo.uniqueName ?? cuerpo.result?.uniqueName ?? "");
   if (!uniqueName) {
-    return { ok: false, mensaje: `el bridge no devolvio el nombre del nodo ${nodo.type}` };
+    return {
+      ok: false,
+      mensaje: `el bridge no devolvio el nombre del nodo ${nodo.type}: ${anadido.rawText?.slice(0, 200) ?? ""}`,
+    };
   }
   if (nodo.nombre) nombres.set(nodo.nombre, uniqueName);
   if (nodo.columnas || nodo.columnasPorConector || nodo.esquemas) {
@@ -710,9 +811,13 @@ for (const pendiente of mappersPorNodo) {
   for (let intento = 0; intento < 24; intento++) {
     const cuerpo = ((ejecutado.data ?? {}) as { result?: { error?: string }; error?: string });
     const error = cuerpo.result?.error ?? cuerpo.error ?? "";
-    if (!error.includes("no esta compilado")) break;
+    if (!compilando(error)) break;
     await new Promise((resolve) => setTimeout(resolve, 5000));
-    ejecutado = await bridge.executeJob({ name: escenario.job, timeoutMs: 180_000 });
+    ejecutado = await bridge.executeJob({
+      name: escenario.job,
+      context: escenario.contexto,
+      timeoutMs: 180_000,
+    });
   }
   if (!ejecutado.ok) {
     return { ejecutaOk: false, salidaCorrecta: false, mensaje: `no se pudo ejecutar: ${errorDe(ejecutado)}` };

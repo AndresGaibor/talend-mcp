@@ -1364,6 +1364,13 @@ tener el entorno completo. Y la clase principal se deduce de las clases
 compiladas: el fichero `<JobName>.class` dentro de `target/classes` dice el
 paquete.
 
+No siempre esta en `poms`: hay jobs cuyo proyecto Maven queda montado pero
+vacio, y entonces el codigo generado aparece en un proyecto suelto del
+workspace, `PRJ_<PROYECTO>_<JOB>_<VERSION>` (el job en mayusculas), con el mismo
+layout (`src/main/java/...`, `target/classes`, `target/classpath.jar`). El
+buscador del bridge mira primero `poms/jobs/process` y, si ahi no hay
+`target/classpath.jar`, cae a esa carpeta. Ver la seccion 53.
+
 Con eso el bridge relanza el job y devuelve su salida, que es lo que hace
 falta para comprobar que el resultado es el esperado (el plan de pruebas lo
 pide explicitamente: "la salida coincide con lo esperado, que defines tu
@@ -1980,26 +1987,63 @@ Y la moraleja: **entre mediciones largas hay que reiniciar Studio**. Una medicio
 y no pasa nada; tres o cuatro seguidas, con todo el codigo generado, pueden tumbar el IDE. Ademas, `jcmd <pid>
 GC.run` recupera a un Studio que se ha quedado sin memoria (si el proceso no ha muerto todavia).
 
-## 40. Los triggers: el conector se llama "OnComponentError", no "COMPONENT_ERROR"
+## 40. Los triggers: el conector va con el tipo del catalogo
 
-Una conexion de trigger (el "On component error" de un componente) **no se crea** si se le pasa el tipo del
-catalogo. El tipo es `COMPONENT_ERROR` (y `COMPONENT_OK`, `SUBJOB_OK`, `SUBJOB_ERROR`, `RUN_IF`,
-`ITERATE`), pero el nombre del conector en el job es el que da Studio:
+Una conexion de trigger (el "On subjob ok" de un componente) tiene **dos** nombres, y aqui se confunden facil:
 
-| Tipo del catalogo | Nombre en el job |
+| Que | Atributo en el `.item` | Valor de un trigger |
+|---|---|---|
+| El **conector** | `connectorName` | `SUBJOB_OK`, `COMPONENT_OK`, `RUN_IF`... (el tipo del catalogo) |
+| El **nombre de la conexion** | `label` | `OnSubjobOk`, `OnComponentOk`, `If`... |
+
+Es decir, un trigger bien hecho se guarda asi:
+
+```xml
+<connection connectorName="SUBJOB_OK" label="OnSubjobOk" lineStyle="1"
+            metaname="tDBOutput_2" source="tDBOutput_2" target="tDBCommit_2">
+```
+
+Con `connectorName="OnSubjobOk"` (el nombre "bonito") pasan tres cosas en cadena:
+
+1. `Node.getConnectorFromName("OnSubjobOk")` devuelve `null`: la lista de conectores del nodo tiene
+   `SUBJOB_OK`, no `OnSubjobOk`. El `ConnectionCreateCommand` revienta con
+   `NullPointerException: nodeConnectorSource is null` (se ve en `.metadata/.log`), pero **despues** de haber
+   metido la conexion en el modelo.
+2. La conexion queda con `lineStyle="0"` (flujo de datos) y el `connectorName` que se le paso.
+3. El generador la trata como flujo: copia la fila del origen en un struct del destino que no tiene columnas y
+   el job no compila con `nombre cannot be resolved or is not a field`.
+
+El comando saca el tipo de la linea de
+`INodeConnector.getDefaultConnectionType()` del conector que se le pasa, asi que con el nombre del catalogo no
+hace falta tocar el estilo a mano. Los estilos que se han medido en el `.item`, por si hay que comprobarlos:
+
+| `lineStyle` | Tipo de conexion |
 |---|---|
-| `COMPONENT_ERROR` | `OnComponentError` |
-| `COMPONENT_OK` | `OnComponentOk` |
-| `SUBJOB_ERROR` | `OnSubjobError` |
-| `SUBJOB_OK` | `OnSubjobOk` |
-| `RUN_IF` | `If` |
-| `ITERATE` | `Iterate` |
+| 0 | `FLOW_MAIN` (`FLOW`) |
+| 1 | `ON_SUBJOB_OK` (`OnSubjobOk`) |
+| 4 | `ON_SUBJOB_ERROR` (`OnSubjobError`) |
 
-Con el tipo, el `ConnectionCreateCommand` acepta la conexion pero no la deja en el modelo: el job se guarda sin
-la conexion y el trigger nunca se dispara. Sin ningun error visible: el `connect` responde "ok".
+Ojo: el `lineStyle` **no** es el ordinal del enum (en `EConnectionType`, `ON_SUBJOB_OK` es el 3 y
+`ON_SUBJOB_ERROR` el 4). El enum tiene 24 constantes, y lo que va en el `connectorName` del `.item` es
+`getName()`, no `name()`:
 
-Ademas, los triggers **no son conexiones de datos**: no consumen la fila y su nombre no es `row1`. Por eso el
-nombre de la conexion de un trigger es el del conector (`OnComponentError`) y no el numerado de filas.
+| `name()` | `getName()` |
+|---|---|
+| `FLOW_MAIN` | `FLOW` |
+| `ON_SUBJOB_OK` | `SUBJOB_OK` |
+| `ON_SUBJOB_ERROR` | `SUBJOB_ERROR` |
+| `ON_COMPONENT_OK` | `COMPONENT_OK` |
+| `ON_COMPONENT_ERROR` | `COMPONENT_ERROR` |
+| `RUN_AFTER` | `AFTER` |
+| `RUN_IF` | `RUN_IF` |
+| `FLOW_REF` | `LOOKUP` |
+| `FLOW_MERGE` | `MERGE` |
+| `ITERATE` | `ITERATE` |
+
+Todos los nodos llevan los conectores de trigger en su lista (`SUBJOB_OK`, `SUBJOB_ERROR`, `COMPONENT_OK`,
+`COMPONENT_ERROR`, `RUN_IF`, `AFTER`...), aunque el componente no los use. Se consultan con
+`node.getListConnector()` (`getConnectors()` no existe) y cada uno trae `getName()`, `getBaseSchema()` y
+`getDefaultConnectionType()`.
 
 
 ## 41. El tAggregateRow: la primera tabla de metadata es la de salida
@@ -2290,3 +2334,87 @@ Select-String -Path <plugins>\...\components\tTeradataInput\TeradataInput_java.x
 ```
 
 Solo cuentan los `IMPORT` con `REQUIRED="true"` (los que llevan `REQUIRED_IF` son condicionales).
+
+## 53. Un trigger solo se genera si sale del **arranque** del subjob
+
+El generador de Studio emite la llamada al destino de un trigger dentro del metodo del **primer componente**
+del subjob (el que la plantilla reconoce con `INode.isDesignSubjobStartNode()`). Un trigger que sale de un
+componente de en medio del flujo **se guarda en el job, compila y no se ejecuta nunca**: no hay aviso, la
+conexion esta ahi con su `lineStyle="1"` y el destino simplemente no aparece en el `main` generado.
+
+Medido con tres jobs de dos o tres nodos:
+
+| Job | Conexion | Codigo generado |
+|---|---|---|
+| `tJava_2` -> `tJava_4` (`SUBJOB_OK`) | el origen es el arranque | `tJava_4Process(globalMap);` dentro de `tJava_2Process` |
+| `tFixedFlowInput` -> `tLogRow`, `tLogRow` -> `tJava` | el origen esta a mitad de flujo | nada; `tJava_2Process` no se llama en ningun sitio |
+| `tFixedFlowInput` -> `tLogRow`, **`tFixedFlowInput`** -> `tJava` | el origen es el arranque | `tJava_2Process(globalMap);` al final del metodo del subjob, despues del `tLogRow` |
+
+De ahi la regla practica: **el trigger se dibuja desde el primer componente del subjob**, no desde el ultimo.
+Para un commit explicito, el `tDBCommit` se cuelga del `tFixedFlowInput` (o del componente de arranque que sea),
+no del `tDBOutput`: la llamada se emite al final del subjob, cuando la escritura ya ha terminado.
+
+El bridge devuelve un aviso (`warnings`) cuando el origen de un trigger no es el arranque del subjob, porque el
+fallo es mudo.
+
+El otro detalle es el orden de las conexiones: el generador recorre las salidas del arranque y emite el flujo
+y el trigger en la misma pasada; por eso el nombre de la conexion del trigger (`OnSubjobOk`) no puede coincidir
+con el de la fila.
+
+### El destino de un trigger tiene que poder arrancar su propio subjob
+
+`ConnectionManager.canConnectToTarget` rechaza las conexiones `ON_SUBJOB_OK` y `ON_SUBJOB_ERROR` cuando el
+destino no es el arranque de su propio subjob:
+
+```java
+if (!target.getUniqueName().equals(target.getDesignSubjobStartNode().getUniqueName())) {
+  return false;
+}
+```
+
+Un `tFileOutputDelimited`, un `tDBOutput` o un `tLogRow` necesitan entrada, asi que no arrancan subjob: si se
+les cuelga el trigger directamente, **Studio no crea la conexion**. El patron correcto es colgar el trigger de
+un componente que pueda empezar subjob (`tFixedFlowInput`, `tJava`, `tDBCommit`...) y, si el manejador tiene que
+escribir o transformar, montar debajo un subjob normal (`tFixedFlowInput` -> `tFileOutputDelimited`).
+
+Y el rechazo es **mudo**: `CommandStack.execute` comprueba `canExecute()` y, si devuelve `false`, no hace nada y
+no lanza. Por eso el bridge ahora llama a `canExecute()` antes de ejecutar (y falla con un mensaje que explica
+el motivo) y despues comprueba que la conexion esta en el modelo (`target.getIncomingConnections()`); antes
+respondia `ok` sin haber conectado nada.
+
+### Un fallo no siempre dispara el trigger de error
+
+Medido con dos jobs iguales salvo el origen del fallo:
+
+| Fallo | Resultado |
+|---|---|
+| `tDie` en el flujo | el manejador de `SUBJOB_ERROR` corre y el job termina con codigo 1 |
+| `tFileInputDelimited` con un fichero que no existe | el job registra `[ERROR]`, **no** ejecuta el manejador y termina con codigo **0** |
+
+Para probar un trigger de error hace falta un fallo que lance de verdad (`tDie`, `tAssertCatcher`...). Un
+`tFileInputDelimited` sin fichero deja el subjob a medias sin pasar por el manejador.
+
+### El orden importa: primero los flujos, despues los triggers
+
+`canConnectToTarget` tambien rechaza un **flujo** cuando el arranque del subjob ya tiene un trigger de subjob
+(`ON_SUBJOB_OK`/`ON_SUBJOB_ERROR`) y el destino del flujo no puede arrancar subjob. Es decir: si primero se
+cuelga el trigger y despues se intenta conectar el flujo, la conexion de datos falla. Se montan primero las
+conexiones de datos y al final los triggers.
+
+## 54. Donde acaba el codigo generado de un job
+
+Hay dos sitios posibles y no depende del tipo de job sino del estado del proyecto Maven:
+
+| Carpeta | Cuando aparece |
+|---|---|
+| `poms/jobs/process/<JOB>/<job>_<version>/` | lo normal: el proyecto Maven del job esta montado y se genera ahi |
+| `PRJ_<PROYECTO>_<JOB>_<VERSION>/` (en la raiz del workspace, job en mayusculas) | el proyecto Maven del job existe pero esta **vacio**; el generador deja el codigo en un proyecto suelto con el mismo layout |
+
+En los dos casos el layout es el mismo (`src/main/java/<paquete>/<Job>.java`, `target/classes`,
+`target/classpath.jar`). Lo que cambia es donde hay que buscar el `classpath.jar` para relanzar el job a mano:
+si solo se mira `poms`, un job que se ha generado en el proyecto suelto "no esta compilado" aunque acabe de
+compilarse y ejecutarse desde el IDE.
+
+El sintoma tipico: en `poms/jobs/process/<JOB>/` hay una carpeta `mcp_<job>_0.1` vacia (sin `src` ni `target`)
+y el `MCP_<JOB>.java` esta en `PRJ_<PROYECTO>_MCP_<JOB>_0.1/src/main/java/...`.
+

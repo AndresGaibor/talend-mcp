@@ -19,6 +19,7 @@ import com.andres.talend.bridge.UiThread;
 import com.google.gson.JsonObject;
 
 import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspaceRoot;
 
 /**
  * Ejecuta un job ya generado y devuelve su salida.
@@ -159,26 +160,72 @@ public final class JobExecutor {
       if (iProject == null) {
         return null;
       }
-      org.eclipse.core.resources.IFolder root = iProject.getFolder("poms/jobs/process");
-      if (!root.exists()) {
-        return null;
-      }
       String normalized = name.toLowerCase().replace('-', '_') + "_" + version.replace('-', '_');
-      Path base = root.getLocation().toPath();
-      // Primero dentro de la carpeta del job, y luego en cualquier subcarpeta.
-      Path direct = base.resolve(name).resolve(normalized);
-      if (Files.isDirectory(direct)) {
-        return direct;
+      Path encontrada = null;
+      org.eclipse.core.resources.IFolder root = iProject.getFolder("poms/jobs/process");
+      if (root.exists()) {
+        Path base = root.getLocation().toPath();
+        // Primero dentro de la carpeta del job, y luego en cualquier subcarpeta.
+        Path direct = base.resolve(name).resolve(normalized);
+        if (Files.isDirectory(direct)) {
+          encontrada = direct;
+        }
+        if (encontrada == null) {
+          encontrada = search(base, normalized, 3);
+        }
+        if (encontrada == null) {
+          encontrada = search(base, name + "_" + version, 3);
+        }
       }
-      Path found = search(base, normalized, 3);
-      if (found != null) {
-        return found;
+      if (compilada(encontrada)) {
+        return encontrada;
       }
-      return search(base, name + "_" + version, 3);
+      // Studio tambien genera en un proyecto suelto del workspace,
+      // `PRJ_<PROYECTO>_<JOB>_<VERSION>`, cuando el job no tiene su proyecto
+      // poms montado: ahi deja el `target/classpath.jar` que hace falta para
+      // relanzarlo.
+      Path suelta = generatedProject(iProject, name, version);
+      if (suelta != null) {
+        return suelta;
+      }
+      return encontrada;
     } catch (Exception e) {
       BridgeLog.warn("No se pudo localizar la carpeta del job '" + name + "'", e);
       return null;
     }
+  }
+
+  /** Si la carpeta tiene el job compilado. */
+  private static boolean compilada(Path folder) {
+    return folder != null && Files.isRegularFile(folder.resolve("target").resolve("classpath.jar"));
+  }
+
+  /**
+   * Proyecto de codigo generado suelto del job, si lo hay.
+   *
+   * Se llama `PRJ_<PROYECTO>_<JOB>_<VERSION>`, con el job en mayusculas.
+   */
+  private static Path generatedProject(IProject iProject, String name, String version) {
+    try {
+      String suffix = "_" + name.toUpperCase().replace('-', '_') + "_" + version.replace('-', '_');
+      IWorkspaceRoot workspace = iProject.getWorkspace().getRoot();
+      for (IProject candidate : workspace.getProjects()) {
+        String label = candidate.getName();
+        if (!label.startsWith("PRJ_") || !label.endsWith(suffix)) {
+          continue;
+        }
+        if (candidate.getLocation() == null) {
+          continue;
+        }
+        Path path = candidate.getLocation().toPath();
+        if (compilada(path)) {
+          return path;
+        }
+      }
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo buscar el proyecto generado de '" + name + "'", e);
+    }
+    return null;
   }
 
   /** Busca una carpeta por nombre, con una profundidad maxima. */

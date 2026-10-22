@@ -665,37 +665,50 @@
       "job": "MCP_L5_Trigger",
       "nodos": [
         {
-          "type": "tFileInputDelimited",
+          "type": "tFixedFlowInput",
           "nombre": "lector",
-          "parameters": {
-            "FILENAME": {
-              "value": "@TESTDATA@/no_existe_este_fichero.csv"
-            },
-            "FIELDSEPARATOR": {
-              "value": ";"
-            },
-            "HEADER": {
-              "value": "1"
-            }
-          },
           "columnas": [
-            {
-              "name": "id",
-              "type": "id_Integer"
-            },
             {
               "name": "nombre",
               "type": "id_String"
             }
+          ],
+          "values": [
+            [
+              "Ana"
+            ]
           ]
         },
         {
-          "type": "tLogRow",
-          "nombre": "normal"
+          "type": "tDie",
+          "nombre": "corta",
+          "parameters": {
+            "MESSAGE": {
+              "value": "el job se corta a proposito"
+            },
+            "EXIT_JVM": {
+              "value": "false"
+            }
+          }
+        },
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "manejador",
+          "columnas": [
+            {
+              "name": "estado",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "fallo al procesar"
+            ]
+          ]
         },
         {
           "type": "tFileOutputDelimited",
-          "nombre": "manejador",
+          "nombre": "escribe",
           "parameters": {
             "FILENAME": {
               "value": "@TESTDATA@/l5_trigger.txt"
@@ -709,18 +722,25 @@
       "conexiones": [
         {
           "origen": "lector",
-          "destino": "normal"
+          "destino": "corta"
         },
         {
-          "origen": "normal",
+          "origen": "manejador",
+          "destino": "escribe"
+        },
+        {
+          "origen": "lector",
           "destino": "manejador",
-          "tipo": "COMPONENT_ERROR"
+          "tipo": "SUBJOB_ERROR"
         }
       ],
       "espera": {
         "error_esperado": true,
         "fichero": {
-          "ruta": "@TESTDATA@/l5_trigger.txt"
+          "ruta": "@TESTDATA@/l5_trigger.txt",
+          "contiene": [
+            "fallo al procesar"
+          ]
         }
       }
     },
@@ -1264,6 +1284,11 @@
     {
       "nombre": "bases de datos: leer de un Postgres",
       "job": "MCP_L5_Postgres",
+      "prepara": [
+        "DROP TABLE IF EXISTS clientes CASCADE",
+        "CREATE TABLE clientes (id integer, nombre varchar(80), ciudad varchar(80), monto numeric(12,2))",
+        "INSERT INTO clientes VALUES (1, 'Ana María Núñez', 'Bogotá', 1500.50), (2, 'José Cañizares', 'Medellín', 2300.00), (3, 'Lucía Peña', 'Cali', 1850.00), (4, 'Pedro Ñoño', 'Barranquilla', 875.25), (5, 'María José Muñoz', 'Bogotá', 3210.75), (6, 'Andrés Villalba', 'Cartagena', 999.99), (7, 'Camila Gómez', 'Bucaramanga', 0.00), (8, 'Sin nombre', 'Pereira', 450.00), (9, 'Tomás O''Brien', 'Santa Marta', 1250.00), (10, 'Sofía Ramírez', 'Bogotá', 750.25)"
+      ],
       "nodos": [
         {
           "type": "tPostgresqlConnection",
@@ -1779,6 +1804,333 @@
         "lineas": [
           "1|Bogota",
           "2|Medellin"
+        ]
+      }
+    },
+    {
+      "nombre": "bases de datos: actualizar con clave y commit explicito",
+      "job": "MCP_L5_Actualiza",
+      "prepara": [
+        "DROP TABLE IF EXISTS l5_update",
+        "CREATE TABLE l5_update (id integer, nombre varchar(50))",
+        "INSERT INTO l5_update VALUES (1, 'Ana'), (2, 'Jose')"
+      ],
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "2",
+              "Jose Actualizado"
+            ]
+          ]
+        },
+        {
+          "type": "tPostgresqlConnection",
+          "nombre": "conexion",
+          "parameters": {
+            "HOST": {
+              "value": "localhost"
+            },
+            "PORT": {
+              "value": "5433"
+            },
+            "USER": {
+              "value": "talend"
+            },
+            "PASS": {
+              "value": "talend"
+            },
+            "DBNAME": {
+              "value": "talend_test"
+            },
+            "AUTO_COMMIT": {
+              "value": "false"
+            }
+          }
+        },
+        {
+          "type": "tPostgresqlOutput",
+          "nombre": "actualiza",
+          "parameters": {
+            "USE_EXISTING_CONNECTION": {
+              "value": "true"
+            },
+            "CONNECTION": {
+              "value": "@uniqueName:conexion",
+              "literal": false
+            },
+            "TABLE": {
+              "value": "l5_update"
+            },
+            "TABLE_ACTION": {
+              "value": "NONE"
+            },
+            "USE_FIELD_OPTIONS": {
+              "value": "true"
+            },
+            "DATA_ACTION": {
+              "value": "UPDATE"
+            },
+            "MAPPING": {
+              "value": "PostgreSQL"
+            },
+            "END_OF_FLOW": {
+              "value": "false"
+            }
+          },
+          "tablas": {
+            "FIELD_OPTIONS": {
+              "columns": [
+                "SCHEMA_COLUMN",
+                "UPDATE_KEY",
+                "DELETE_KEY",
+                "UPDATABLE",
+                "INSERTABLE"
+              ],
+              "rows": [
+                {
+                  "SCHEMA_COLUMN": "id",
+                  "UPDATE_KEY": "true",
+                  "DELETE_KEY": "false",
+                  "UPDATABLE": "false",
+                  "INSERTABLE": "false"
+                },
+                {
+                  "SCHEMA_COLUMN": "nombre",
+                  "UPDATE_KEY": "false",
+                  "DELETE_KEY": "false",
+                  "UPDATABLE": "true",
+                  "INSERTABLE": "true"
+                }
+              ]
+            }
+          },
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer",
+              "sourceType": "INT4"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String",
+              "sourceType": "VARCHAR"
+            }
+          ],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tPostgresqlCommit",
+          "nombre": "confirma",
+          "parameters": {
+            "CONNECTION": {
+              "value": "@uniqueName:conexion",
+              "literal": false
+            },
+            "CLOSE": {
+              "value": "false"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "actualiza"
+        },
+        {
+          "origen": "entrada",
+          "destino": "confirma",
+          "tipo": "SUBJOB_OK"
+        }
+      ],
+      "espera": {
+        "consulta": {
+          "sql": "SELECT nombre FROM l5_update WHERE id = 2",
+          "valor": "Jose Actualizado"
+        }
+      }
+    },
+    {
+      "nombre": "bases de datos: borrar con clave",
+      "job": "MCP_L5_Borra",
+      "prepara": [
+        "DROP TABLE IF EXISTS l5_borra",
+        "CREATE TABLE l5_borra (id integer, nombre varchar(50))",
+        "INSERT INTO l5_borra VALUES (1, 'Ana'), (2, 'Jose'), (3, 'Lucia')"
+      ],
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            }
+          ],
+          "values": [
+            [
+              "2"
+            ]
+          ]
+        },
+        {
+          "type": "tPostgresqlConnection",
+          "nombre": "conexion",
+          "parameters": {
+            "HOST": {
+              "value": "localhost"
+            },
+            "PORT": {
+              "value": "5433"
+            },
+            "USER": {
+              "value": "talend"
+            },
+            "PASS": {
+              "value": "talend"
+            },
+            "DBNAME": {
+              "value": "talend_test"
+            },
+            "AUTO_COMMIT": {
+              "value": "true"
+            }
+          }
+        },
+        {
+          "type": "tPostgresqlOutput",
+          "nombre": "borra",
+          "parameters": {
+            "USE_EXISTING_CONNECTION": {
+              "value": "true"
+            },
+            "CONNECTION": {
+              "value": "@uniqueName:conexion",
+              "literal": false
+            },
+            "TABLE": {
+              "value": "l5_borra"
+            },
+            "TABLE_ACTION": {
+              "value": "NONE"
+            },
+            "USE_FIELD_OPTIONS": {
+              "value": "true"
+            },
+            "DATA_ACTION": {
+              "value": "DELETE"
+            },
+            "MAPPING": {
+              "value": "PostgreSQL"
+            },
+            "END_OF_FLOW": {
+              "value": "false"
+            }
+          },
+          "tablas": {
+            "FIELD_OPTIONS": {
+              "columns": [
+                "SCHEMA_COLUMN",
+                "UPDATE_KEY",
+                "DELETE_KEY",
+                "UPDATABLE",
+                "INSERTABLE"
+              ],
+              "rows": [
+                {
+                  "SCHEMA_COLUMN": "id",
+                  "UPDATE_KEY": "false",
+                  "DELETE_KEY": "true",
+                  "UPDATABLE": "false",
+                  "INSERTABLE": "false"
+                }
+              ]
+            }
+          },
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer",
+              "sourceType": "INT4"
+            }
+          ],
+          "schemaDespuesDeConectar": true
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "borra"
+        }
+      ],
+      "espera": {
+        "consulta": {
+          "sql": "SELECT count(*)::int FROM l5_borra",
+          "valor": 2
+        }
+      }
+    },
+    {
+      "nombre": "control de flujo: un tDie corta el job",
+      "job": "MCP_L5_Die",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "1",
+              "Ana"
+            ]
+          ]
+        },
+        {
+          "type": "tDie",
+          "nombre": "corta",
+          "parameters": {
+            "MESSAGE": {
+              "value": "el job se corta a proposito"
+            },
+            "EXIT_JVM": {
+              "value": "false"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "corta"
+        }
+      ],
+      "espera": {
+        "error_esperado": true,
+        "contiene": [
+          "el job se corta a proposito"
         ]
       }
     }

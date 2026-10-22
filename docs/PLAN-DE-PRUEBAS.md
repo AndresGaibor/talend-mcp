@@ -41,13 +41,13 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 | 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**. **Se ejecutan bien** el `tUniqRow`, el `tSortRow`, el `tFilterRow` (con su condicion), el `tUnite`, el `tAggregateRow` (con sus tablas `GROUPBYS` y `OPERATIONS`; ver INTERNALS 41) y el `tNormalize` (que parte una columna en filas; la entrada y la salida tienen que declarar las columnas con el mismo nombre). Sin probar: `tJoin`, `tReplicate`, `tDenormalize` y `tFilterColumns` |
 | 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`) y con el `tJavaRow` cuya salida la define el parametro `SCHEMA` (el escenario L5, que aplica el esquema despues de conectar) |
 | 5 | Excel, posicional, JSON, Parquet | **Validada**: la **lectura** de JSON (`tFileInputJSON`) compila y se ejecuta con la salida esperada (la raiz del bucle va en `JSON_LOOP_QUERY` y el mapeo en la tabla `MAPPING_JSONPATH`; ver INTERNALS 48), y la **escritura** de JSON funciona (el `tFileOutputJSON` escribe las filas). `tFileInputPositional`: el `.item` es correcto |
-| 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes), y el `tFileList` lista la carpeta (no emite filas: deja los valores en el `globalMap`; ver INTERNALS 47). Sin probar: `tDie` |
-| 7 | Bases de datos (`tDB*`, commit/rollback, insert/update/delete) | **Parcial**: el `tPostgresqlInput` lee del Postgres de pruebas y la salida es la esperada, y el `tPostgresqlOutput` **escribe y se verifica** (con `AUTO_COMMIT=true` en la conexion y **sin** componente de commit; ver INTERNALS 45). Sin probar: el commit/rollback explicito (`tPostgresqlCommit`/`tPostgresqlRollback`) y las demas acciones de salida |
+| 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes), el `tFileList` lista la carpeta (no emite filas: deja los valores en el `globalMap`; ver INTERNALS 47), el `tDie` corta el job con codigo 1 y un trigger de error (`SUBJOB_ERROR` desde el arranque del subjob) ejecuta su manejador. Un trigger se genera solo si sale del **arranque** del subjob y su destino tiene que poder arrancar subjob (INTERNALS 53). Sin probar: `tPrejob`/`tPostjob` y `tWarn` |
+| 7 | Bases de datos (`tDB*`, commit/rollback, insert/update/delete) | **Casi entera**: el `tPostgresqlInput` lee del Postgres de pruebas con la salida esperada, el `tPostgresqlOutput` **escribe y se verifica**, **actualiza con clave** (`UPDATE_KEY`) **y hace commit explicito** (`tPostgresqlCommit` colgado con `OnSubjobOk` del arranque del subjob, con `AUTO_COMMIT=false` en la conexion) y **borra con clave** (`DELETE_KEY`). Sin probar: el rollback explicito (`tPostgresqlRollback`) y las demas acciones de salida |
 | 8 | Migracion de un programa SAS real, comparado fila por fila | **Pendiente** |
 | 9 | Robustez | Validada: componente inexistente da error claro; repetir la instruccion no duplica componentes; 16 componentes y 60 columnas |
 
-Orden recomendado para lo que falta: el commit/rollback explicito y las demas acciones de salida (la 7),
-el `tDie` (la 6) y la 8 (la migracion de SAS).
+Orden recomendado para lo que falta: el rollback explicito (la 7), `tPrejob`/`tPostjob` y `tWarn` (la 6) y la 8
+(la migracion de SAS).
 
 ## Plantilla de resultados
 
@@ -263,7 +263,7 @@ Esto es lo que hace lento el catalogo completo: no es la medicion, es la red.
 
 Esto es L1/L2/L3/L4 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista,
 acepte configuracion, se pueda conectar y compile. **No** dice que ejecute bien: eso es L5, y esta validado en
-**20 escenarios** con la salida verificada.
+**23 escenarios** con la salida verificada.
 
 ## Ejecucion con la salida esperada (L5)
 
@@ -295,7 +295,7 @@ docker compose -f testdata/docker-compose.yml up -d
 | dos `tFileInputDelimited` -> `tUnite` -> `tLogRow` | Correcto: salen las ocho filas (las dos fuentes) |
 | `tFileInputDelimited` -> `tMap` -> `tLogRow` | Correcto: el `tMap` renombra la columna con `toUpperCase()` y filtra por monto (`2\|JOSE`, `3\|LUCIA`). El modelo del `tMap` (entradas, salidas con sus expresiones y filtros) lo monta el arnes con el `mapper` del bridge |
 | `tFixedFlowInput` -> `tFileOutputJSON` | Correcto: el JSON escrito tiene las filas |
-| `tFileInputDelimited` (fichero que no existe) -> `tLogRow` -> trigger de error -> `tFileOutputDelimited` | Correcto: el trigger se dispara y el manejador escribe su fichero (ver INTERNALS 40) |
+| `tFixedFlowInput` -> `tDie`, con `SUBJOB_ERROR` desde el arranque hacia un manejador (`tFixedFlowInput` -> `tFileOutputDelimited`) | Correcto: el `tDie` corta el job con codigo 1 y el manejador escribe su fichero. Un fallo que no lanza (un `tFileInputDelimited` sin fichero) **no** dispara el manejador (ver INTERNALS 53) |
 | `tPrejob` -> `tRunJob` (hijo) -> `tPostjob` | Correcto: el padre llama al hijo y su salida sale en la del padre |
 | `tPostgresqlConnection` -> `tPostgresqlInput` -> `tLogRow` | Correcto: lee las diez filas del Postgres de pruebas (ver INTERNALS 35) |
 | contextos: crear un entorno y sus variables | Correcto: el job tiene los dos entornos con sus valores. El `tContextLoad` no saca filas (necesita su `nodeData` con la lista de variables a cargar), asi que el valor se comprueba en el modelo |
@@ -307,9 +307,13 @@ docker compose -f testdata/docker-compose.yml up -d
 | `tFileList` (suelto) + `tJavaRow` que lee el `globalMap` -> `tLogRow` | Correcto: el `tFileList` lista la carpeta y el `tJavaRow` saca el nombre del fichero del `globalMap` (`<uniqueName>_CURRENT_FILE`); el `tFileList` no emite filas (ver INTERNALS 47) |
 | `tRowGenerator` -> `tLogRow` | Correcto: genera tres filas con el valor de su tabla `VALUES` (`Ana`, `Ana`, `Ana`) |
 | `tFixedFlowInput` -> `tFilterColumns` -> `tLogRow` | Correcto: se queda solo con las columnas del esquema del `tFilterColumns` (`1\|Bogota`, `2\|Medellin`) |
+| `tPostgresqlConnection` -> `tPostgresqlOutput` (`ACTION=UPDATE`, `UPDATE_KEY`) + `tPostgresqlCommit` con `OnSubjobOk` desde el arranque del subjob | Correcto: la consulta de comprobacion devuelve el valor nuevo. La conexion va con `AUTO_COMMIT=false` y el commit se cuelga **del arranque** del subjob, no del output: Studio solo genera los triggers que salen del primer componente (INTERNALS 53) |
+| `tPostgresqlConnection` -> `tPostgresqlOutput` (`ACTION=DELETE`, `DELETE_KEY`) | Correcto: la fila con esa clave desaparece y el resto sigue |
+| `tFixedFlowInput` -> `tDie` | Correcto: el job termina con codigo 1 y el mensaje del `tDie` |
 
-**Veinte escenarios en verde (los 20 pasan) y ninguno pendiente.** Los dos ultimos son el generador de
-filas (`tRowGenerator`) y el filtro de columnas (`tFilterColumns`); antes se desbloquearon el de la
+**Veintitres escenarios en verde (los 23 pasan) y ninguno pendiente.** Los tres ultimos son el commit explicito
+con `OnSubjobOk` (`tPostgresqlCommit`), el borrado con clave (`DELETE_KEY`) y el `tDie`; antes se anadieron el
+generador de filas (`tRowGenerator`) y el filtro de columnas (`tFilterColumns`); antes se desbloquearon el de la
 lectura de JSON (el `tFileInputJSON`) y el del listado de ficheros (el `tFileList`);
 los dos anteriores fueron el del `tJavaRow` y el del `tNormalize`. Antes de ellos ya estaban el del
 `tAggregateRow` (que se ejecuta con su formato real de tabla, INTERNALS 41) y el de escritura en Postgres

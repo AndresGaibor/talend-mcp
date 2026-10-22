@@ -179,24 +179,59 @@ public final class NodeOperations {
     // puede ir vacia. Son el nombre del schema de la conexion, el nombre de
     // la conexion y la metadata que viaja.
     List<Object> meta = new ArrayList<>();
+    // El nombre se calcula una sola vez: para un flujo, cada llamada busca el
+    // siguiente `rowN` libre, y pedirlo dos veces deja la conexion con un
+    // nombre y el estilo aplicado a otro.
+    String nombreConexion = connectionNameOf(spec, process, target);
     meta.add(sourceName);
-    meta.add(connectionNameOf(spec, process, target));
+    meta.add(nombreConexion);
     meta.add(null);
 
     Class<?> commandClass = TalendClasses
         .load("org.talend.designer.core.ui.editor.cmd.ConnectionCreateCommand");
+    // El conector va con el nombre del catalogo (`SUBJOB_OK`, `COMPONENT_OK`):
+    // es el que existe en la lista de conectores del nodo. `OnSubjobOk` es la
+    // etiqueta de la conexion, no el conector, y con ella el comando falla
+    // (`nodeConnectorSource is null`) y la linea queda como flujo de datos.
+    String conector = connectorOf(spec);
+    boolean trigger = isTriggerConnector(conector);
     Object command = commandClass
         .getConstructor(TalendClasses.load("org.talend.designer.core.ui.editor.nodes.Node"),
             String.class, List.class)
-        .newInstance(source, connectorNameOf(spec), meta);
+        .newInstance(source, conector, meta);
     commandClass.getMethod("setTarget", TalendClasses.load("org.talend.designer.core.ui.editor.nodes.Node"))
         .invoke(command, target);
     // La conexion se ejecuta por el command stack, igual que cuando se
     // arrastra con el raton. Si se llama a `execute()` directamente el
     // editor no se marca como modificado y el guardado se salta la
     // conexion.
+    //
+    // El `commandStack` mira `canExecute()` antes de ejecutar, y si el
+    // comando dice que no, **no hace nada y no avisa**. Por eso se comprueba
+    // antes: un trigger de subjob solo puede apuntar a un componente que
+    // pueda arrancar su propio subjob.
+    Object puedeEjecutar = commandClass.getMethod("canExecute").invoke(command);
+    if (!Boolean.TRUE.equals(puedeEjecutar)) {
+      throw new IllegalStateException("Studio rechaza la conexion " + sourceName + " -> " + targetName
+          + " con el conector " + conector + ":"
+          + (trigger
+              ? " el destino no puede arrancar un subjob propio (un trigger solo apunta a un componente de"
+                  + " arranque; si el destino necesita entrada, el trigger va al arranque de ese subjob)"
+              : " revisa que el conector exista en el origen y que el destino lo acepte"));
+    }
     Object commandStack = editor.getClass().getMethod("getCommandStack").invoke(editor);
     commandStack.getClass().getMethod("execute", Command.class).invoke(commandStack, command);
+    if (trigger) {
+      // El comando deberia dejar el estilo del trigger, pero se fija aqui
+      // igualmente: una linea de trigger marcada como flujo hace que el
+      // generador copie la fila del origen en un struct del destino sin
+      // columnas y el job no compila.
+      setConnectionType(target, nombreConexion, conector);
+    }
+    if (!conectado(target, nombreConexion)) {
+      throw new IllegalStateException("Studio acepto la conexion " + sourceName + " -> " + targetName
+          + " pero no la dejo en el modelo; el job se guardaria sin ella");
+    }
     TalendApi.markModified(process);
     JobPersistence.persist(process);
 
@@ -204,7 +239,106 @@ public final class NodeOperations {
     result.put("source", sourceName);
     result.put("target", targetName);
     result.put("connector", connectorOf(spec));
+    if (trigger && !esArranqueDeSubjob(source)) {
+      // Studio genera la llamada al destino de un trigger dentro del metodo
+      // del **primer** componente del subjob. Si la conexion sale de un
+      // componente de en medio del flujo, la conexion se guarda pero el
+      // generador no la emite y el destino no se ejecuta nunca.
+      result.put("warnings", List.of(
+          "El trigger sale de '" + sourceName + "', que no es el primer componente del subjob:"
+              + " Studio lo guarda pero no genera la llamada, asi que '" + targetName
+              + "' no se ejecutaria. Conectalo desde el arranque del subjob."));
+    }
     return result;
+  }
+
+  /** Si el nodo es el arranque del subjob en el diseno (no un componente de en medio). */
+  private static boolean esArranqueDeSubjob(Object node) {
+    Object valor = TalendApi.invokeOrNull(node, "isDesignSubjobStartNode");
+    return Boolean.TRUE.equals(valor);
+  }
+
+  /**
+   * Si el nodo destino ya tiene esa conexion entrante.
+   *
+   * El command stack no avisa cuando se salta un comando que no puede
+   * ejecutar, asi que despues de conectar se comprueba en el modelo.
+   */
+  private static boolean conectado(Object target, String nombre) {
+    Object conexiones = TalendApi.invokeOrNull(target, "getIncomingConnections");
+    if (!(conexiones instanceof Iterable)) {
+      return false;
+    }
+    for (Object conexion : (Iterable<?>) conexiones) {
+      Object actual = TalendApi.invokeOrNull(conexion, "getName");
+      if (actual != null && nombre.equals(String.valueOf(actual))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Deja la conexion con el estilo de linea que le corresponde.
+   *
+   * El comando ya crea la conexion con el conector del catalogo, pero el
+   * estilo de la linea se fija aqui como red de seguridad: una conexion de
+   * trigger marcada como flujo hace que el generador copie la fila del origen
+   * en un struct del destino sin columnas. Los estilos son los del IDE: 0
+   * flujo, 1 OnSubjobOk, 2 OnSubjobError, 3 OnComponentOk, 4 OnComponentError,
+   * 6 If, 7 Iterate.
+   */
+  private static void setConnectionType(Object target, String connectionName, String connector) {
+    String tipo = switch (connector) {
+      case "OnSubjobOk", "SUBJOB_OK" -> "ON_SUBJOB_OK";
+      case "OnSubjobError", "SUBJOB_ERROR" -> "ON_SUBJOB_ERROR";
+      case "OnComponentOk", "COMPONENT_OK" -> "ON_COMPONENT_OK";
+      case "OnComponentError", "COMPONENT_ERROR" -> "ON_COMPONENT_ERROR";
+      case "OnRowsEnd", "ROWS_END" -> "ON_ROWS_END";
+      case "If", "RUN_IF" -> "RUN_IF";
+      case "Iterate", "ITERATE" -> "ITERATE";
+      case "Reject", "REJECT" -> "REJECT";
+      default -> "FLOW_MAIN";
+    };
+    Object conexiones;
+    try {
+      conexiones = target.getClass().getMethod("getIncomingConnections").invoke(target);
+    } catch (Exception e) {
+      return;
+    }
+    if (!(conexiones instanceof Iterable)) {
+      return;
+    }
+    Class<?> clase;
+    try {
+      clase = TalendClasses.load("org.talend.core.model.process.EConnectionType");
+    } catch (Exception e) {
+      return;
+    }
+    Object valor = null;
+    for (Object candidato : clase.getEnumConstants()) {
+      if (tipo.equals(((Enum<?>) candidato).name())) {
+        valor = candidato;
+      }
+    }
+    if (valor == null) {
+      return;
+    }
+    for (Object conexion : (Iterable<?>) conexiones) {
+      Object nombre = TalendApi.invokeOrNull(conexion, "getName");
+      if (nombre == null || !connectionName.equals(String.valueOf(nombre))) {
+        continue;
+      }
+      // Solo el estilo: el `connectorName` ya lo pone el comando con el
+      // nombre del catalogo (`SUBJOB_OK`). Renombrarlo a `OnSubjobOk` deja la
+      // conexion apuntando a un conector que no existe en el nodo origen, y
+      // ademas revienta la figura de la linea.
+      try {
+        conexion.getClass().getMethod("setLineStyle", clase).invoke(conexion, valor);
+      } catch (Exception e) {
+        BridgeLog.warn("No se pudo tipar la conexion " + connector, e);
+      }
+    }
   }
 
   /**
@@ -444,10 +578,50 @@ public final class NodeOperations {
       if (generated == null) {
         return;
       }
-      parameter.getClass().getMethod("setValue", Object.class)
-          .invoke(parameter, String.valueOf(generated));
+      String nombre = String.valueOf(generated);
+      parameter.getClass().getMethod("setValue", Object.class).invoke(parameter, nombre);
+      // La etiqueta del nodo es la que Studio usa para nombrar su tabla de
+      // metadata. Si se queda con la de fabrica (`tDBOutput_1`) y el nombre
+      // unico es otro (`tDBOutput_2`), la conexion se cuelga de la tabla vieja:
+      // el job compila con un struct vacio o falla con "columna cannot be
+      // resolved or is not a field". En el IDE etiqueta y nombre unico
+      // coinciden, asi que aqui se igualan.
+      Object etiqueta = TalendApi.invokeOrNull(node, "getLabel");
+      String anterior = etiqueta == null ? "" : String.valueOf(etiqueta);
+      node.getClass().getMethod("setLabel", String.class).invoke(node, nombre);
+      renameTablesOf(node, anterior, nombre);
     } catch (Exception e) {
       BridgeLog.warn("No se pudo asignar el nombre unico al nodo", e);
+    }
+  }
+
+  /**
+   * Renombra las tablas de metadata que se llamaban como la etiqueta vieja.
+   *
+   * El resto (REJECT...) conserva su nombre.
+   */
+  private static void renameTablesOf(Object node, String anterior, String nuevo) {
+    if (anterior.isEmpty() || anterior.equals(nuevo)) {
+      return;
+    }
+    Object tablas;
+    try {
+      tablas = node.getClass().getMethod("getMetadataList").invoke(node);
+    } catch (Exception e) {
+      return;
+    }
+    if (!(tablas instanceof Iterable)) {
+      return;
+    }
+    for (Object tabla : (Iterable<?>) tablas) {
+      try {
+        Object nombre = tabla.getClass().getMethod("getTableName").invoke(tabla);
+        if (nombre != null && anterior.equals(String.valueOf(nombre))) {
+          tabla.getClass().getMethod("setTableName", String.class).invoke(tabla, nuevo);
+        }
+      } catch (Exception e) {
+        // Tabla sin nombre: se deja como esta.
+      }
     }
   }
 
@@ -605,18 +779,6 @@ public final class NodeOperations {
     // llama rowN: ese nombre es la variable de la fila en el codigo
     // generado, y las tablas de los componentes la referencian ("row1.monto").
     return uniqueFlowName(process);
-  }
-
-  /**
-   * Nombre del conector, con la convencion de Studio.
-   *
-   * Los triggers se llaman `OnComponentOk`, `OnComponentError`, `If`... y no
-   * con el tipo del catalogo (`COMPONENT_OK`, `COMPONENT_ERROR`...): con el
-   * tipo, Studio no crea la conexion.
-   */
-  private static String connectorNameOf(JsonObject spec) {
-    String connector = connectorOf(spec);
-    return isTriggerConnector(connector) ? triggerName(connector) : connector;
   }
 
   /** Los triggers (OnComponentOk, If...) no son conexiones de datos. */

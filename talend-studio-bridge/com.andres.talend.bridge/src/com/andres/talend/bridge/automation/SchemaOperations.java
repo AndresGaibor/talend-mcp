@@ -52,13 +52,44 @@ public final class SchemaOperations {
       actuales.addAll((List<?>) listaActual);
     }
     Object existente = tableNamed(actuales, uniqueName);
+    if (existente == null) {
+      // Studio crea en el nodo una tabla FLOW con el nombre del componente
+      // recien soltado (`tDBOutput_1`) y la conexion se queda apuntando a ella.
+      // Si se crea otra tabla con el nombre del nodo, el flujo sigue leyendo la
+      // vieja: el `tDBOutput` con UPDATE/DELETE genera codigo contra un struct
+      // vacio y falla con "nombre cannot be resolved or is not a field".
+      // Por eso se reutiliza la que ya existe y se renombra.
+      existente = tableOfConnector(actuales, connectorName(spec));
+    }
+    Object columnas = table.getClass().getMethod("getListColumns").invoke(table);
     if (existente != null) {
-      existente.getClass().getMethod("setListColumns", List.class)
-          .invoke(existente, table.getClass().getMethod("getListColumns").invoke(table));
+      existente.getClass().getMethod("setListColumns", List.class).invoke(existente, columnas);
+      existente.getClass().getMethod("setTableName", String.class).invoke(existente, uniqueName);
       table = existente;
     }
-    node.getClass().getMethod("setMetadataList", List.class)
-        .invoke(node, new ArrayList<Object>(java.util.Collections.singletonList(table)));
+    // Las tablas de otros conectores (REJECT...) se conservan; las FLOW que
+    // sobren se rellenan con las mismas columnas, para que el flujo lea la que
+    // lea, el schema este completo.
+    List<Object> tablas = new ArrayList<>();
+    tablas.add(table);
+    String conector = connectorName(spec);
+    for (Object otra : actuales) {
+      if (otra == table) {
+        continue;
+      }
+      Object cuelgaDe = otra.getClass().getMethod("getAttachedConnector").invoke(otra);
+      String de = cuelgaDe == null ? "" : String.valueOf(cuelgaDe);
+      if (de.equals(conector)) {
+        otra.getClass().getMethod("setListColumns", List.class).invoke(otra, columnas);
+      }
+      tablas.add(otra);
+    }
+    node.getClass().getMethod("setMetadataList", List.class).invoke(node, tablas);
+    // La conexion de entrada tiene su propia tabla de metadata, y puede ser la
+    // vieja (la que Studio creo al soltar el componente, con otro nombre). Si
+    // se queda vacia, el generador arma la fila de entrada sin columnas: el
+    // job no compila ("nombre cannot be resolved or is not a field").
+    syncIncomingConnections(node, conector, columnas);
 
     // Los componentes con schema fijo guardan los datos en una tabla: sin
     // ella el job se ejecuta pero no saca datos.
@@ -72,6 +103,75 @@ public final class SchemaOperations {
     result.put("uniqueName", uniqueName);
     result.put("columns", JsonSpec.arrayOf(spec, "columns").size());
     return result;
+  }
+
+  /**
+   * La tabla del nodo que cuelga de ese conector, si la hay.
+   *
+   * Cuando hay varias con el mismo conector (Studio deja una vacia con el
+   * nombre del componente al soltarlo), se prefiere la que ya tiene columnas.
+   */
+  private static Object tableOfConnector(List<Object> tables, String connector) {
+    Object vacia = null;
+    for (Object table : tables) {
+      String de;
+      try {
+        Object attached = table.getClass().getMethod("getAttachedConnector").invoke(table);
+        de = attached == null ? "" : String.valueOf(attached);
+      } catch (Exception e) {
+        continue;
+      }
+      if (!connector.equals(de)) {
+        continue;
+      }
+      try {
+        Object columns = table.getClass().getMethod("getListColumns").invoke(table);
+        if (columns instanceof List && !((List<?>) columns).isEmpty()) {
+          return table;
+        }
+      } catch (Exception e) {
+        // Sin columnas legibles: se guarda como ultimo recurso.
+      }
+      if (vacia == null) {
+        vacia = table;
+      }
+    }
+    return vacia;
+  }
+
+  /**
+   * Copia las columnas a la tabla de las conexiones de entrada del conector.
+   *
+   * Studio crea la tabla de la conexion al conectar y la deja apuntando a la
+   * metadata que el nodo tenia en ese momento. Si despues se sustituye la del
+   * nodo, la conexion sigue con la vieja: hay que rellenarla tambien, o el
+   * codigo generado lee columnas que no existen.
+   */
+  private static void syncIncomingConnections(Object node, String connector, Object columnas) {
+    Object conexiones;
+    try {
+      conexiones = node.getClass().getMethod("getIncomingConnections").invoke(node);
+    } catch (Exception e) {
+      return;
+    }
+    if (!(conexiones instanceof Iterable)) {
+      return;
+    }
+    for (Object conexion : (Iterable<?>) conexiones) {
+      Object tipo = TalendApi.invokeOrNull(conexion, "getConnectorName");
+      if (tipo != null && !connector.equals(String.valueOf(tipo))) {
+        continue;
+      }
+      Object tabla = TalendApi.invokeOrNull(conexion, "getMetadataTable");
+      if (tabla == null) {
+        continue;
+      }
+      try {
+        tabla.getClass().getMethod("setListColumns", List.class).invoke(tabla, columnas);
+      } catch (Exception e) {
+        // La tabla es de otro tipo: se deja como esta.
+      }
+    }
   }
 
   /** La tabla del nodo que tiene ese nombre, si la hay. */
@@ -267,6 +367,8 @@ public final class SchemaOperations {
     if (!(metadataList instanceof Iterable)) {
       return columns;
     }
+    // Solo la primera tabla: es la del schema del componente. Las demas
+    // (REJECT...) tienen sus propias columnas y no van en la tabla de datos.
     for (Object table : (Iterable<?>) metadataList) {
       Object listColumns = table.getClass().getMethod("getListColumns").invoke(table);
       if (!(listColumns instanceof Iterable)) {
@@ -277,6 +379,7 @@ public final class SchemaOperations {
             String.valueOf(column.getClass().getMethod("getLabel").invoke(column)),
             ColumnTypes.of(column)));
       }
+      break;
     }
     return columns;
   }

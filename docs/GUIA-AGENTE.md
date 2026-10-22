@@ -112,6 +112,19 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
   compila pero no sale ninguna fila. `talend_job_connect_nodes` lo comprueba antes de conectar y avisa
   del conector que toca. El **nombre** de la conexion lo pone el bridge (`row1`, `row2`...), y es el que
   usan las tablas de los componentes (`row1.monto`). Ver INTERNALS 32.
+- **Triggers (`SUBJOB_OK`, `COMPONENT_OK`, `RUN_IF`...): dibujalos desde el PRIMER componente del subjob.**
+  Studio solo genera la llamada al destino cuando la conexion sale del arranque del subjob; si sale de un
+  componente de en medio (un `tDBOutput`, un `tLogRow`), la conexion se guarda, el job compila y el destino
+  **no se ejecuta nunca**, sin ningun error. La llamada se emite al final del subjob, asi que para un commit
+  explicito el `tDBCommit` se cuelga del `tFixedFlowInput`, no del `tDBOutput`. El bridge devuelve un aviso
+  cuando detecta el caso. Ver INTERNALS 53.
+- **El destino de un trigger tambien tiene que poder arrancar subjob.** Un trigger no puede apuntar a un
+  `tDBOutput`, un `tFileOutputDelimited` ni un `tLogRow` (necesitan entrada): Studio rechaza la conexion.
+  `talend_job_connect_nodes` falla con el motivo en vez de responder `ok`. Si el manejador tiene que escribir,
+  cuelga el trigger de un `tFixedFlowInput` y pon el `tFileOutputDelimited` debajo, en su subjob.
+- **Un trigger de error necesita un fallo que lance**: con un `tDie` el manejador corre; con un
+  `tFileInputDelimited` que apunta a un fichero inexistente, no (el job registra `[ERROR]` y termina con
+  codigo 0).
 - **Parametros que el catalogo no declara** (p. ej. `FILENAME` de `tFileOutputDelimited`): el bridge
   los crea con el tipo indicado o deducido.
 - **Los parametros de lista van sin comillas.** Un parametro cuyo tipo acaba en `_LIST` (el
@@ -168,7 +181,7 @@ Un escenario declara el job, sus nodos, sus conexiones y **lo que se espera**:
 | `nodos` | Los componentes, en orden |
 | `conexiones` | `origen`, `destino` y, si hace falta, `tipo` (por defecto, el conector de salida del origen) |
 | `espera` | `lineas` (exactas o el numero), `contiene`, `fichero`, `contextos` o `consulta` (SQL contra el Postgres de pruebas) |
-| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que (hoy **ningun escenario lo usa**: los 20 estan en verde) |
+| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que (hoy **ningun escenario lo usa**: los 23 estan en verde) |
 | `contextos` / `jobs` | Los entornos del job y los jobs auxiliares (el hijo de un `tRunJob`), que se montan antes que el principal |
 
 Y cada nodo:
