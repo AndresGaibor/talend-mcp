@@ -21,6 +21,7 @@ import { writeFileSync } from "node:fs";
 import { createBridgeClient } from "../src/modules/studio-bridge/adapters/http-studio-bridge.client";
 import { DefinitionIndexRepository } from "../src/modules/component-definitions/infrastructure/definition-index.repository";
 import { planMount } from "../src/modules/component-definitions/application/plan-required-parameters.use-case";
+import type { ComponentDefinition } from "../src/modules/component-definitions/domain/component-definition.types";
 
 const args = process.argv.slice(2);
 
@@ -113,20 +114,22 @@ async function buildMountPlan(): Promise<Record<string, unknown>> {
  * Los componentes a medir.
  *
  * Con `--family` se miden los de esa familia (los de "File/Input", "File/
- * Output"...); con `--components`, los que se pidan separados por comas. Sin
- * ninguna de las dos, se mide el catalogo Standard entero (lo filtra el
- * bridge).
+ * Output"...); con `--components`, los que se pidan separados por comas. Con
+ * `--sin-artefacto` se quedan solo los que no piden ningun artefacto de Maven
+ * (los que compilan sin descargar nada). Sin ninguna de las tres, se mide el
+ * catalogo Standard entero (lo filtra el bridge).
  */
 async function selectComponents(mount: Record<string, unknown>): Promise<string[] | undefined> {
   const family = valorDe("--family");
   const explicit = valorDe("--components");
+  const sinArtefacto = args.includes("--sin-artefacto");
   if (explicit) {
     return explicit
       .split(",")
       .map((name) => name.trim())
       .filter((name) => name.length > 0);
   }
-  if (!family && !args.includes("--con-definicion")) {
+  if (!family && !args.includes("--con-definicion") && !sinArtefacto) {
     return undefined;
   }
   const repository = new DefinitionIndexRepository();
@@ -145,10 +148,22 @@ async function selectComponents(mount: Record<string, unknown>): Promise<string[
     .filter(
       (definition) =>
         definition.palette === "DI" &&
-        definition.families.some((item) => wanted.includes(item.toLowerCase())),
+        (wanted.length === 0 || definition.families.some((item) => wanted.includes(item.toLowerCase()))) &&
+        (!sinArtefacto || !pideArtefacto(definition)),
     )
     .map((definition) => definition.name)
     .filter((name) => name in mount);
+}
+
+/**
+ * Si el componente exige algun artefacto de Maven.
+ *
+ * El build de Maven corre en modo offline, asi que un artefacto que no este en
+ * el `.m2` de Studio hace fallar el build (y tarda ~50 s). Los componentes que
+ * no piden nada se miden primero.
+ */
+function pideArtefacto(definition: ComponentDefinition): boolean {
+  return (definition.imports ?? []).some((item) => item.required && Boolean(item.mvn));
 }
 
 async function main(): Promise<void> {

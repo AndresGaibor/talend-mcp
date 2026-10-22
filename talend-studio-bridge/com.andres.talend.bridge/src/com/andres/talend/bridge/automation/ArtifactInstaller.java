@@ -35,12 +35,15 @@ public final class ArtifactInstaller {
   /**
    * Descarga un artefacto al repositorio local de Studio.
    *
-   * @param spec groupId, artifactId y version.
+   * @param spec groupId, artifactId y version. Con `file` se instala un jar que
+   *        ya esta en el equipo (util para los componentes de Talend Exchange,
+   *        cuyo dominio no se resuelve desde todas las redes).
    */
   public static Map<String, Object> install(JsonObject spec) throws Exception {
     String group = JsonSpec.required(spec, "groupId");
     String artifact = JsonSpec.required(spec, "artifactId");
     String version = JsonSpec.required(spec, "version");
+    String file = JsonSpec.string(spec, "file");
 
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("groupId", group);
@@ -62,10 +65,19 @@ public final class ArtifactInstaller {
       Files.createDirectories(folder);
       boolean already = Files.isRegularFile(jar);
       if (!already) {
-        download(group, artifact, version, "jar", jar);
+        if (file != null && !file.trim().isEmpty()) {
+          copyJar(Paths.get(file.trim()), jar);
+          result.put("fromFile", file);
+        } else {
+          download(group, artifact, version, "jar", jar);
+        }
       }
       if (!Files.isRegularFile(pom)) {
-        download(group, artifact, version, "pom", pom);
+        if (file != null && !file.trim().isEmpty()) {
+          writeMinimalPom(pom, group, artifact, version);
+        } else {
+          download(group, artifact, version, "pom", pom);
+        }
       }
       result.put("installed", true);
       result.put("alreadyInstalled", already);
@@ -73,9 +85,38 @@ public final class ArtifactInstaller {
     } catch (Exception e) {
       result.put("installed", false);
       result.put("error", e.getMessage());
-      BridgeLog.warn("No se pudo descargar " + group + ":" + artifact + ":" + version, e);
+      BridgeLog.warn("No se pudo instalar " + group + ":" + artifact + ":" + version, e);
     }
     return result;
+  }
+
+  /** Copia un jar local al repositorio de Studio. */
+  private static void copyJar(Path origen, Path destino) throws Exception {
+    if (!Files.isRegularFile(origen)) {
+      throw new IllegalStateException("No existe el fichero '" + origen + "'");
+    }
+    Path temporal = destino.resolveSibling(destino.getFileName() + ".tmp");
+    Files.copy(origen, temporal, StandardCopyOption.REPLACE_EXISTING);
+    Files.move(temporal, destino, StandardCopyOption.REPLACE_EXISTING);
+  }
+
+  /**
+   * Escribe un pom minimo.
+   *
+   * Maven necesita el pom del artefacto: sin el, el build falla con
+   * "Artifact has not been packaged into the correct form".
+   */
+  private static void writeMinimalPom(Path pom, String group, String artifact, String version)
+      throws Exception {
+    String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">\n"
+        + "  <modelVersion>4.0.0</modelVersion>\n"
+        + "  <groupId>" + group + "</groupId>\n"
+        + "  <artifactId>" + artifact + "</artifactId>\n"
+        + "  <version>" + version + "</version>\n"
+        + "  <packaging>jar</packaging>\n"
+        + "</project>\n";
+    Files.write(pom, xml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
   }
 
   /** Descarga un fichero del repositorio publico de Maven. */

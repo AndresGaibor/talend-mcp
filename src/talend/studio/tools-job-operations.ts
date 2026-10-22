@@ -528,15 +528,20 @@ export const jobOperationsTools = [
   },
   {
     name: "talend_studio_install_artifact",
-    description: "Descarga un artefacto de Maven Central al repositorio local de Talend Studio. Necesario para los componentes cuyo runtime no viene con Studio (por ejemplo el tFileInputJSON, que necesita com.jayway.jsonpath:json-path).",
+    description:
+      "Descarga un artefacto de Maven Central al repositorio local de Talend Studio. Necesario para los componentes cuyo runtime no viene con Studio (por ejemplo el tFileInputJSON, que necesita com.jayway.jsonpath:json-path). Con `file` se instala un jar que ya este en el equipo: los componentes de Talend Exchange (el tMap necesita talend-tmap-dataset) no estan en Maven Central y su dominio no se resuelve desde todas las redes.",
     inputSchema: z.object({
       groupId: z.string().describe("Group id de Maven, por ejemplo com.jayway.jsonpath"),
       artifactId: z.string().describe("Artifact id de Maven, por ejemplo json-path"),
       version: z.string().describe("Version, por ejemplo 2.9.0"),
+      file: z
+        .string()
+        .optional()
+        .describe("Ruta de un jar local ya descargado. Si se da, no se descarga de Maven"),
     }),
-    handler: async ({ groupId, artifactId, version }: { groupId: string; artifactId: string; version: string }) => {
+    handler: async ({ groupId, artifactId, version, file }: { groupId: string; artifactId: string; version: string; file?: string }) => {
       const bridge = await loadBridge();
-      const result = await bridge.installArtifact({ groupId, artifactId, version });
+      const result = await bridge.installArtifact({ groupId, artifactId, version, file });
       return bridgeOk({
         ok: result.ok,
         source: result.source,

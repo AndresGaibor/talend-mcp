@@ -111,6 +111,18 @@ entornos y variables (los entornos se leen del `.item`, porque la API del reposi
 creado (las referencias del item solo admiten cambios cuando ya esta guardado), y el item se queda sin
 variables. La tool falla con un error claro y borra lo que habia creado, en vez de dejar basura en el proyecto.
 
+### Las tools de jobs ya funcionan
+
+`talend_jobs_list` y `talend_jobs_read` leen el proyecto del disco (no necesitan Studio): la lista trae nombre,
+version, carpeta, fecha, tamano y numero de componentes de cada job; la lectura trae los componentes con sus
+parametros y las conexiones. `talend_jobs_create` crea el job **con la API de Studio** (antes escribia el `.item`
+a mano, lo que estaba prohibido).
+
+De paso se borro el codigo muerto del modulo de jobs: cinco tools que no estaban registradas (sus casos de uso y
+dos puertos sin uso) y el `job-runner` de `src/talend/execution` (tres funciones con TODO y sin usar). Se
+registraron las dos tools de spec que si funcionan: `talend_jobs_validate_pipeline_spec` y
+`talend_jobs_preview_pipeline_spec`.
+
 ### Comprobacion de conexiones
 
 `talend_job_connect_nodes` comprueba, con las definiciones del XML, que el conector sea una salida del origen que

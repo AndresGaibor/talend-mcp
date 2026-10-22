@@ -618,6 +618,8 @@ export class TalendStudioBridgeClient {
     groupId: string;
     artifactId: string;
     version: string;
+    /** Jar local ya descargado (para los componentes de Talend Exchange). */
+    file?: string;
   }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/artifacts/install", {
       method: "POST",

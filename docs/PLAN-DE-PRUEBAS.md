@@ -114,14 +114,49 @@ otra version de Weka; `tFileInputMSXML` genera codigo con una llave sin cerrar; 
 necesitan una conexion real del repositorio.
 
 El catalogo entero no se mide de una vez: los componentes sin artefacto en el `.m2` de Studio tardan ~50 s cada uno
-(el generador busca el artefacto en Maven). Por eso se mide por familias, y hay familias que no se pueden medir
-todavia:
+(el build de Maven corre en modo *offline*: en vez de descargar, falla con "Cannot access central ... in offline
+mode"). Por eso se mide por familias, y **las familias que necesitan artefactos que no estan en el `.m2` no se miden
+todavia** (son las raras y las que no aportan).
 
-| Familia | Que pasa |
-|---|---|
-| `Big Data/HDFS`, `File/Hadoop` | Faltan los jars de Hadoop en el `.m2` ("missing jar:hadoop-hdfs-client-3.3.4.jar"): el build se queda esperando y el hilo de la UI de Studio se agota |
-| `ELT/Connections` | Faltan los artefactos del runtime de ELT |
-| `Databases/DB Specifics/*` | Cada motor necesita su driver (el de PostgreSQL si se ha instalado con `talend_studio_install_artifact`, con la version exacta que pide el build) |
+### Que artefacto pide cada familia
+
+El indice de definiciones (`src/modules/component-definitions/`) declara, por componente, los `IMPORT` que exige
+(`REQUIRED="true"`), con su coordenada Maven. Con eso se puede filtrar la medicion: se mide primero lo que no
+pide nada, y lo que pide algo se mide solo si el artefacto esta ya en el repositorio local de Studio
+(`<instalacion>/configuration/.m2/repository`).
+
+| Familia | Componentes | Piden artefacto |
+|---|---|---|
+| `Logs_Errors` | 11 | 0 |
+| `Databases/DB Specifics/PostgreSQL` | 15 | 0 (el driver si esta en el `.m2`) |
+| `Processing` | 13 | 2 |
+| `Orchestration` | 18 | 1 |
+| `Misc` | 10 | 2 |
+| `File/Management` | 13 | 5 |
+| `XML` | 13 | 8 |
+| `Data_Quality` | 19 | 13 |
+| `Business/SAP` | 18 | 15 |
+| `Internet` | 15 | 11 |
+| `ELT/Connections` | 20 | 11 |
+
+Lo que **ya esta** en el `.m2` de esta instalacion (y por tanto compila sin descargar nada): `dom4j 2.1.3` (XML),
+`json-path 2.9.0` (JSON), `talend_file_enhanced 1.3.1` (archivos), `talend-common-utils 1.0`,
+`commons-compress 1.28.0`, `advancedPersistentLookupLib 1.6` y los drivers de PostgreSQL (`42.7.13` y `42.7.4`).
+
+Lo que **no esta** y hay que instalar a mano:
+
+| Artefacto | Quien lo pide | De donde sale |
+|---|---|---|
+| `talend-tmap-dataset 1.2.16` | `tMap` (y `tMapMulti`?) | **Talend Exchange**, no Maven Central |
+| `sapjco3 6.0.0` | los 15 componentes de SAP | Repositorio de Talend (no accesible desde aqui) |
+| `hadoop-client-* 3.3.4` | `Big Data/HDFS`, `File/Hadoop` | Maven Central (descargable) |
+| `OneWireAPI 0.1` | `tAddCRCRow` | Maven Central |
+| `geoip 1.0.0` | `tAddLocationFromIP` | Maven Central |
+
+**Los dominios de Talend Exchange (`exchange.talend.com`, `components.talend.com`) no resuelven en DNS desde esta
+maquina**: no hay forma de instalar ahi el jar del `tMap` automaticamente. `talend_studio_install_artifact` solo
+descarga de Maven Central, y ahi el `talend-tmap-dataset` no existe. Para el `tMap` hay que instalar el componente
+desde el propio Studio ("Additional components" / Talend Exchange) o copiar el jar a mano al `.m2` de Studio.
 
 Esto es lo que hace lento el catalogo completo: no es la medicion, es la red.
 
