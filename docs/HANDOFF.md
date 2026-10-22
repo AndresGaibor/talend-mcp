@@ -135,7 +135,7 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
 | L3/L4 | 134 componentes de las nueve familias mas usadas: **134 se crean, guardan y borran, y 99 compilan (74 %)**. Ademas, los 44 componentes que **no piden artefacto** (`Logs_Errors`, `XML`, `Data_Quality`, `File/Management` y `PostgreSQL`): **44 de 44 y 38 compilan (86 %)**, en 96 s. Los que no compilan necesitan una configuracion real (tablas, XSD, columnas), no un jar |
-| L5 | **8 escenarios con la salida verificada**: humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, **un `tMap` que renombra y filtra**, bases de datos con Postgres, contextos y orquestacion padre/hijo. Queda pendiente el `tAggregateRow` |
+| L5 | **12 escenarios con la salida verificada**: humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, **un `tFilterRow` con condicion**, **un `tUnite`**, **un `tMap` que renombra y filtra**, **escribir un JSON**, **un trigger de error**, bases de datos con Postgres, contextos y orquestacion padre/hijo. Quedan 5 pendientes documentados (el `tAggregateRow`, el `tFileInputJSON`, el `tJavaRow`, el `tDBOutput` y el `tFileList`) |
 
 ## Lo siguiente (por prioridad)
 

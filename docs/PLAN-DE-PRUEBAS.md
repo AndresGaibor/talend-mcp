@@ -189,13 +189,21 @@ el fichero que escribe). El informe queda en `testdata/resultados-l5.csv`.
 | `tFileInputDelimited` -> `tLogRow` | Correcto: las cuatro filas, con el separador y los decimales tal cual |
 | `tFileInputDelimited` -> `tFileOutputDelimited` | Correcto: el fichero escrito tiene las cuatro filas |
 | `tFileInputDelimited` -> `tUniqRow` -> `tSortRow` -> `tLogRow` | Correcto: quita el duplicado y ordena por monto descendente |
+| `tFileInputDelimited` -> `tFilterRow` -> `tLogRow` | Correcto: deja solo las filas con monto mayor que 150 |
+| dos `tFileInputDelimited` -> `tUnite` -> `tLogRow` | Correcto: salen las ocho filas (las dos fuentes) |
 | `tFileInputDelimited` -> `tMap` -> `tLogRow` | Correcto: el `tMap` renombra la columna con `toUpperCase()` y filtra por monto (`2\|JOSE`, `3\|LUCIA`). El modelo del `tMap` (entradas, salidas con sus expresiones y filtros) lo monta el arnes con el `mapper` del bridge |
+| `tFixedFlowInput` -> `tFileOutputJSON` | Correcto: el JSON escrito tiene las filas |
+| `tFileInputDelimited` (fichero que no existe) -> `tLogRow` -> trigger de error -> `tFileOutputDelimited` | Correcto: el trigger se dispara y el manejador escribe su fichero (ver INTERNALS 40) |
 | `tPrejob` -> `tRunJob` (hijo) -> `tPostjob` | Correcto: el padre llama al hijo y su salida sale en la del padre |
 | `tPostgresqlConnection` -> `tPostgresqlInput` -> `tLogRow` | Correcto: lee las diez filas del Postgres de pruebas (ver INTERNALS 35) |
 | contextos: crear un entorno y sus variables | Correcto: el job tiene los dos entornos con sus valores. El `tContextLoad` no saca filas (necesita su `nodeData` con la lista de variables a cargar), asi que el valor se comprueba en el modelo |
 | `tFileInputDelimited` -> `tAggregateRow` -> `tLogRow` | **Pendiente**: el `tAggregateRow` necesita dos tablas de metadata y al rellenar el schema se rompe la tabla que la conexion tiene asignada (ver INTERNALS 32) |
+| `tFileInputJSON` -> `tLogRow` | **Pendiente**: el pom del job no hereda las librerias del componente (json-simple) y el codigo no compila |
+| `tFixedFlowInput` -> `tJavaRow` -> `tLogRow` | **Pendiente**: la salida del `tJavaRow` la define el parametro `SCHEMA`, que el bridge no deja con la forma que espera el generador |
+| `tPostgresqlOutput` -> `tDBCommit` | **Pendiente**: el `tDBOutput` genera el `INSERT` con los nombres de columna a null |
+| `tFileList` -> `tLogRow` | **Pendiente**: el `tFileList` saca las filas pero vacias (los valores van al `globalMap`, no a la fila) |
 
-**Ocho escenarios en verde.** El `tMap` compila y se ejecuta **sin** el `talend-tmap-dataset` del Exchange: ese jar
+**Doce escenarios en verde.** El `tMap` compila y se ejecuta **sin** el `talend-tmap-dataset` del Exchange: ese jar
 solo hace falta para el editor visual del mapper, no para generar codigo ni para ejecutar.
 
 Los pasos para ejecutar y leer la salida estan en INTERNALS 33: primero el Run de Studio (que genera y compila),
