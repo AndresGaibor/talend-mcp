@@ -458,6 +458,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `bun run scripts/studio-job.ts <cmd>` | Hablar directo con el bridge: `fase0`, `create`, `add`, `connect`, `schema`, `list`, `run`, `delete`, `dialogs` |
 | `bun run scripts/query-bridge.ts` | Volcado del estado de Studio (ping, job activo...) |
 | `bun run scripts/coverage.ts` | Mide cuantos componentes del catalogo se crean, se configuran, se montan y compilan (`--filter`, `--family`, `--components`, `--max`, `--compile`, `--out`) |
+| `bun run scripts/cobertura-familias.ts` | Cruza los informes de `coverage.ts` con el catalogo instalado: por familia, cuantos compilan, cuantos fallan y cuantos no se han medido (`--todas`, `--familia <texto>`, `--pendientes`) |
 | `bun run scripts/execution-check.ts [filtro]` | Monta, ejecuta y verifica los escenarios L5 (el informe sale en `testdata/resultados-l5.csv`) |
 | `bun run scripts/component-definitions.ts` | Las definiciones de los componentes instalados (parametros obligatorios, conexiones) y el detalle de uno |
 | `bun run scripts/make-testdata.ts` | Regenera los datos de prueba de `testdata/` |
