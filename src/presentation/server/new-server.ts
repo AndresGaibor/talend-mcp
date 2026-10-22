@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { getAllRuntimeTools, getRuntimeTools } from "../../server/registered-tools";
 import { GENERIC_TOOL_OUTPUT_SCHEMA } from "./tool-registry";
+import { buildServerInstructions } from "../../modules/guide/domain/server-instructions";
 
 export interface NewServerOptions {
   port?: number;
@@ -43,7 +44,10 @@ function isAllowedOrigin(origin: string | undefined, allowOrigins: string[] = []
 }
 
 export function createNewMcpServer(options?: { live?: boolean; stderr?: NodeJS.WritableStream }) {
-  const server = new McpServer({ name: "talend-mcp", version: "1.0.0" });
+  const server = new McpServer(
+    { name: "talend-mcp", version: "1.0.0" },
+    { instructions: buildServerInstructions() },
+  );
   const allTools = getRuntimeTools();
 
   for (const tool of allTools) {
@@ -160,6 +164,7 @@ function handleMcpRequest(
       protocolVersion: "2024-11-05",
       serverInfo: { name: "talend-mcp", version: "1.0.0" },
       capabilities: buildServerCapabilities(),
+      instructions: buildServerInstructions(),
     }));
     return true;
   }

@@ -2,6 +2,7 @@ import { buildXml, parseXml } from "./xml";
 import { createEmptyJobItemXml } from "./job-crud";
 import { generateTalendId } from "./utils";
 import { buildMapNodeData } from "./component-mappers";
+import { buildColumn } from "./job-generator/columns";
 
 /**
  * Valor de un parametro de componente.
@@ -70,76 +71,7 @@ function buildElementParameter(name: string, value: string, field = "TEXT"): Rec
   return { "@_field": field, "@_name": name, "@_value": value };
 }
 
-type ColumnSpec = { name: string; type?: string; length?: number; precision?: number; nullable?: boolean; key?: boolean; sourceType?: string; pattern?: string };
-
-/**
- * Tipos Java validos de Talend para una columna de schema.
- *
- * Usar un id que no existe (por ejemplo id_Decimal) hace que el generador de
- * codigo de Studio falle con "Unknown java id type" al ejecutar el job.
- */
-const TALEND_COLUMN_TYPES = new Set([
-  "id_String",
-  "id_Integer",
-  "id_Long",
-  "id_Double",
-  "id_Float",
-  "id_BigDecimal",
-  "id_Boolean",
-  "id_Byte",
-  "id_Short",
-  "id_Character",
-  "id_Date",
-  "id_Password",
-  "id_Dynamic",
-]);
-
-const COLUMN_TYPE_ALIASES: Record<string, string> = {
-  string: "id_String",
-  text: "id_String",
-  varchar: "id_String",
-  char: "id_Character",
-  int: "id_Integer",
-  integer: "id_Integer",
-  long: "id_Long",
-  bigint: "id_Long",
-  double: "id_Double",
-  float: "id_Float",
-  real: "id_Double",
-  decimal: "id_BigDecimal",
-  numeric: "id_BigDecimal",
-  bigdecimal: "id_BigDecimal",
-  boolean: "id_Boolean",
-  bool: "id_Boolean",
-  byte: "id_Byte",
-  short: "id_Short",
-  date: "id_Date",
-  datetime: "id_Date",
-  timestamp: "id_Date",
-  password: "id_Password",
-};
-
-/** Normaliza el tipo de una columna al id Java que espera Talend. */
-export function normalizeColumnType(type?: string): string {
-  if (!type) return "id_String";
-  if (TALEND_COLUMN_TYPES.has(type)) return type;
-
-  const alias = COLUMN_TYPE_ALIASES[type.toLowerCase()];
-  if (alias) return alias;
-
-  return "id_String";
-}
-
-function buildColumn(col: ColumnSpec): Record<string, unknown> {
-  const node: Record<string, unknown> = { "@_name": col.name, "@_type": normalizeColumnType(col.type) };
-  if (col.length !== undefined) node["@_length"] = String(col.length);
-  if (col.precision !== undefined) node["@_precision"] = String(col.precision);
-  if (col.nullable !== undefined) node["@_nullable"] = col.nullable ? "true" : "false";
-  if (col.key !== undefined) node["@_key"] = col.key ? "true" : "false";
-  if (col.sourceType !== undefined) node["@_sourceType"] = col.sourceType;
-  if (col.pattern !== undefined) node["@_pattern"] = col.pattern;
-  return node;
-}
+export { normalizeColumnType } from "./job-generator/columns";
 
 function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
   const parameters: Record<string, unknown>[] = [buildElementParameter("UNIQUE_NAME", spec.uniqueName)];
@@ -360,61 +292,7 @@ export function buildJobPropertiesXml(spec: JobSpec, rootItemId: string): string
   return buildXml(doc);
 }
 
-export function validateJobSpec(spec: unknown): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  if (!spec || typeof spec !== "object") {
-    return { valid: false, errors: ["Spec must be an object"] };
-  }
-
-  const s = spec as Record<string, unknown>;
-
-  if (typeof s.jobName !== "string" || s.jobName.length === 0) {
-    errors.push("jobName is required and must be a non-empty string");
-  }
-
-  if (!Array.isArray(s.components)) {
-    errors.push("components is required and must be an array");
-  } else {
-    const uniqueNames = new Set<string>();
-    for (let i = 0; i < s.components.length; i++) {
-      const comp = s.components[i] as Record<string, unknown>;
-      if (typeof comp.uniqueName !== "string") {
-        errors.push(`components[${i}].uniqueName is required`);
-      }
-      if (typeof comp.componentName !== "string") {
-        errors.push(`components[${i}].componentName is required`);
-      }
-      if (typeof comp.uniqueName === "string" && uniqueNames.has(comp.uniqueName)) {
-        errors.push(`Duplicate uniqueName: ${comp.uniqueName}`);
-      }
-      if (typeof comp.uniqueName === "string") uniqueNames.add(comp.uniqueName);
-    }
-  }
-
-  if (Array.isArray(s.connections)) {
-    const connUniqueNames = new Set<string>();
-    for (let i = 0; i < s.connections.length; i++) {
-      const conn = s.connections[i] as Record<string, unknown>;
-      if (typeof conn.source !== "string") {
-        errors.push(`connections[${i}].source is required`);
-      }
-      if (typeof conn.target !== "string") {
-        errors.push(`connections[${i}].target is required`);
-      }
-      if (typeof conn.label !== "string") {
-        errors.push(`connections[${i}].label is required`);
-      }
-      if (typeof conn.uniqueName === "string" && connUniqueNames.has(conn.uniqueName)) {
-        errors.push(`Duplicate connection uniqueName: ${conn.uniqueName}`);
-      }
-      if (typeof conn.uniqueName === "string") connUniqueNames.add(conn.uniqueName);
-      else if (typeof conn.label === "string") connUniqueNames.add(conn.label);
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
-}
+export { validateJobSpec } from "./job-spec-validator";
 
 export interface JobletSpec {
   jobletName: string;

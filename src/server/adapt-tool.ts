@@ -211,7 +211,7 @@ function extractAnnotations(tool: unknown): McpToolAnnotation | undefined {
       readOnlyHint: tool.safety.readOnlyHint,
       idempotentHint: tool.safety.idempotentHint,
       destructiveHint: tool.safety.destructiveHint,
-      openWorldHint: tool.safety.openWorldHint,
+      openWorldHint: tool.safety.openWorldHint ?? !tool.safety.readOnlyHint,
       requiresConfirmation: tool.safety.requiresConfirmation === true || isVerbDestructive,
     };
   }
@@ -223,6 +223,7 @@ function extractAnnotations(tool: unknown): McpToolAnnotation | undefined {
       readOnlyHint: readOnly === true,
       idempotentHint: readOnly === true,
       destructiveHint: destructive === true || isVerbDestructive,
+      openWorldHint: readOnly !== true,
       requiresConfirmation: requiresConfirmation === true || destructive === true || isVerbDestructive,
     };
   }
@@ -235,6 +236,7 @@ function extractAnnotations(tool: unknown): McpToolAnnotation | undefined {
       readOnlyHint: resolvedReadOnly,
       idempotentHint: resolvedReadOnly,
       destructiveHint: destructive === true || isVerbDestructive,
+      openWorldHint: !resolvedReadOnly,
       requiresConfirmation: requiresConfirmation === true || destructive === true || isVerbDestructive,
     };
   }

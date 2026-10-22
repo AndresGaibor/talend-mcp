@@ -3,6 +3,7 @@ import { convertInputSchema } from "../../src/server/adapt-tool";
 import { createListJobsTool } from "../../src/presentation/tools/jobs/list-jobs.tool";
 import { createReportSnippetsGenerateTool } from "../../src/modules/jobs/tools/report-snippets-generate.tool";
 import { snapshotTools } from "../../src/talend/studio/tools-snapshot";
+import { getEnrichedOutputSchema, hasEnrichedDataSchema, TalendColumnSchema } from "../../src/server/enriched-schemas";
 
 type JsonSchema = {
   type?: string;
@@ -91,4 +92,63 @@ describe("Tool Contracts — campos con default no son required", () => {
     expect(required).not.toContain("mode");
  });
 
+});
+
+describe("schemas de salida enriquecidos por dominio", () => {
+  test("conserva los schemas de jobs y componentes en la fachada", () => {
+    expect(hasEnrichedDataSchema("talend_delete_job")).toBe(true);
+    expect(hasEnrichedDataSchema("talend_update_schema_column")).toBe(true);
+    expect(TalendColumnSchema.safeParse({ name: "id", type: "id_Integer" }).success).toBe(true);
+
+    const deleteOutput = getEnrichedOutputSchema("talend_delete_job");
+    expect(deleteOutput.safeParse({ ok: true, data: { deleted: true, jobName: "ventas" } }).success).toBe(true);
+
+    const updateOutput = getEnrichedOutputSchema("talend_update_schema_column");
+    expect(updateOutput.safeParse({
+      ok: true,
+      data: { itemPath: "job.item", uniqueName: "tInput_1", columnName: "id", column: {} },
+    }).success).toBe(true);
+  });
+
+  test("conserva los schemas de ejecucion y Studio en la fachada", () => {
+    expect(hasEnrichedDataSchema("talend_find_exported_jobs")).toBe(true);
+    expect(getEnrichedOutputSchema("talend_find_exported_jobs").safeParse({
+      ok: true,
+      data: [{ jobName: "Ventas", scriptPath: "Ventas_run.sh", platform: "posix", folderPath: "build", modifiedAt: "" }],
+    }).success).toBe(true);
+    expect(getEnrichedOutputSchema("talend_live_status").safeParse({
+      ok: true,
+      data: { active: false, warnings: [] },
+    }).success).toBe(true);
+  });
+
+  test("conserva los schemas de contextos y repositorio en la fachada", () => {
+    expect(getEnrichedOutputSchema("talend_list_repository_contexts").safeParse({
+      ok: true,
+      data: { contexts: [{ name: "Default", parameters: [] }] },
+    }).success).toBe(true);
+    expect(getEnrichedOutputSchema("talend_repo_status").safeParse({
+      ok: true,
+      data: { branch: "main", commit: "abc", remote: "origin", project: null },
+    }).success).toBe(true);
+  });
+
+  test("conserva los schemas de análisis y módulos en la fachada", () => {
+    expect(getEnrichedOutputSchema("talend_analyze_logs").safeParse({
+      ok: true,
+      data: { logFile: null, analysis: null, rawSnippet: [], suggestions: [] },
+    }).success).toBe(true);
+    expect(getEnrichedOutputSchema("talend_secrets_scan_job").safeParse({
+      ok: true,
+      data: { jobName: "Ventas", secretsFoundCount: 0, findings: [] },
+    }).success).toBe(true);
+    expect(getEnrichedOutputSchema("talend_datasets_inspect_csv_folder").safeParse({
+      ok: true,
+      data: { folderPath: "data", files: [], totalRows: 0 },
+    }).success).toBe(true);
+    expect(getEnrichedOutputSchema("talend_deliverables_validate").safeParse({
+      ok: true,
+      data: { valid: true, errors: [], warnings: [] },
+    }).success).toBe(true);
+  });
 });

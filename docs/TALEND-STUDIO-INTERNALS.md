@@ -9,6 +9,22 @@ Sirve para dos cosas:
 1. Explicar por qué el bridge hace las cosas como las hace, para que no se rompan a ciegas.
 2. Servir de punto de partida cuando haya que explorar una API interna nueva.
 
+## Indice por tema
+
+| Tema | Secciones |
+|---|---|
+| Entorno, formato y ejecucion | [Entorno y rutas](#1-entorno-y-rutas), [Anatomia del `.item`](#4-anatomia-de-un-item-de-job), [Layout del proyecto](#5-layout-del-proyecto-talend), [Como ejecuta Studio](#6-como-ejecuta-un-job-talend-studio), [Ejecutar y leer salida](#23-ejecutar-un-job-y-leer-su-salida) |
+| Modelo y API de Studio | [Modelo en memoria](#7-el-problema-del-modelo-en-memoria), [Clases](#8-referencia-de-clases), [Job abierto](#11-operar-sobre-el-job-abierto-con-la-api-de-studio), [Job abierto: pendientes](#12-operar-sobre-el-job-abierto-lo-que-faltaba) |
+| Bridge y workbench | [Guardian de modales](#13-el-guardian-de-modales), [Estructura del bridge](#19-estructura-del-codigo-del-bridge), [Instalacion P2/hot](#20-instalar-el-plugin-caliente-o-con-p2), [Hot reload](#21-la-carga-en-caliente-lo-que-hay-que-soltar-antes-de-recargar), [Hilo UI](#26-que-no-puede-entrar-al-hilo-de-la-ui) |
+| Componentes, conexiones y schemas | [Definiciones](#18-configuracion-declarativa-de-componentes), [Variantes del catalogo](#29-el-catalogo-tiene-una-variante-de-cada-componente-por-tipo-de-job), [Cobertura L3/L4](#31-la-cobertura-con-montaje-como-se-mide-l3-y-l4-de-verdad), [Conectores](#32-conectar-bien-el-nombre-de-la-conexion-y-el-del-conector), [Propagacion de schema](#42-conectar-propaga-el-esquema-del-destino-hacia-atras), [Celdas de tabla](#46-los-valores-de-las-celdas-de-tabla-los-nombres-sin-comillas) |
+| Transformaciones y archivos | [tAggregateRow](#41-el-taggregaterow-la-primera-tabla-de-metadata-es-la-de-salida), [tFileList](#47-el-tfilelist-en-talend-8-no-emite-filas-deja-valores-en-el-globalmap), [tFileInputJSON](#48-el-tfileinputjson-la-raiz-del-bucle-y-el-mapeo), [tNormalize](#49-el-tnormalize-la-salida-copia-las-columnas-de-la-entrada-por-su-nombre), [tJavaRow](#50-el-tjavarow-el-codigo-se-inserta-tal-cual) |
+| Bases de datos | [Conexion](#35-conectar-con-una-base-de-datos), [Escritura](#45-escribir-en-una-base-de-datos-como-se-hace), [Nombre de columna](#43-el-nombre-de-la-columna-en-la-base-de-datos-setoriginaldbcolumnname), [Driver y compilacion](#52-el-driver-de-la-base-no-hace-falta-para-compilar-solo-para-ejecutar) |
+| Triggers y contextos | [Triggers](#40-los-triggers-el-conector-va-con-el-tipo-del-catalogo), [Contextos de job](#36-los-contextos-los-entornos-de-un-job), [Contextos de proyecto](#37-los-contextos-del-proyecto-los-items-de-tipo-contexts), [Arranque de subjob](#53-un-trigger-solo-se-genera-si-sale-del-arranque-del-subjob) |
+| Fallos conocidos y diagnostico | [Diagnostico](#10-recetas-de-diagnostico), [Componentes que no generan codigo](#24-componentes-que-no-generan-codigo-valido-en-talend-801), [Problemas de diseno](#27-problemas-de-diseno-de-un-job), [Errores del agregador Maven](#51-al-compilar-child-module--does-not-exist-el-agregador-maven-y-el-heap), [Heap de Studio](#39-el-heap-de-studio-se-llena-y-el-ide-deja-de-responder), [Classpath bloqueado](#55-studio-bloquea-el-classpathjar-del-job-que-ha-cargado) |
+
+Las secciones 38-57 registran descubrimientos recientes; sus numeros se conservan porque otras
+guias y planes los citan como `INTERNALS N`.
+
 ## 1. Entorno y rutas
 
 | Qué | Ruta |
@@ -2450,4 +2466,69 @@ y los builds siguientes ya no generaron codigo.
 Consecuencia practica: no lanzar `executeJob` mientras Studio esta compilando ese job. El arnes lo hace para
 saber si el build ha terminado, y justo ahi esta el riesgo: abre el jar en el momento en que Studio lo va a
 reemplazar.
+
+## 56. Al reiniciar Studio carga el bundle **instalado**, no el de la carga en caliente
+
+La carga en caliente (`~/.talend-bridge/hot/bridge.jar` + `Bundle.update`) solo vale para la sesion en curso.
+Al arrancar, Studio monta el bundle que tiene instalado; si los ultimos cambios se aplicaron solo en caliente,
+tras reiniciar vuelve el jar viejo.
+
+Sintoma: `/ping` contesta `ok` pero con una `version` antigua (el numero final es la marca de compilacion), y el
+bridge "funciona" a medias. Medido: `job/create` crea el job, `nodes/add` contesta `ok` con un `uniqueName`,
+pero el `.item` se queda **vacio** (196 bytes, solo la cabecera XMI). El job compila igual (es el esqueleto de
+Talend, ~50 KB de codigo generado) y al ejecutarlo no imprime nada: el arnes lo reporta como
+`las lineas no son las esperadas: ... y salio []`. Los 25 escenarios fallaron asi, sin un solo error del bridge.
+
+Comprobacion y arreglo:
+
+```bash
+bun run scripts/bridge-call.ts /ping          # la 'version' tiene que ser la ultima compilacion
+bun run scripts/start.ts --install-bridge --force
+```
+
+Regla: despues de cada reinicio de Studio, mirar la `version` del ping (o reinstalar el bridge) antes de
+automatizar. El `--force` recompila y recarga sin reiniciar Studio.
+
+## 57. Las listas cerradas se guardan con su `VALUE`, no con el nombre
+
+Un parametro de lista cerrada no guarda el texto que se ve en la interfaz, sino el `VALUE` de su `<ITEM>`.
+Cuando `NAME` y `VALUE` coinciden (`TABLE_ACTION`: `NONE`, `TRUNCATE`...) no se nota; cuando no coinciden,
+el valor equivocado se cuela en el codigo generado como si fuera un identificador Java y el job no compila.
+
+Medido con el `tWarn`:
+
+```xml
+<ITEM NAME="WARNING" VALUE="4" />
+```
+
+- Con `"PRIORITY": "WARNING"` el build falla en la generacion: `The Job "MCP_L5_Aviso" has wrong
+  configuration` con `Detail Message: WARNING cannot be resolved to a variable` (y no aparece ningun
+  `classpath.jar`: el sintoma en el arnes es `El job no esta compilado`).
+- Con `"PRIORITY": "4"` compila y el job escribe en la salida estandar:
+  `[WARN ] 12:06:43 prj_bancolombia.mcp_l5_aviso_0_1.MCP_L5_Aviso- tWarn_2 - Message: cuidado con el dato. Code: W001`
+
+El `tWarn` se usa como subjob propio (`tFixedFlowInput` -> `tLogRow` y `OnSubjobOk` del arranque hacia el
+`tWarn`): avisa y el job sigue con codigo 0. El mensaje y el codigo salen en la misma linea, con el nivel
+del `PRIORITY`; la marca de tiempo impide comparar la linea completa, se comprueba por subcadena.
+
+## 58. Inspeccionar definiciones instaladas de componentes
+
+Los `.java.xml` y `.javajet` activos estan dentro del plugin de componentes de la instalacion de Studio. El
+sufijo del plugin cambia entre versiones, por lo que no conviene guardar en notas o scripts una ruta completa
+como `org.talend.designer.components.localprovider_<version>`. Para localizar e imprimir las definiciones se usa:
+
+```powershell
+bun run scripts/inspect-component.ts --plugins-dir "<ruta-de-Studio>/plugins" --file begin tLogCatcher tJoin
+bun run scripts/inspect-component.ts --plugins-dir "<ruta-de-Studio>/plugins" --file xml tLogCatcher
+bun run scripts/inspect-component.ts --plugins-dir "<ruta-de-Studio>/plugins" tJoin
+```
+
+`--file` acepta `xml`, `begin`, `main`, `end` o `all`; si se omite, muestra todos los archivos existentes. El
+script busca el componente en todos los plugins que tengan `components/<nombre>` y presenta todas las coincidencias,
+con numeros de linea. La ruta se recibe como argumento; no hay una ruta de maquina fija.
+
+Este metodo permitio diagnosticar `tSetGlobalVar`: el `begin` de `tJava` se genera antes de que empiece el bucle
+del flujo, aunque el nodo se haya conectado despues de `tSetGlobalVar`. Por eso no sirve para observar ahi una
+variable que se asigna por fila. El consumidor debe ejecutarse en el flujo (por ejemplo, `tJavaRow`); el escenario
+L5 confirma que entonces puede leer `l5_global=Talend`.
 

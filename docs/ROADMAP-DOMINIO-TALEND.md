@@ -73,7 +73,7 @@ La cobertura reportaba los 1294 componentes como fallidos. Causas reales, reprod
 | 2 | ~~`uniqueName` real~~ (ya lo era) + **alta verificada**: `add` falla si el nodo no entra (hecho) | El nombre devuelto siempre existe en el job |
 | 3 | ~~Arreglar la prueba de cobertura~~ (hecho) | El CSV deja de ser 100 % fallos |
 | 4 | ~~Leer los problemas del job~~ (hecho: `talend_job_problems`, avisos de diseno). Tambien hecho: **compilacion** sin ejecutar (`talend_job_compile`, `coverage --compile`) | "Abre sin avisos" y L4 se comprueban sin ejecutar |
-| 5 | **Matriz de dominio** por componente: L1/L2 hecho (`coverage.ts` + `coverage-summary.ts`). L3 y L4 **hechos** con el **montaje** (origen y destino) y los parametros obligatorios del XML: **259 medidos, 216 compilan**. L5 **hecho en 18 escenarios (los 18 en verde, ninguno pendiente)**; falta medir las familias de base de datos que piden un driver | Se sabe cuantos componentes estan al 100 %, y por que fallan los demas |
+| 5 | **Matriz de dominio** por componente: L1/L2 hecho (`coverage.ts` + `coverage-summary.ts`). L3 y L4 **hechos** con el **montaje** (origen y destino) y los parametros obligatorios del XML: **259 medidos, 216 compilan**. L5 **hecho en 28 escenarios (los 28 en verde, ninguno pendiente)**; falta medir las familias de base de datos que piden un driver | Se sabe cuantos componentes estan al 100 %, y por que fallan los demas |
 | 6 | **Tests del bridge aislados**: hechos (hecho) | `bun test` verde con y sin Studio |
 | 7 | **Indice de definiciones de los componentes**: hecho (`talend_components_definition`, `scripts/component-definitions.ts`). Pendiente: que lo usen las tools que configuran (hoy es el plan de la cobertura) | Un agente sabe que poner en cada componente sin adivinar |
 | 8 | **Metadata del repositorio**: conexiones de base de datos y esquemas de archivo, que es lo que abre los `tDB*` en modo "Repository". **Pendiente**: en Talend 8 no se ha encontrado la clase del modelo de las conexiones compartidas de base de datos. **No es bloqueante**: los jobs se montan en modo "built-in" (HOST, PORT, USER y PASS en el propio componente) y asi funcionan (Postgres, MySQL, MS SQL Server y Oracle ya compilan, y el Postgres ya lee y escribe) | Un `tDB*` puede tomar la conexion del repositorio en vez de del propio componente |
@@ -121,7 +121,7 @@ Hoy se crean nodos, conexiones FLOW, schema y parametros. Falta lo que hace un j
 | Transformaciones (`tFilterRow`, `tSortRow`, `tAggregateRow`, `tUniqRow`, `tJoin`, `tUnite`, `tNormalize`...) | Las tablas se rellenan con el plan (columnas y valores por defecto) y **compilan**. **Ejecutan bien** el `tUniqRow`, el `tSortRow`, el `tFilterRow`, el `tUnite`, el `tMap`, el `tAggregateRow` (este ultimo con las cuatro reglas de INTERNALS 41) y el `tNormalize` (que parte una columna en filas; la entrada y la salida declaran las columnas con el mismo nombre, INTERNALS 49) | El `tJoin` |
 | Bases de datos (`tDB*`) | **Postgres probado a L5**: lee (`tPostgresqlInput`), escribe (`tPostgresqlOutput` con `AUTO_COMMIT=true`), **actualiza con clave** (`UPDATE_KEY`) **con commit explicito** (`tPostgresqlCommit` con `OnSubjobOk` desde el arranque del subjob y `AUTO_COMMIT=false`), **borra con clave** (`DELETE_KEY`) y **deshace con rollback explicito** (`tPostgresqlRollback`). Compilan Postgres, MySQL, MS SQL Server y Oracle | Medir las familias que faltan: DB2, Informix, Vertica, Greenplum, Teradata, Netezza, Sybase, Ingres (y las que piden un jar que no esta en el `.m2`). Sin probar: las demas acciones de tabla (`TABLE_ACTION`) |
 | Excel, posicional, JSON, XML, Parquet, Avro | **JSON validado a L5**: la lectura (`tFileInputJSON`, con `JSON_LOOP_QUERY` y la tabla `MAPPING_JSONPATH`) y la escritura (`tFileOutputJSON`). Posicional no compila en 8.0.1 | XML, Parquet y Avro sin probar |
-| Control de flujo | `tPrejob`, `tPostjob`, `tRunJob`, el trigger de error y el `tDie` (corta con codigo 1), ok (L5). El `tFileList` tambien (L5), con su peculiaridad: **no emite filas**, deja los valores en el `globalMap` (INTERNALS 47). Los triggers se generan solo desde el arranque del subjob y su destino tiene que poder arrancar subjob (INTERNALS 53) | `tWarn` (pendiente: Studio dejo bloqueado el jar del job, INTERNALS 55), `tFlowToIterate`, `tLogCatcher`, `tSetGlobalVar` |
+| Control de flujo | `tPrejob`, `tPostjob`, `tRunJob`, el trigger de error, `tDie` (corta con codigo 1), `tWarn` (avisa y el job sigue), `tFileList`, `tFlowToIterate` y `tSetGlobalVar` (valor global leído por un consumidor del flujo), todo validado a L5. Los triggers se generan solo desde el arranque del subjob y su destino tiene que poder arrancar subjob (INTERNALS 53) | `tLogCatcher` |
 | Nube y APIs | Sin probar | `tRESTClient`, `tHTTP*`, S3, Azure, GCS, Salesforce, Snowflake |
 | Big Data, ESB, MDM, DQ | Sin probar | Decidir alcance segun la licencia de Studio; DQ ya tiene tools de lectura |
 
@@ -173,7 +173,7 @@ datos generen codigo, y estan hechos:
 
 1. ~~Identidad del job, alta verificada, cobertura que mide~~ (hecho).
 2. ~~L3 y L4 medidos con el montaje y los parametros obligatorios del XML~~ (hecho: **259 medidos, 216
-   compilan**). **L5** va por familias, con **25 escenarios en verde** y el `tWarn` pendiente.
+   compilan**). **L5** va por familias, con **28 escenarios en verde y ninguno pendiente**.
 3. ~~Medir las familias de base de datos que faltan~~ (hecho). Las **25 familias de `DB Specifics`**: **179
    componentes, 177 compilan (99 %)**. Fallan `tCosmosDBClose` (pide el driver de MongoDB; fase B) y
    `tIngresBulkExec` (el codigo generado referencia una variable que Talend no declara). Aprendido: **el driver
@@ -210,5 +210,6 @@ datos generen codigo, y estan hechos:
   `talend_studio_install_artifact`; el build de Maven de Studio corre en modo *offline* y sin el driver en su `.m2`
   el componente no compila.
 - Un programa SAS pequeno real para la fase 8.
-- Que familias y ediciones de Talend entran en alcance (Big Data, ESB, MDM, Cloud).
+- Que familias y ediciones de Talend entran en alcance (Big Data, ESB, MDM, Cloud). La propuesta por
+  costo y valor esta en [COBERTURA-POR-FAMILIA.md](COBERTURA-POR-FAMILIA.md).
 - Credenciales de TMC si se quiere publicar en la nube.

@@ -4,6 +4,19 @@ Para un agente (o una persona) que **usa** el MCP contra un Talend Studio abiert
 hacer es cambiar el codigo del repo, empieza por [AGENTS.md](../AGENTS.md); aqui se explica como
 operar Studio.
 
+## Punto de entrada para un agente nuevo
+
+En una sesion MCP, empieza por `talend_guide { mode: "overview" }`. El servidor tambien entrega
+instrucciones durante `initialize`. Para ver una tarea concreta, usa
+`talend_guide { mode: "task", task: "crear-job" }`; para buscar por lenguaje natural, usa
+`talend_guide { mode: "search", query: "contextos" }`. La guia avisa si el preset activo oculta
+alguna tool requerida. Para agentes nuevos, `TALEND_MCP_FILTER=agent` expone las herramientas del
+ciclo habitual de un job; `all` expone las capacidades avanzadas.
+
+El catalogo generado de tools, argumentos y requisitos esta en
+[CATALOGO-DE-TOOLS.md](CATALOGO-DE-TOOLS.md). Para aprender el codigo de este repositorio, consulta
+[ARQUITECTURA.md](ARQUITECTURA.md) y [PLAN-DE-TRABAJO.md](PLAN-DE-TRABAJO.md).
+
 La regla que resume todo: **los jobs se crean y se modifican con la API de Studio (via el
 bridge), nunca escribiendo el `.item` a mano.** Cuando se escribio el XML por fuera, Studio
 dejo el modelo en memoria obsoleto, aparecieron tipos que no existen (`id_Decimal`), valores
@@ -43,7 +56,9 @@ escribiendo el `.item` a mano.
 2. Servidor MCP arriba: `bun run start:server` (o `bun run start`).
 3. Bridge vivo: tool `talend_bridge_ping`, o `bun run scripts/mcp-call.ts talend_bridge_ping '{}'`.
    Debe devolver `plugin: com.andres.talend.bridge`, y `unsafeActions: true` si vas a usar
-   `talend_studio_run_code`.
+   `talend_studio_run_code`. **Mira la `version`**: si es anterior a la ultima compilacion del
+   plugin, Studio acaba de arrancar y ha cargado el bundle instalado, no el de la carga en
+   caliente; reinstala antes de automatizar (INTERNALS 56).
 4. Si cambiaste Java del bridge: `bun run scripts/start.ts --install-bridge` (ver
    [AGENTS.md](../AGENTS.md) para las opciones). No hace falta reiniciar Studio.
 
@@ -150,6 +165,10 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
 - **Escribir en una base de datos:** la conexion va con `AUTO_COMMIT=true` y **no** se encola un
   componente de commit: el `tDBOutput` escribe el lote al final y, sin commit, al cerrar la conexion
   se pierde todo. Un commit encolado se ejecuta dentro del bucle de filas y rompe el lote. Ver INTERNALS 45.
+- **Las listas cerradas van con su `VALUE`, no con el nombre.** `TABLE_ACTION` coincide (`TRUNCATE`), pero
+  `PRIORITY` del `tWarn` no: hay que poner `"4"` (WARNING), no `"WARNING"`. Con el nombre, el valor se cuela
+  como identificador en el codigo generado y el job no compila (`WARNING cannot be resolved to a variable`).
+  Ver INTERNALS 57.
 - **El `tFileList` no emite filas.** Su conector `FLOW` es `MAX_OUTPUT=0`: lo que deja son valores en el
   `globalMap` (`<uniqueName>_CURRENT_FILE`, `_CURRENT_FILEPATH`, ...). Para consumirlos, un `tJavaRow`
   los lee del `globalMap`. Y su `LIST_MODE` es el **tipo de listado** (`FILES`, `DIRECTORIES`, `BOTH`),
@@ -188,7 +207,7 @@ Un escenario declara el job, sus nodos, sus conexiones y **lo que se espera**:
 | `nodos` | Los componentes, en orden |
 | `conexiones` | `origen`, `destino` y, si hace falta, `tipo` (por defecto, el conector de salida del origen) |
 | `espera` | `lineas` (exactas o el numero), `contiene`, `fichero`, `contextos` o `consulta` (SQL contra el Postgres de pruebas) |
-| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que (hoy **ningun escenario lo usa**: los 25 estan en verde) |
+| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que (hoy **ningun escenario lo usa**: los 28 estan en verde) |
 | `contextos` / `jobs` | Los entornos del job y los jobs auxiliares (el hijo de un `tRunJob`), que se montan antes que el principal |
 
 Y cada nodo:
@@ -496,6 +515,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `NumberFormatException: "Main1100Main1"` | Nodo creado fuera de la API de Studio | Recrear el nodo con `talend_job_add_node` |
 | Job vacio tras anadir nodos | No se guardo (`doSave` aborta si el editor no esta "dirty") | Operar con las tools `talend_job_*`, que guardan por `saveXmlFile` |
 | `Invalid class loader from a refreshed bundle` | Bridge viejo atendiendo tras recargar | Volver a ejecutar `--install-bridge` |
+| `/ping` con `version` antigua; `nodes/add` contesta `ok` pero el `.item` del job queda vacio y el job no imprime nada | Studio se reinicio y cargo el bundle **instalado**, no el de la carga en caliente | `--install-bridge --force` y comprobar la `version` (INTERNALS 56) |
 | `The Job ... has wrong configuration` | Error de compilacion del job | Leer `Error Line` y `Detail Message` |
 | `Missing artifact ...` | Runtime del componente no incluido en Studio | `talend_studio_install_artifact` (Maven Central) |
 | `Child module ... does not exist` (al compilar) | El agregador Maven salio mal porque el heap estaba lleno (pasa midiendo muchos componentes en una corrida) | Repetir esos componentes en una corrida nueva (`coverage.ts` ya fuerza un GC al 60 %); no hace falta reiniciar Studio |
@@ -513,7 +533,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `tFileList` | **Validado a L5**, con su peculiaridad: **no emite filas**, deja los valores en el `globalMap` (`<uniqueName>_CURRENT_FILE`...). Para consumirlos hace falta un `tJavaRow` (o equivalente) |
 | `tFileOutputARFF`, `tFileInputARFF`, `tFileInputXML` | El componente esta escrito para otra version de Weka que la que trae Studio |
 | `tFileOutputDelimited` | Necesita librerias que pueden faltar en el `.m2` de Studio |
-| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, 216 de los 259 medidos compilan (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) esta verificado en **18 escenarios** |
+| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, 216 de los 259 medidos compilan (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) esta verificado en **28 escenarios** |
 | Componentes de la generacion nueva | Los 120 de los `.car` (AWS, JDBC, Snowflake...) no tienen XML: su definicion esta en el codigo Java y hay que preguntarsela a Studio (`talend_studio_component_parameters`) |
 | Salida de la vista Run | No se puede leer; por eso existe `talend_job_execute` |
 

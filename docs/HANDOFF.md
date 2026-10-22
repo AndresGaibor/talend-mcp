@@ -20,7 +20,9 @@ L4 compila, L5 ejecuta con la salida esperada).
    en una base de datos, los valores de las celdas de tabla, el `tFileList`, el `tFileInputJSON`, el `tNormalize`
    y el `tJavaRow`).
 4. `docs/PLAN-DE-PRUEBAS.md`: el estado por fase y por familia.
-5. `AGENTS.md`: reglas del repo.
+5. `docs/COBERTURA-POR-FAMILIA.md`: el mapa de cobertura por familia y el orden de las proximas tandas.
+6. `docs/REFACTOR-PENDIENTE.md`: estado de las suites incrementales y candidatos a dividir por responsabilidad.
+7. `AGENTS.md`: reglas del repo.
 
 ## Estado del repo
 
@@ -30,7 +32,7 @@ L4 compila, L5 ejecuta con la salida esperada).
 - **Hay cambios sin commitear** en el arbol de trabajo: la puesta al dia de los cuatro documentos de estado
   (este `HANDOFF`, el `PLAN-DE-PRUEBAS`, la `GUIA-AGENTE` y el `ROADMAP`), las secciones 40 y 53-54 de INTERNALS,
   el plugin Java del bridge (`NodeOperations`, `JobExecutor`, `SchemaOperations`), el arnes
-  (`scripts/execution-check.ts`) y el fixture de escenarios, con los **25 escenarios L5 en verde**.
+  (`scripts/execution-check.ts`) y el fixture de escenarios, con los **28 escenarios L5 en verde**.
 
 ## Comandos de trabajo
 
@@ -121,20 +123,20 @@ El **nombre** de la conexion (`row1`, `row2`...) es la variable de la fila en el
 los componentes la referencian (`row1.monto`). El bridge la llamaba `conn_1` y las transformaciones no generaban
 codigo. Ademas, el **conector** no siempre es `FLOW`: el `tUniqRow` saca sus filas por `UNIQUE`. Ver INTERNALS 32.
 
-### Arnes de ejecucion (L5): 25 de 25 en verde
+### Arnes de ejecucion (L5): 28 de 28 en verde
 
 `scripts/execution-check.ts` monta un job, lo ejecuta y **compara la salida con la esperada** (declarada antes de
 ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json`; el informe sale en
-`testdata/resultados-l5.csv`. **Veinticinco escenarios en verde**: el de humo, el de leer un
+`testdata/resultados-l5.csv`. **Veintiocho escenarios en verde**: el de humo, el de leer un
 CSV, el de leer y escribir un CSV, el de transformaciones (`tUniqRow` + `tSortRow` sobre el CSV, quitando el
 duplicado y ordenando por importe), el `tFilterRow` con condicion, el `tUnite`, el `tMap` que renombra y filtra,
 la escritura de un JSON, la lectura de un JSON, el listado de los ficheros de una carpeta, el trigger de error, los
 contextos, la orquestacion padre/hijo, el `tAggregateRow`, la escritura en Postgres, la lectura de Postgres, el
 `tJavaRow`, el `tNormalize`, el `tRowGenerator`, el `tFilterColumns`, el **update con clave y commit explicito**,
-el **delete con clave**, el **`tDie` que corta el job**, el **rollback explicito** y el **`tPrejob`/`tPostjob`**.
-Queda uno fuera: el `tWarn`, bloqueado por el jar que Studio deja abierto (INTERNALS 55).
+el **delete con clave**, el **`tDie` que corta el job**, el **rollback explicito**, el **`tPrejob`/`tPostjob`** y el
+**`tWarn` que avisa y no corta**, **`tFlowToIterate`** (dos filas, dos iteraciones) y **`tSetGlobalVar`** (la variable se lee desde un `tJavaRow` en el flujo). **Ninguno pendiente.**
 
-Los cinco ultimos, y lo que ensenaron:
+Los ocho ultimos, y lo que ensenaron:
 
 - **"bases de datos: actualizar con clave y commit explicito"**: `tPostgresqlOutput` con `ACTION=UPDATE` y su
   `UPDATE_KEY`, y el `tPostgresqlCommit` colgado con `OnSubjobOk` **del arranque del subjob** (no del output):
@@ -153,13 +155,19 @@ Los cinco ultimos, y lo que ensenaron:
   escriben en el mismo fichero (`APPEND`). El orden comprobado es `pre`, `principal`, `post`: el arnes compara las
   lineas exactas del fichero, no solo que aparezcan. El primer subjob escribe con `FILE_EXIST_EXCEPTION=false`
   porque el Run de Studio deja el fichero escrito antes del relanzamiento.
+- **"control de flujo: convertir filas en iteraciones"**: `tFlowToIterate` convierte cada fila en una iteracion,
+  guarda sus valores con claves como `row1.id` y `row1.nombre` en `globalMap`, y la conexion al `tJava` es de tipo
+  `ITERATE`. El `tJava` imprime una linea por iteracion.
+- **"codigo: guardar y leer una variable global"**: `tSetGlobalVar` guarda las celdas de `VARIABLES` como
+  literales Java. Su consumidor debe ejecutarse por fila en el flujo; el `begin` de un `tJava` se ejecuta antes de
+  procesar la entrada. `tJavaRow` imprime el valor después de `tSetGlobalVar`.
 
 Ademas, el arnes reintenta mientras Studio compila tanto en la espera como en la ejecucion final (`no esta
 compilado` y `No se encontro la clase principal`), reabre el job y repite el `addNode` cuando Studio contesta
 `No se pudo abrir el job ... en el editor` (es transitorio: tambien le pasa con jobs del usuario) y reintenta un
 `addNode` que vuelve sin nombre cuando Studio esta ocupado.
 
-Los seis que se cerraron en las ultimas tandas:
+Los escenarios que se cerraron en las ultimas tandas:
 
 - **"transformaciones: agregar por ciudad"** (`tAggregateRow`): funciona con las cuatro reglas de INTERNALS 41 (la
   tabla de salida va la primera, el origen se queda con una sola tabla, las tablas del agregado usan el nombre
@@ -205,9 +213,9 @@ hace falta para que un `tRunJob` pueda llamar a su hijo.
 - Los valores de las celdas de tabla que son nombres van sin comillas y los demas como literales (INTERNALS 46):
   lo aplica el bridge (`ComponentConfigurator.valorDeCelda` y `esNombreDeCelda`).
 
-**Lo que queda pendiente de L5: el `tWarn`.** Su job se quedo sin codigo generado porque Studio dejo bloqueado
-el `classpath.jar` (INTERNALS 55); hay que reiniciar Studio y volver a probarlo. Los demas escenarios que llevaban
-`pendiente` ya estan en verde: el arnes ejecuta los 25.
+**Lo que queda pendiente de L5: nada.** El `tWarn` (el ultimo que faltaba) ya esta en verde: va como subjob
+propio con `OnSubjobOk` desde el arranque y compila solo si el `PRIORITY` lleva su `VALUE` (`4`), no el
+   nombre `WARNING` (INTERNALS 57). El arnes ejecuta los 27.
 
 ### Otros arreglos de esta sesion
 
@@ -228,7 +236,7 @@ el `classpath.jar` (INTERNALS 55); hay que reiniciar Studio y volver a probarlo.
   que la conexion quedo en el modelo.
 - **La memoria**: Studio se queda sin memoria con las mediciones largas (INTERNALS 39). Ahora la medicion lo
   vigila y cancela al 80 % del heap, y hay la tool `talend_studio_memory`.
-- **25 escenarios L5** con la salida verificada (ver PLAN-DE-PRUEBAS).
+- **28 escenarios L5** con la salida verificada (ver PLAN-DE-PRUEBAS).
 
 ### Contextos (entornos) de un job
 
@@ -276,7 +284,7 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
 | L3/L4 | **259 componentes medidos**: las nueve familias mas usadas (134, de los que 99 compilan) y las que no piden artefacto (`Logs_Errors`, `XML`, `Data_Quality`, `File/Management`, `PostgreSQL`, `MySQL`, `Data_Quality/Matching`, `DB_SCD`, `MS_SQL_Server`, `Oracle`): 125 de ellos, 117 compilan. **216 de 259 compilan (83 %)**. Los que no, necesitan una configuracion real (tablas, XSD, columnas), no un jar. Aparte, las **25 familias de `Databases/DB Specifics`**: **179 componentes, 177 compilan (99 %)**; fallan `tCosmosDBClose` (driver de MongoDB) y `tIngresBulkExec` (codigo generado) |
-| L5 | **25 escenarios con la salida verificada** (los 25 que ejecuta el arnes): humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, un `tFilterRow` con condicion, un `tUnite`, un `tMap` que renombra y filtra, escribir un JSON, **leer un JSON**, **listar los ficheros de una carpeta**, un trigger de error, contextos, orquestacion padre/hijo, un `tAggregateRow`, **escribir en un Postgres y verificar**, **leer de un Postgres**, un `tJavaRow`, un `tNormalize`, **un `tRowGenerator`**, **un `tFilterColumns`**, **un update con clave y commit explicito**, **un delete con clave**, **un `tDie` que corta el job**, **un rollback explicito** y **un `tPrejob`/`tPostjob`**. Pendiente: el `tWarn` (jar bloqueado por Studio, INTERNALS 55) |
+| L5 | **28 escenarios con la salida verificada** (los 28 que ejecuta el arnes): humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, un `tFilterRow` con condicion, un `tUnite`, un `tMap` que renombra y filtra, escribir un JSON, **leer un JSON**, **listar los ficheros de una carpeta**, un trigger de error, contextos, orquestacion padre/hijo, un `tAggregateRow`, **escribir en un Postgres y verificar**, **leer de un Postgres**, un `tJavaRow`, un `tNormalize`, **un `tRowGenerator`**, **un `tFilterColumns`**, **un update con clave y commit explicito**, **un delete con clave**, **un `tDie` que corta el job**, **un rollback explicito**, **un `tPrejob`/`tPostjob`**, **un `tWarn` que avisa y no corta**, **un `tFlowToIterate`** y **un `tSetGlobalVar`**. **No queda ninguno pendiente** |
 
 ## Lo siguiente (por prioridad)
 

@@ -80,99 +80,42 @@ modo solo lectura por defecto.
 
 ## Herramientas disponibles
 
-### Lectura e inspeccion
+### Para agentes externos: empezar por `talend_guide`
 
-- `talend_detect_open_job` - detecta el job abierto en Talend Studio
-- `talend_list_jobs` - lista los jobs del proyecto
-- `talend_read_job` - devuelve resumen de un job
-- `talend_read_contexts` - lee los contextos de un job
-- `talend_list_project_contexts` - lista todos los contextos de todos los jobs del proyecto
-- `talend_list_repository_contexts` - lista todos los contextos de repositorio del proyecto
-- `talend_read_repository_context` - lee un contexto de repositorio completo con todas sus variables
-- `talend_create_job` - crea un job nuevo, opcionalmente dentro de una carpeta
-- `talend_create_folder` - crea una carpeta dentro de `process`
-- `talend_rename_job` - renombra un job existente
-- `talend_delete_job` - elimina un job existente
-- `talend_duplicate_job` - duplica un job, con soporte para `sourceFolderPath` y `targetFolderPath`
-- `talend_move_job_to_folder` - mueve un job completo a otra carpeta
-- `talend_list_components` - lista componentes de un job
-- `talend_show_flow` - muestra el flujo entre componentes
-- `talend_read_contexts` - lee variables de contexto
-- `talend_analyze_tdboutput` - analiza componentes tMysqlOutput/tDBOutput
-- `talend_read_latest_run_log` - obtiene la ultima ejecucion
-- `talend_read_job_errors` - errores historicos en `.metadata/.log`
-- `talend_summarize_open_job` - resumen completo del job abierto
-- `talend_inspect_component` - inspeccion detallada de un componente
-- `talend_inspect_job` - inspeccion completa del job
+El servidor entrega instrucciones MCP al inicializar. La primera llamada recomendada es
+`talend_guide` en modo `overview`; devuelve las tareas, las familias disponibles y enlaces
+`nextActions` para continuar. No hace falta aprenderse los nombres de las ~230 tools.
 
-### Edicion (solo en modo workspace local, no repo)
+```json
+{ "mode": "task", "task": "crear-job" }
+```
 
-- `talend_update_component_parameter` - actualiza parametro de componente
-- `talend_preview_component_parameter` - preview del cambio
-- `talend_update_schema_column` - actualiza columna de schema
-- `talend_preview_schema_column` - preview del cambio
-- `talend_duplicate_component` - duplica un componente
-- `talend_add_connection` - agrega conexion entre componentes
-- `talend_update_context` - actualiza parametro de contexto
-- `talend_upsert_context` - crea o actualiza parametro
-- `talend_delete_context` - elimina parametro de contexto
-- `talend_update_job_metadata` - actualiza nombre/descripcion/purpose
-- `talend_create_repository_context` - crea un contexto de repositorio en `context/`
-- `talend_upsert_repository_context_parameter` - crea o actualiza un parametro en un contexto de repositorio
-- `talend_delete_repository_context` - elimina un contexto de repositorio completo
+Modos de `talend_guide`: `overview` (mapa), `task` (flujo paso a paso), `search` (busqueda en
+lenguaje natural), `tool` (schema y condiciones de una tool), `rules` (reglas de Talend) y
+`environment` (proyecto y estado del bridge). Siempre empieza con `overview` si no sabes que
+pedir. Para clientes nuevos se recomienda `TALEND_MCP_FILTER=agent`: expone un subconjunto para
+el ciclo habitual de un job sin cargar de golpe las ~230 tools. Usa `all` para descubrir todo y
+`core` para una sesion restringida a herramientas esenciales. La guia sigue disponible con
+cualquier preset y advierte cuando una tarea necesita tools no expuestas.
 
-### Jobs y carpetas
+Consulta [docs/CATALOGO-DE-TOOLS.md](docs/CATALOGO-DE-TOOLS.md) para el inventario completo y
+[docs/GUIA-AGENTE.md](docs/GUIA-AGENTE.md) para los detalles operativos de Talend Studio.
 
-- `talend_create_job` acepta `folderPath` para crear archivos dentro de `process/<carpeta>/`
-- `talend_read_job`, `talend_update_job_metadata`, `talend_rename_job` y `talend_delete_job` aceptan `folderPath` para desambiguar jobs repetidos
-- `talend_duplicate_job` acepta `sourceFolderPath` y `targetFolderPath`
-- `talend_move_job_to_folder` mueve `*.item` y `*.properties` y actualiza `TalendProperties:ItemState path`
+### Areas funcionales
 
-### Automatizacion de Talend Studio en vivo (requiere Studio abierto con el bridge)
+El MCP agrupa capacidades para descubrir e inspeccionar jobs, crear y editar jobs en Studio,
+contextos, componentes y schemas, ejecuciones e historiales, diagnostico de errores, validacion,
+secretos, datasets, conexiones, Git, snapshots, Data Quality, mastery de componentes y entregables.
+Usa `talend_guide` para elegir el flujo y [docs/CATALOGO-DE-TOOLS.md](docs/CATALOGO-DE-TOOLS.md)
+para consultar nombres y argumentos exactos. No uses listas copiadas de versiones anteriores: el
+catalogo se genera desde las tools registradas.
 
-Crean y editan jobs con la API nativa de Studio, no escribiendo el `.item`. Flujo, reglas de
-configuracion y errores frecuentes en [docs/GUIA-AGENTE.md](docs/GUIA-AGENTE.md).
+Las tools que leen archivos del proyecto funcionan sin Studio. Las que operan sobre el job abierto,
+crean componentes o ejecutan codigo requieren Studio y el plugin bridge. Para modificar un job,
+sigue el flujo `crear-job` o `editar-job` de `talend_guide`; no edites su `.item` a mano.
 
-- `talend_studio_list_components` / `talend_studio_component_parameters` - catalogo de Studio y parametros de cada componente
-- `talend_job_create_in_studio` / `talend_job_open_in_studio` / `talend_job_delete_in_studio` - ciclo de vida del job
-- `talend_job_add_node` / `talend_job_configure_node` / `talend_job_update_node` / `talend_job_connect_nodes` / `talend_job_set_schema` / `talend_job_list_nodes` - nodos, conexiones y schema
-- `talend_job_run_by_name` - compila y lanza el job en Studio; `talend_job_execute` - lo relanza y devuelve su salida
-- `talend_studio_run_code` - ejecuta Java dentro de Studio (requiere `unsafeActions`)
-- `talend_studio_dismiss_dialogs` / `talend_studio_install_artifact` / `talend_studio_install_modules` / `talend_studio_coverage` - utilidades
-- `talend_bridge_*` - estado y control del IDE (editores, vistas, comandos, launches)
-
-Tambien se puede llamar la API del bridge directo: `bun run scripts/bridge-call.ts /ping`.
-
-### Gestion de repositorios git
-
-- `talend_repo_setup` - clona y activa un repo como proyecto
-- `talend_repo_status` - estado del repo activo
-- `talend_repo_pull` - pull del repo activo
-- `talend_repo_switch` - cambia de repo activo
-- `talend_repo_sources` - lista repos en cache
-
-### Ejecucion
-
-- `talend_run_job` - ejecuta un job de Talend Studio
-- `talend_job_info` - informacion del script de ejecucion
-
-### Conocimiento de componentes
-
-- `talend_components_catalog_status` - estado del catalogo de componentes
-- `talend_components_scan_installed` - escanea los plugins instalados
-- `talend_components_catalog_rebuild` - reconstruye el catalogo local
-- `talend_components_search` - busca componentes en el catalogo
-- `talend_components_inspect` - inspecciona un componente
-- `talend_components_extract_schema` - extrae el schema de un componente
-- `talend_components_compare_schemas` - compara los schemas de dos componentes
-- `talend_components_get_mapping_suggestions` - sugiere mapeos entre schemas
-
-### Recetas y calidad
-
-- `talend_recipe_generate` - genera una receta de flujo a partir de un objetivo
-- `talend_recipe_get` - recupera una receta generada
-- `talend_job_quality_report` - puntaje de calidad de un job con hallazgos
-- `talend_job_quality_issues` - lista los hallazgos de calidad de un job
+Tambien se puede llamar la API local del bridge directamente para diagnostico:
+`bun run scripts/bridge-call.ts /ping`.
 
 ---
 
@@ -185,7 +128,8 @@ Tambien se puede llamar la API del bridge directo: `bun run scripts/bridge-call.
       "command": "bun",
       "args": ["run", "index.ts"],
       "env": {
-        "TALEND_WORKSPACE": "<ruta-al-workspace-de-talend>"
+        "TALEND_WORKSPACE": "<ruta-al-workspace-de-talend>",
+        "TALEND_MCP_FILTER": "agent"
       }
     }
   }
@@ -212,6 +156,7 @@ Para comprobar el estado del servidor, abre `http://127.0.0.1:3927/healthz`.
 bun install          # dependencias
 bun test             # suite completa (330+ tests)
 bun run typecheck    # TypeScript sin emitir
+bun run docs:tools   # regenera el catálogo navegable de tools
 ```
 
 La guia de trabajo para agentes de IA esta en [AGENTS.md](AGENTS.md). El mapa del repositorio

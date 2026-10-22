@@ -2,8 +2,10 @@
  * Harness de ejecucion (L5): monta un job, lo ejecuta y comprueba que la
  * salida es la esperada.
  *
- *   bun run scripts/execution-check.ts             # todas las pruebas
- *   bun run scripts/execution-check.ts archivos     # solo las que cuyo nombre cuadra
+ *   bun run scripts/execution-check.ts                       # todas las pruebas
+ *   bun run scripts/execution-check.ts archivos             # filtro por nombre
+ *   bun run scripts/execution-check.ts --suite transformaciones
+ *   bun run scripts/execution-check.ts --solo-fallidos       # reintenta los fallos del CSV anterior
  *
  * Cada escenario declara el job que hay que montar, como montarlo y **que se
  * espera**; la comprobacion se hace contra esa expectativa, no contra lo que
@@ -16,7 +18,11 @@
  */
 
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
+import { consultar, preparar } from "./l5/postgres";
+import { selectScenarios } from "./l5/scenario-selection";
+import { planJobAssembly } from "./l5/job-plan";
 import { createBridgeClient } from "../src/modules/studio-bridge/adapters/http-studio-bridge.client";
 import { DefinitionIndexRepository } from "../src/modules/component-definitions/infrastructure/definition-index.repository";
 import {
@@ -148,93 +154,87 @@ type Escenario = {
 };
 
 const args = process.argv.slice(2);
-const filtro = args.find((arg) => !arg.startsWith("--"));
 const salidaCsv = "testdata/resultados-l5.csv";
 const ficheroEscenarios = "tests/fixtures/talend/escenarios-l5.json";
 const carpetaTestdata = resolve(process.cwd(), "testdata");
+
+function argumento(nombre: string): string | undefined {
+  const prefijo = `--${nombre}=`;
+  const inline = args.find((arg) => arg.startsWith(prefijo));
+  if (inline) return inline.slice(prefijo.length);
+  const indice = args.indexOf(`--${nombre}`);
+  return indice >= 0 ? args[indice + 1] : undefined;
+}
+
+const suite = argumento("suite")?.toLowerCase();
+const soloFallidos = args.includes("--solo-fallidos");
+const referenciaGit = argumento("desde");
+const filtro = args.find(
+  (arg, index) => !arg.startsWith("--") && args[index - 1] !== "--suite" && args[index - 1] !== "--desde",
+);
+
+const suitesValidas = new Set([
+  "humo", "archivos", "transformaciones", "bd", "control", "contextos", "orquestacion", "codigo", "otros",
+]);
+
+function nombresFallidosAnteriores(): Set<string> {
+  if (!existsSync(salidaCsv)) {
+    throw new Error(`No existe el informe anterior ${salidaCsv}; ejecuta primero una suite completa.`);
+  }
+  return new Set(
+    readFileSync(salidaCsv, "utf8")
+      .split(/\r?\n/)
+      .slice(1)
+      .filter(Boolean)
+      .filter((linea) => {
+        const campos = linea.split(",");
+        return campos[2] !== "si" || campos[3] !== "si";
+      })
+      .map((linea) => linea.split(",", 1)[0] ?? ""),
+  );
+}
+
+function nombresCambiadosDesde(referencia: string): Set<string> {
+  let salida: string;
+  try {
+    salida = execFileSync("git", ["show", `${referencia}:${ficheroEscenarios}`], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    throw new Error(`No se pudo leer ${ficheroEscenarios} en '${referencia}': ${error}`);
+  }
+  const anterior = JSON.parse(salida.replace(/^\uFEFF/, "")) as Escenario[] | { escenarios: Escenario[] };
+  const escenariosAnteriores = Array.isArray(anterior) ? anterior : anterior.escenarios;
+  const versionAnterior = new Map(escenariosAnteriores.map((escenario) => [escenario.nombre, JSON.stringify(escenario)]));
+  const actual = JSON.parse(readFileSync(ficheroEscenarios, "utf8").replace(/^\uFEFF/, "")) as
+    | Escenario[]
+    | { escenarios: Escenario[] };
+  const escenariosActuales = Array.isArray(actual) ? actual : actual.escenarios;
+  return new Set(
+    escenariosActuales
+      .filter((escenario) => versionAnterior.get(escenario.nombre) !== JSON.stringify(escenario))
+      .map((escenario) => escenario.nombre),
+  );
+}
 
 /** Sustituye `@TESTDATA@` por la ruta absoluta de los datos de prueba. */
 function conRutas(valor: string): string {
   return valor.replace(/@TESTDATA@/g, carpetaTestdata.replace(/\\/g, "/"));
 }
 
-/**
- * Consulta a la base de datos de pruebas.
- *
- * Es el Postgres de `testdata/docker-compose.yml` (puerto 5433). Se usa el
- * cliente de SQL que trae Bun, sin dependencias.
- */
-async function consultar(sqlTexto: string): Promise<string | number | null> {
-  const url =
-    process.env.L5_POSTGRES_URL ??
-    "postgres://talend:talend@127.0.0.1:5433/talend_test";
-  try {
-    const sql = new Bun.SQL(url);
-    try {
-      const filas = (await sql.unsafe(sqlTexto)) as Array<Record<string, unknown>>;
-      const primera = filas[0];
-      if (!primera) return null;
-      const valores = Object.values(primera);
-      const valor = valores[0];
-      return valor === null || valor === undefined ? null : (valor as string | number);
-    } finally {
-      await sql.close();
-    }
-  } catch (error) {
-    return null;
-  }
-}
-
-/**
- * Deja la base de datos de pruebas como el escenario la necesita.
- *
- * Se ejecutan las sentencias en orden y, si una falla, el escenario no se
- * ejecuta: una tabla a medio preparar da un resultado que no significa nada.
- */
-async function preparar(sentencias: string[]): Promise<{ ok: boolean; mensaje?: string }> {
-  const url =
-    process.env.L5_POSTGRES_URL ??
-    "postgres://talend:talend@127.0.0.1:5433/talend_test";
-  const sql = new Bun.SQL(url);
-  try {
-    for (const sentencia of sentencias) {
-      await sql.unsafe(sentencia);
-    }
-    return { ok: true };
-  } catch (error) {
-    const mensaje = error instanceof Error ? error.message : String(error);
-    return { ok: false, mensaje: `la preparacion de la base fallo: ${mensaje}` };
-  } finally {
-    await sql.close();
-  }
-}
-
 function errorDe(respuesta: { error?: { message?: string }; rawText?: string }): string {
   return respuesta.error?.message ?? respuesta.rawText?.slice(0, 300) ?? "error desconocido";
-}
-
-/** El tipo de componente de un nodo del escenario, por su nombre. */
-function tipoDeNodo(nodos: Nodo[], nombre: string): string {
-  return nodos.find((nodo) => nodo.nombre === nombre)?.type ?? "";
-}
-
-/**
- * El conector por el que sale un componente.
- *
- * Se saca de su definicion en el XML de Studio: el `tUniqRow` no saca sus
- * filas por el conector principal, sino por "UNIQUE" (y "DUPLICATE" para las
- * repetidas). Conectar por "FLOW" no da error: el job compila y no sale
- * ninguna fila.
- */
-function conectorDeSalida(tipo: string): string {
-  const definicion = definiciones.get(tipo);
-  return definicion ? outputConnectorOf(definicion) : "FLOW";
 }
 
 /** Definiciones de los componentes, para saber sus conectores. */
 let definiciones = new Map<string, Awaited<ReturnType<DefinitionIndexRepository["load"]>>["components"][number]>();
 
 async function main(): Promise<void> {
+  if (suite && !suitesValidas.has(suite)) {
+    throw new Error(`Suite desconocida '${suite}'. Opciones: ${[...suitesValidas].join(", ")}`);
+  }
   if (!existsSync(ficheroEscenarios)) {
     console.error(`No esta el fichero de escenarios: ${ficheroEscenarios}`);
     process.exit(1);
@@ -243,6 +243,18 @@ async function main(): Promise<void> {
     readFileSync(ficheroEscenarios, "utf8").replace(/^\uFEFF/, ""),
   ) as Escenario[] | { escenarios: Escenario[] };
   const escenarios = Array.isArray(contenido) ? contenido : contenido.escenarios;
+  const fallidosAnteriores = soloFallidos ? nombresFallidosAnteriores() : undefined;
+  const cambiadosDesde = referenciaGit ? nombresCambiadosDesde(referenciaGit) : undefined;
+  const escenariosSeleccionados = selectScenarios(escenarios, {
+    nameFilter: filtro,
+    suite,
+    failedNames: fallidosAnteriores,
+    changedNames: cambiadosDesde,
+  });
+  if (escenariosSeleccionados.length === 0) {
+    console.log("No hay escenarios que coincidan con los filtros.");
+    return;
+  }
   const bridge = await createBridgeClient({ config: { timeoutMs: 180_000 } });
 
   // Las definiciones de los componentes: de ellas sale el conector por el que
@@ -250,16 +262,18 @@ async function main(): Promise<void> {
   const indice = await new DefinitionIndexRepository().load();
   definiciones = new Map(indice.components.map((componente) => [componente.name, componente]));
 
-  const lineas = ["escenario,job,ejecuta_ok,salida_correcta,detalle"];
+  const cabeceraCsv = "escenario,job,ejecuta_ok,salida_correcta,detalle";
+  const resultadosPrevios = new Map<string, string>();
+  if (existsSync(salidaCsv)) {
+    for (const linea of readFileSync(salidaCsv, "utf8").split(/\r?\n/).slice(1)) {
+      if (linea.trim()) resultadosPrevios.set(linea.split(",", 1)[0] ?? "", linea);
+    }
+  }
+  const resultadosActuales = new Map<string, string>();
   let bien = 0;
   let total = 0;
 
-  for (const escenario of escenarios) {
-    if (filtro && !escenario.nombre.toLowerCase().includes(filtro.toLowerCase())) continue;
-    if (escenario.pendiente) {
-      console.log(`PENDIENTE ${escenario.nombre}: ${escenario.pendiente}`);
-      continue;
-    }
+  for (const escenario of escenariosSeleccionados) {
     total++;
     const detalle = await ejecutar(bridge, escenario);
     const correcto = detalle.ejecutaOk && detalle.salidaCorrecta;
@@ -268,7 +282,8 @@ async function main(): Promise<void> {
       `${correcto ? "OK   " : "FALLA"} ${escenario.nombre}` +
         (detalle.mensaje ? `: ${detalle.mensaje}` : ""),
     );
-    lineas.push(
+    resultadosActuales.set(
+      escenario.nombre,
       [
         escenario.nombre,
         escenario.job,
@@ -279,6 +294,8 @@ async function main(): Promise<void> {
     );
   }
 
+  for (const [nombre, linea] of resultadosActuales) resultadosPrevios.set(nombre, linea);
+  const lineas = [cabeceraCsv, ...resultadosPrevios.values()];
   writeFileSync(salidaCsv, `${lineas.join("\n")}\n`, "utf8");
   console.log(`\n${bien} de ${total} escenarios correctos. Informe en ${salidaCsv}`);
   if (bien !== total) process.exitCode = 1;
@@ -514,6 +531,10 @@ async function montarJob(
     contextos?: Escenario["contextos"];
   },
 ): Promise<{ ok: boolean; mensaje?: string }> {  // 1. Job limpio.
+  const jobPlan = planJobAssembly({ nodes: spec.nodos, connections: spec.conexiones }, definiciones);
+  if (!jobPlan.ok) {
+    return { ok: false, mensaje: jobPlan.error };
+  }
   const borrado = await reintentar(
     () => bridge.deleteJob({ name: spec.job }),
     transitorioDeStudio,
@@ -548,7 +569,10 @@ async function montarJob(
 
   // 2. Nodos, con sus parametros y su schema.
   const nombres = new Map<string, string>();
-  const tablasPorNodo: Array<{ uniqueName: string; tablas: NonNullable<Nodo["tablas"]> }> = [];
+  const nodosPorAlias = new Map(
+    spec.nodos.map((nodo, indice) => [nodo.nombre ?? `#${indice}`, [nodo, indice] as const]),
+  );
+  const tablasPorNodo: Array<{ nombre: string; uniqueName: string; tablas: NonNullable<Nodo["tablas"]> }> = [];
   const esquemasDespues: Array<{
     uniqueName: string;
     nombre: string;
@@ -556,8 +580,12 @@ async function montarJob(
     columns?: Nodo["columnas"];
     values?: Nodo["values"];
   }> = [];
-  const mappersPorNodo: Array<{ uniqueName: string; mapper: NonNullable<Nodo["mapper"]> }> = [];
-  for (const nodo of spec.nodos) {
+  const mappersPorNodo: Array<{ nombre: string; uniqueName: string; mapper: NonNullable<Nodo["mapper"]> }> = [];
+  for (const alias of jobPlan.nodes) {
+  const entrada = nodosPorAlias.get(alias);
+  if (!entrada) continue;
+  const [nodo, indiceNodo] = entrada;
+  const nombrePlan = nodo.nombre ?? `#${indiceNodo}`;
   const parameters = nodo.parameters
     ? Object.fromEntries(
         Object.entries(nodo.parameters).map(([clave, valor]) => [
@@ -585,8 +613,9 @@ async function montarJob(
   // Dos fallos transitorios de Studio: contesta `ok` sin el nodo (esta
   // terminando un build) o no consigue abrir el job en el editor. En los dos
   // casos se reabre el job y se reintenta antes de dar el escenario por
-  // perdido.
-  for (let intento = 0; intento < 6; intento++) {
+  // perdido. La espera crece, porque el fallo tipico es que Studio todavia
+  // esta cerrando el job anterior.
+  for (let intento = 0; intento < 10; intento++) {
     if (anadido.ok) {
       // El bridge envuelve la respuesta en `result`.
       const cuerpo = (anadido.data ?? {}) as {
@@ -638,7 +667,7 @@ async function montarJob(
         // origen se queda con las columnas del destino.
         esquemasDespues.push({
           uniqueName,
-          nombre: nodo.nombre ?? "",
+          nombre: nombrePlan,
           schema: [],
           columns: nodo.columnas ?? [],
           values: nodo.values,
@@ -676,7 +705,7 @@ async function montarJob(
         };
       }
       if (nodo.schemaDespuesDeConectar) {
-        esquemasDespues.push({ uniqueName, nombre: nodo.nombre ?? "", schema });
+        esquemasDespues.push({ uniqueName, nombre: nombrePlan, schema });
       }
     }
   }
@@ -684,36 +713,31 @@ async function montarJob(
     // Las tablas se ponen DESPUES de conectar: al conectar, Talend rehace
     // las tablas del componente y se pierde lo que se habia puesto antes
     // (es lo que pasa con el tMap y con el tAggregateRow).
-    tablasPorNodo.push({ uniqueName, tablas: nodo.tablas });
+    tablasPorNodo.push({ nombre: nombrePlan, uniqueName, tablas: nodo.tablas });
   }
   if (nodo.mapper) {
     // El modelo del tMap tambien va despues de conectar: necesita las
     // columnas de la conexion de entrada para evaluar las expresiones.
-    mappersPorNodo.push({ uniqueName, mapper: nodo.mapper });
+    mappersPorNodo.push({ nombre: nombrePlan, uniqueName, mapper: nodo.mapper });
   }
 }
-// 3. Conexiones. El conector se saca de la definicion del componente de
-// origen: el tUniqRow no saca sus filas por "FLOW", sino por "UNIQUE".
-for (const conexion of spec.conexiones) {
-  const origen = nombres.get(conexion.origen);
-  const destino = nombres.get(conexion.destino);
+// 3. El runner traduce los alias del plan a los nombres unicos generados por Studio.
+for (const conexion of jobPlan.connections) {
+  const origen = nombres.get(conexion.source);
+  const destino = nombres.get(conexion.target);
   if (!origen || !destino) {
-    return {
-  ok: false,
-      mensaje: `conexion sin nodos: ${conexion.origen} -> ${conexion.destino}`,
-    };
+    return { ok: false, mensaje: `conexion sin nodos: ${conexion.source} -> ${conexion.target}` };
   }
-  const tipo = conexion.tipo ?? conectorDeSalida(tipoDeNodo(spec.nodos, conexion.origen));
   const conectada = await bridge.connectNodes({
     job: spec.job,
     source: origen,
     target: destino,
-    type: tipo,
+    type: conexion.type,
   });
   if (!conectada.ok) {
     return {
   ok: false,
-      mensaje: `no se pudo conectar ${conexion.origen} -> ${conexion.destino}: ${errorDe(conectada)}`,
+      mensaje: `no se pudo conectar ${conexion.source} -> ${conexion.target}: ${errorDe(conectada)}`,
     };
   }
 }
@@ -725,12 +749,10 @@ for (const conexion of spec.conexiones) {
 // atras, asi que el origen se queda con las columnas del destino. Por eso
 // los esquemas "despues" de los nodos que son origen de alguna conexion se
 // ponen los ultimos: son los que se han quedado descolocados.
-const destinos = new Set(spec.conexiones.map((conexion) => conexion.destino));
-const esOrigen = (pendiente: { nombre: string }) => !destinos.has(pendiente.nombre);
-const ordenEsquemas = [
-  ...esquemasDespues.filter((pendiente) => !esOrigen(pendiente)),
-  ...esquemasDespues.filter(esOrigen),
-];
+const ordenSchemas = new Map(jobPlan.afterConnect.schemas.map((nombre, indice) => [nombre, indice]));
+const ordenEsquemas = [...esquemasDespues].sort(
+  (a, b) => (ordenSchemas.get(a.nombre) ?? Number.MAX_SAFE_INTEGER) - (ordenSchemas.get(b.nombre) ?? Number.MAX_SAFE_INTEGER),
+);
 for (const pendiente of ordenEsquemas) {
     if (pendiente.values) {
       const conDatos = await bridge.setNodeSchema({
@@ -759,7 +781,10 @@ for (const pendiente of ordenEsquemas) {
     };
   }
 }
-for (const pendiente of tablasPorNodo) {
+const tablasPorNombre = new Map(tablasPorNodo.map((pendiente) => [pendiente.nombre, pendiente]));
+for (const nombre of jobPlan.afterConnect.tables) {
+  const pendiente = tablasPorNombre.get(nombre);
+  if (!pendiente) continue;
   const conTablas = await bridge.configureNode({
     job: spec.job,
     uniqueName: pendiente.uniqueName,
@@ -774,7 +799,10 @@ for (const pendiente of tablasPorNodo) {
 }
 // El modelo del tMap: las tablas de entrada, las de salida (con las
 // expresiones de cada columna) y las variables.
-for (const pendiente of mappersPorNodo) {
+const mappersPorNombre = new Map(mappersPorNodo.map((pendiente) => [pendiente.nombre, pendiente]));
+for (const nombre of jobPlan.afterConnect.mappers) {
+  const pendiente = mappersPorNombre.get(nombre);
+  if (!pendiente) continue;
   const conMapper = await bridge.configureNode({
     job: spec.job,
     uniqueName: pendiente.uniqueName,

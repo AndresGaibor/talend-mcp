@@ -17,6 +17,7 @@
     "dq:analyses": "bun run scripts/list-dq-analyses.ts",
     "jobs": "bun run scripts/jobs.ts",
     "contexts": "bun run scripts/contexts.ts",
+    "docs:tools": "bun run scripts/generate-tool-catalog.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

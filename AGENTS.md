@@ -10,7 +10,7 @@ archivo. `CLAUDE.md` solo guarda el detalle de Bun y apunta aqui.
 Servidor MCP (Model Context Protocol) que analiza y edita proyectos de **Qlik Talend Studio**
 sobre los archivos `.item` y `.properties` de un workspace de Talend.
 
-El servidor expone ~220 herramientas MCP. No tiene interfaz grafica propia: la consumes desde
+El servidor expone ~230 herramientas MCP. No tiene interfaz grafica propia: la consumes desde
 un cliente MCP.
 
 **Dos formas de trabajar aqui, dos puntos de entrada:**
@@ -19,6 +19,12 @@ un cliente MCP.
 |---|---|
 | **Usar** el MCP para crear, editar, ejecutar y verificar jobs en un Talend Studio abierto | [docs/GUIA-AGENTE.md](docs/GUIA-AGENTE.md) (flujo, reglas de configuracion, errores, limites) y [docs/PLAN-DE-PRUEBAS.md](docs/PLAN-DE-PRUEBAS.md) |
 | **Cambiar** el codigo del repo o el plugin Java | Este archivo, [docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md) y [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) |
+
+Para un agente conectado al servidor MCP, la primera llamada es `talend_guide` en modo
+`overview`. Para clientes externos nuevos usa `TALEND_MCP_FILTER=agent`; la guia descubre las
+tools activas, enseña tareas paso a paso y avisa cuando el preset no expone una capacidad.
+El inventario completo se genera con `bun run docs:tools` y se publica en
+[docs/CATALOGO-DE-TOOLS.md](docs/CATALOGO-DE-TOOLS.md).
 
 Regla de fondo para quien usa el MCP: los jobs se crean y modifican **con las tools que usan la
 API de Studio** (`talend_job_*_in_studio`, `talend_job_add_node`...), nunca escribiendo el
@@ -63,7 +69,9 @@ Reglas de Bun (proyecto, no Node):
 - **`entregables/` y `evidencias/`** son salidas generadas y no se versionan.
 - **El plugin Java se recarga en caliente.** `bun run scripts/start.ts --install-bridge`
   publica el bundle en `~/.talend-bridge/hot/bridge.jar` y el plugin lo detecta y se
-  recarga solo (`Bundle.update`). No reinicies Talend Studio para aplicar cambios.
+  recarga solo (`Bundle.update`). No reinicies Talend Studio para aplicar cambios. Ojo: al
+  reiniciar Studio se carga el bundle **instalado**, no el de la carga en caliente; despues de un
+  reinicio hay que volver a lanzar `--install-bridge` y mirar la `version` del ping.
 - **Nada lento ni bloqueante en el hilo de UI del bridge.** `UiThread.sync` es solo para tocar
   widgets o el modelo del job, y en trozos cortos. Ejecutar jobs, descargar artefactos, recorrer
   el catalogo entero o esperar procesos va en el hilo de trabajo HTTP; si no, Talend Studio se

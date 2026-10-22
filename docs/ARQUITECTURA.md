@@ -13,7 +13,7 @@ Mapa del repositorio `talend-mcp`. Para las reglas de trabajo mira [AGENTS.md](.
             │ HTTP / SSE / stdio
 ┌───────────▼──────────────┐
 │      Servidor MCP        │   index.ts
-│  new-server.ts           │   ├─ registro de tools (~200)
+│  new-server.ts           │   ├─ registro de tools (~230)
 │  registered-tools.ts     │   └─ dispatch JSON-RPC
 └───────────┬──────────────┘
             │
@@ -28,9 +28,19 @@ Mapa del repositorio `talend-mcp`. Para las reglas de trabajo mira [AGENTS.md](.
                                 └──────────────┘
 ```
 
-El servidor trabaja **sin** Talend Studio abierto: lee y escribe los archivos del proyecto
-directamente. El plugin Java solo hace falta para lo que exige el IDE en vivo (job abierto,
-seleccion, ejecuciones, markers).
+El MCP tiene dos modos de operacion y no deben confundirse:
+
+- **Inspeccion en disco**: puede listar y analizar `.item`, `.properties`, contextos y logs sin
+  abrir Studio.
+- **Edicion y ejecucion en vivo**: para crear y modificar jobs, configurar nodos y ejecutar codigo
+  se usa la API del IDE mediante el plugin bridge. No edites `.item` a mano: Studio mantiene un
+  modelo en memoria y el XML externo puede dejar el job inconsistente.
+
+El handshake MCP da instrucciones para agentes nuevos. La tool `talend_guide` orienta en tareas,
+schemas, reglas del dominio y estado del entorno. Para un cliente externo nuevo se recomienda
+`TALEND_MCP_FILTER=agent`; `all` expone el catalogo completo y `core` limita las tools a una
+seleccion esencial. La guia permanece visible con todos los presets y avisa si el preset no expone
+los pasos necesarios para una tarea.
 
 ## 2. Capas del servidor
 
@@ -40,22 +50,30 @@ seleccion, ejecuciones, markers).
 | Config | `src/config/` | Contrato de variables de entorno. |
 | Nucleo | `src/domain/`, `src/application/` | Entidades de job, workspace, analysis y los casos de uso que las usan. |
 | Infraestructura | `src/infrastructure/` | Filesystem, git, XML y repositorios. |
-| Dominio Talend | `src/talend/` | Todo lo que sabe de Talend: XML de jobs, contextos, Data Quality, mastery, diagnostico, ejecuciones y las tools de estudio. |
-| Modulos | `src/modules/` | Modulos con casos de uso y adapters propios (datasets, secrets, studio-bridge, component-knowledge, evidence-pack, requirements, runs, errors, validation, snapshots). |
+| Dominio Talend | `src/talend/` | XML de jobs, contextos, Data Quality, mastery, diagnostico, ejecuciones, bridge y tools del IDE. |
+| Modulos | `src/modules/` | Modulos con casos de uso y adapters propios: jobs, runs, secrets, datasets, snapshots, component-knowledge, component-definitions, studio-bridge, guide, errors, validation, evidence-pack y requirements. |
 | Presentacion | `src/presentation/` | Tools por area (`tools/`) y el servidor HTTP/stdio (`server/`). |
 | Servidor | `src/server/` | Registro de tools, adaptacion al MCP, esquemas de salida. |
 | Compartido | `src/shared/` | Contratos: envelope `TalendResult`, result envelope. |
 
 ### Tools: dos ubicaciones, un solo registro
 
-- **Tools de modulo** (`src/modules/*/tools/`): casos de uso propios, schema Zod,
-  `structuredContent` con el payload en `data`.
-- **Tools de estudio** (`src/talend/studio/tools-<area>.ts`): lo que necesita el IDE en vivo
-  (bridge, componentes, snapshots, ejecuciones, specs de pipeline).
+- **Tools de presentacion** (`src/presentation/tools/`): registro legacy organizado por areas.
+- **Tools de modulo** (`src/modules/*/tools/`): casos de uso propios, schema Zod y contratos
+  de salida.
+- **Tools de Studio** (`src/talend/studio/tools-<area>.ts`): operaciones sobre bridge/IDE,
+  componentes, ejecuciones, snapshots y especificaciones.
 
-Ambas familias se ensamblan en `src/presentation/server/tool-registry.ts` y se registran en
-`getModuleTools()` (`src/server/registered-tools.ts`). No hay aliases: cada capacidad tiene
-una sola tool, llamada `talend_<area>_<verbo>`.
+Las listas convergen en `getRegisteredServerTools()` (`src/presentation/server/tool-registry.ts`)
+y `getModuleTools()` (`src/server/registered-tools.ts`), donde se adaptan al MCP y se aplican
+presets. Flujo:
+
+```text
+implementacion -> registro -> adaptToolToMcp -> preset -> MCP tools/list -> tools/call
+```
+
+No agregues una tool sin conectarla al registro y probar que aparece con el preset esperado.
+`docs/CATALOGO-DE-TOOLS.md` se genera con `bun run docs:tools`.
 
 ## 3. Plugin Java (bridge)
 
@@ -105,3 +123,10 @@ tests/
 ```
 
 Todos los tests corren con `bun test`. `bunfig.toml` acota la busqueda a `tests/`.
+
+El montaje de escenarios L5 empieza a separarse del acceso al bridge mediante planes puros en
+`scripts/l5/`. `planJobAssembly` traduce alias y conectores (segun las definiciones de Studio) y
+ordena las fases posteriores a conectar: re-aplicar schemas, configurar tablas y aplicar el modelo
+del `tMap`. Se prueba sin abrir el IDE (`tests/talend/job-plan.test.ts`); el arnes L5 sigue siendo
+la prueba de integracion en Studio. Esta capa se ampliara por pasos, sin reemplazar las tools MCP
+ni escribir archivos `.item` directamente.

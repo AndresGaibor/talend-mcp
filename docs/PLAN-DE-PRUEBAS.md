@@ -41,12 +41,12 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 | 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**. **Se ejecutan bien** el `tUniqRow`, el `tSortRow`, el `tFilterRow` (con su condicion), el `tUnite`, el `tAggregateRow` (con sus tablas `GROUPBYS` y `OPERATIONS`; ver INTERNALS 41) y el `tNormalize` (que parte una columna en filas; la entrada y la salida tienen que declarar las columnas con el mismo nombre). Sin probar: `tJoin`, `tReplicate`, `tDenormalize` y `tFilterColumns` |
 | 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`) y con el `tJavaRow` cuya salida la define el parametro `SCHEMA` (el escenario L5, que aplica el esquema despues de conectar) |
 | 5 | Excel, posicional, JSON, Parquet | **Validada**: la **lectura** de JSON (`tFileInputJSON`) compila y se ejecuta con la salida esperada (la raiz del bucle va en `JSON_LOOP_QUERY` y el mapeo en la tabla `MAPPING_JSONPATH`; ver INTERNALS 48), y la **escritura** de JSON funciona (el `tFileOutputJSON` escribe las filas). `tFileInputPositional`: el `.item` es correcto |
-| 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes), el `tFileList` lista la carpeta (no emite filas: deja los valores en el `globalMap`; ver INTERNALS 47), el `tDie` corta el job con codigo 1, un trigger de error (`SUBJOB_ERROR` desde el arranque del subjob) ejecuta su manejador y `tPrejob`/`tPostjob` corren antes y despues del subjob principal (el fichero sale en el orden `pre`, `principal`, `post`). Un trigger se genera solo si sale del **arranque** del subjob y su destino tiene que poder arrancar subjob (INTERNALS 53). Pendiente: `tWarn`, bloqueado porque Studio dejo el `classpath.jar` del job abierto (INTERNALS 55) |
+| 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn`, `tFlowToIterate`, `tSetGlobalVar` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes), el `tFileList` lista la carpeta (no emite filas: deja los valores en el `globalMap`; ver INTERNALS 47), el `tDie` corta el job con codigo 1, un trigger de error (`SUBJOB_ERROR` desde el arranque del subjob) ejecuta su manejador, `tPrejob`/`tPostjob` corren antes y despues del subjob principal (el fichero sale en el orden `pre`, `principal`, `post`), el `tWarn` avisa sin cortar el job (`[WARN ] ... Message: ... Code: ...` en la salida), `tFlowToIterate` convierte dos filas en dos iteraciones y `tSetGlobalVar` permite leer `l5_global=Talend` desde un `tJavaRow`. Un trigger se genera solo si sale del **arranque** del subjob y su destino tiene que poder arrancar subjob (INTERNALS 53). El `PRIORITY` del `tWarn` va con su `VALUE` (`4`), no con el nombre `WARNING` (INTERNALS 57) |
 | 7 | Bases de datos (`tDB*`, commit/rollback, insert/update/delete) | **Completa la parte de Postgres**: el `tPostgresqlInput` lee del Postgres de pruebas con la salida esperada, el `tPostgresqlOutput` **escribe y se verifica**, **actualiza con clave** (`UPDATE_KEY`), **hace commit explicito** (`tPostgresqlCommit` colgado con `OnSubjobOk` del arranque del subjob, con `AUTO_COMMIT=false` en la conexion), **borra con clave** (`DELETE_KEY`) y **deshace con rollback explicito** (`tPostgresqlRollback`: la consulta de comprobacion ve el valor anterior). Sin probar: las demas acciones de salida y las familias de base de datos que faltan |
 | 8 | Migracion de un programa SAS real, comparado fila por fila | **Pendiente** |
 | 9 | Robustez | Validada: componente inexistente da error claro; repetir la instruccion no duplica componentes; 16 componentes y 60 columnas |
 
-Orden recomendado para lo que falta: el `tWarn` (la 6), cuando se reinicie Studio, y la 8 (la migracion de SAS).
+Orden recomendado para lo que falta: la 8 (la migracion de SAS).
 
 ## Plantilla de resultados
 
@@ -61,6 +61,9 @@ un job de pruebas (`MCP_Coverage`) y escribe `testdata/cobertura.csv`. Tarda ~5 
 consulta el progreso (una peticion HTTP unica la cortaria el cliente a los 5 min). Opciones: `--filter`, `--family`,
 `--components`, `--max`, `--compile` (nivel L4), `--cancel`. Tras cada fallo el job de pruebas se reinicia, para
 que un componente roto no contamine a los siguientes. `bun run scripts/coverage-summary.ts` agrupa los fallos.
+
+El mapa por familia, los fallos que no son del componente y el orden de las proximas tandas estan
+en [COBERTURA-POR-FAMILIA.md](COBERTURA-POR-FAMILIA.md).
 
 **"Montar" es lo que hace que la medicion valga**: cada componente se mide dentro de un job minimo (un
 `tFixedFlowInput` con schema si consume, un `tLogRow` si el generador lo pide) y con sus parametros obligatorios
@@ -262,7 +265,7 @@ Esto es lo que hace lento el catalogo completo: no es la medicion, es la red.
 
 Esto es L1/L2/L3/L4 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista,
 acepte configuracion, se pueda conectar y compile. **No** dice que ejecute bien: eso es L5, y esta validado en
-**25 escenarios** con la salida verificada.
+**28 escenarios** con la salida verificada.
 
 ## Ejecucion con la salida esperada (L5)
 
@@ -274,6 +277,9 @@ el fichero que escribe). El informe queda en `testdata/resultados-l5.csv`.
 |---|---|
 | `bun run scripts/execution-check.ts` | Monta y ejecuta todos los escenarios |
 | `bun run scripts/execution-check.ts agregar` | Solo los escenarios cuyo nombre contenga ese texto |
+| `bun run scripts/execution-check.ts --suite transformaciones` | Ejecuta una suite: `humo`, `archivos`, `transformaciones`, `bd`, `control`, `contextos`, `orquestacion`, `codigo` u `otros` |
+| `bun run scripts/execution-check.ts --solo-fallidos` | Reintenta solo los escenarios fallidos segun `testdata/resultados-l5.csv` |
+| `bun run scripts/execution-check.ts --desde HEAD` | Ejecuta los escenarios cuyo fixture cambio respecto al commit indicado |
 | `L5_KEEP_JOBS=1 bun run scripts/execution-check.ts` | Deja los jobs montados en Studio (por defecto se borran). En PowerShell: `$env:L5_KEEP_JOBS="1"; bun run scripts/execution-check.ts` |
 
 En el JSON de escenarios, `@TESTDATA@` es la carpeta `testdata/` (los datos que usan: `l5_clientes.csv`,
@@ -311,8 +317,11 @@ docker compose -f testdata/docker-compose.yml up -d
 | `tFixedFlowInput` -> `tDie` | Correcto: el job termina con codigo 1 y el mensaje del `tDie` |
 | `tPostgresqlConnection` -> `tPostgresqlOutput` (`ACTION=UPDATE`, `UPDATE_KEY`) + `tPostgresqlRollback` con `OnSubjobOk` desde el arranque del subjob | Correcto: la consulta de comprobacion ve el valor **anterior**. La conexion va con `AUTO_COMMIT=false` y el rollback se cuelga del arranque del subjob, igual que el commit |
 | `tPrejob` -> `tFixedFlowInput` -> `tFileOutputDelimited`, subjob principal, `tPostjob` -> `tFixedFlowInput` -> `tFileOutputDelimited` (los tres al mismo fichero, con `APPEND`) | Correcto: el fichero queda en el orden `pre`, `principal`, `post`. `tPrejob`/`tPostjob` solo tienen conector `COMPONENT_OK` (no `FLOW`): se cuelgan con `OnComponentOk` del `tFixedFlowInput` de su subjob |
+| `tFixedFlowInput` -> `tLogRow` y, con `OnSubjobOk`, un `tWarn` (`PRIORITY=4`) | Correcto: sale la fila y la linea `[WARN ] ... Message: ... Code: ...`, y el job termina con codigo 0. Con `PRIORITY="WARNING"` (el nombre en vez del `VALUE`) el job no compila (INTERNALS 57) |
+| `tFixedFlowInput` -> `tFlowToIterate` -> `tJava` (conector `ITERATE`) | Correcto: cada fila activa una iteracion y los valores `row1.id` y `row1.nombre` del `globalMap` salen como `1\|Ana` y `2\|Jose` |
+| `tFixedFlowInput` -> `tSetGlobalVar` -> `tJavaRow` | Correcto: la tabla `VARIABLES` guarda `l5_global=Talend` y el consumidor, ejecutado por fila tras el flujo, imprime `Talend` |
 
-**Veinticinco escenarios en verde (los 25 pasan).** Los dos ultimos son el rollback explicito (la consulta de
+**Veintiocho escenarios en verde (los 28 pasan).** Se validaron `tFlowToIterate` (convierte cada fila en una iteracion) y `tSetGlobalVar` (variable global disponible para el consumidor en el flujo). Antes, el `tWarn` (avisa y el job sigue), el rollback explicito (la consulta de
 comprobacion ve el valor anterior) y el `tPrejob`/`tPostjob` (el fichero sale en el orden `pre`, `principal`,
 `post`); antes se anadieron el commit explicito con `OnSubjobOk` (`tPostgresqlCommit`), el borrado con clave
 (`DELETE_KEY`) y el `tDie`; antes el generador de filas (`tRowGenerator`) y el filtro de columnas

@@ -5,7 +5,9 @@
  *   bun run scripts/coverage.ts --filter tFile     # solo los que contienen ese texto
  *   bun run scripts/coverage.ts --max 50           # solo los primeros 50
  *   bun run scripts/coverage.ts --compile          # ademas genera el codigo y comprueba que compila (L4)
+ *   bun run scripts/coverage.ts --family File/Input --solo-pendientes
  *   bun run scripts/coverage.ts --out informe.csv  # guarda el detalle
+ *   bun run scripts/coverage.ts --solo-pendientes   # omite componentes ya compilados en una tanda anterior
  *   bun run scripts/coverage.ts --cancel           # para la medicion en marcha
  *
  * El informe sale en `testdata/cobertura.csv` con una fila por componente: si se pudo
@@ -17,11 +19,12 @@
  * segundos: una sola peticion HTTP larga la cortaria el cliente a los 5 minutos.
  */
 
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createBridgeClient } from "../src/modules/studio-bridge/adapters/http-studio-bridge.client";
 import { DefinitionIndexRepository } from "../src/modules/component-definitions/infrastructure/definition-index.repository";
 import { planMount } from "../src/modules/component-definitions/application/plan-required-parameters.use-case";
 import type { ComponentDefinition } from "../src/modules/component-definitions/domain/component-definition.types";
+import { filterUncompiled } from "./coverage-selection";
 
 const args = process.argv.slice(2);
 
@@ -141,36 +144,47 @@ async function selectComponents(mount: Record<string, unknown>): Promise<string[
   const family = valorDe("--family");
   const explicit = valorDe("--components");
   const sinArtefacto = args.includes("--sin-artefacto");
+  let selected: string[] | undefined;
   if (explicit) {
-    return explicit
+    selected = explicit
       .split(",")
       .map((name) => name.trim())
       .filter((name) => name.length > 0);
+  } else if (!family && !args.includes("--con-definicion") && !sinArtefacto) {
+    selected = undefined;
+  } else {
+    const repository = new DefinitionIndexRepository();
+    const index = await repository.load();
+    if (args.includes("--con-definicion")) {
+      // Los componentes que tienen definicion XML: son los que se pueden
+      // configurar con el plan. Los otros tardan minutos buscando artefactos.
+      selected = Object.keys(mount);
+    } else {
+      const wanted = (family ?? "")
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter((item) => item.length > 0);
+      selected = index.components
+        .filter(
+          (definition) =>
+            definition.palette === "DI" &&
+            (wanted.length === 0 || definition.families.some((item) => wanted.includes(item.toLowerCase()))) &&
+            (!sinArtefacto || !pideArtefacto(definition)),
+        )
+        .map((definition) => definition.name)
+        .filter((name) => name in mount);
+    }
   }
-  if (!family && !args.includes("--con-definicion") && !sinArtefacto) {
-    return undefined;
+
+  if (!args.includes("--solo-pendientes")) return selected;
+  const reports: string[] = [];
+  if (existsSync("testdata")) {
+    for (const file of readdirSync("testdata")) {
+      if (!file.startsWith("cobertura") || !file.endsWith(".csv")) continue;
+      reports.push(readFileSync(`testdata/${file}`, "utf8"));
+    }
   }
-  const repository = new DefinitionIndexRepository();
-  const index = await repository.load();
-  if (args.includes("--con-definicion")) {
-    // Los componentes que tienen definicion XML: son los que se pueden
-    // configurar con el plan. Los otros (los de la generacion nueva) tardan
-    // minutos cada uno porque el generador busca su artefacto en Maven.
-    return Object.keys(mount);
-  }
-  const wanted = (family ?? "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter((item) => item.length > 0);
-  return index.components
-    .filter(
-      (definition) =>
-        definition.palette === "DI" &&
-        (wanted.length === 0 || definition.families.some((item) => wanted.includes(item.toLowerCase()))) &&
-        (!sinArtefacto || !pideArtefacto(definition)),
-    )
-    .map((definition) => definition.name)
-    .filter((name) => name in mount);
+  return filterUncompiled(selected ?? Object.keys(mount), reports);
 }
 
 /**

@@ -2430,6 +2430,272 @@
           ]
         }
       }
+    },
+    {
+      "nombre": "control de flujo: un tWarn avisa y el job sigue",
+      "job": "MCP_L5_Aviso",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "1",
+              "Ana"
+            ]
+          ]
+        },
+        {
+          "type": "tWarn",
+          "nombre": "aviso",
+          "parameters": {
+            "MESSAGE": {
+              "value": "cuidado con el dato"
+            },
+            "CODE": {
+              "value": "W001"
+            },
+            "PRIORITY": {
+              "value": "4"
+            }
+          }
+        },
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "salida"
+        },
+        {
+          "origen": "entrada",
+          "destino": "aviso",
+          "tipo": "SUBJOB_OK"
+        }
+      ],
+      "espera": {
+        "contiene": [
+          "1|Ana",
+          "cuidado con el dato",
+          "Code: W001"
+        ]
+      }
+    },
+    {
+      "nombre": "control de flujo: convertir filas en iteraciones",
+      "job": "MCP_L5_Itera",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "1",
+              "Ana"
+            ],
+            [
+              "2",
+              "Jose"
+            ]
+          ]
+        },
+        {
+          "type": "tFlowToIterate",
+          "nombre": "itera"
+        },
+        {
+          "type": "tJava",
+          "nombre": "imprime",
+          "parameters": {
+            "CODE": {
+              "value": "System.out.println(globalMap.get(\"row1.id\") + \"|\" + globalMap.get(\"row1.nombre\"));"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "itera"
+        },
+        {
+          "origen": "itera",
+          "destino": "imprime",
+          "tipo": "ITERATE"
+        }
+      ],
+      "espera": {
+        "contiene": [
+          "1|Ana",
+          "2|Jose"
+        ]
+      }
+    },
+    {
+      "nombre": "codigo: guardar y leer una variable global",
+      "job": "MCP_L5_GlobalVar",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            }
+          ],
+          "values": [
+            [
+              "1"
+            ]
+          ]
+        },
+        {
+          "type": "tSetGlobalVar",
+          "nombre": "guarda",
+          "tablas": {
+            "VARIABLES": {
+              "columns": [
+                "KEY",
+                "VALUE"
+              ],
+              "rows": [
+                {
+                  "KEY": "l5_global",
+                  "VALUE": "Talend"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "tJavaRow",
+          "nombre": "lee",
+          "parameters": {
+            "CODE": {
+              "value": "System.out.println(globalMap.get(\"l5_global\"));"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "guarda"
+        },
+        {
+          "origen": "guarda",
+          "destino": "lee"
+        }
+      ],
+      "espera": {
+        "contiene": [
+          "Talend"
+        ]
+      }
+    },
+    {
+      "nombre": "transformaciones: unir flujo principal y lookup",
+      "job": "MCP_L5_Join",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "principal",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" }
+          ],
+          "values": [
+            ["1", "Ana"],
+            ["2", "Beto"]
+          ],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "lookup",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "ciudad", "type": "id_String" }
+          ],
+          "values": [
+            ["1", "Bogota"],
+            ["2", "Cali"]
+          ],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tJoin",
+          "nombre": "union",
+          "parameters": {
+            "USE_LOOKUP_COLS": { "value": "true" }
+          },
+          "esquemas": [
+            {
+              "conector": "FLOW",
+              "nombre": "@uniqueName",
+              "columnas": [
+                { "name": "id", "type": "id_Integer" },
+                { "name": "nombre", "type": "id_String" },
+                { "name": "ciudad_lookup", "type": "id_String" }
+              ]
+            }
+          ],
+          "schemaDespuesDeConectar": true,
+          "tablas": {
+            "JOIN_KEY": {
+              "columns": ["INPUT_COLUMN", "LOOKUP_COLUMN"],
+              "rows": [
+                { "INPUT_COLUMN": "id", "LOOKUP_COLUMN": "id" }
+              ]
+            },
+            "LOOKUP_COLS": {
+              "columns": ["OUTPUT_COLUMN", "LOOKUP_COLUMN"],
+              "rows": [
+                { "OUTPUT_COLUMN": "ciudad_lookup", "LOOKUP_COLUMN": "ciudad" }
+              ]
+            }
+          }
+        },
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
+      ],
+      "conexiones": [
+        { "origen": "principal", "destino": "union" },
+        { "origen": "lookup", "destino": "union" },
+        { "origen": "union", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": [
+          "1|Ana|Bogota",
+          "2|Beto|Cali"
+        ]
+      }
     }
   ]
 }

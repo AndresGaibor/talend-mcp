@@ -51,6 +51,7 @@ import { createSchemaSuggestionsTool } from "../modules/component-knowledge/tool
 import { createCatalogRebuildTool } from "../modules/component-knowledge/tools/catalog-rebuild.tool";
 import { createJobQualityReportTool, createJobQualityIssuesTool } from "../modules/component-knowledge/tools/job-quality.tool";
 import { createComponentDefinitionTool } from "../modules/component-definitions/tools/component-definition.tool";
+import { createAgentGuideTool } from "../modules/guide/tools/agent-guide.tool";
 
 export type RuntimeTool = {
   definition: McpToolDefinition;
@@ -102,6 +103,7 @@ function getModuleTools(): RuntimeTool[] {
     createJobQualityReportTool(),
     createJobQualityIssuesTool(),
     createComponentDefinitionTool(),
+    createAgentGuideTool({ listTools: () => getAllRuntimeTools() }),
   ];
 
   return rawTools.map((tool) => ({
@@ -155,6 +157,7 @@ export function buildRuntimeToolCache(): void {
 //
 //   all          → todas las tools talend_*
 //   canonical    → idem, sin los duplicados legacy conocidos
+//   agent        → flujo habitual de inspeccion, creacion, edicion y ejecucion
 //   core         → 21 tools esenciales (las mas seguras para clientes limitados)
 //   jobs         → talend_jobs_* + tools de job relacionadas
 //   snapshots    → talend_snapshots_*
@@ -199,6 +202,60 @@ const PRESET_CORE = new Set([
 ]);
 
 /**
+ * Seleccion orientada a agentes nuevos: cubre el ciclo habitual de un job sin
+ * enviar las 200+ tools especializadas en cada `tools/list`. Para las tareas
+ * avanzadas, `talend_guide` avisa si el preset no expone los pasos necesarios.
+ */
+const PRESET_AGENT = new Set([
+  "talend_guide",
+  "talend_diagnose_environment",
+  "talend_bridge_ping",
+  "talend_detect_open_jobs",
+  "talend_summarize_open_job",
+  "talend_jobs_list",
+  "talend_jobs_read",
+  "talend_show_flow",
+  "talend_read_contexts",
+  "talend_list_project_contexts",
+  "talend_list_repository_contexts",
+  "talend_read_repository_context",
+  "talend_studio_list_components",
+  "talend_studio_component_parameters",
+  "talend_components_definition",
+  "talend_components_search",
+  "talend_components_parameters",
+  "talend_components_connectors",
+  "talend_components_get_mapping_suggestions",
+  "talend_recipe_generate",
+  "talend_job_create_in_studio",
+  "talend_job_open_in_studio",
+  "talend_job_add_node",
+  "talend_job_configure_node",
+  "talend_job_update_node",
+  "talend_job_set_schema",
+  "talend_job_connect_nodes",
+  "talend_job_list_nodes",
+  "talend_job_contexts_list",
+  "talend_job_context_create",
+  "talend_job_context_set",
+  "talend_job_problems",
+  "talend_job_compile",
+  "talend_job_run_by_name",
+  "talend_job_wait_run",
+  "talend_job_execute",
+  "talend_runs_list",
+  "talend_runs_read",
+  "talend_errors_explain",
+  "talend_errors_suggest_fix",
+  "talend_secrets_scan_project",
+  "talend_secrets_scan_job",
+  "talend_validation_validate_design",
+  "talend_validation_validate_context_usage",
+  "talend_job_quality_report",
+  "talend_job_quality_issues",
+]);
+
+/**
  * Nombres legacy que siguen existiendo como tool y duplican una canonica.
  * Se ocultan en el preset "canonical" para no exponer la misma capacidad dos
  * veces. Si una tool deja de existir, hay que quitarla de esta lista.
@@ -208,7 +265,7 @@ const LEGACY_TALEND_ALIASES = new Set([
 ]);
 
 const KNOWN_PRESETS = new Set([
-  "all", "canonical", "core", "jobs", "snapshots", "runs", "errors",
+  "all", "canonical", "agent", "core", "jobs", "snapshots", "runs", "errors",
   "validation", "secrets", "datasets", "deliverables", "components", "bridge",
   "requirements", "evidence", "reports",
 ]);
@@ -223,6 +280,7 @@ function applyFilter<T extends { name: string } | { definition: { name: string }
 
   const wantsAll          = patterns.includes("all");
   const wantsCanonical    = patterns.includes("canonical");
+  const wantsAgent        = patterns.includes("agent");
   const wantsCore         = patterns.includes("core");
   const wantsJobs         = patterns.includes("jobs");
   const wantsSnapshots    = patterns.includes("snapshots");
@@ -243,11 +301,18 @@ function applyFilter<T extends { name: string } | { definition: { name: string }
   return items.filter(item => {
     const name = ("name" in item ? item.name : (item as any).definition.name).toLowerCase();
 
+    // La guia debe estar disponible con cualquier preset: reduce las llamadas
+    // iniciales a `tools/list` sin ocultar el mapa de orientacion del agente.
+    if (name === "talend_guide") return true;
+
     // "all": todas las tools talend_*
     if (wantsAll && name.startsWith("talend_")) return true;
 
     // "canonical": toda tool talend_* que no sea un duplicado legacy conocido
     if (wantsCanonical && name.startsWith("talend_") && !LEGACY_TALEND_ALIASES.has(name)) return true;
+
+    // "agent": conjunto corto para el ciclo habitual de un job y su guia.
+    if (wantsAgent && PRESET_AGENT.has(name)) return true;
 
     // "core": set curado de 21 tools seguras
     if (wantsCore && PRESET_CORE.has(name)) return true;
