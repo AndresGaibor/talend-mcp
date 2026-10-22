@@ -475,6 +475,110 @@
       }
     },
     {
+      "nombre": "archivos: leer un JSON",
+      "job": "MCP_L5_Json",
+      "pendiente": "el pom del job no hereda las librerias que declara el componente (json-simple), asi que el codigo generado no compila ('org.json.simple.JSONValue cannot be resolved to a type'). El jar si esta en el .m2 de Studio; lo que falta es que el build lo anada al pom. La escritura de JSON si funciona",
+      "nodos": [
+        {
+          "type": "tFileInputJSON",
+          "nombre": "lector",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_clientes.json" },
+            "READ_BY": { "value": "JSONPATH" }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" }
+          ],
+          "tablas": {
+            "MAPPING_JSONPATH": {
+              "columns": ["SCHEMA_COLUMN", "QUERY"],
+              "rows": [
+                { "SCHEMA_COLUMN": "id", "QUERY": "$.clientes[*].id" },
+                { "SCHEMA_COLUMN": "nombre", "QUERY": "$.clientes[*].nombre" },
+                { "SCHEMA_COLUMN": "ciudad", "QUERY": "$.clientes[*].ciudad" }
+              ]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "lector", "destino": "salida" }],
+      "espera": {
+        "lineas": ["1|Ana|Bogota", "2|Jose|Medellin"]
+      }
+    },
+    {
+      "nombre": "archivos: escribir un JSON",
+      "job": "MCP_L5_JsonSalida",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" }
+          ],
+          "values": [["1", "Ana"], ["2", "Jose"]]
+        },
+        {
+          "type": "tFileOutputJSON",
+          "nombre": "escribe",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_salida.json" },
+            "GENERATE_JSON_ARRAY": { "value": "true" }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" }
+          ]
+        }
+      ],
+      "conexiones": [{ "origen": "entrada", "destino": "escribe" }],
+      "espera": {
+        "fichero": {
+          "ruta": "@TESTDATA@/l5_salida.json",
+          "contiene": ["Ana", "Jose"]
+        }
+      }
+    },
+    {
+      "nombre": "codigo: un tJava toca la fila",
+      "job": "MCP_L5_Java",
+      "pendiente": "el tJavaRow toma su entrada del metadata del nodo y su salida del parametro SCHEMA; el bridge no consigue dejar el SCHEMA con la forma que espera el generador (los 'elementValue' de tipo SCHEMA_COLUMN/TYPE/...), asi que la fila de salida sale sin columnas ('nombre_mayus cannot be resolved'). Ademas, si el metadata lleva una columna entera, la salida la genera como 'int' y el codigo hace 'row.id != null', que no compila",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" }
+          ],
+          "values": [["1", "Ana"], ["2", "Jose"]]
+        },
+        {
+          "type": "tJavaRow",
+          "nombre": "codigo",
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "CODE": {
+              "value": "output_row.nombre_mayus = input_row.nombre.toUpperCase();"
+            }
+          },
+          "columnas": [{ "name": "nombre_mayus", "type": "id_String" }]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "codigo" },
+        { "origen": "codigo", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": ["ANA", "JOSE"]
+      }
+    },
+    {
       "nombre": "transformaciones: un tMap renombra y filtra",
       "job": "MCP_L5_TMap",
       "nodos": [
@@ -842,22 +946,16 @@
             "TABLE": { "value": "l5_salida" },
             "TABLE_ACTION": { "value": "DELETE" },
             "MAPPING": { "value": "PostgreSQL" },
-            "SCHEMA_FLOW": {
-              "value": [
-                { "elementRef": "SCHEMA_COLUMN", "value": "id" },
-                { "elementRef": "SCHEMA_COLUMN", "value": "nombre" },
-                { "elementRef": "SCHEMA_COLUMN", "value": "ciudad" },
-                { "elementRef": "SCHEMA_COLUMN", "value": "monto" }
-              ],
-              "field": "SCHEMA_TYPE"
+            "FIELD_OPTIONS": {
+              "columns": ["SCHEMA_COLUMN", "UPDATE_KEY", "DELETE_KEY", "UPDATABLE", "INSERTABLE"],
+              "rows": [
+                { "SCHEMA_COLUMN": "id", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
+                { "SCHEMA_COLUMN": "nombre", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
+                { "SCHEMA_COLUMN": "ciudad", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
+                { "SCHEMA_COLUMN": "monto", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" }
+              ]
             }
-          },
-          "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" },
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "monto", "type": "id_Double" }
-          ]
+          }
         },
         {
           "type": "tPostgresqlCommit",
