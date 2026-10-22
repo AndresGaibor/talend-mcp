@@ -350,6 +350,15 @@ public final class ComponentConfigurator {
     if (kind.startsWith("MEMO") || kind.startsWith("PROPERTY") || kind.startsWith("EXPRESSION")) {
       return value;
     }
+    // Las listas y las referencias a componentes se guardan sin comillas, como
+    // las escribe el IDE. Si se entrecomillan, el generador no las reconoce:
+    // el `TABLE_ACTION` de un `tDBOutput` vale "TRUNCATE", y con comillas
+    // ninguncomparacion del plantilla encaja y la accion no se ejecuta.
+    // Lo mismo con la columna a normalizar del `tNormalize`
+    // (`PREV_COLUMN_LIST`): con comillas sale `fila."columna"`.
+    if (kind.endsWith("_LIST")) {
+      return value;
+    }
     return asLiteral(value, literal);
   }
 
@@ -605,6 +614,103 @@ public final class ComponentConfigurator {
       }
     }
     node.getClass().getMethod("setMetadataList", List.class).invoke(node, tables);
+    // La tabla de rechazo se deja como estaba: al conectar, Talend propaga el
+    // esquema del destino hacia atras y mete sus columnas en la del origen.
+    restoreRejectTables(actuales, tables);
+  }
+
+  /**
+   * Devuelve las tablas de rechazo del nodo a sus columnas de error, cuando
+   * se han quedado con columnas de otro componente.
+   *
+   * Cuando se conectan dos componentes, Talend sincroniza el origen con el
+   * destino: si el destino ya tiene un esquema (por ejemplo, el `tAggregateRow`
+   * con sus columnas de salida), el origen se queda con esas columnas, y su
+   * tabla de rechazo tambien. Con el origen descolocado, el generador del
+   * `tFileInputDelimited` falla con "Index N out of bounds for length N".
+   *
+   * Una tabla de rechazo sanita tiene las columnas del propio nodo mas
+   * `errorCode` y `errorMessage`. Si trae columnas que no son del nodo, esta
+   * contaminada: se deja con las dos columnas de error, que es lo que
+   * funciona.
+   */
+  private static void restoreRejectTables(List<Object> actuales, List<Object> aplicadas)
+      throws Exception {
+    java.util.Set<String> propias = new java.util.HashSet<>();
+    propias.add("errorCode");
+    propias.add("errorMessage");
+    // Las columnas del propio nodo son las de sus tablas de datos.
+    for (Object table : actuales) {
+      if (!esDeRechazo(table)) {
+        propias.addAll(etiquetasDe(table));
+      }
+    }
+    for (Object table : actuales) {
+      if (aplicadas.contains(table) || !esDeRechazo(table)) {
+        continue;
+      }
+      boolean contaminada = false;
+      for (String etiqueta : etiquetasDe(table)) {
+        if (!propias.contains(etiqueta)) {
+          contaminada = true;
+          break;
+        }
+      }
+      if (contaminada) {
+        BridgeLog.info("Tabla de rechazo contaminada: se deja con las columnas de error");
+        setColumnsOf(table, columnasDeError());
+      }
+    }
+  }
+
+  /** Si la tabla esta enganchada a un conector de rechazo. */
+  private static boolean esDeRechazo(Object table) {
+    String conector = conectorDe(table);
+    return conector != null && conector.toUpperCase().startsWith("REJECT");
+  }
+
+  /** Las etiquetas (nombres) de las columnas de una tabla de metadata. */
+  private static List<String> etiquetasDe(Object table) {
+    List<String> etiquetas = new ArrayList<>();
+    try {
+      Object columnas = table.getClass().getMethod("getListColumns").invoke(table);
+      if (!(columnas instanceof List)) {
+        return etiquetas;
+      }
+      for (Object columna : (List<?>) columnas) {
+        Object etiqueta = columna.getClass().getMethod("getLabel").invoke(columna);
+        if (etiqueta != null) {
+          etiquetas.add(String.valueOf(etiqueta));
+        }
+      }
+    } catch (Exception e) {
+      // Sin columnas: se deja la tabla como estaba.
+    }
+    return etiquetas;
+  }
+
+  /** Las dos columnas de error de una tabla de rechazo. */
+  private static JsonArray columnasDeError() {
+    JsonArray columnas = new JsonArray();
+    JsonObject errorCode = new JsonObject();
+    errorCode.addProperty("name", "errorCode");
+    errorCode.addProperty("type", "id_Integer");
+    columnas.add(errorCode);
+    JsonObject errorMessage = new JsonObject();
+    errorMessage.addProperty("name", "errorMessage");
+    errorMessage.addProperty("type", "id_String");
+    columnas.add(errorMessage);
+    return columnas;
+  }
+
+  /** El conector al que esta enganchada una tabla de metadata. */
+  private static String conectorDe(Object table) {
+    try {
+      Object conector = table.getClass().getMethod("getAttachedConnector").invoke(table);
+      return conector == null ? null : String.valueOf(conector);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   /** La tabla del nodo que tiene ese nombre, si la hay. */
@@ -641,6 +747,10 @@ public final class ComponentConfigurator {
       Object column = columnClass.getConstructor().newInstance();
       column.getClass().getMethod("setLabel", String.class).invoke(column, columnName);
       column.getClass().getMethod("setId", String.class).invoke(column, columnName);
+      // El nombre de la columna en la base de datos. Sin esto, `getColumnName()`
+      // devuelve null y el `tDBOutput` genera el INSERT con los nombres de
+      // columna a null ("INSERT INTO tabla (null,null)").
+      column.getClass().getMethod("setOriginalDbColumnName", String.class).invoke(column, columnName);
       String type = ColumnTypes.normalize(JsonSpec.string(definition, "type"));
       column.getClass().getMethod("setType", String.class).invoke(column, type);
       column.getClass().getMethod("setTalendType", String.class).invoke(column, type);
@@ -674,6 +784,8 @@ public final class ComponentConfigurator {
       Object column = columnClass.getConstructor().newInstance();
       column.getClass().getMethod("setLabel", String.class).invoke(column, columnName);
       column.getClass().getMethod("setId", String.class).invoke(column, columnName);
+      // El nombre de la columna en la base de datos (ver `setColumnsOf`).
+      column.getClass().getMethod("setOriginalDbColumnName", String.class).invoke(column, columnName);
       String type = ColumnTypes.normalize(JsonSpec.string(definition, "type"));
       column.getClass().getMethod("setType", String.class).invoke(column, type);
       column.getClass().getMethod("setTalendType", String.class).invoke(column, type);

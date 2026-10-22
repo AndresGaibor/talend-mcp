@@ -43,6 +43,20 @@ public final class SchemaOperations {
     // Studio no la serializa y el metadata se queda vacio en el `.item`.
     table.getClass().getMethod("setAttachedConnector", String.class)
         .invoke(table, connectorName(spec));
+    // Si el nodo ya tiene una tabla con ese nombre, se actualiza esa en vez
+    // de crear otra: las conexiones tienen una referencia a la tabla, y si se
+    // sustituye, el flujo se queda con la tabla vieja (sin las filas).
+    List<Object> actuales = new ArrayList<>();
+    Object listaActual = node.getClass().getMethod("getMetadataList").invoke(node);
+    if (listaActual instanceof List) {
+      actuales.addAll((List<?>) listaActual);
+    }
+    Object existente = tableNamed(actuales, uniqueName);
+    if (existente != null) {
+      existente.getClass().getMethod("setListColumns", List.class)
+          .invoke(existente, table.getClass().getMethod("getListColumns").invoke(table));
+      table = existente;
+    }
     node.getClass().getMethod("setMetadataList", List.class)
         .invoke(node, new ArrayList<Object>(java.util.Collections.singletonList(table)));
 
@@ -58,6 +72,24 @@ public final class SchemaOperations {
     result.put("uniqueName", uniqueName);
     result.put("columns", JsonSpec.arrayOf(spec, "columns").size());
     return result;
+  }
+
+  /** La tabla del nodo que tiene ese nombre, si la hay. */
+  private static Object tableNamed(List<Object> tables, String name) {
+    if (name == null) {
+      return null;
+    }
+    for (Object table : tables) {
+      try {
+        Object tableName = table.getClass().getMethod("getTableName").invoke(table);
+        if (name.equals(String.valueOf(tableName))) {
+          return table;
+        }
+      } catch (Exception e) {
+        // Sin nombre: no es la que buscamos.
+      }
+    }
+    return null;
   }
 
   /**
@@ -77,6 +109,9 @@ public final class SchemaOperations {
       Object column = columnClass.getConstructor().newInstance();
       column.getClass().getMethod("setLabel", String.class).invoke(column, name);
       column.getClass().getMethod("setId", String.class).invoke(column, name);
+      // El nombre de la columna en la base de datos. Sin esto, el `tDBOutput`
+      // genera el INSERT con los nombres de columna a null.
+      column.getClass().getMethod("setOriginalDbColumnName", String.class).invoke(column, name);
       String type = ColumnTypes.normalize(JsonSpec.string(definition, "type"));
       column.getClass().getMethod("setType", String.class).invoke(column, type);
       column.getClass().getMethod("setTalendType", String.class).invoke(column, type);
@@ -171,17 +206,19 @@ public final class SchemaOperations {
       }
       if (Boolean.TRUE.equals(parameter.getClass().getMethod("isColumnsBasedOnSchema").invoke(parameter))) {
         // Tabla de datos: una fila por registro, con una clave por columna.
-        if (columnCodes.isEmpty()) {
-          String[] names = new String[columns.size()];
-          for (int i = 0; i < columns.size(); i++) {
-            names[i] = columns.get(i).name;
-          }
-          try {
-            parameter.getClass().getMethod("setListItemsDisplayCodeName", String[].class)
-                .invoke(parameter, (Object) names);
-          } catch (Exception e) {
-            return;
-          }
+        // Los nombres de columna se ponen siempre: si el componente se queda
+        // con las columnas de otro (al conectar, el destino propaga su
+        // esquema hacia atras), la tabla se queda con los nombres viejos y
+        // las filas salen vacias.
+        String[] names = new String[columns.size()];
+        for (int i = 0; i < columns.size(); i++) {
+          names[i] = columns.get(i).name;
+        }
+        try {
+          parameter.getClass().getMethod("setListItemsDisplayCodeName", String[].class)
+              .invoke(parameter, (Object) names);
+        } catch (Exception e) {
+          return;
         }
         List<Object> data = new ArrayList<>();
         for (List<String> values : rows) {

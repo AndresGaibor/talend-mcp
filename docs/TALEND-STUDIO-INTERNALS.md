@@ -2000,3 +2000,100 @@ la conexion y el trigger nunca se dispara. Sin ningun error visible: el `connect
 
 Ademas, los triggers **no son conexiones de datos**: no consumen la fila y su nombre no es `row1`. Por eso el
 nombre de la conexion de un trigger es el del conector (`OnComponentError`) y no el numerado de filas.
+
+
+## 41. El tAggregateRow: la primera tabla de metadata es la de salida
+
+El `tAggregateRow` (y el `tAggregateSortedRow`) son componentes "virtuales": en el IDE son un par
+(`tAggregateIn` + `tAggregateOut`) y su codigo se genera con las plantillas de esos dos. La plantilla
+`tAggregateOut_main.javajet` saca la tabla de salida asi:
+
+```java
+List<IMetadataTable> mestadataTableListOut = node.getMetadataList();
+outputMetadataTable = mestadataTableListOut.get(0);   // <-- la PRIMERA
+outputColumns = outputMetadataTable.getListColumns();
+```
+
+La tabla de entrada, en cambio, sale de la **conexion**:
+
+```java
+inputMetadataTable = conn.getMetadataTable();
+inputColumns = inputMetadataTable.getListColumns();
+```
+
+De ahi las cuatro reglas para configurar un agregado:
+
+1. **La tabla de salida va la primera** de la lista de metadata del nodo. En el spec del bridge, el orden de
+   `esquemas` es el orden de la lista: la primera entrada es la de salida.
+2. **El origen se queda con una sola tabla**: la de salida del agregado. La tabla de entrada es la de la
+   conexion, no hace falta declararla (y declararla crea una tabla suelta que no usa nadie).
+3. **Las tablas del agregado (`GROUPBYS`, `OPERATIONS`) usan el nombre simple de la columna**, no
+   `row1.columna`: la plantilla busca con `column.getLabel().equals(columnname)`. Y las funciones van en
+   minusculas (`sum`, `count`, `max`...), porque las compara con `("avg").equals(fun)`.
+4. **El numero de columnas del origen tiene que ser el mismo que el de la salida del agregado**. El generador
+   del `tFileInputDelimited` asigna los valores del fichero por posicion contra el esquema del destino: si el
+   origen tiene mas columnas que la salida del destino, falla con
+   `Index N out of bounds for length N` (en `TFileInputDelimitedBeginJava.codeForValueToConnWithD`).
+
+## 42. Conectar propaga el esquema del destino hacia atras
+
+Al conectar dos componentes, Talend sincroniza el origen con el destino. Si el destino ya tiene un esquema
+(el `tAggregateRow` con sus columnas de salida), **el origen se queda con esas columnas** y su tabla de
+rechazo tambien. Es el comportamiento del IDE (alli sale un aviso), pero por API pasa en silencio.
+
+Consecuencia: el esquema del origen hay que ponerlo **despues de conectar**, como hace el IDE. En el
+arnes (`scripts/execution-check.ts`) el nodo se marca con `"schemaDespuesDeConectar": true`, y los
+esquemas "despues" se aplican **con los origenes al final**: son los que se han quedado descolocados.
+
+Ademas, la tabla de rechazo (`REJECT`) del origen queda con las columnas del destino, y el generador del
+lector falla (`Index N out of bounds`). El bridge lo arregla solo: en `applySchema`, si la tabla de
+rechazo tiene columnas que no son del propio nodo, se la deja con las dos de error (`errorCode` y
+`errorMessage`).
+
+## 43. El nombre de la columna en la base de datos: `setOriginalDbColumnName`
+
+Un `IMetadataColumn` tiene tres nombres: la etiqueta (`getLabel`), el id (`getId`) y el nombre de la
+columna en la base de datos (`getColumnName`). **No hay `setColumnName`**: el nombre de la BD se pone con
+`setOriginalDbColumnName`.
+
+Si no se pone, el `tDBOutput` genera el INSERT con los nombres de columna a null:
+
+```sql
+INSERT INTO "l5_salida" (null,null,null,null) VALUES (('1'::int4),('Ana'),('Bogota'),('100.5'::double precision))
+```
+
+que el Postgres rechaza con `column "null" does not exist`. Ojo: `getColumnName()` **cae en la etiqueta**
+cuando no hay nombre de BD, asi que el sintoma (nombres a null) viene de otro sitio: el generador usa el
+nombre de la BD, no el de la etiqueta.
+
+El puente lo pone en los dos caminos que crean columnas: `ComponentConfigurator` (el `schema` de un
+componente) y `SchemaOperations` (el `schema` con filas de un `tFixedFlowInput`). Si solo se pusiera en
+uno, el esquema se contagia por la conexion y el bug vuelve.
+
+## 44. Los parametros de lista cerrada no se entrecomillan
+
+El IDE escribe los valores de un parametro de tipo `CLOSED_LIST` **sin comillas** (`value="TRUNCATE"`) y
+los de tipo `TEXT` o `DBTABLE` **con comillas** (`value="&quot;l5_salida&quot;"`). El puente los
+entrecomillaba todos, y con las comillas ninguna comparacion de la plantilla encaja: el `TABLE_ACTION` de
+un `tDBOutput` valia `"TRUNCATE"` y la accion de tabla no se ejecutaba (sin ningun error visible).
+
+Lo mismo con `COMPONENT_LIST`. La regla del puente: `CLOSED_LIST` y `COMPONENT_LIST` sin comillas; el
+resto, como hasta ahora.
+
+## 45. Escribir en una base de datos: como se hace
+
+El camino que funciona (probado contra un Postgres):
+
+1. El `tDBOutput` (o `tPostgresqlOutput`) con `USE_EXISTING_CONNECTION=true` y la conexion compartida.
+2. La conexion con `AUTO_COMMIT=true`. El `tDBOutput` no hace commit por su cuenta: escribe el lote al
+   final (en la seccion "end" del componente) y, sin commit, al cerrar la conexion se pierde todo.
+3. **No hay que encolar un `tPostgresqlCommit`**. Si se encola (conectado a la salida del output), se
+   ejecuta **dentro del bucle de filas**: el output emite cada fila al downstream, el commit hace
+   `commit()` y cierra la conexion, y el lote que se escribe al final falla con
+   `This connection has been closed`.
+4. `TABLE_ACTION` es un valor de la lista cerrada: `NONE`, `DROP_CREATE`, `CREATE`,
+   `CREATE_IF_NOT_EXISTS`, `DROP_IF_NOT_EXISTS_AND_CREATE`, `CLEAR`, `TRUNCATE`. `DELETE` no existe.
+5. Las columnas que se escriben van en la tabla `FIELD_OPTIONS` (cinco campos por columna: `SCHEMA_COLUMN`,
+   `UPDATE_KEY`, `DELETE_KEY`, `UPDATABLE`, `INSERTABLE`). En el spec del arnes, `FIELD_OPTIONS` es un
+   parametro de tipo TABLE: va en `tablas`, no en `parameters`.
+6. `MAPPING` es el id del motor (`PostgreSQL`, `MySQL`...), no el nombre del componente.

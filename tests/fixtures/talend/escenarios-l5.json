@@ -832,7 +832,6 @@
     {
       "nombre": "codigo: un tJava toca la fila",
       "job": "MCP_L5_Java",
-      "pendiente": "el tJavaRow toma su entrada del metadata del nodo y su salida del parametro SCHEMA; el bridge no consigue dejar el SCHEMA con la forma que espera el generador (los 'elementValue' de tipo SCHEMA_COLUMN/TYPE/...), asi que la fila de salida sale sin columnas ('nombre_mayus cannot be resolved'). Ademas, si el metadata lleva una columna entera, la salida la genera como 'int' y el codigo hace 'row.id != null', que no compila",
       "nodos": [
         {
           "type": "tFixedFlowInput",
@@ -856,7 +855,8 @@
               "2",
               "Jose"
             ]
-          ]
+          ],
+          "schemaDespuesDeConectar": true
         },
         {
           "type": "tJavaRow",
@@ -897,27 +897,33 @@
       }
     },
     {
-      "nombre": "transformaciones: un tNormalize divide una columna",
+      "nombre": "transformaciones: un tNormalize parte una columna en filas",
       "job": "MCP_L5_Normaliza",
-      "pendiente": "el codigo generado del tNormalize copia las columnas de la salida desde las de la entrada por el mismo nombre ('row2.nombre = row1.nombre'), sin usar la columna a normalizar, asi que la entrada y la salida no pueden tener nombres distintos ('apellido cannot be resolved or is not a field')",
       "nodos": [
         {
           "type": "tFixedFlowInput",
           "nombre": "entrada",
           "columnas": [
             {
-              "name": "nombre_completo",
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "etiquetas",
               "type": "id_String"
             }
           ],
           "values": [
             [
-              "Ana;Nunez"
+              "Ana",
+              "rojo;verde"
             ],
             [
-              "Jose;Ramirez"
+              "Jose",
+              "azul"
             ]
-          ]
+          ],
+          "schemaDespuesDeConectar": true
         },
         {
           "type": "tNormalize",
@@ -925,7 +931,10 @@
           "schemaDespuesDeConectar": true,
           "parameters": {
             "NORMALIZE_COLUMN": {
-              "value": "nombre_completo"
+              "value": "etiquetas"
+            },
+            "ITEMSEPARATOR": {
+              "value": ";"
             },
             "CSV_OPTION": {
               "value": "false"
@@ -937,7 +946,7 @@
               "type": "id_String"
             },
             {
-              "name": "apellido",
+              "name": "etiquetas",
               "type": "id_String"
             }
           ]
@@ -959,8 +968,9 @@
       ],
       "espera": {
         "lineas": [
-          "Ana|Nunez",
-          "Jose|Ramirez"
+          "Ana|rojo",
+          "Ana|verde",
+          "Jose|azul"
         ]
       }
     },
@@ -1095,7 +1105,7 @@
           "nombre": "lector",
           "parameters": {
             "FILENAME": {
-              "value": "@TESTDATA@/l5_clientes.csv"
+              "value": "@TESTDATA@/l5_ventas.csv"
             },
             "FIELDSEPARATOR": {
               "value": ";"
@@ -1107,29 +1117,31 @@
               "value": "UTF-8"
             }
           },
-          "columnas": [
+          "schemaDespuesDeConectar": true,
+          "esquemas": [
             {
-              "name": "id",
-              "type": "id_Integer"
-            },
-            {
-              "name": "nombre",
-              "type": "id_String"
-            },
-            {
-              "name": "ciudad",
-              "type": "id_String"
-            },
-            {
-              "name": "monto",
-              "type": "id_Double"
+              "conector": "FLOW",
+              "nombre": "@uniqueName",
+              "columnas": [
+                {
+                  "name": "ciudad",
+                  "type": "id_String"
+                },
+                {
+                  "name": "monto",
+                  "type": "id_Double"
+                },
+                {
+                  "name": "cliente",
+                  "type": "id_Integer"
+                }
+              ]
             }
           ]
         },
         {
           "type": "tAggregateRow",
           "nombre": "agrega",
-          "schemaDespuesDeConectar": true,
           "esquemas": [
             {
               "conector": "FLOW",
@@ -1180,7 +1192,7 @@
                 {
                   "OUTPUT_COLUMN": "num_clientes",
                   "FUNCTION": "count",
-                  "INPUT_COLUMN": "id",
+                  "INPUT_COLUMN": "cliente",
                   "IGNORE_NULL": "true"
                 }
               ]
@@ -1292,9 +1304,8 @@
       }
     },
     {
-      "nombre": "bases de datos: escribir en un Postgres y confirmar",
+      "nombre": "bases de datos: escribir en un Postgres y verificar",
       "job": "MCP_L5_Escritura",
-      "pendiente": "el tDBOutput genera el INSERT con los nombres de columna a null: el generador los saca de las columnas de la tabla de salida del nodo y el bridge solo consigue ponerlas en el SCHEMA_FLOW (los 'elementValue') y en el metadata. Con MAPPING=PostgreSQL el INSERT sale bien formado pero sin los nombres ('INSERT INTO tabla (null,null,null,null)'), y el Postgres lo rechaza con 'column \"null\" does not exist'. La lectura si funciona (el otro escenario)",
       "nodos": [
         {
           "type": "tFixedFlowInput",
@@ -1350,6 +1361,9 @@
             },
             "DBNAME": {
               "value": "talend_test"
+            },
+            "AUTO_COMMIT": {
+              "value": "true"
             }
           }
         },
@@ -1368,11 +1382,16 @@
               "value": "l5_salida"
             },
             "TABLE_ACTION": {
-              "value": "DELETE"
+              "value": "TRUNCATE"
             },
             "MAPPING": {
               "value": "PostgreSQL"
             },
+            "END_OF_FLOW": {
+              "value": "false"
+            }
+          },
+          "tablas": {
             "FIELD_OPTIONS": {
               "columns": [
                 "SCHEMA_COLUMN",
@@ -1411,19 +1430,6 @@
                   "INSERTABLE": "true"
                 }
               ]
-            }
-          }
-        },
-        {
-          "type": "tPostgresqlCommit",
-          "nombre": "confirma",
-          "parameters": {
-            "USE_EXISTING_CONNECTION": {
-              "value": "true"
-            },
-            "CONNECTION": {
-              "value": "@uniqueName:conexion",
-              "literal": false
             }
           }
         }

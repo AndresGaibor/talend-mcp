@@ -462,7 +462,13 @@ async function montarJob(
   // 2. Nodos, con sus parametros y su schema.
   const nombres = new Map<string, string>();
   const tablasPorNodo: Array<{ uniqueName: string; tablas: NonNullable<Nodo["tablas"]> }> = [];
-  const esquemasDespues: Array<{ uniqueName: string; schema: unknown[] }> = [];
+  const esquemasDespues: Array<{
+    uniqueName: string;
+    nombre: string;
+    schema: unknown[];
+    columns?: Nodo["columnas"];
+    values?: Nodo["values"];
+  }> = [];
   const mappersPorNodo: Array<{ uniqueName: string; mapper: NonNullable<Nodo["mapper"]> }> = [];
   for (const nodo of spec.nodos) {
   const parameters = nodo.parameters
@@ -520,6 +526,18 @@ async function montarJob(
           mensaje: `no se pudieron poner los datos a ${nodo.type}: ${errorDe(conDatos)}`,
         };
       }
+      if (nodo.schemaDespuesDeConectar) {
+        // Los nodos con filas tambien se reponen despues de conectar: al
+        // conectar, el esquema del destino se propaga hacia atras y el
+        // origen se queda con las columnas del destino.
+        esquemasDespues.push({
+          uniqueName,
+          nombre: nodo.nombre ?? "",
+          schema: [],
+          columns: nodo.columnas ?? [],
+          values: nodo.values,
+        });
+      }
     } else {
       // El schema va en su conector y, si el nodo tiene mas de un conector
       // de datos, tambien en los demas: el `tUniqRow` tiene el de salida en
@@ -552,7 +570,7 @@ async function montarJob(
         };
       }
       if (nodo.schemaDespuesDeConectar) {
-        esquemasDespues.push({ uniqueName, schema });
+        esquemasDespues.push({ uniqueName, nombre: nodo.nombre ?? "", schema });
       }
     }
   }
@@ -596,14 +614,40 @@ for (const conexion of spec.conexiones) {
 // 3. Tablas: despues de conectar, que es cuando el componente ya sabe
 // que columnas de entrada tiene. Y tambien el schema de los componentes que
 // lo piden (el tAggregateRow pierde la tabla de salida al conectar).
-for (const pendiente of esquemasDespues) {
-  const conSchema = await bridge.configureNode({
-    job: spec.job,
-    uniqueName: pendiente.uniqueName,
-    schema: pendiente.schema as never,
-  });
-  if (!conSchema.ok) {
-    return {
+//
+// El orden importa: al conectar, Talend propaga el esquema del destino hacia
+// atras, asi que el origen se queda con las columnas del destino. Por eso
+// los esquemas "despues" de los nodos que son origen de alguna conexion se
+// ponen los ultimos: son los que se han quedado descolocados.
+const destinos = new Set(spec.conexiones.map((conexion) => conexion.destino));
+const esOrigen = (pendiente: { nombre: string }) => !destinos.has(pendiente.nombre);
+const ordenEsquemas = [
+  ...esquemasDespues.filter((pendiente) => !esOrigen(pendiente)),
+  ...esquemasDespues.filter(esOrigen),
+];
+for (const pendiente of ordenEsquemas) {
+    if (pendiente.values) {
+      const conDatos = await bridge.setNodeSchema({
+        job: spec.job,
+        uniqueName: pendiente.uniqueName,
+        columns: pendiente.columns ?? [],
+        values: pendiente.values,
+      });
+      if (!conDatos.ok) {
+        return {
+  ok: false,
+          mensaje: `no se pudieron reponer los datos: ${errorDe(conDatos)}`,
+        };
+      }
+      continue;
+    }
+    const conSchema = await bridge.configureNode({
+      job: spec.job,
+      uniqueName: pendiente.uniqueName,
+      schema: pendiente.schema as never,
+    });
+    if (!conSchema.ok) {
+      return {
   ok: false,
       mensaje: `no se pudo poner el schema: ${errorDe(conSchema)}`,
     };

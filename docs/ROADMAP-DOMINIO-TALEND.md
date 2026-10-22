@@ -21,11 +21,15 @@ Estado de partida y guia de uso: [GUIA-AGENTE.md](GUIA-AGENTE.md). Pruebas por f
 
 Hoy: **L1/L2 medido en los 897 componentes Standard: 877 (98 %)**. L3 y L4 se miden con
 `scripts/coverage.ts`, que monta cada componente en un job minimo (origen y destino) y le rellena los
-parametros obligatorios que declara el XML de la instalacion. En las nueve familias mas usadas (134
-componentes) **134 se crean, guardan y borran, y 99 compilan (74 %)**: los que no compilan son, sobre todo, las
-mitades de un par (`tAggregateIn`, `tSortIn`...) que necesitan su pareja, y los que necesitan una configuracion
-real (tablas de transformacion, contexto). L5 (ejecutar con la salida correcta) esta validado con un arnes de
-escenarios: tres en verde (humo, leer un CSV, leer y escribir un CSV).
+parametros obligatorios que declara el XML de la instalacion. En total hay **259 componentes medidos a L3/L4, de
+los que 216 compilan (83 %)**: las nueve familias mas usadas (134, de los que 99 compilan) y las que no piden
+artefacto (125, de los que 117 compilan). Los que no compilan son, sobre todo, las mitades de un par
+(`tAggregateIn`, `tSortIn`...) que necesitan su pareja, y los que necesitan una configuracion real (tablas de
+transformacion, contexto). L5 (ejecutar con la salida correcta) esta validado con un arnes de escenarios
+(`scripts/execution-check.ts`): **14 en verde** (humo, leer un CSV, leer y escribir un CSV, transformaciones, un
+`tFilterRow`, un `tUnite`, un `tMap`, escribir un JSON, un trigger de error, contextos, orquestacion padre/hijo,
+un `tAggregateRow` y escribir en un Postgres). Quedan **cuatro escenarios pendientes**, cada uno con su motivo
+escrito en el fixture: el `tFileInputJSON`, el `tFileList`, el `tJavaRow` y el `tNormalize`.
 
 ### Las definiciones de los componentes, sin abrir Studio
 
@@ -36,7 +40,8 @@ definiciones es lo que permite configurar cualquier componente sin adivinar:
   obligatorios, con que valor se rellenan, que conexiones admite y que artefactos necesita.
 - El plan de montaje (`planMount`) se le pasa al bridge: con el, la cobertura mide L3 y L4 de verdad.
 - Las tablas de los parametros (`FORMATS`, `CONDITIONS`, `CRITERIA`) se rellenan con las columnas del schema:
-  con eso, `tFilterRow`, `tSortRow` y `tAggregateRow` ya compilan.
+  con eso, `tFilterRow`, `tSortRow` y `tAggregateRow` ya compilan. El `tAggregateRow` ademas **ejecuta** con la
+  salida esperada verificada, con las cuatro reglas de INTERNALS 41.
 
 Lo que no llega: los 120 componentes de la generacion nueva (los de los `.car`: AWS, JDBC, Snowflake...) no
 tienen XML, su definicion esta en el codigo Java. Para ellos hay que preguntar a Studio.
@@ -68,9 +73,10 @@ La cobertura reportaba los 1294 componentes como fallidos. Causas reales, reprod
 | 2 | ~~`uniqueName` real~~ (ya lo era) + **alta verificada**: `add` falla si el nodo no entra (hecho) | El nombre devuelto siempre existe en el job |
 | 3 | ~~Arreglar la prueba de cobertura~~ (hecho) | El CSV deja de ser 100 % fallos |
 | 4 | ~~Leer los problemas del job~~ (hecho: `talend_job_problems`, avisos de diseno). Tambien hecho: **compilacion** sin ejecutar (`talend_job_compile`, `coverage --compile`) | "Abre sin avisos" y L4 se comprueban sin ejecutar |
-| 5 | **Matriz de dominio** por componente: L1/L2 hecho (`coverage.ts` + `coverage-summary.ts`). L3 y L4: se miden con el **montaje** (origen y destino) y los parametros obligatorios del XML. Pendiente L5 (ejecutar con la salida esperada) | Se sabe cuantos componentes estan al 100 %, y por que fallan los demas |
+| 5 | **Matriz de dominio** por componente: L1/L2 hecho (`coverage.ts` + `coverage-summary.ts`). L3 y L4 **hechos** con el **montaje** (origen y destino) y los parametros obligatorios del XML: **259 medidos, 216 compilan**. L5 **hecho en 14 escenarios**; faltan 4 (el `tFileInputJSON`, el `tFileList`, el `tJavaRow` y el `tNormalize`) y las familias de base de datos sin medir | Se sabe cuantos componentes estan al 100 %, y por que fallan los demas |
 | 6 | **Tests del bridge aislados**: hechos (hecho) | `bun test` verde con y sin Studio |
 | 7 | **Indice de definiciones de los componentes**: hecho (`talend_components_definition`, `scripts/component-definitions.ts`). Pendiente: que lo usen las tools que configuran (hoy es el plan de la cobertura) | Un agente sabe que poner en cada componente sin adivinar |
+| 8 | **Metadata del repositorio**: conexiones de base de datos y esquemas de archivo, que es lo que abre los `tDB*` en modo "Repository". **Pendiente**: en Talend 8 no se ha encontrado la clase del modelo de las conexiones compartidas de base de datos. **No es bloqueante**: los jobs se montan en modo "built-in" (HOST, PORT, USER y PASS en el propio componente) y asi funcionan (Postgres, MySQL, MS SQL Server y Oracle ya compilan, y el Postgres ya lee y escribe) | Un `tDB*` puede tomar la conexion del repositorio en vez de del propio componente |
 
 ### Resultado de la primera medicion (L1/L2)
 
@@ -97,7 +103,9 @@ Hoy se crean nodos, conexiones FLOW, schema y parametros. Falta lo que hace un j
   entorno a un item recien creado). Falta el `tContextLoad` con los valores del entorno.
 - **Metadata del repositorio**: conexiones a base de datos, esquemas de archivo (delimitado,
   Excel, JSON, XML), esquemas genericos, y **usarlos en los nodos** (propiedad "Repository" en vez
-  de "Built-in"). Es indispensable para todos los `tDB*`.
+  de "Built-in"). Es lo que abre los `tDB*` en modo "Repository": la parte de las conexiones
+  compartidas de base de datos sigue pendiente (P0, fila 8) y, mientras tanto, el modo "built-in"
+  (HOST, PORT, USER y PASS en el propio componente) es lo que funciona.
 - **Joblets, rutinas y librerias**: crear y usar joblets; rutinas Java propias; jars de terceros;
   test cases.
 - **Gestion de jobs**: versiones nuevas, carpetas, renombrar, mover, duplicar, dependencias
@@ -108,23 +116,37 @@ Hoy se crean nodos, conexiones FLOW, schema y parametros. Falta lo que hace un j
 
 | Familia | Estado | Bloqueo / siguiente paso |
 |---|---|---|
-| Archivos delimitados y planos | Validado | Rendimiento (500 mil filas) y encodings |
-| `tMap` | `.item` correcto, no compila | Falta `talend-tmap-dataset-1.2.16.jar` (Talend Exchange). Probar `talend_studio_install_modules` y el repositorio de modulos de Talend; sin eso, no hay `tMap` |
-| Transformaciones (`tFilterRow`, `tSortRow`, `tAggregateRow`, `tUniqRow`, `tJoin`, `tUnite`, `tNormalize`...) | Las tablas se rellenan con el plan (columnas y valores por defecto) y **compilan** | Falta la fila real: que condicion poner en cada fila (`CONDITIONS` del tFilterRow, `CRITERIA` del tSortRow) y como se ejecuta con la condicion |
-| Bases de datos (`tDB*`) | Sin probar | Postgres (en la nube o Docker), drivers, conexion compartida, commit/rollback, acciones de salida |
-| Excel, posicional, JSON, XML, Parquet, Avro | Posicional y JSON no compilan en 8.0.1 | Investigar `DIE_ON_ERROR` del catalogo vs el del nodo (seccion 24 de INTERNALS) y buscar el camino que si genera |
-| Control de flujo | `tPrejob`, `tPostjob`, `tRunJob` ok | `tFileList`, `tFlowToIterate`, `tDie`, `tWarn`, `tLogCatcher`, `tSetGlobalVar` |
+| Archivos delimitados y planos | Validado a L5 | Rendimiento (500 mil filas) y encodings |
+| `tMap` | **Validado a L5**: renombra y filtra, con la salida esperada verificada. Compila y ejecuta **sin** el `talend-tmap-dataset` | Solo falta el jar del Exchange para el editor visual del mapper |
+| Transformaciones (`tFilterRow`, `tSortRow`, `tAggregateRow`, `tUniqRow`, `tJoin`, `tUnite`, `tNormalize`...) | Las tablas se rellenan con el plan (columnas y valores por defecto) y **compilan**. **Ejecutan bien** el `tUniqRow`, el `tSortRow`, el `tFilterRow`, el `tUnite`, el `tMap` y el `tAggregateRow` (este ultimo con las cuatro reglas de INTERNALS 41) | El `tNormalize` (el generador copia las columnas de la salida desde las de la entrada por el mismo nombre, asi que no se puede cambiar el nombre de la columna) y el `tJoin` |
+| Bases de datos (`tDB*`) | **Postgres probado a L5**: lee (`tPostgresqlInput`) y escribe (`tPostgresqlOutput`, con `AUTO_COMMIT=true` en la conexion compartida). Compilan Postgres, MySQL, MS SQL Server y Oracle | Medir las familias que faltan: DB2, Informix, AS400, Vertica, Greenplum, Teradata, Exasol, Netezza, Firebird, Access, Amazon Aurora y Redshift (y las que piden un jar que no esta en el `.m2`). Sin probar: `tDBCommit`/`tDBRollback` explicitos y las acciones de tabla (`TABLE_ACTION`) |
+| Excel, posicional, JSON, XML, Parquet, Avro | Posicional y JSON no compilan en 8.0.1. La **escritura** de JSON funciona (L5) | El `tFileInputJSON` no compila: el `pom` del job no hereda las librerias del componente (`json-simple`), aunque el jar este en el `.m2` de Studio. Investigar `DIE_ON_ERROR` del catalogo vs el del nodo (seccion 24 de INTERNALS) y buscar el camino que si genera |
+| Control de flujo | `tPrejob`, `tPostjob`, `tRunJob` y el trigger de error, ok (L5) | `tFileList` (hace el listado, pero las filas salen vacias: la columna `CURRENT_FILE` no se rellena), `tFlowToIterate`, `tDie`, `tWarn`, `tLogCatcher`, `tSetGlobalVar` |
 | Nube y APIs | Sin probar | `tRESTClient`, `tHTTP*`, S3, Azure, GCS, Salesforce, Snowflake |
 | Big Data, ESB, MDM, DQ | Sin probar | Decidir alcance segun la licencia de Studio; DQ ya tiene tools de lectura |
 
 Prioridad: cobertura de **toda** la familia mas usada antes de ir a la siguiente.
 
+### Lo que el bridge ya resuelve (para que las filas lleguen al generador)
+
+Tres arreglos del plugin Java (INTERNALS 42, 43 y 44) hacen que las transformaciones y la escritura en base de
+datos generen codigo, y estan hechos:
+
+- **El esquema se aplica despues de conectar**: al conectar, Talend propaga el esquema del destino hacia atras y
+  se lleva las columnas del origen. En el arnes, los nodos marcados `schemaDespuesDeConectar` se aplican al final.
+- **La tabla de rechazo (`REJECT`) de un nodo se restaura sola** si ha quedado con las columnas de otro
+  componente: si no, el generador falla con un `Index N out of bounds`.
+- **El nombre de la columna en la base de datos** (`setOriginalDbColumnName`): sin el, el `tDBOutput` genera el
+  `INSERT` con los nombres de columna a `null` y el Postgres lo rechaza. Y los parametros de lista cerrada
+  (`CLOSED_LIST` y `COMPONENT_LIST`) ya no se entrecomillan, que hacia que el `TABLE_ACTION` no se ejecutara.
+
 ## 5. P3: ciclo de vida completo
 
 - **Ejecutar con parametros**: contexto, valores por llamada, timeout, salida estructurada,
   contadores de filas (`tStatCatcher`) y logs.
-- **Harness de aserciones**: cada prueba declara la salida esperada antes de correr y compara
-  (archivos "golden", conteos, checksums).
+- **Harness de aserciones**: **hecho**: el arnes de L5 declara la salida esperada antes de correr y compara
+  (lineas exactas, lineas que tienen que aparecer, el fichero que escribe y una consulta a la base de datos).
+  Falta una suite que lo corra en automatico y que guarde los "golden".
 - **Build y exportacion**: Build Job (zip autonomo), imagen Docker/OSGi.
 - **Publicar en Talend Cloud (TMC)**: API REST de Talend Management Console (artefactos, tareas,
   planes, engines). Es una API distinta, hoy sin conectar.
@@ -146,18 +168,40 @@ Prioridad: cobertura de **toda** la familia mas usada antes de ir a la siguiente
 ## 7. Orden recomendado (los 5 siguientes pasos)
 
 1. ~~Identidad del job, alta verificada, cobertura que mide~~ (hecho).
-2. L3 y L4 medidos con el montaje y los parametros obligatorios del XML. **L5** (ejecutar con la salida
-   esperada, por familias) es lo que falta: es el nivel que de verdad prueba que el job sirve.
-3. Tipos de job (Spark, Streaming) y los runtimes que faltan.
-4. P1: conexiones/triggers y metadata del repositorio (abre los `tDB*`).
-5. P2: el `tMap` (modulo) y las filas reales de las tablas de transformacion (las columnas ya se rellenan; falta
-   saber que condicion poner en cada fila).
+2. ~~L3 y L4 medidos con el montaje y los parametros obligatorios del XML~~ (hecho: **259 medidos, 216
+   compilan**). **L5** va por familias, con **14 escenarios en verde**. Quedan **4 escenarios** con el motivo
+   escrito en el fixture (el `tFileInputJSON`, el `tFileList`, el `tJavaRow` y el `tNormalize`) y las familias
+   de base de datos que todavia no se han medido.
+3. **Medir las familias de base de datos que faltan** (DB2, Informix, AS400, Vertica, Greenplum, Teradata,
+   Exasol, Netezza, Firebird, Access, Amazon Aurora y Redshift) y las que piden un jar que hay que instalar
+   antes (`--components <lista> --compile --out <csv>`).
+4. Tipos de job (Spark, Streaming) y los runtimes que faltan.
+5. P0/P1: las conexiones compartidas de base de datos del metadata del repositorio (mientras tanto, modo
+   "built-in") y las filas reales de las tablas de transformacion.
 
-## 8. Lo que hace falta de ti
+## 8. Riesgos conocidos
+
+- **Los drivers de base de datos hay que instalarlos a mano**. El build de Maven de Studio corre en modo
+  *offline*: si el driver no esta en su `.m2`, el componente no compila ni ejecuta. Los que se pueden bajar de
+  Maven Central se instalan con `talend_studio_install_artifact`; los que no, no se pueden instalar desde aqui.
+- **Talend Exchange no resuelve en DNS desde esta maquina** (`exchange.talend.com` y `components.talend.com`):
+  el `talend-tmap-dataset` (el jar del `tMap`) hay que instalarlo desde el propio Studio ("Additional
+  components") o copiando el jar a mano al `.m2`. **No es un bloqueo**: el `tMap` genera codigo y ejecuta sin
+  ese jar (solo lo necesita el editor visual del mapper).
+- **El heap de Studio se llena** con las mediciones largas: hay que reiniciar Studio entre sesiones de medicion.
+  La medicion cancela sola al 80 % del heap y se vigila con la tool `talend_studio_memory`.
+- **Este workspace no abre los jobs de Big Data** (Spark Batch y Streaming), ni los del usuario ni los del MCP:
+  es un estado del repositorio del proyecto, no del MCP.
+- **Studio no deja crear los contextos del proyecto** (ni enganchar el entorno a un item recien creado): se
+  listan, se leen y se borran, pero no se crean.
+
+## 9. Lo que hace falta de ti
 
 - Acceso al modulo `talend-tmap-dataset` o al repositorio de modulos de Talend (o credenciales de
   Talend Exchange).
 - Una base de datos de pruebas (Postgres) y sus credenciales de prueba.
+- Los drivers de las bases de datos que todavia no se han medido (DB2, Informix, AS400, Vertica, Greenplum,
+  Teradata, Exasol, Netezza, Firebird, Access, Amazon Aurora y Redshift), si se quieren medir esas familias.
 - Un programa SAS pequeno real para la fase 8.
 - Que familias y ediciones de Talend entran en alcance (Big Data, ESB, MDM, Cloud).
 - Credenciales de TMC si se quiere publicar en la nube.

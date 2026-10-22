@@ -114,7 +114,213 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
   usan las tablas de los componentes (`row1.monto`). Ver INTERNALS 32.
 - **Parametros que el catalogo no declara** (p. ej. `FILENAME` de `tFileOutputDelimited`): el bridge
   los crea con el tipo indicado o deducido.
+- **Los parametros de lista cerrada van sin comillas.** Un `CLOSED_LIST` (el `TABLE_ACTION` de un
+  `tDBOutput`, por ejemplo) se escribe como el IDE: `value="TRUNCATE"`, sin comillas. Con comillas
+  el valor es `"TRUNCATE"` y la accion de tabla no se ejecuta, sin ningun error visible. Ver INTERNALS 44.
+- **El nombre de la columna en la base de datos** se pone con `setOriginalDbColumnName` (no hay
+  `setColumnName`). Sin eso, el `tDBOutput` genera el `INSERT` con los nombres a `null` y el Postgres
+  lo rechaza con `column "null" does not exist`. Ver INTERNALS 43.
+- **Escribir en una base de datos:** la conexion va con `AUTO_COMMIT=true` y **no** se encola un
+  componente de commit: el `tDBOutput` escribe el lote al final y, sin commit, al cerrar la conexion
+  se pierde todo. Un commit encolado se ejecuta dentro del bucle de filas y rompe el lote. Ver INTERNALS 45.
 - Detalle y justificacion en [TALEND-STUDIO-INTERNALS.md](TALEND-STUDIO-INTERNALS.md) seccion 18.
+
+### Montar un job con el arnes (`scripts/execution-check.ts`)
+
+El arnes monta un job entero desde una declaracion en JSON, lo ejecuta y **compara la salida con la esperada**
+(declarada antes de ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json` y el informe sale
+en `testdata/resultados-l5.csv`.
+
+```bash
+bun run scripts/execution-check.ts                  # todos los escenarios
+bun run scripts/execution-check.ts agregar          # solo los que su nombre contenga "agregar"
+L5_KEEP_JOBS=1 bun run scripts/execution-check.ts   # deja los jobs montados en Studio
+```
+
+En PowerShell la variable de entorno va antes: `$env:L5_KEEP_JOBS="1"; bun run scripts/execution-check.ts`. Por
+defecto los jobs que monta el arnes se borran al terminar.
+
+Un escenario declara el job, sus nodos, sus conexiones y **lo que se espera**:
+
+| Clave | Que es |
+|---|---|
+| `nombre` | Nombre del escenario (es lo que filtra el comando) |
+| `job` | Nombre del job que se monta en el proyecto de Studio |
+| `nodos` | Los componentes, en orden |
+| `conexiones` | `origen`, `destino` y, si hace falta, `tipo` (por defecto, el conector de salida del origen) |
+| `espera` | `lineas` (exactas o el numero), `contiene`, `fichero`, `contextos` o `consulta` (SQL contra el Postgres de pruebas) |
+| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que |
+| `contextos` / `jobs` | Los entornos del job y los jobs auxiliares (el hijo de un `tRunJob`), que se montan antes que el principal |
+
+Y cada nodo:
+
+| Clave | Que es |
+|---|---|
+| `parameters` | Los parametros del componente: `{ "FILENAME": { "value": "..." } }`. Con `literal: true` el valor va en crudo (una `QUERY`, un `CODE`); con `literal: false` es el nombre de otro nodo (`"@uniqueName:conexion"`) |
+| `tablas` | Las tablas de metadata del componente (`GROUPBYS`, `OPERATIONS`, `FIELD_OPTIONS`...): `columns` y `rows` |
+| `columnas` / `columnasPorConector` | Las columnas del esquema, en el conector principal o en otro (`UNIQUE`...) |
+| `esquemas` | Las tablas de metadata tal cual, para los componentes con varios conectores de datos (el `tAggregateRow`) |
+| `values` | Las filas de un `tFixedFlowInput` |
+| `mapper` | El modelo del `tMap` (entradas, salidas con sus expresiones y filtros) |
+| `schemaDespuesDeConectar` | `true` para poner el esquema **despues** de conectar |
+
+**`parameters` o `tablas`:** los valores sueltos van en `parameters`; los que son tablas de metadata van en `tablas`.
+El `TABLE` de un `tDBOutput` (que es la tabla `FIELD_OPTIONS`) es un parametro de tipo TABLE: va en `tablas`.
+
+**El orden de los esquemas:** al conectar, Talend propaga el esquema del destino hacia atras, asi que el origen se
+queda con las columnas del destino. Por eso el esquema del origen se pone **despues de conectar** (con
+`"schemaDespuesDeConectar": true`), y los esquemas "despues" se aplican **con los nodos origen al final**: son los que
+se han quedado descolocados. Ver INTERNALS 42.
+
+**Ejemplo: un `tAggregateRow`.** El origen declara el **mismo numero de columnas** que la salida del agregado (el
+generador del `tFileInputDelimited` las asigna por posicion), y la tabla de salida del agregado va la primera en su
+lista de metadata:
+
+```json
+{
+  "nombre": "transformaciones: agregar por ciudad",
+  "job": "MCP_L5_Agrega",
+  "nodos": [
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lector",
+      "parameters": {
+        "FILENAME": { "value": "@TESTDATA@/l5_ventas.csv" },
+        "FIELDSEPARATOR": { "value": ";" },
+        "HEADER": { "value": "1" }
+      },
+      "schemaDespuesDeConectar": true,
+      "esquemas": [
+        {
+          "conector": "FLOW",
+          "nombre": "@uniqueName",
+          "columnas": [
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" },
+            { "name": "cliente", "type": "id_Integer" }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "tAggregateRow",
+      "nombre": "agrega",
+      "esquemas": [
+        {
+          "conector": "FLOW",
+          "nombre": "@uniqueName",
+          "columnas": [
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "total_monto", "type": "id_Double" },
+            { "name": "num_clientes", "type": "id_Integer" }
+          ]
+        }
+      ],
+      "tablas": {
+        "GROUPBYS": {
+          "columns": ["OUTPUT_COLUMN", "INPUT_COLUMN"],
+          "rows": [{ "OUTPUT_COLUMN": "ciudad", "INPUT_COLUMN": "ciudad" }]
+        },
+        "OPERATIONS": {
+          "columns": ["OUTPUT_COLUMN", "FUNCTION", "INPUT_COLUMN", "IGNORE_NULL"],
+          "rows": [
+            { "OUTPUT_COLUMN": "total_monto", "FUNCTION": "sum", "INPUT_COLUMN": "monto", "IGNORE_NULL": "true" },
+            { "OUTPUT_COLUMN": "num_clientes", "FUNCTION": "count", "INPUT_COLUMN": "cliente", "IGNORE_NULL": "true" }
+          ]
+        }
+      }
+    },
+    { "type": "tLogRow", "nombre": "salida" }
+  ],
+  "conexiones": [
+    { "origen": "lector", "destino": "agrega" },
+    { "origen": "agrega", "destino": "salida" }
+  ],
+  "espera": { "contiene": ["Bogota|201.0|2", "Medellin|200.25|1", "Cali|300.0|1"] }
+}
+```
+
+Las cuatro reglas del agregado (INTERNALS 41): la tabla de salida va la primera; el origen se queda con una sola
+tabla; las tablas usan el **nombre simple** de la columna (`monto`, no `row1.monto`) y las funciones en minusculas
+(`sum`, `count`); y el numero de columnas del origen es el de la salida del agregado.
+
+**Ejemplo: escribir en un Postgres.** La conexion va con `AUTO_COMMIT=true` y **no** hay ningun componente de commit
+encolado (INTERNALS 45):
+
+```json
+{
+  "nombre": "bases de datos: escribir en un Postgres y verificar",
+  "job": "MCP_L5_Escritura",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        { "name": "id", "type": "id_Integer" },
+        { "name": "nombre", "type": "id_String" },
+        { "name": "ciudad", "type": "id_String" },
+        { "name": "monto", "type": "id_Double" }
+      ],
+      "values": [
+        ["1", "Ana", "Bogota", "100.5"],
+        ["2", "Jose", "Medellin", "200.25"]
+      ]
+    },
+    {
+      "type": "tPostgresqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": { "value": "localhost" },
+        "PORT": { "value": "5433" },
+        "USER": { "value": "talend" },
+        "PASS": { "value": "talend" },
+        "DBNAME": { "value": "talend_test" },
+        "AUTO_COMMIT": { "value": "true" }
+      }
+    },
+    {
+      "type": "tPostgresqlOutput",
+      "nombre": "escribe",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": { "value": "true" },
+        "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
+        "TABLE": { "value": "l5_salida" },
+        "TABLE_ACTION": { "value": "TRUNCATE" },
+        "MAPPING": { "value": "PostgreSQL" },
+        "END_OF_FLOW": { "value": "false" }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": ["SCHEMA_COLUMN", "UPDATE_KEY", "DELETE_KEY", "UPDATABLE", "INSERTABLE"],
+          "rows": [
+            { "SCHEMA_COLUMN": "id", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
+            { "SCHEMA_COLUMN": "nombre", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
+            { "SCHEMA_COLUMN": "ciudad", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
+            { "SCHEMA_COLUMN": "monto", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [{ "origen": "entrada", "destino": "escribe" }],
+  "espera": {
+    "consulta": { "sql": "SELECT count(*)::int FROM l5_salida", "valor": 2 }
+  }
+}
+```
+
+Cinco detalles que no se ven en el JSON pero deciden si esto funciona:
+
+- `TABLE_ACTION` es un valor de **lista cerrada**: va **sin comillas**. Con comillas el `TRUNCATE` no se ejecutaba.
+- `FIELD_OPTIONS` va en `tablas` (es un parametro de tipo TABLE), no en `parameters`.
+- `CONNECTION` necesita `literal: false` (es el nombre del nodo de conexion) y la `QUERY` de un `tDBInput` necesita
+  `literal: true` (va en crudo).
+- **No se encola un `tPostgresqlCommit`**: se ejecutaria dentro del bucle de filas y el lote final fallaria con
+  `This connection has been closed`. El commit lo hace la conexion con `AUTO_COMMIT=true`.
+- `MAPPING` es el id del motor (`PostgreSQL`), no el nombre del componente.
+
+El Postgres de pruebas es el de `testdata/docker-compose.yml` (puerto 5433):
+`docker compose -f testdata/docker-compose.yml up -d`.
 
 ## 5. Verificar el resultado, no el `ok`
 
@@ -203,6 +409,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `bun run scripts/studio-job.ts <cmd>` | Hablar directo con el bridge: `fase0`, `create`, `add`, `connect`, `schema`, `list`, `run`, `delete`, `dialogs` |
 | `bun run scripts/query-bridge.ts` | Volcado del estado de Studio (ping, job activo...) |
 | `bun run scripts/coverage.ts` | Mide cuantos componentes del catalogo se crean, se configuran, se montan y compilan (`--filter`, `--family`, `--components`, `--max`, `--compile`, `--out`) |
+| `bun run scripts/execution-check.ts [filtro]` | Monta, ejecuta y verifica los escenarios L5 (el informe sale en `testdata/resultados-l5.csv`) |
 | `bun run scripts/component-definitions.ts` | Las definiciones de los componentes instalados (parametros obligatorios, conexiones) y el detalle de uno |
 | `bun run scripts/make-testdata.ts` | Regenera los datos de prueba de `testdata/` |
 | `bun run scripts/start.ts --install-bridge` | Compila y recarga el plugin Java en caliente |
@@ -225,12 +432,13 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 
 | Tema | Estado |
 |---|---|
-| `tMap` | El `.item` sale correcto (expresiones, filtros, joins) pero **no compila** sin `talend-tmap-dataset-1.2.16.jar`, de Talend Exchange (no esta en Maven Central) |
-| `tFilterRow`, `tSortRow`, `tUniqRow`, `tAggregateRow` | Se configuran con el plan de la definicion (sus tablas se rellenan con las columnas del schema) y **compilan**; falta probarlos con filas y condiciones reales |
-| `tFileInputPositional`, `tFileInputJSON` | Generan codigo que no compila en 8.0.1 (usan `onSubJobError` inexistente). Usa `tFileInputDelimited` si puedes |
+| `tMap` | El `.item` sale correcto (expresiones, filtros, joins) pero **no compila** sin `talend-tmap-dataset-1.2.16.jar`, de Talend Exchange (no esta en Maven Central). Para generar codigo y ejecutar no hace falta: el jar solo lo usa el editor visual del mapper |
+| `tFilterRow`, `tSortRow`, `tUniqRow`, `tAggregateRow` | Se configuran con el plan de la definicion (sus tablas se rellenan con las columnas del schema) y **compilan**. Ademas, **se ejecutan bien** con filas y condiciones reales (escenarios L5): el `tAggregateRow` necesita las cuatro reglas de INTERNALS 41 |
+| `tFileInputPositional` | Genera codigo que no compila en 8.0.1 (usa `onSubJobError` inexistente). Usa `tFileInputDelimited` si puedes |
+| `tFileInputJSON` | El pom del job no hereda las librerias que declara el componente (json-simple) y el codigo no compila (`org.json.simple.JSONValue cannot be resolved to a type`). El jar si esta en el `.m2` de Studio: lo que falta es que el build lo anada al pom. La **escritura** de JSON (`tFileOutputJSON`) si funciona |
 | `tFileOutputARFF`, `tFileInputARFF`, `tFileInputXML` | El componente esta escrito para otra version de Weka que la que trae Studio |
 | `tFileOutputDelimited` | Necesita librerias que pueden faltar en el `.m2` de Studio |
-| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, la mayoria compila (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) solo medido en muestras |
+| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, 216 de los 259 medidos compilan (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) esta verificado en **14 escenarios** |
 | Componentes de la generacion nueva | Los 120 de los `.car` (AWS, JDBC, Snowflake...) no tienen XML: su definicion esta en el codigo Java y hay que preguntarsela a Studio (`talend_studio_component_parameters`) |
 | Salida de la vista Run | No se puede leer; por eso existe `talend_job_execute` |
 
