@@ -174,12 +174,12 @@ datos generen codigo, y estan hechos:
 1. ~~Identidad del job, alta verificada, cobertura que mide~~ (hecho).
 2. ~~L3 y L4 medidos con el montaje y los parametros obligatorios del XML~~ (hecho: **259 medidos, 216
    compilan**). **L5** va por familias, con **20 escenarios en verde y ninguno pendiente**.
-3. **Medir las familias de base de datos que faltan** (DB2, Informix, Vertica, Greenplum, Teradata, Netezza,
-   Sybase, Ingres) y las que piden un jar que hay que instalar antes
-   (`--components <lista> --compile --out <csv>`). Hecho con las 17 familias de "DB Specifics" (77 componentes):
-   **76 compilan**. El unico que no es `tCosmosDBClose`, que necesita el driver de MongoDB y va con la fase B.
-   La primera corrida salio mal (42 fallos falsos por el agregador Maven, que se rompe con el heap lleno): se
-   arreglo con una recoleccion forzada en `coverage.ts` y midiendo por tandas (INTERNALS 51).
+3. ~~Medir las familias de base de datos que faltan~~ (hecho). Las **25 familias de `DB Specifics`**: **179
+   componentes, 177 compilan (99 %)**. Fallan `tCosmosDBClose` (pide el driver de MongoDB; fase B) y
+   `tIngresBulkExec` (el codigo generado referencia una variable que Talend no declara). Aprendido: **el driver
+   solo hace falta para ejecutar, no para compilar** (INTERNALS 52), asi que L4 se mide sin instalar drivers; y
+   si el heap pasa del 80 % el agregador Maven se rompe y todos los componentes siguientes fallan (INTERNALS 51,
+   arreglado con una recoleccion forzada en `coverage.ts`).
 4. Tipos de job (Spark, Streaming) y los runtimes que faltan.
 5. P0/P1: las conexiones compartidas de base de datos del metadata del repositorio (mientras tanto, modo
    "built-in") y las filas reales de las tablas de transformacion.

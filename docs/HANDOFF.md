@@ -85,14 +85,16 @@ obligatorios, con que valor, cuando se ven, que conexiones admite y que artefact
 - Los componentes sin artefacto local tardan ~50 s cada uno (el generador busca el artefacto en Maven): por eso
   el catalogo entero no se mide de una vez.
 
-**Donde esta la medicion**: **259 componentes medidos a L3/L4, de los que 216 compilan (83 %)**, mas las **17
-familias de `Databases/DB Specifics`** (77 componentes, **76 compilan**; el unico que no es `tCosmosDBClose`,
-que pide el driver de MongoDB y va con la fase B). El detalle esta en `testdata/cobertura-l4-*.csv`.
+**Donde esta la medicion**: **259 componentes medidos a L3/L4, de los que 216 compilan (83 %)**, mas las **25
+familias de `Databases/DB Specifics`**: **179 componentes, 177 compilan (99 %)**. Fallan solo `tCosmosDBClose`
+(pide el driver de MongoDB) y `tIngresBulkExec` (codigo generado roto). El detalle esta en
+`testdata/cobertura-l4-*.csv`.
 
-La medicion de las familias de BD dejo una leccion: si el heap de Studio pasa del 80 %, el agregador Maven sale
-mal y **todos** los componentes siguientes fallan con `Child module ... does not exist`, aunque esten bien. La
-primera corrida asi dio 32 de 77; con una **recoleccion forzada** en `coverage.ts` (cada vez que pasa del 60 %) y
-repitiendo por tandas (21 + 21 + 2) salieron **76 de 77** (INTERNALS 51).
+Dos lecciones de esa medicion. Primera: **el driver de la base no hace falta para compilar**, solo para ejecutar
+(INTERNALS 52), asi que L4 de las familias de BD se mide sin instalar nada. Segunda: si el heap de Studio pasa del
+80 %, el agregador Maven sale mal y **todos** los componentes siguientes fallan con `Child module ... does not
+exist`, aunque esten bien; la primera corrida asi dio 32 de 77, y con una **recoleccion forzada** en
+`coverage.ts` (cada vez que pasa del 60 %) y midiendo por tandas salieron 177 de 179 (INTERNALS 51).
 
 ### El bridge: cuatro arreglos con efecto practico
 
@@ -240,18 +242,18 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 | Nivel | Resultado |
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
-| L3/L4 | **259 componentes medidos**: las nueve familias mas usadas (134, de los que 99 compilan) y las que no piden artefacto (`Logs_Errors`, `XML`, `Data_Quality`, `File/Management`, `PostgreSQL`, `MySQL`, `Data_Quality/Matching`, `DB_SCD`, `MS_SQL_Server`, `Oracle`): 125 de ellos, 117 compilan. **216 de 259 compilan (83 %)**. Los que no, necesitan una configuracion real (tablas, XSD, columnas), no un jar. Aparte, las **17 familias de `Databases/DB Specifics`**: **76 de 77 compilan** (el unico que no es `tCosmosDBClose`, que pide el driver de MongoDB) |
+| L3/L4 | **259 componentes medidos**: las nueve familias mas usadas (134, de los que 99 compilan) y las que no piden artefacto (`Logs_Errors`, `XML`, `Data_Quality`, `File/Management`, `PostgreSQL`, `MySQL`, `Data_Quality/Matching`, `DB_SCD`, `MS_SQL_Server`, `Oracle`): 125 de ellos, 117 compilan. **216 de 259 compilan (83 %)**. Los que no, necesitan una configuracion real (tablas, XSD, columnas), no un jar. Aparte, las **25 familias de `Databases/DB Specifics`**: **179 componentes, 177 compilan (99 %)**; fallan `tCosmosDBClose` (driver de MongoDB) y `tIngresBulkExec` (codigo generado) |
 | L5 | **20 escenarios con la salida verificada** (los 20 que ejecuta el arnes): humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, un `tFilterRow` con condicion, un `tUnite`, un `tMap` que renombra y filtra, escribir un JSON, **leer un JSON**, **listar los ficheros de una carpeta**, un trigger de error, contextos, orquestacion padre/hijo, un `tAggregateRow`, **escribir en un Postgres y verificar**, un `tJavaRow`, un `tNormalize`, **un `tRowGenerator`** y **un `tFilterColumns`**. **No queda ninguno pendiente** |
 
 ## Lo siguiente (por prioridad)
 
-1. **Medir las familias de base de datos que faltan** a L4, con los drivers instalados: DB2, Informix, Vertica,
-   Greenplum, Teradata, Netezza, Sybase, Ingres, y los componentes de las demas familias que piden un jar. La
-   medicion va con `--components <lista> --compile --out <csv>` (o `--family`), y los drivers que se pueden bajar de
-   Maven Central se instalan con `talend_studio_install_artifact`. Ya estan medidas: Postgres, MySQL, MS SQL Server,
-   Oracle y las 17 familias de "Databases/DB Specifics" (AS400, Access, Amazon Aurora/Redshift/Oracle, Azure
-   Synapse, Cosmos DB, EXASolution, FireBird, HSQLDb, Hive, JDBC, JavaDb, MaxDB, SAP Hana, SQLite y VectorWise):
-   **76 de 77 compilan**. Falta solo `tCosmosDBClose`, que pide el driver de MongoDB.
+1. ~~Medir las familias de base de datos a L4~~ (hecho). Las 25 familias de `Databases/DB Specifics` quedan
+   medidas: **179 componentes, 177 compilan**. Los dos fallos: `tCosmosDBClose` (pide el driver de MongoDB) y
+   `tIngresBulkExec` (codigo generado roto). Queda la **fase B** para lo que pide un jar que no esta: los drivers
+   de DB2, Informix, Netezza y Greenplum solo existen en el repositorio de Talend; Vertica si esta en Maven Central
+   (`com.vertica.jdbc:vertica-jdbc:12.0.4-0`) y se podria instalar con `talend_studio_install_artifact` (aunque,
+   como el driver no hace falta para compilar, solo cambiaria L5). Y las familias que piden `hadoop-client`,
+   `sapjco3` o el `talend-tmap-dataset` de Exchange.
 2. **Metadata del repositorio** (conexiones de base de datos y esquemas de archivo), que es lo que abre los
    `tDB*` en modo "Repository". **No es bloqueante**: en Talend 8 no se ha encontrado la clase del modelo de las
    conexiones compartidas, asi que hoy los jobs se montan en modo "built-in" (HOST, PORT, USER y PASS en el

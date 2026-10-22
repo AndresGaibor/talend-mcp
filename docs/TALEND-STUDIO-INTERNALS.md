@@ -2260,3 +2260,33 @@ POST /automation/memory {}            ->  {"usedPercent": 51}
 `scripts/coverage.ts` lo aprovecha: cuando el heap pasa del 60 % pide una recoleccion y usa el
 valor posterior para decidir si cancela (corta al 80 %). Sin el recolector, una corrida de 21
 componentes se quedaba en 2; con el, la tanda avanza mucho mas antes de necesitar un reinicio.
+
+## 52. El driver de la base no hace falta para compilar, solo para ejecutar
+
+Los componentes de base de datos declaran el driver en los `IMPORT` obligatorios del XML:
+
+```xml
+<IMPORT NAME="Driver-DB2" MODULE="db2jcc4.jar" MVN="mvn:org.talend.libraries/db2jcc4/6.0.0" REQUIRED="true" />
+```
+
+De ahi se deduce (mal) que sin ese jar el componente no compila. **Si compila**: el codigo que genera
+Talend no usa los tipos del driver, lo carga por nombre al ejecutar. Medido con las ocho familias de
+`DB Specifics` que no tienen driver en el `.m2` (DB2, Greenplum, Informix, Ingres, Netezza, Sybase,
+Teradata y Vertica): **102 componentes, 101 compilan** sin instalar nada.
+
+Lo que el jar resuelve es la **ejecucion** (L5): sin driver y sin servidor, ese job no corre.
+
+La consecuencia para la medicion: L4 de las familias de base de datos se puede medir entera sin
+descargar drivers; lo que no se puede prometer es L5. El unico fallo de esas ocho familias fue
+`tIngresBulkExec`, y no es el driver: el codigo generado referencia una variable que Talend no
+declara (`executableFilePath_tDBBulkExec_4 cannot be resolved`), que es un fallo de generacion del
+componente.
+
+Como se consulta que pide un componente, sin abrir el IDE:
+
+```powershell
+# El driver (y demas artefactos) que exige un componente
+Select-String -Path <plugins>\...\components\tTeradataInput\TeradataInput_java.xml -Pattern 'MVN="[^"]+"[^>]*REQUIRED="true"'
+```
+
+Solo cuentan los `IMPORT` con `REQUIRED="true"` (los que llevan `REQUIRED_IF` son condicionales).

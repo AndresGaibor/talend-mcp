@@ -125,8 +125,8 @@ reemplazos), `tReservoirSampling` (la columna de muestreo) y los dos de XML (`tW
 
 En total, **259 componentes medidos a L3/L4, de los que 216 compilan (83 %)**: las nueve familias mas usadas
 (134, de los que 99 compilan) y los 125 componentes que no piden artefacto (44 + 19 + 62, de los que 117
-compilan). Aparte van las **17 familias de `Databases/DB Specifics` (77 componentes, 76 compilan)**, medidas en
-una tanda posterior (ver mas abajo), y los 42 del primer intento fallido que se repitieron.
+compilan). Aparte van las **25 familias de `Databases/DB Specifics` (179 componentes, 177 compilan)**, medidas en
+tandas posteriores (ver mas abajo), y los 42 del primer intento fallido que se repitieron.
 
 Los 35 que no compilan en la medicion de las nueve familias se agrupan en:
 
@@ -152,10 +152,10 @@ necesitan una conexion real del repositorio.
 
 El catalogo entero no se mide de una vez: los componentes sin artefacto en el `.m2` de Studio tardan ~50 s cada uno
 (el build de Maven corre en modo *offline*: en vez de descargar, falla con "Cannot access central ... in offline
-mode"). Por eso se mide por familias, y **las familias que necesitan artefactos que no estan en el `.m2` no se miden
-todavia** (son las raras y las que no aportan).
+mode"). Por eso se mide por familias. Que un componente pida un artefacto **no** impide medirlo a L4: el driver
+solo hace falta para ejecutar (ver "Las familias de BD que piden driver compilan sin el driver", mas abajo).
 
-### Las 17 familias de "DB Specifics": 76 de 77 compilan
+### Primera tanda: las 17 familias de "DB Specifics" (76 de 77)
 
 Medicion de las 17 familias de `Databases/DB Specifics` completas (AS400, Access, Aurora, Redshift, Oracle en
 Amazon, Synapse, Cosmos DB, EXASolution, FireBird, HSQLDb, Hive, JDBC, JavaDb, MaxDB, SAP Hana, SQLite y
@@ -164,7 +164,8 @@ VectorWise), con `--compile --sin-artefacto`:
 | Resultado | Cuantos |
 |---|---|
 | Componentes probados | 77 |
-| Se crean y se configuran | 75 (los 2 de mas son conexiones que no necesitan configuracion) |
+| Se crean | 75 (los 2 que faltan fueron timeouts de la interfaz, y despues compilaron) |
+| Se configuran | 38 (el resto son `Close`, `Commit` y `Rollback`, que no tienen nada que configurar) |
 | **Compilan (L4)** | **76** |
 | No compilan | 1 |
 
@@ -219,6 +220,44 @@ Lo que **no esta** y hay que instalar a mano:
 maquina**: no hay forma de instalar ahi el jar del `tMap` automaticamente. `talend_studio_install_artifact` solo
 descarga de Maven Central, y ahi el `talend-tmap-dataset` no existe. Para el `tMap` hay que instalar el componente
 desde el propio Studio ("Additional components" / Talend Exchange) o copiar el jar a mano al `.m2` de Studio.
+
+### Las familias de BD que piden driver compilan sin el driver
+
+Las ocho familias de `DB Specifics` que faltaban declaran en sus componentes un `IMPORT` obligatorio con el driver
+JDBC, y **ninguno de esos drivers esta en el `.m2`** de esta instalacion:
+
+| Familia | Artefacto obligatorio | En Maven Central |
+|---|---|---|
+| DB2 | `org.talend.libraries:db2jcc4:6.0.0` (y las dos licencias) | No (repo de Talend) |
+| Greenplum | `com.infobright.io:namedpipe:1.0` | No |
+| Informix | `com.ibm.informix:ifxjdbc:3.5` (y cinco mas) | No |
+| Ingres | `com.ingres.jdbc:iijdbc:10.2-4.1.10` | No |
+| Netezza | `org.talend.libraries:nzjdbc:6.0.0` | No |
+| Sybase | (ninguno obligatorio) | — |
+| Teradata | `com.teradata.jdbc:terajdbc4:17.10.00.27` | No esa version (solo 17.20) |
+| Vertica | `com.vertica.jdbc:vertica-jdbc:12.0.4-0` | **Si** (se puede instalar) |
+
+**Y aun asi compilan.** El codigo que genera Talend **no referencia las clases del driver**: lo carga por nombre al
+ejecutar (`DriverManager`), asi que L4 (que el job compile) no necesita el jar. El jar hace falta para **ejecutar**
+el job contra la base, y eso no se puede probar aqui sin servidor.
+
+Medidas las ocho, en tres tandas:
+
+| Tanda | Familias | Probados | Compilan |
+|---|---|---|---|
+| 1 | DB2, Greenplum | 24 | 24 |
+| 2 | Informix, Ingres, Netezza | 34 | 33 |
+| 3 | Sybase, Teradata, Vertica | 44 | 44 |
+| **Total** | **8 familias** | **102** | **101** |
+
+El unico que no compila es `tIngresBulkExec`, y no es configuracion: el codigo generado referencia una variable que
+Talend no declara (`executableFilePath_tDBBulkExec_4 cannot be resolved`). Es un fallo de generacion del componente,
+no del arnes.
+
+Consecuencia practica: L4 de las familias de base de datos se puede medir sin instalar nada. Lo que no se puede es
+dar L5 de esas familias sin driver y sin servidor. Sumando las 25 familias de `DB Specifics` medidas (17 + estas 8):
+**179 componentes, 177 compilan (99 %)**. Las cuatro que faltaban (PostgreSQL, MySQL, MS SQL Server y Oracle) ya
+estaban entre las nueve familias mas usadas.
 
 Esto es lo que hace lento el catalogo completo: no es la medicion, es la red.
 
