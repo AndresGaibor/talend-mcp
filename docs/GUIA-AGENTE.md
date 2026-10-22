@@ -475,7 +475,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `Invalid class loader from a refreshed bundle` | Bridge viejo atendiendo tras recargar | Volver a ejecutar `--install-bridge` |
 | `The Job ... has wrong configuration` | Error de compilacion del job | Leer `Error Line` y `Detail Message` |
 | `Missing artifact ...` | Runtime del componente no incluido en Studio | `talend_studio_install_artifact` (Maven Central) |
-| `Child module ... does not exist` (al compilar) | El agregador Maven de los jobs quedo con un modulo huerfano (pasa tras medir cientos de jobs en una corrida) | Reiniciar Studio y medir por tandas; el job afectado vuelve a compilar |
+| `Child module ... does not exist` (al compilar) | El agregador Maven salio mal porque el heap estaba lleno (pasa midiendo muchos componentes en una corrida) | Repetir esos componentes en una corrida nueva (`coverage.ts` ya fuerza un GC al 60 %); no hace falta reiniciar Studio |
 | `talend-tmap-dataset-...jar` ausente | El tMap necesita un modulo de Talend Exchange | Limitacion del entorno, ver abajo |
 | `El hilo de la interfaz de Studio esta ocupado` | La UI esta compilando u ocupada | Esperar y reintentar |
 

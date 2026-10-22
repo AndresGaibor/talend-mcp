@@ -33,6 +33,16 @@ const args = process.argv.slice(2);
  */
 const LIMITE_MEMORIA_PORCENTAJE = 80;
 
+/**
+ * Porcentaje de memoria a partir del cual se fuerza una recoleccion de basura.
+ *
+ * El codigo generado de cada job se queda en el heap aunque el job se borre, asi
+ * que la memoria sube componente a componente. Forzar el recolector antes de
+ * decidir si hay que cancelar hace que la tanda aguante mucho mas (y evita
+ * reiniciar Studio cada pocos componentes).
+ */
+const UMBRAL_RECOLECCION_PORCENTAJE = 60;
+
 function valorDe(flag: string): string | undefined {
   const index = args.indexOf(flag);
   if (index < 0 || index + 1 >= args.length) {
@@ -233,7 +243,16 @@ async function main(): Promise<void> {
     // de cada job) y el IDE deja de responder. Si se pasa del limite, se
     // cancela la medicion en vez de tumbar el Studio.
     const memoria = await bridge.memory();
-    const usado = (memoria.data as { usedPercent?: number } | undefined)?.usedPercent ?? 0;
+    let usado = (memoria.data as { usedPercent?: number } | undefined)?.usedPercent ?? 0;
+
+    // Antes de cancelar, se le pide al JVM que recoja: si la memoria era basura
+    // (el codigo del job anterior), la medicion puede seguir.
+    if (usado >= UMBRAL_RECOLECCION_PORCENTAJE && usado < LIMITE_MEMORIA_PORCENTAJE) {
+      await bridge.memory({ gc: true });
+      const despues = await bridge.memory();
+      usado = (despues.data as { usedPercent?: number } | undefined)?.usedPercent ?? usado;
+    }
+
     if (usado >= LIMITE_MEMORIA_PORCENTAJE) {
       console.error(
         `\n\nStudio lleva el ${usado}% de su memoria: se cancela la medicion (si no, el IDE se queda sin memoria).`,

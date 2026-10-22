@@ -125,7 +125,8 @@ reemplazos), `tReservoirSampling` (la columna de muestreo) y los dos de XML (`tW
 
 En total, **259 componentes medidos a L3/L4, de los que 216 compilan (83 %)**: las nueve familias mas usadas
 (134, de los que 99 compilan) y los 125 componentes que no piden artefacto (44 + 19 + 62, de los que 117
-compilan).
+compilan). Aparte van las **17 familias de `Databases/DB Specifics` (77 componentes, 76 compilan)**, medidas en
+una tanda posterior (ver mas abajo), y los 42 del primer intento fallido que se repitieron.
 
 Los 35 que no compilan en la medicion de las nueve familias se agrupan en:
 
@@ -154,27 +155,30 @@ El catalogo entero no se mide de una vez: los componentes sin artefacto en el `.
 mode"). Por eso se mide por familias, y **las familias que necesitan artefactos que no estan en el `.m2` no se miden
 todavia** (son las raras y las que no aportan).
 
-### Las 17 familias de "DB Specifics": primer intento, no valido
+### Las 17 familias de "DB Specifics": 76 de 77 compilan
 
-Se lanzo una medicion de las 17 familias de `Databases/DB Specifics` completas (AS400, Access, Aurora, Redshift,
-Oracle en Amazon, Synapse, Cosmos DB, EXASolution, FireBird, HSQLDb, Hive, JDBC, JavaDb, MaxDB, SAP Hana, SQLite y
-VectorWise), con `--compile --sin-artefacto` y el informe en `testdata/cobertura-l4-bd2.csv`:
+Medicion de las 17 familias de `Databases/DB Specifics` completas (AS400, Access, Aurora, Redshift, Oracle en
+Amazon, Synapse, Cosmos DB, EXASolution, FireBird, HSQLDb, Hive, JDBC, JavaDb, MaxDB, SAP Hana, SQLite y
+VectorWise), con `--compile --sin-artefacto`:
 
 | Resultado | Cuantos |
 |---|---|
 | Componentes probados | 77 |
-| Se crean y se configuran | 75 |
-| **Compilan (L4)** | **32** |
-| No compilan | 45 |
+| Se crean y se configuran | 75 (los 2 de mas son conexiones que no necesitan configuracion) |
+| **Compilan (L4)** | **76** |
+| No compilan | 1 |
 
-**La cifra de 32 no sirve como medida de esas familias.** A mitad de la corrida se rompio el agregador Maven de
-Studio (`Child module ... does not exist`, INTERNALS 51) y **42 de los 45 fallos son ese error**, no el componente.
-De los 3 restantes: uno es real (`tCosmosDBClose`: `com.mongodb cannot be resolved`, falta el driver) y dos son
-timeouts de la interfaz (`tAmazonOracleRow` y `tHiveConnection`). Hay que repetirla **por tandas** (una o dos
-familias por corrida, reiniciando Studio entre tandas) antes de dar un porcentaje.
+El unico que no compila es `tCosmosDBClose`, que necesita el driver de MongoDB (`com.mongodb cannot be
+resolved`): no esta ni en los plugins de Studio ni en su `.m2`, asi que va con la fase B (igual que SAP y
+Hadoop). Los otros 76 quedan medidos.
 
-Lo que si queda demostrado: el recorrido llega a crear y configurar 75 de 77, y las familias cuyo driver ya esta
-en el `.m2` (Hive, Access, Aurora, Oracle, AS400) compilan enteras.
+**El primer intento de esta misma tanda salio mal y conviene saber por que.** Se midieron los 77 de una vez y a
+mitad de la corrida se rompio el agregador Maven de Studio (`Child module ... does not exist`, INTERNALS 51):
+42 de los 45 fallos eran ese error del build, no del componente, y el informe (`testdata/cobertura-l4-bd2.csv`)
+no valia como medicion. La causa de fondo era el heap: con el JVM al 80 % el build empieza a fallar. Se arreglo
+anadiendo a `scripts/coverage.ts` una **recoleccion forzada** (`/automation/memory` con `{"gc": true}`) cada vez
+que la memoria pasa del 60 %, y repitiendo en tres tandas (21 + 21 + 2 componentes): las tres terminaron en
+verde con el heap al 57 %.
 
 ### Que artefacto pide cada familia
 

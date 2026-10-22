@@ -2219,11 +2219,11 @@ esquema del `tJavaRow` hay que ponerlo despues de conectar).
 **Trampa**: si una columna del esquema es entera y **no admite nulos**, el codigo generado hace
 `row.id != null` sobre un `int`, y eso no compila. Usa columnas `String` (o que admitan nulos).
 
-## 51. El agregador Maven de los jobs se rompe con un modulo huerfano
+## 51. Al compilar: `Child module ... does not exist` (el agregador Maven y el heap)
 
-Studio compila cada job con Maven a traves de un agregador que genera al vuelo. Si en el
-`poms/jobs/process/` queda un modulo que el agregador referencia y ya no existe, **todas** las
-compilaciones siguientes fallan con el mismo error, aunque el job este bien:
+Studio compila cada job con Maven a traves de un agregador que genera al vuelo. Con el heap cargado
+ese agregador sale mal: referencia un modulo que ya no existe (el de un job que se borro) y
+**todas** las compilaciones siguientes fallan con el mismo error, aunque el job este bien:
 
 ```
 [ERROR] Child module C:\...\poms\jobs\process\mcp_coverage_0.1 of C:\...\poms\build-aggregator.pom does not exist
@@ -2231,15 +2231,32 @@ compilaciones siguientes fallan con el mismo error, aunque el job este bien:
 
 Paso midiendo 77 componentes de golpe: tras unos 33, el agregador quedo apuntando a un proyecto
 que se habia borrado y los 42 siguientes fallaron con ese texto. El error es del build, no del
-componente.
+componente: al repetir esos 42 en tandas, con el heap por debajo del 60 %, **compilaron todos**.
 
 Que hacer:
 
-- **Reiniciar Studio** entre mediciones largas (ademas del heap, que se llena: se vigila con
-  `talend_studio_memory`, y `scripts/coverage.ts` corta al 80 %).
+- **La causa de fondo es el heap.** `scripts/coverage.ts` fuerza un recolector cuando pasa del
+  60 % (ver abajo) y corta al 80 %; asi una tanda de 21 componentes termina sobrada. Sin el
+  recolector se rompia al segundo componente.
 - Medir **por tandas** (una familia o dos por corrida), no las 17 de una vez.
-- Un job que fallo asi vuelve a compilar solo cuando el agregador se regenera bien: hay que
-  recrearlo (o reiniciar Studio) y repetir la medicion de ese componente.
+- Si aun asi aparece el error, lo medido en esa tanda no vale: **repetir esos componentes en una
+  corrida nueva**. No hay que recrear el job ni reiniciar Studio: el agregador se regenera al
+  volver a compilar (fue lo que se hizo con los 42, y compilaron).
 
 El sintoma se reconoce porque `error_compilacion` trae `Child module ... does not exist` y no un
 error de Java.
+
+### La memoria: se puede forzar una recoleccion
+
+El endpoint `/automation/memory` acepta `{"gc": true}` y llama a `System.gc()`. Ojo: **los
+porcentajes que devuelve son los de antes de recolectar** (mide y luego recoge), asi que hay que
+volver a consultarlo para ver el efecto real:
+
+```
+POST /automation/memory {"gc": true}  ->  {"usedPercent": 83, "gc": true}
+POST /automation/memory {}            ->  {"usedPercent": 51}
+```
+
+`scripts/coverage.ts` lo aprovecha: cuando el heap pasa del 60 % pide una recoleccion y usa el
+valor posterior para decidir si cancela (corta al 80 %). Sin el recolector, una corrida de 21
+componentes se quedaba en 2; con el, la tanda avanza mucho mas antes de necesitar un reinicio.
