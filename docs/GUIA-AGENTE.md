@@ -118,12 +118,30 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
   `TABLE_ACTION` de un `tDBOutput`, la columna a normalizar de un `tNormalize`...) se escribe como el
   IDE: `value="TRUNCATE"`, sin comillas. Con comillas el valor es `"TRUNCATE"` y la accion de tabla no
   se ejecuta, sin ningun error visible. Ver INTERNALS 44.
+- **Las celdas de una tabla: los nombres sin comillas.** En las tablas de metadata (`GROUPBYS`,
+  `OPERATIONS`, `CONDITIONS`, `CRITERIA`, `MAPPING_JSONPATH`...) el IDE entrecomilla los literales y deja
+  sin comillas los nombres: `SCHEMA_COLUMN`, `COLNAME`, `INPUT_COLUMN`, `OUTPUT_COLUMN`, `FUNCTION`,
+  `OPERATOR`, `SORT`, `ORDER`, `KEY_ATTRIBUTE`, `CASE_SENSITIVE`, `PARAMETER_NAME` y `TARGET_COLUMN`.
+  Los demas valores van como literales Java (con comillas), como hace el IDE. Asi la consulta JSONPath
+  de un `tFileInputJSON` sale como `"$.clientes[*].id"` y compila. Ver INTERNALS 46.
 - **El nombre de la columna en la base de datos** se pone con `setOriginalDbColumnName` (no hay
   `setColumnName`). Sin eso, el `tDBOutput` genera el `INSERT` con los nombres a `null` y el Postgres
   lo rechaza con `column "null" does not exist`. Ver INTERNALS 43.
 - **Escribir en una base de datos:** la conexion va con `AUTO_COMMIT=true` y **no** se encola un
   componente de commit: el `tDBOutput` escribe el lote al final y, sin commit, al cerrar la conexion
   se pierde todo. Un commit encolado se ejecuta dentro del bucle de filas y rompe el lote. Ver INTERNALS 45.
+- **El `tFileList` no emite filas.** Su conector `FLOW` es `MAX_OUTPUT=0`: lo que deja son valores en el
+  `globalMap` (`<uniqueName>_CURRENT_FILE`, `_CURRENT_FILEPATH`, ...). Para consumirlos, un `tJavaRow`
+  los lee del `globalMap`. Y su `LIST_MODE` es el **tipo de listado** (`FILES`, `DIRECTORIES`, `BOTH`),
+  no el orden: con `"ASC"` ahi no lista nada. Ver INTERNALS 47.
+- **El `tFileInputJSON`** con `READ_BY=JSONPATH` lleva la raiz del bucle en `JSON_LOOP_QUERY` y el
+  mapeo en la tabla `MAPPING_JSONPATH`. Ver INTERNALS 48.
+- **El `tNormalize`** copia las columnas de la salida desde las de la entrada **por su nombre**: la
+  entrada y la salida tienen que declarar las mismas columnas. La columna a partir va en
+  `NORMALIZE_COLUMN` y el separador en `ITEMSEPARATOR`. Ver INTERNALS 49.
+- **El `tJavaRow`** inserta el codigo tal cual, con `input_row` y `output_row` sustituidos por el nombre
+  de las conexiones. Ojo: una columna entera que no admita nulos hace que el codigo generado use
+  `row.id != null` sobre un `int`, y eso no compila. Ver INTERNALS 50.
 - Detalle y justificacion en [TALEND-STUDIO-INTERNALS.md](TALEND-STUDIO-INTERNALS.md) seccion 18.
 
 ### Montar un job con el arnes (`scripts/execution-check.ts`)
@@ -150,7 +168,7 @@ Un escenario declara el job, sus nodos, sus conexiones y **lo que se espera**:
 | `nodos` | Los componentes, en orden |
 | `conexiones` | `origen`, `destino` y, si hace falta, `tipo` (por defecto, el conector de salida del origen) |
 | `espera` | `lineas` (exactas o el numero), `contiene`, `fichero`, `contextos` o `consulta` (SQL contra el Postgres de pruebas) |
-| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que |
+| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que (hoy **ningun escenario lo usa**: los 20 estan en verde) |
 | `contextos` / `jobs` | Los entornos del job y los jobs auxiliares (el hijo de un `tRunJob`), que se montan antes que el principal |
 
 Y cada nodo:
@@ -177,6 +195,31 @@ conectar: al conectar, el esquema del destino se propaga hacia atras y se lleva 
 **Cuando hace falta `schemaDespuesDeConectar`:** en el `tAggregateRow` (la tabla de salida va la primera), en el
 `tJavaRow` (su salida la define el parametro `SCHEMA`) y en el `tNormalize` (la entrada y la salida declaran las
 columnas con el mismo nombre).
+
+**Un componente que no va en el flujo:** el `tFileList` no emite filas, asi que se declara en el job **suelto**
+(sin conexion) y sus valores se leen del `globalMap`. El codigo del `tJavaRow` que los lee lleva el `uniqueName`
+del nodo, no el nombre que le pone el escenario:
+
+```json
+{
+  "type": "tFileList",
+  "nombre": "lista",
+  "parameters": {
+    "DIRECTORY": { "value": "@TESTDATA@/l5_lista" },
+    "LIST_MODE": { "value": "FILES" },
+    "ORDER_BY_FILENAME": { "value": "true" },
+    "ORDER_ACTION_ASC": { "value": "true" }
+  }
+},
+{
+  "type": "tJavaRow",
+  "nombre": "lee",
+  "parameters": {
+    "CODE": { "value": "output_row.fichero = (String) globalMap.get(\"@uniqueName:lista\" + \"_CURRENT_FILE\");" }
+  },
+  "columnas": [{ "name": "fichero", "type": "id_String" }]
+}
+```
 
 **Ejemplo: un `tAggregateRow`.** El origen declara el **mismo numero de columnas** que la salida del agregado (el
 generador del `tFileInputDelimited` las asigna por posicion), y la tabla de salida del agregado va la primera en su
@@ -418,6 +461,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `bun run scripts/execution-check.ts [filtro]` | Monta, ejecuta y verifica los escenarios L5 (el informe sale en `testdata/resultados-l5.csv`) |
 | `bun run scripts/component-definitions.ts` | Las definiciones de los componentes instalados (parametros obligatorios, conexiones) y el detalle de uno |
 | `bun run scripts/make-testdata.ts` | Regenera los datos de prueba de `testdata/` |
+| `bun run scripts/limpiar-mcp.ts [--simular]` | Borra los jobs `MCP_*` que dejan el arnes y la medicion (con `--simular` solo los lista), y limpia las carpetas vacias y los proyectos Maven huerfanos |
 | `bun run scripts/start.ts --install-bridge` | Compila y recarga el plugin Java en caliente |
 
 ## 10. Errores frecuentes
@@ -431,6 +475,7 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `Invalid class loader from a refreshed bundle` | Bridge viejo atendiendo tras recargar | Volver a ejecutar `--install-bridge` |
 | `The Job ... has wrong configuration` | Error de compilacion del job | Leer `Error Line` y `Detail Message` |
 | `Missing artifact ...` | Runtime del componente no incluido en Studio | `talend_studio_install_artifact` (Maven Central) |
+| `Child module ... does not exist` (al compilar) | El agregador Maven de los jobs quedo con un modulo huerfano (pasa tras medir cientos de jobs en una corrida) | Reiniciar Studio y medir por tandas; el job afectado vuelve a compilar |
 | `talend-tmap-dataset-...jar` ausente | El tMap necesita un modulo de Talend Exchange | Limitacion del entorno, ver abajo |
 | `El hilo de la interfaz de Studio esta ocupado` | La UI esta compilando u ocupada | Esperar y reintentar |
 
@@ -441,11 +486,11 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `tMap` | El `.item` sale correcto (expresiones, filtros, joins) pero **no compila** sin `talend-tmap-dataset-1.2.16.jar`, de Talend Exchange (no esta en Maven Central). Para generar codigo y ejecutar no hace falta: el jar solo lo usa el editor visual del mapper |
 | `tFilterRow`, `tSortRow`, `tUniqRow`, `tAggregateRow` | Se configuran con el plan de la definicion (sus tablas se rellenan con las columnas del schema) y **compilan**. Ademas, **se ejecutan bien** con filas y condiciones reales (escenarios L5): el `tAggregateRow` necesita las cuatro reglas de INTERNALS 41 |
 | `tFileInputPositional` | Genera codigo que no compila en 8.0.1 (usa `onSubJobError` inexistente). Usa `tFileInputDelimited` si puedes |
-| `tFileInputJSON` | El pom del job no heredia las librerias que declara el componente (json-simple) y el codigo no compilaba (`org.json.simple.JSONValue cannot be resolved to a type`). Ahora compila y se ejecuta, pero la salida no es la esperada: el codigo generado usa la ruta por defecto del componente (`$['bills']`) en vez del `MAPPING_JSONPATH` del escenario. La **escritura** de JSON (`tFileOutputJSON`) si funciona |
-| `tFileList` | Saca las filas pero **vacias**: la columna `CURRENT_FILE` no se rellena (los valores que deja el componente van al `globalMap`, no a la fila). El listado de la carpeta si se hace |
+| `tFileInputJSON` | **Validado a L5**: lee el JSON con la ruta del escenario (`JSON_LOOP_QUERY` + tabla `MAPPING_JSONPATH`). Antes el pom del job no heredia las librerias del componente (json-simple) y el codigo no compilaba |
+| `tFileList` | **Validado a L5**, con su peculiaridad: **no emite filas**, deja los valores en el `globalMap` (`<uniqueName>_CURRENT_FILE`...). Para consumirlos hace falta un `tJavaRow` (o equivalente) |
 | `tFileOutputARFF`, `tFileInputARFF`, `tFileInputXML` | El componente esta escrito para otra version de Weka que la que trae Studio |
 | `tFileOutputDelimited` | Necesita librerias que pueden faltar en el `.m2` de Studio |
-| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, 216 de los 259 medidos compilan (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) esta verificado en **16 escenarios** |
+| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, 216 de los 259 medidos compilan (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) esta verificado en **18 escenarios** |
 | Componentes de la generacion nueva | Los 120 de los `.car` (AWS, JDBC, Snowflake...) no tienen XML: su definicion esta en el codigo Java y hay que preguntarsela a Studio (`talend_studio_component_parameters`) |
 | Salida de la vista Run | No se puede leer; por eso existe `talend_job_execute` |
 

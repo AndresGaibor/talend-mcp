@@ -40,14 +40,14 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 | 2 | `tMap` (renombrar, expresiones, filtros, rechazo, lookups, nulos, fechas, Var) | **Validada en L5**: el modelo del mapper (entradas, salidas con expresiones, filtro) se monta con el `mapper` del bridge, el job compila y ejecuta. El `talend-tmap-dataset` del Exchange solo hace falta para el editor visual, no para generar codigo ni para ejecutar |
 | 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**. **Se ejecutan bien** el `tUniqRow`, el `tSortRow`, el `tFilterRow` (con su condicion), el `tUnite`, el `tAggregateRow` (con sus tablas `GROUPBYS` y `OPERATIONS`; ver INTERNALS 41) y el `tNormalize` (que parte una columna en filas; la entrada y la salida tienen que declarar las columnas con el mismo nombre). Sin probar: `tJoin`, `tReplicate`, `tDenormalize` y `tFilterColumns` |
 | 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`) y con el `tJavaRow` cuya salida la define el parametro `SCHEMA` (el escenario L5, que aplica el esquema despues de conectar) |
-| 5 | Excel, posicional, JSON, Parquet | **Parcial**: la **escritura** de JSON funciona (el `tFileOutputJSON` escribe las filas). La **lectura** de JSON ya compila y se ejecuta (antes el pom del job no heredia las librerias que declara el componente, json-simple, y el codigo no compilaba), pero la salida no es la esperada: el codigo generado usa la ruta por defecto del componente (`$['bills']`) en vez del `MAPPING_JSONPATH` del escenario. `tFileInputPositional`: el `.item` es correcto |
-| 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes). Sin probar: `tFileList`, `tDie` |
+| 5 | Excel, posicional, JSON, Parquet | **Validada**: la **lectura** de JSON (`tFileInputJSON`) compila y se ejecuta con la salida esperada (la raiz del bucle va en `JSON_LOOP_QUERY` y el mapeo en la tabla `MAPPING_JSONPATH`; ver INTERNALS 48), y la **escritura** de JSON funciona (el `tFileOutputJSON` escribe las filas). `tFileInputPositional`: el `.item` es correcto |
+| 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes), y el `tFileList` lista la carpeta (no emite filas: deja los valores en el `globalMap`; ver INTERNALS 47). Sin probar: `tDie` |
 | 7 | Bases de datos (`tDB*`, commit/rollback, insert/update/delete) | **Parcial**: el `tPostgresqlInput` lee del Postgres de pruebas y la salida es la esperada, y el `tPostgresqlOutput` **escribe y se verifica** (con `AUTO_COMMIT=true` en la conexion y **sin** componente de commit; ver INTERNALS 45). Sin probar: el commit/rollback explicito (`tPostgresqlCommit`/`tPostgresqlRollback`) y las demas acciones de salida |
 | 8 | Migracion de un programa SAS real, comparado fila por fila | **Pendiente** |
 | 9 | Robustez | Validada: componente inexistente da error claro; repetir la instruccion no duplica componentes; 16 componentes y 60 columnas |
 
-Orden recomendado para lo que falta: la 6 completa (`tFileList`, `tDie`), la 7 (el commit/rollback explicito y las
-demas acciones de salida), la 5 (la lectura de JSON) y la 8.
+Orden recomendado para lo que falta: el commit/rollback explicito y las demas acciones de salida (la 7),
+el `tDie` (la 6) y la 8 (la migracion de SAS).
 
 ## Plantilla de resultados
 
@@ -154,6 +154,28 @@ El catalogo entero no se mide de una vez: los componentes sin artefacto en el `.
 mode"). Por eso se mide por familias, y **las familias que necesitan artefactos que no estan en el `.m2` no se miden
 todavia** (son las raras y las que no aportan).
 
+### Las 17 familias de "DB Specifics": primer intento, no valido
+
+Se lanzo una medicion de las 17 familias de `Databases/DB Specifics` completas (AS400, Access, Aurora, Redshift,
+Oracle en Amazon, Synapse, Cosmos DB, EXASolution, FireBird, HSQLDb, Hive, JDBC, JavaDb, MaxDB, SAP Hana, SQLite y
+VectorWise), con `--compile --sin-artefacto` y el informe en `testdata/cobertura-l4-bd2.csv`:
+
+| Resultado | Cuantos |
+|---|---|
+| Componentes probados | 77 |
+| Se crean y se configuran | 75 |
+| **Compilan (L4)** | **32** |
+| No compilan | 45 |
+
+**La cifra de 32 no sirve como medida de esas familias.** A mitad de la corrida se rompio el agregador Maven de
+Studio (`Child module ... does not exist`, INTERNALS 51) y **42 de los 45 fallos son ese error**, no el componente.
+De los 3 restantes: uno es real (`tCosmosDBClose`: `com.mongodb cannot be resolved`, falta el driver) y dos son
+timeouts de la interfaz (`tAmazonOracleRow` y `tHiveConnection`). Hay que repetirla **por tandas** (una o dos
+familias por corrida, reiniciando Studio entre tandas) antes de dar un porcentaje.
+
+Lo que si queda demostrado: el recorrido llega a crear y configurar 75 de 77, y las familias cuyo driver ya esta
+en el `.m2` (Hive, Access, Aurora, Oracle, AS400) compilan enteras.
+
 ### Que artefacto pide cada familia
 
 El indice de definiciones (`src/modules/component-definitions/`) declara, por componente, los `IMPORT` que exige
@@ -198,7 +220,7 @@ Esto es lo que hace lento el catalogo completo: no es la medicion, es la red.
 
 Esto es L1/L2/L3/L4 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista,
 acepte configuracion, se pueda conectar y compile. **No** dice que ejecute bien: eso es L5, y esta validado en
-**16 escenarios** con la salida verificada.
+**20 escenarios** con la salida verificada.
 
 ## Ejecucion con la salida esperada (L5)
 
@@ -234,19 +256,24 @@ docker compose -f testdata/docker-compose.yml up -d
 | `tPrejob` -> `tRunJob` (hijo) -> `tPostjob` | Correcto: el padre llama al hijo y su salida sale en la del padre |
 | `tPostgresqlConnection` -> `tPostgresqlInput` -> `tLogRow` | Correcto: lee las diez filas del Postgres de pruebas (ver INTERNALS 35) |
 | contextos: crear un entorno y sus variables | Correcto: el job tiene los dos entornos con sus valores. El `tContextLoad` no saca filas (necesita su `nodeData` con la lista de variables a cargar), asi que el valor se comprueba en el modelo |
-| `tFileInputDelimited` -> `tAggregateRow` -> `tLogRow` | **Correcto** (nuevo): agrupa por ciudad y suma el monto (`Bogota\|201.0\|2`, `Medellin\|200.25\|1`, `Cali\|300.0\|1`). La tabla de salida del agregado va la primera en su lista de metadata (ver INTERNALS 41) |
-| `tPostgresqlConnection` -> `tPostgresqlOutput` (sin componente de commit) | **Correcto** (nuevo): escribe las dos filas y la consulta de comprobacion devuelve 2. La conexion va con `AUTO_COMMIT=true` y **no** hay ningun `tPostgresqlCommit` encolado (ver INTERNALS 45) |
-| `tFixedFlowInput` -> `tJavaRow` -> `tLogRow` | **Correcto** (nuevo): el `tJavaRow` deja la fila de salida con sus columnas (`ANA`, `JOSE`) si su esquema se aplica **despues de conectar** (`schemaDespuesDeConectar: true`) |
-| `tFixedFlowInput` -> `tNormalize` -> `tLogRow` | **Correcto** (nuevo): parte la columna `etiquetas` en filas (`Ana\|rojo`, `Ana\|verde`, `Jose\|azul`). La entrada y la salida declaran las columnas con el **mismo nombre** (el codigo generado las copia por el nombre) y la columna a normalizar (`NORMALIZE_COLUMN`) es un valor de lista cerrada: va sin comillas |
-| `tFileInputJSON` -> `tLogRow` | **Pendiente**: antes no compilaba (el pom del job no heredia las librerias que declara el componente, json-simple, y el codigo daba `org.json.simple.JSONValue cannot be resolved to a type`). Ahora **compila y se ejecuta**, pero la salida no es la esperada: el codigo generado usa la ruta por defecto del componente (`$['bills']`) en vez del `MAPPING_JSONPATH` del escenario (`$.clientes[*].id`). La escritura de JSON si funciona |
-| `tFileList` -> `tLogRow` | **Pendiente**: el `tFileList` saca las filas pero vacias: la columna `CURRENT_FILE` nunca se rellena (los valores que deja el componente van al `globalMap`, no a la fila). El listado de la carpeta si se hace |
+| `tFileInputDelimited` -> `tAggregateRow` -> `tLogRow` | Correcto: agrupa por ciudad y suma el monto (`Bogota\|201.0\|2`, `Medellin\|200.25\|1`, `Cali\|300.0\|1`). La tabla de salida del agregado va la primera en su lista de metadata (ver INTERNALS 41) |
+| `tPostgresqlConnection` -> `tPostgresqlOutput` (sin componente de commit) | Correcto: escribe las dos filas y la consulta de comprobacion devuelve 2. La conexion va con `AUTO_COMMIT=true` y **no** hay ningun `tPostgresqlCommit` encolado (ver INTERNALS 45) |
+| `tFixedFlowInput` -> `tJavaRow` -> `tLogRow` | Correcto: el `tJavaRow` deja la fila de salida con sus columnas (`ANA`, `JOSE`) si su esquema se aplica **despues de conectar** (`schemaDespuesDeConectar: true`) |
+| `tFixedFlowInput` -> `tNormalize` -> `tLogRow` | Correcto: parte la columna `etiquetas` en filas (`Ana\|rojo`, `Ana\|verde`, `Jose\|azul`). La entrada y la salida declaran las columnas con el **mismo nombre** (el codigo generado las copia por el nombre) y la columna a normalizar (`NORMALIZE_COLUMN`) es un valor de lista cerrada: va sin comillas |
+| `tFileInputJSON` -> `tLogRow` | Correcto: lee el JSON con la ruta del escenario (`$.clientes[*]`) y sale `1\|Ana\|Bogota`, `2\|Jose\|Medellin`. Con `READ_BY=JSONPATH` la raiz del bucle va en `JSON_LOOP_QUERY` y el mapeo en la tabla `MAPPING_JSONPATH` (ver INTERNALS 48) |
+| `tFileList` (suelto) + `tJavaRow` que lee el `globalMap` -> `tLogRow` | Correcto: el `tFileList` lista la carpeta y el `tJavaRow` saca el nombre del fichero del `globalMap` (`<uniqueName>_CURRENT_FILE`); el `tFileList` no emite filas (ver INTERNALS 47) |
+| `tRowGenerator` -> `tLogRow` | Correcto: genera tres filas con el valor de su tabla `VALUES` (`Ana`, `Ana`, `Ana`) |
+| `tFixedFlowInput` -> `tFilterColumns` -> `tLogRow` | Correcto: se queda solo con las columnas del esquema del `tFilterColumns` (`1\|Bogota`, `2\|Medellin`) |
 
-**Dieciseis escenarios en verde (los 16 pasan) y dos pendientes.** Los cuatro desbloqueados en esta tanda son el del
-`tAggregateRow` (que ya se ejecuta con su formato real de tabla, INTERNALS 41), el de escritura en Postgres (que
-necesitaba el nombre de columna en la base de datos y el `AUTO_COMMIT` en la conexion, INTERNALS 43 y 45), el del
-`tJavaRow` y el del `tNormalize`. El escenario de escritura en Postgres se llamaba antes "...y confirmar" y usaba un
-`tDBCommit`: asi no funcionaba. El informe de la ultima vuelta completa esta en `testdata/resultados-l5.csv` (una
-fila por escenario, con `ejecuta_ok` y `salida_correcta`).
+**Veinte escenarios en verde (los 20 pasan) y ninguno pendiente.** Los dos ultimos son el generador de
+filas (`tRowGenerator`) y el filtro de columnas (`tFilterColumns`); antes se desbloquearon el de la
+lectura de JSON (el `tFileInputJSON`) y el del listado de ficheros (el `tFileList`);
+los dos anteriores fueron el del `tJavaRow` y el del `tNormalize`. Antes de ellos ya estaban el del
+`tAggregateRow` (que se ejecuta con su formato real de tabla, INTERNALS 41) y el de escritura en Postgres
+(que necesitaba el nombre de columna en la base de datos y el `AUTO_COMMIT` en la conexion, INTERNALS 43
+y 45). Ese ultimo se llamaba antes "...y confirmar" y usaba un `tDBCommit`: asi no funcionaba. El informe
+de la ultima vuelta completa esta en `testdata/resultados-l5.csv` (una fila por escenario, con `ejecuta_ok`
+y `salida_correcta`).
 
 El `tMap` compila y se ejecuta **sin** el `talend-tmap-dataset` del Exchange: ese jar solo hace falta para el
 editor visual del mapper, no para generar codigo ni para ejecutar.
@@ -257,7 +284,7 @@ despues el relanzamiento que devuelve las lineas. El formato de las tablas de la
 ## Reglas para configurar un componente
 
 Las reglas que hacen que un job compile y se ejecute. Salen de los casos que ya estan resueltos; el detalle de cada
-una esta en [TALEND-STUDIO-INTERNALS.md](TALEND-STUDIO-INTERNALS.md), secciones 41 a 45.
+una esta en [TALEND-STUDIO-INTERNALS.md](TALEND-STUDIO-INTERNALS.md), secciones 41 a 50.
 
 ### El `tAggregateRow`: cuatro reglas
 
@@ -315,6 +342,20 @@ columna a normalizar del `tNormalize` (`PREV_COLUMN_LIST`): con comillas salia `
 La regla del bridge es general: **todo parametro cuyo tipo acaba en `_LIST` se guarda sin comillas**; el resto, como
 hasta ahora.
 
+### Los valores de las celdas de tabla: los nombres sin comillas
+
+Los valores de las **tablas** de un componente (`GROUPBYS`, `OPERATIONS`, `CONDITIONS`, `CRITERIA`, `UNIQUE_KEY`,
+`MAPPING_JSONPATH`...) van al codigo generado como literales Java, y ahi el IDE **entrecomilla** los que son
+literales y deja **sin comillas** los que son nombres.
+
+Las celdas que son nombres van sin comillas: `SCHEMA_COLUMN`, `COLNAME`, `INPUT_COLUMN`, `OUTPUT_COLUMN`,
+`FUNCTION`, `OPERATOR`, `SORT`, `ORDER`, `KEY_ATTRIBUTE`, `CASE_SENSITIVE`, `PARAMETER_NAME` y `TARGET_COLUMN`.
+Las demas, como literales Java (con comillas), como hace el IDE. Asi la consulta JSONPath de un `tFileInputJSON`
+sale como `"$.clientes[*].id"` y compila.
+
+Ojo: esta regla es para las celdas de una tabla. Los **parametros** tienen la suya (los que acaban en `_LIST`, sin
+comillas).
+
 ### El `tNormalize`: la entrada y la salida con las mismas columnas
 
 El codigo generado del `tNormalize` copia las columnas de la salida desde las de la entrada **por el mismo nombre**
@@ -328,6 +369,36 @@ separador en el `ITEMSEPARATOR`. El componente **parte esa columna en filas**, r
 |---|---|
 | `nombre=Ana`, `etiquetas=rojo;verde` | `Ana\|rojo` y `Ana\|verde` |
 | `nombre=Jose`, `etiquetas=azul` | `Jose\|azul` |
+
+### El `tFileList`: no emite filas, deja los valores en el `globalMap`
+
+El conector `FLOW` del `tFileList` es `MAX_OUTPUT=0`/`MAX_INPUT=0`: **no emite filas**, asi que no hay ninguna
+columna `CURRENT_FILE` que rellenar. Lo que deja son valores en el `globalMap`, con el `uniqueName` del nodo
+delante: `<uniqueName>_CURRENT_FILE`, `_CURRENT_FILEPATH`, `_CURRENT_FILEDIRECTORY`, `_CURRENT_FILEEXTENSION` y
+`_NB_FILE`.
+
+Para consumirlos, un `tJavaRow` los lee del `globalMap` (`globalMap.get("<uniqueName>_CURRENT_FILE")`).
+
+Ademas, el `LIST_MODE` es el **tipo de listado** (`FILES`, `DIRECTORIES`, `BOTH`), no el orden: con `"ASC"` ahi el
+componente **no lista nada** (el codigo generado se queda con la lista vacia). El orden va en
+`ORDER_BY_FILENAME` y `ORDER_ACTION_ASC`.
+
+### El `tFileInputJSON`: la raiz del bucle y el mapeo
+
+Con `READ_BY=JSONPATH`:
+
+1. La raiz del bucle va en el parametro `JSON_LOOP_QUERY` (`$.clientes[*]`). `LOOP_QUERY` es del modo `XPATH`.
+2. El mapeo de columnas va en la tabla `MAPPING_JSONPATH` (`SCHEMA_COLUMN` y `QUERY`). El valor de `QUERY` es un
+   literal: va con comillas.
+3. El pom del job si hereda las librerias del componente (`json-path`, `json-smart`, `accessors-smart`, `slf4j`).
+
+### El `tJavaRow`: el codigo se inserta tal cual
+
+El codigo (parametro `CODE`) va tal cual al job, con `input_row` y `output_row` sustituidos por el nombre de las
+conexiones (`row1`, `row2`...). La fila de entrada sale de la conexion y la de salida, del esquema del nodo.
+
+Trampa: si una columna del esquema es **entera y no admite nulos**, el codigo generado hace `row.id != null` sobre un
+`int` y no compila. Usa columnas `String` (o que admitan nulos).
 
 ### Escribir en una base de datos
 

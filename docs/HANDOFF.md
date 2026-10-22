@@ -15,9 +15,10 @@ L4 compila, L5 ejecuta con la salida esperada).
 
 1. `docs/GUIA-AGENTE.md`: como usar el MCP, el flujo, los errores y los limites.
 2. `docs/ROADMAP-DOMINIO-TALEND.md`: el plan priorizado (P0 a P4).
-3. `docs/TALEND-STUDIO-INTERNALS.md`: las secciones 41 a 45 son las nuevas (el `tAggregateRow`, la propagacion del
-   esquema al conectar, el nombre de la columna en la base de datos, los parametros de lista cerrada y como se
-   escribe en una base de datos).
+3. `docs/TALEND-STUDIO-INTERNALS.md`: las secciones 41 a 50 son las nuevas (el `tAggregateRow`, la propagacion del
+   esquema al conectar, el nombre de la columna en la base de datos, los parametros de lista, como se escribe
+   en una base de datos, los valores de las celdas de tabla, el `tFileList`, el `tFileInputJSON`, el `tNormalize`
+   y el `tJavaRow`).
 4. `docs/PLAN-DE-PRUEBAS.md`: el estado por fase y por familia.
 5. `AGENTS.md`: reglas del repo.
 
@@ -26,9 +27,10 @@ L4 compila, L5 ejecuta con la salida esperada).
 - Rama `main`, al dia con el remoto. `bun test` verde (304 tests). `bun run typecheck` pasa.
 - Los tests de integracion contra el Studio real solo corren con `TALEND_BRIDGE_INTEGRATION=1`
   (`tests/integration/`). Con y sin Studio, `bun test` es verde.
-- **Hay cambios sin commitear** en el arbol de trabajo: el plugin Java del bridge (`ComponentConfigurator` y
-  `SchemaOperations`), el arnes (`scripts/execution-check.ts`), el fixture de escenarios y las secciones 41 a 45
-  de INTERNALS. El siguiente que arranque el repo tiene que revisar ese diff antes de medir nada.
+- **Hay cambios sin commitear** en el arbol de trabajo: la puesta al dia de los cuatro documentos de estado
+  (este `HANDOFF`, el `PLAN-DE-PRUEBAS`, la `GUIA-AGENTE` y el `ROADMAP`) y las secciones 46 a 50 de INTERNALS.
+  El plugin Java del bridge (`ComponentConfigurator`), el arnes (`scripts/execution-check.ts`) y el fixture de
+  escenarios ya estan en el ultimo commit, con los 20 escenarios L5 en verde.
 
 ## Comandos de trabajo
 
@@ -87,20 +89,24 @@ obligatorios, con que valor, cuando se ven, que conexiones admite y que artefact
 fueron los 44 componentes locales que no piden artefacto: 44 de 44 probados, 38 compilan, 0 fallos, 84 s y el
 heap al 39 %. El detalle esta en `testdata/cobertura-l4-*.csv`.
 
-### El bridge: tres arreglos con efecto practico
+### El bridge: cuatro arreglos con efecto practico
 
-Los tres son del plugin Java (se publican con `bun run scripts/start.ts --install-bridge`) y estan explicados
-en INTERNALS 42, 43 y 44:
+Los cuatro son del plugin Java (se publican con `bun run scripts/start.ts --install-bridge`) y estan explicados
+en INTERNALS 42, 43, 44 y 46:
 
 1. **El nombre de la columna en la base de datos** (`setOriginalDbColumnName`): sin el, el `tDBOutput` genera el
    `INSERT` con los nombres de columna a `null` y el Postgres lo rechaza. Se pone en los dos caminos que crean
    columnas (`ComponentConfigurator` y `SchemaOperations`): si solo se pusiera en uno, el esquema se contagia por
    la conexion y el bug vuelve.
-2. **Los parametros de lista cerrada no se entrecomillan**: `CLOSED_LIST` y `COMPONENT_LIST` van sin comillas
-   (con comillas, el `TABLE_ACTION` de un `tDBOutput` valia `"TRUNCATE"` y la accion de tabla no se ejecutaba).
+2. **Los parametros de lista no se entrecomillan**: `CLOSED_LIST`, `COMPONENT_LIST` y `PREV_COLUMN_LIST` van sin
+   comillas (con comillas, el `TABLE_ACTION` de un `tDBOutput` valia `"TRUNCATE"` y la accion de tabla no se ejecutaba).
 3. **La tabla de rechazo (`REJECT`) se restaura sola**: si un nodo se queda con las columnas de otro componente, el
    bridge la deja con las dos de error (`errorCode` y `errorMessage`) en vez de dejar al generador con un
    `Index N out of bounds`.
+4. **Las celdas de tabla que son nombres van sin comillas** (`SCHEMA_COLUMN`, `COLNAME`, `INPUT_COLUMN`,
+   `OUTPUT_COLUMN`, `FUNCTION`, `OPERATOR`, `SORT`, `ORDER`, `KEY_ATTRIBUTE`, `CASE_SENSITIVE`, `PARAMETER_NAME`,
+   `TARGET_COLUMN`); las demas, como literales Java, como hace el IDE. Asi la consulta JSONPath de un
+   `tFileInputJSON` sale como `"$.clientes[*].id"` y compila.
 
 ### Conectar bien (un bug que rompia muchos jobs)
 
@@ -108,23 +114,44 @@ El **nombre** de la conexion (`row1`, `row2`...) es la variable de la fila en el
 los componentes la referencian (`row1.monto`). El bridge la llamaba `conn_1` y las transformaciones no generaban
 codigo. Ademas, el **conector** no siempre es `FLOW`: el `tUniqRow` saca sus filas por `UNIQUE`. Ver INTERNALS 32.
 
-### Arnés de ejecucion (L5): 14 de 14 en verde
+### Arnés de ejecucion (L5): 20 de 20 en verde
 
 `scripts/execution-check.ts` monta un job, lo ejecuta y **compara la salida con la esperada** (declarada antes de
 ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json`; el informe sale en
-`testdata/resultados-l5.csv`. **Catorce escenarios en verde** (antes doce): el de humo, el de leer un CSV, el de
-leer y escribir un CSV, el de transformaciones (`tUniqRow` + `tSortRow` sobre el CSV, quitando el duplicado y
-ordenando por importe), el `tFilterRow` con condicion, el `tUnite`, el `tMap` que renombra y filtra, la escritura
-de un JSON, el trigger de error, los contextos, la orquestacion padre/hijo y los dos de esta sesion:
+`testdata/resultados-l5.csv`. **Veinte escenarios en verde y ninguno pendiente**: el de humo, el de leer un
+CSV, el de leer y escribir un CSV, el de transformaciones (`tUniqRow` + `tSortRow` sobre el CSV, quitando el
+duplicado y ordenando por importe), el `tFilterRow` con condicion, el `tUnite`, el `tMap` que renombra y filtra,
+la escritura de un JSON, la lectura de un JSON, el listado de los ficheros de una carpeta, el trigger de error, los
+contextos, la orquestacion padre/hijo, el `tAggregateRow`, la escritura en Postgres, el `tJavaRow`, el
+`tNormalize`, el `tRowGenerator` y el `tFilterColumns`.
+
+Los seis que se cerraron en las ultimas tandas:
 
 - **"transformaciones: agregar por ciudad"** (`tAggregateRow`): funciona con las cuatro reglas de INTERNALS 41 (la
   tabla de salida va la primera, el origen se queda con una sola tabla, las tablas del agregado usan el nombre
   simple de la columna y el numero de columnas del origen tiene que ser el de la salida). El dato de entrada es
   `testdata/l5_ventas.csv` (`ciudad;monto;cliente`).
-- **"bases de datos: escribir en un Postgres y verificar"** (`tPostgresqlOutput`): el escenario **ya no usa un
+- **"bases de datos: escribir en un Postgres y verificar"** (`tPostgresqlOutput`): el escenario **no usa un
   componente de commit**: la conexion compartida va con `AUTO_COMMIT=true`. El `tDBOutput` no hace commit por su
   cuenta, y si se encola un `tPostgresqlCommit` se ejecuta dentro del bucle de filas, cierra la conexion y el lote
   final falla. Los pasos, en INTERNALS 45.
+- **"codigo: un tJava toca la fila"** (`tJavaRow`): el codigo (`CODE`) se inserta tal cual, con `input_row` y
+  `output_row` sustituidos por el nombre de las conexiones; la salida la define el esquema del nodo, que hay que
+  aplicar **despues de conectar**. Y las columnas enteras que no admiten nulos hay que evitarlas (INTERNALS 50).
+- **"transformaciones: un tNormalize parte una columna en filas"**: el generador copia las columnas de la salida
+  desde las de la entrada **por su nombre**, asi que la entrada y la salida declaran las mismas columnas
+  (INTERNALS 49).
+
+Y los dos de la ultima tanda:
+
+- **"archivos: leer un JSON"** (`tFileInputJSON`): con `READ_BY=JSONPATH`, la raiz del bucle va en
+  `JSON_LOOP_QUERY` (`LOOP_QUERY` es del modo `XPATH`) y el mapeo en la tabla `MAPPING_JSONPATH`. El valor de la
+  celda `QUERY` es un literal: va con comillas, como lo escribe el IDE. El `pom` del job ya hereda las librerias
+  del componente. INTERNALS 48.
+- **"archivos: listar los ficheros de una carpeta"** (`tFileList`): en Talend 8 **no emite filas** (su conector
+  `FLOW` es `MAX_OUTPUT=0`): lo que deja son valores en el `globalMap` (`<uniqueName>_CURRENT_FILE`,
+  `_CURRENT_FILEPATH`, ...). El escenario lo lee con un `tJavaRow`. Ademas, su `LIST_MODE` es el **tipo de
+  listado** (`FILES`, `DIRECTORIES`, `BOTH`), no el orden: con `"ASC"` ahi no lista nada. INTERNALS 47.
 
 Ademas, el de bases de datos de lectura: un `tPostgresqlConnection` + `tPostgresqlInput` que lee del Postgres de
 pruebas (Docker, `testdata/docker-compose.yml`, puerto 5433). Los tres detalles que hay que recordar estan en
@@ -141,18 +168,12 @@ hace falta para que un `tRunJob` pueda llamar a su hijo.
   esquema del origen hay que ponerlo despues, como hace el IDE.
 - `FIELD_OPTIONS` (las columnas que se escriben en una base de datos) va en `tablas`, no en `parameters`: es un
   parametro de tipo TABLE.
+- Los valores de las celdas de tabla que son nombres van sin comillas y los demas como literales (INTERNALS 46):
+  lo aplica el bridge (`ComponentConfigurator.valorDeCelda` y `esNombreDeCelda`).
 
-**Lo que queda pendiente** (el arnes los salta porque llevan `pendiente` con el motivo en el fixture):
-
-| Escenario | Por que no cierra |
-|---|---|
-| archivos: leer un JSON | El `pom` del job no hereda las librerias que declara el componente (`json-simple`): el jar esta en el `.m2` de Studio, pero el build no lo anade al `pom`. La escritura de JSON si funciona |
-| archivos: listar los ficheros de una carpeta | El `tFileList` hace el listado, pero las filas salen vacias: la columna `CURRENT_FILE` no se rellena (los valores del componente van al `globalMap`, no a la fila) |
-| codigo: un tJava toca la fila | La salida del `tJavaRow` la define el parametro `SCHEMA` y el bridge no lo deja con la forma que espera el generador. Ademas, una columna entera genera `row.id != null` y no compila |
-| transformaciones: un tNormalize divide una columna | El generador copia las columnas de la salida desde las de la entrada por el mismo nombre, asi que la entrada y la salida no pueden tener nombres distintos |
-
-Ojo: en el fixture del arbol de trabajo al escenario del `tJavaRow` se le ha perdido el `pendiente` (se fue al
-editarlo), asi que el arnes lo intentara y fallara. Hay que volver a marcarlo o arreglarlo.
+**Lo que queda pendiente de L5: nada.** Los seis escenarios que llevaban `pendiente` en el fixture (la lectura
+de JSON, el listado de ficheros, el `tJavaRow`, el `tNormalize`, el `tRowGenerator` y el `tFilterColumns`) ya
+estan en verde, asi que el arnes ejecuta los 20.
 
 ### Otros arreglos de esta sesion
 
@@ -167,7 +188,7 @@ editarlo), asi que el arnes lo intentara y fallara. Hay que volver a marcarlo o 
   `COMPONENT_ERROR`), asi que nunca se disparaban. Ahora hay un escenario L5 que lo comprueba.
 - **La memoria**: Studio se queda sin memoria con las mediciones largas (INTERNALS 39). Ahora la medicion lo
   vigila y cancela al 80 % del heap, y hay la tool `talend_studio_memory`.
-- **14 escenarios L5** con la salida verificada (ver PLAN-DE-PRUEBAS).
+- **20 escenarios L5** con la salida verificada (ver PLAN-DE-PRUEBAS).
 
 ### Contextos (entornos) de un job
 
@@ -215,26 +236,24 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
 | L3/L4 | **259 componentes medidos**: las nueve familias mas usadas (134, de los que 99 compilan) y las que no piden artefacto (`Logs_Errors`, `XML`, `Data_Quality`, `File/Management`, `PostgreSQL`, `MySQL`, `Data_Quality/Matching`, `DB_SCD`, `MS_SQL_Server`, `Oracle`): 125 de ellos, 117 compilan. **216 de 259 compilan (83 %)**. Los que no, necesitan una configuracion real (tablas, XSD, columnas), no un jar |
-| L5 | **14 escenarios con la salida verificada** (los 14 que ejecuta el arnes): humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, un `tFilterRow` con condicion, un `tUnite`, un `tMap` que renombra y filtra, escribir un JSON, un trigger de error, contextos, orquestacion padre/hijo, **un `tAggregateRow`** y **escribir en un Postgres y verificar**. Quedan 4 pendientes con su motivo escrito en el fixture: el `tFileInputJSON`, el `tFileList`, el `tJavaRow` y el `tNormalize` |
+| L5 | **20 escenarios con la salida verificada** (los 20 que ejecuta el arnes): humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, un `tFilterRow` con condicion, un `tUnite`, un `tMap` que renombra y filtra, escribir un JSON, **leer un JSON**, **listar los ficheros de una carpeta**, un trigger de error, contextos, orquestacion padre/hijo, un `tAggregateRow`, **escribir en un Postgres y verificar**, un `tJavaRow`, un `tNormalize`, **un `tRowGenerator`** y **un `tFilterColumns`**. **No queda ninguno pendiente** |
 
 ## Lo siguiente (por prioridad)
 
-1. **Cerrar los escenarios L5 que quedan** (son 4: el `tFileInputJSON`, el `tFileList`, el `tJavaRow` y el
-   `tNormalize`; el quinto de antes, la escritura en Postgres, ya esta en verde). Cada uno tiene el motivo
-   escrito en el fixture (`pendiente`), asi que el siguiente paso es el que lo arregla, no el que lo investiga:
-   - `tFileInputJSON`: que el build anade al `pom` las librerias que declara el componente (el jar esta en el
-     `.m2` de Studio).
-   - `tFileList`: como se rellena la columna `CURRENT_FILE` de la fila.
-   - `tJavaRow`: la forma del `SCHEMA` que espera el generador, y el `row.id != null` de la columna entera.
-   - `tNormalize`: como se le dice al generador que la columna de salida no es la de entrada.
-2. **Medir las familias de base de datos que faltan** a L4: DB2, Informix, AS400, Vertica, Greenplum, Teradata,
-   Exasol, Netezza, Firebird, Access, Amazon Aurora y Redshift, mas las que piden un jar que todavia no esta en el
-   `.m2` de Studio. Van con `--components <lista> --compile --out <csv>`. Hasta ahi, lo unico medido de bases de
-   datos es Postgres, MySQL, MS SQL Server y Oracle.
-3. **Metadata del repositorio** (conexiones de base de datos y esquemas de archivo), que es lo que abre los
+1. **Medir las familias de base de datos que faltan** a L4, con los drivers instalados: DB2, Informix, Vertica,
+   Greenplum, Teradata, Netezza, Sybase, Ingres, y los componentes de las demas familias que piden un jar. La
+   medicion va con `--components <lista> --compile --out <csv>` (o `--family`), y los drivers que se pueden bajar de
+   Maven Central se instalan con `talend_studio_install_artifact`. Hasta ahi, lo medido de bases de datos es
+   Postgres, MySQL, MS SQL Server y Oracle, mas la tanda de 17 familias de "Databases/DB Specifics" que no piden
+   artefacto (AS400, Access, Amazon Aurora/Redshift/Oracle, Azure Synapse, Cosmos DB, EXASolution, FireBird,
+   HSQLDb, Hive, JDBC, JavaDb, MaxDB, SAP Hana, SQLite y VectorWise).
+2. **Metadata del repositorio** (conexiones de base de datos y esquemas de archivo), que es lo que abre los
    `tDB*` en modo "Repository". **No es bloqueante**: en Talend 8 no se ha encontrado la clase del modelo de las
    conexiones compartidas, asi que hoy los jobs se montan en modo "built-in" (HOST, PORT, USER y PASS en el
    propio componente) y asi funcionan.
+3. **Limpiar los jobs de prueba que deja el arnes** (`MCP_L5_*`) y el `MCP_Coverage` de la medicion en el
+   workspace de Studio: se borran con `/automation/job/delete` (borrar cierra sus editores). Sirve para no llenar el
+   workspace y para no confundir un job viejo con uno nuevo.
 4. **Medir lo que pide artefacto**: con `--sin-artefacto` la medicion se salta los componentes que piden un jar que
    no esta en el `.m2` de Studio. Los que faltan y se pueden bajar de Maven Central se instalan con
    `talend_studio_install_artifact` (y despues se miden). Los de **Talend Exchange** (el `talend-tmap-dataset` del

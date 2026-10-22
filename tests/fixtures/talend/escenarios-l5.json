@@ -1660,6 +1660,127 @@
           "2|Medellin"
         ]
       }
+    },
+    {
+      "nombre": "transformaciones: generar filas con un tRowGenerator",
+      "job": "MCP_L5_Genera",
+      "nodos": [
+        {
+          "type": "tRowGenerator",
+          "nombre": "genera",
+          "parameters": {
+            "NB_ROWS": {
+              "value": "3"
+            }
+          },
+          "columnas": [
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
+          ],
+          "tablas": {
+            "VALUES": {
+              "columns": [
+                "ARRAY"
+              ],
+              "rows": [
+                {
+                  "ARRAY": "Ana"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "genera",
+          "destino": "salida"
+        }
+      ],
+      "espera": {
+        "lineas": [
+          "Ana",
+          "Ana",
+          "Ana"
+        ]
+      }
+    },
+    {
+      "nombre": "transformaciones: quedarse con unas columnas",
+      "job": "MCP_L5_Filtra",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "schemaDespuesDeConectar": true,
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "1",
+              "Ana",
+              "Bogota"
+            ],
+            [
+              "2",
+              "Jose",
+              "Medellin"
+            ]
+          ]
+        },
+        {
+          "type": "tFilterColumns",
+          "nombre": "filtra",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            }
+          ]
+        },
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "filtra"
+        },
+        {
+          "origen": "filtra",
+          "destino": "salida"
+        }
+      ],
+      "espera": {
+        "lineas": [
+          "1|Bogota",
+          "2|Medellin"
+        ]
+      }
     }
   ]
 }

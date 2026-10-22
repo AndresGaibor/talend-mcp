@@ -2070,15 +2070,19 @@ El puente lo pone en los dos caminos que crean columnas: `ComponentConfigurator`
 componente) y `SchemaOperations` (el `schema` con filas de un `tFixedFlowInput`). Si solo se pusiera en
 uno, el esquema se contagia por la conexion y el bug vuelve.
 
-## 44. Los parametros de lista cerrada no se entrecomillan
+## 44. Los parametros de lista no se entrecomillan
 
-El IDE escribe los valores de un parametro de tipo `CLOSED_LIST` **sin comillas** (`value="TRUNCATE"`) y
+El IDE escribe los valores de un parametro de tipo lista **sin comillas** (`value="TRUNCATE"`) y
 los de tipo `TEXT` o `DBTABLE` **con comillas** (`value="&quot;l5_salida&quot;"`). El puente los
 entrecomillaba todos, y con las comillas ninguna comparacion de la plantilla encaja: el `TABLE_ACTION` de
 un `tDBOutput` valia `"TRUNCATE"` y la accion de tabla no se ejecutaba (sin ningun error visible).
 
-Lo mismo con `COMPONENT_LIST`. La regla del puente: `CLOSED_LIST` y `COMPONENT_LIST` sin comillas; el
-resto, como hasta ahora.
+Lo mismo con `COMPONENT_LIST` y con `PREV_COLUMN_LIST` (la columna a normalizar de un `tNormalize`:
+con comillas salia `fila."columna"`).
+
+La regla del bridge es general: **si el tipo del campo acaba en `_LIST`, el valor va sin comillas**;
+el resto, como hasta ahora. Ojo: esto es para los **parametros**. Los valores de las **celdas de una
+tabla** tienen su propia regla (seccion 46).
 
 ## 45. Escribir en una base de datos: como se hace
 
@@ -2097,3 +2101,145 @@ El camino que funciona (probado contra un Postgres):
    `UPDATE_KEY`, `DELETE_KEY`, `UPDATABLE`, `INSERTABLE`). En el spec del arnes, `FIELD_OPTIONS` es un
    parametro de tipo TABLE: va en `tablas`, no en `parameters`.
 6. `MAPPING` es el id del motor (`PostgreSQL`, `MySQL`...), no el nombre del componente.
+
+## 46. Los valores de las celdas de tabla: los nombres sin comillas
+
+Los valores de las **tablas** de un componente (las de metadata: `GROUPBYS`, `OPERATIONS`, `CONDITIONS`,
+`CRITERIA`, `UNIQUE_KEY`, `MAPPING_JSONPATH`...) van al codigo generado como literales Java. El IDE
+entrecomilla las que son literales y deja sin comillas las que son nombres.
+
+Las celdas cuyo codigo es un **nombre** van sin comillas:
+
+| Codigo de celda | Que es |
+|---|---|
+| `SCHEMA_COLUMN` | La columna del esquema |
+| `COLNAME` | La columna que se ordena o se filtra |
+| `INPUT_COLUMN` / `OUTPUT_COLUMN` | Las columnas de entrada y de salida de una transformacion |
+| `FUNCTION` | La funcion de agregacion (`sum`, `count`...) |
+| `OPERATOR` | El operador de una condicion (`>`, `=`...) |
+| `SORT` / `ORDER` | Como se ordena (`num`, `desc`...) |
+| `KEY_ATTRIBUTE` / `CASE_SENSITIVE` | Los flags de una clave unica |
+| `PARAMETER_NAME` | El nombre de un parametro |
+| `TARGET_COLUMN` | La columna destino |
+
+Las demas van **como literales Java** (con comillas), como hace el IDE. Asi la consulta JSONPath de un
+`tFileInputJSON` sale como `"$.clientes[*].id"` y compila: entrecomillada, el generador la buscaba con
+las comillas dentro y no encontraba la ruta.
+
+Los booleanos y los numeros tampoco llevan comillas (los reconoce el mismo codigo que los pone como
+literales).
+
+Donde esta: `ComponentConfigurator.valorDeCelda` (decide que hacer con cada celda) y
+`ComponentConfigurator.esNombreDeCelda` (la lista de codigos que son nombres). Antes el bridge
+entrecomillaba **todas** las celdas: por eso la consulta JSONPath salia mal.
+
+Ojo: esta regla es para las celdas de una **tabla**. Los **parametros** tienen la suya (seccion 44:
+sin comillas si el tipo acaba en `_LIST`).
+
+## 47. El tFileList en Talend 8: no emite filas, deja valores en el globalMap
+
+El `tFileList` se declara con el conector `FLOW` como `MAX_OUTPUT=0` y `MAX_INPUT=0`: **no emite
+filas**. No hay ninguna columna `CURRENT_FILE` que rellenar, y por eso no se puede encadenar a un
+`tLogRow` esperando datos.
+
+Lo que hace es listar la carpeta y **dejar los valores en el `globalMap`**, con el nombre del
+componente delante:
+
+| Clave | Que es |
+|---|---|
+| `<uniqueName>_CURRENT_FILE` | El nombre del fichero |
+| `<uniqueName>_CURRENT_FILEPATH` | La ruta completa |
+| `<uniqueName>_CURRENT_FILEDIRECTORY` | La carpeta |
+| `<uniqueName>_CURRENT_FILEEXTENSION` | La extension |
+| `<uniqueName>_NB_FILE` | Cuantos ficheros ha listado |
+
+El `uniqueName` es el del nodo (`tFileList_2`, no el nombre que le pone el arnes): para leer un valor
+hay que ir al `globalMap` con esa clave.
+
+Dos trampas:
+
+1. **El `LIST_MODE` es el tipo de listado, no el orden**: `FILES`, `DIRECTORIES` o `BOTH`. Si se le
+   pone `"ASC"`, el componente **no lista nada**: el codigo generado se queda con la lista vacia (sin
+   error visible). El orden va en otros parametros (`ORDER_BY_FILENAME`, `ORDER_ACTION_ASC`).
+2. Como no emite filas, el `tFileList` va **suelto** en el job (no conectado al flujo de datos). Para
+   consumir sus valores, un `tJavaRow` (o cualquier codigo) lee el `globalMap`.
+
+## 48. El tFileInputJSON: la raiz del bucle y el mapeo
+
+Con `READ_BY=JSONPATH` (no `XPATH`):
+
+1. **La raiz del bucle es el parametro `JSON_LOOP_QUERY`** (`$.clientes[*]`). `LOOP_QUERY` es del
+   modo `XPATH`: con `JSONPATH` no se usa, y sin el `JSON_LOOP_QUERY` el componente no encuentra
+   nada.
+2. **El mapeo de columnas va en la tabla `MAPPING_JSONPATH`**, con dos columnas: `SCHEMA_COLUMN` (la
+   columna del esquema) y `QUERY` (la ruta dentro del elemento, `$.id`). El valor de `QUERY` es un
+   literal: va con comillas (seccion 46).
+3. El **pom del job si hereda las librerias** que declara el componente (`json-path`, `json-smart`,
+   `accessors-smart`, `slf4j`), si el nodo se crea con la API de Studio. Antes el build no las anadia
+   y el codigo no compilaba (`org.json.simple.JSONValue cannot be resolved to a type`).
+
+## 49. El tNormalize: la salida copia las columnas de la entrada por su nombre
+
+El codigo generado del `tNormalize` copia las columnas de la salida desde las de la entrada **por el
+mismo nombre**:
+
+```java
+row2.nombre = row1.nombre;
+```
+
+asi que **la salida tiene que declarar las mismas columnas que la entrada**. Si no, el error es
+`apellido cannot be resolved or is not a field`.
+
+Los dos parametros que importan:
+
+| Parametro | Que es |
+|---|---|
+| `NORMALIZE_COLUMN` | La columna que se parte. Es de tipo `PREV_COLUMN_LIST`: va **sin comillas** (seccion 44) |
+| `ITEMSEPARATOR` | El separador de los elementos (`;`) |
+
+El componente **multiplica filas**: una por cada elemento de la columna, repitiendo las demas.
+
+| Entrada | Salida |
+|---|---|
+| `nombre=Ana`, `etiquetas=rojo;verde` | `Ana|rojo` y `Ana|verde` |
+| `nombre=Jose`, `etiquetas=azul` | `Jose|azul` |
+
+## 50. El tJavaRow: el codigo se inserta tal cual
+
+El codigo del `tJavaRow` (el parametro `CODE`) se inserta **tal cual** en el job, sustituyendo
+`input_row` y `output_row` por el **nombre de las conexiones** (`row1`, `row2`...):
+
+```java
+output_row.nombre_mayus = input_row.nombre.toUpperCase();
+```
+
+La fila de entrada sale de la **conexion** y la de salida, del **esquema del nodo** (por eso el
+esquema del `tJavaRow` hay que ponerlo despues de conectar).
+
+**Trampa**: si una columna del esquema es entera y **no admite nulos**, el codigo generado hace
+`row.id != null` sobre un `int`, y eso no compila. Usa columnas `String` (o que admitan nulos).
+
+## 51. El agregador Maven de los jobs se rompe con un modulo huerfano
+
+Studio compila cada job con Maven a traves de un agregador que genera al vuelo. Si en el
+`poms/jobs/process/` queda un modulo que el agregador referencia y ya no existe, **todas** las
+compilaciones siguientes fallan con el mismo error, aunque el job este bien:
+
+```
+[ERROR] Child module C:\...\poms\jobs\process\mcp_coverage_0.1 of C:\...\poms\build-aggregator.pom does not exist
+```
+
+Paso midiendo 77 componentes de golpe: tras unos 33, el agregador quedo apuntando a un proyecto
+que se habia borrado y los 42 siguientes fallaron con ese texto. El error es del build, no del
+componente.
+
+Que hacer:
+
+- **Reiniciar Studio** entre mediciones largas (ademas del heap, que se llena: se vigila con
+  `talend_studio_memory`, y `scripts/coverage.ts` corta al 80 %).
+- Medir **por tandas** (una familia o dos por corrida), no las 17 de una vez.
+- Un job que fallo asi vuelve a compilar solo cuando el agregador se regenera bien: hay que
+  recrearlo (o reiniciar Studio) y repetir la medicion de ese componente.
+
+El sintoma se reconoce porque `error_compilacion` trae `Child module ... does not exist` y no un
+error de Java.
