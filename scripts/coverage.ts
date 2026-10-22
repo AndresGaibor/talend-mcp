@@ -233,7 +233,7 @@ async function main(): Promise<void> {
     // de cada job) y el IDE deja de responder. Si se pasa del limite, se
     // cancela la medicion en vez de tumbar el Studio.
     const memoria = await bridge.memory();
-    const usado = (memoria.data?.result as { usedPercent?: number } | undefined)?.usedPercent ?? 0;
+    const usado = (memoria.data as { usedPercent?: number } | undefined)?.usedPercent ?? 0;
     if (usado >= LIMITE_MEMORIA_PORCENTAJE) {
       console.error(
         `\n\nStudio lleva el ${usado}% de su memoria: se cancela la medicion (si no, el IDE se queda sin memoria).`,

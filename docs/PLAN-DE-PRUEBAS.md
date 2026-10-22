@@ -91,18 +91,20 @@ conectores en el modelo y exigen tener una conexion de salida.
 | Se crean, guardan, listan y borran | **134 de 134** |
 | Compilan (L4) | **99 de 134 (74 %)** |
 
-**Medicion de los componentes que no piden artefacto** (44 de las familias `Logs_Errors`, `XML`, `Data_Quality`,
-`File/Management` y `Databases/DB Specifics/PostgreSQL`), con `--sin-artefacto` (96 s):
+**Medicion de los componentes que no piden artefacto**, con `--sin-artefacto`:
 
-| | Resultado |
-|---|---|
-| Se crean, guardan, listan y borran | **44 de 44** |
-| Compilan (L4) | **38 de 44 (86 %)** |
+| Familias | Componentes | Compilan |
+|---|---|---|
+| `Logs_Errors`, `XML`, `Data_Quality`, `File/Management`, `PostgreSQL` | 44 | 38 (86 %) |
+| `MySQL` | 19 | 19 (100 %) |
+| `Data_Quality/Matching`, `Business_Intelligence/DB_SCD`, `MS_SQL_Server`, `Oracle` | 62 | 60 (97 %) |
 
-Los 6 que no compilan necesitan una configuracion real: `tFileInputXML` (los espacios de nombres del XML),
-`tIntervalMatch` (la conexion de referencia), `tReplaceList` (la tabla de reemplazos), `tReservoirSampling` (la
-columna de muestreo) y los dos de XML (`tWriteXMLField` y `tWriteXMLFieldIn`, que necesitan el arbol XML de
-entrada). Ninguno falla por falta de artefacto.
+Los que no compilan en estos tres grupos son 8, y todos necesitan una configuracion real: `tFileInputXML` (los
+espacios de nombres del XML), `tIntervalMatch` (la conexion de referencia), `tReplaceList` (la tabla de
+reemplazos), `tReservoirSampling` (la columna de muestreo) y los dos de XML (`tWriteXMLField` y
+`tWriteXMLFieldIn`, que necesitan el arbol XML de entrada). Ninguno falla por falta de artefacto.
+
+En total, **259 componentes medidos a L3/L4, de los que 216 compilan (83 %)**.
 
 Los 35 que no compilan en la medicion de las nueve familias se agrupan en:
 
@@ -198,6 +200,7 @@ el fichero que escribe). El informe queda en `testdata/resultados-l5.csv`.
 | `tPostgresqlConnection` -> `tPostgresqlInput` -> `tLogRow` | Correcto: lee las diez filas del Postgres de pruebas (ver INTERNALS 35) |
 | contextos: crear un entorno y sus variables | Correcto: el job tiene los dos entornos con sus valores. El `tContextLoad` no saca filas (necesita su `nodeData` con la lista de variables a cargar), asi que el valor se comprueba en el modelo |
 | `tFileInputDelimited` -> `tAggregateRow` -> `tLogRow` | **Pendiente**: el `tAggregateRow` necesita dos tablas de metadata y al rellenar el schema se rompe la tabla que la conexion tiene asignada (ver INTERNALS 32) |
+| `tFixedFlowInput` -> `tNormalize` -> `tLogRow` | **Pendiente**: el codigo generado del `tNormalize` copia las columnas por el mismo nombre y no usa la columna a normalizar |
 | `tFileInputJSON` -> `tLogRow` | **Pendiente**: el pom del job no hereda las librerias del componente (json-simple) y el codigo no compila |
 | `tFixedFlowInput` -> `tJavaRow` -> `tLogRow` | **Pendiente**: la salida del `tJavaRow` la define el parametro `SCHEMA`, que el bridge no deja con la forma que espera el generador |
 | `tPostgresqlOutput` -> `tDBCommit` | **Pendiente**: el `tDBOutput` genera el `INSERT` con los nombres de columna a null |

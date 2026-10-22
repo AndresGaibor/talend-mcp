@@ -636,6 +636,40 @@
       }
     },
     {
+      "nombre": "transformaciones: un tNormalize divide una columna",
+      "job": "MCP_L5_Normaliza",
+      "pendiente": "el codigo generado del tNormalize copia las columnas de la salida desde las de la entrada por el mismo nombre ('row2.nombre = row1.nombre'), sin usar la columna a normalizar, asi que la entrada y la salida no pueden tener nombres distintos ('apellido cannot be resolved or is not a field')",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [{ "name": "nombre_completo", "type": "id_String" }],
+          "values": [["Ana;Nunez"], ["Jose;Ramirez"]]
+        },
+        {
+          "type": "tNormalize",
+          "nombre": "normaliza",
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "NORMALIZE_COLUMN": { "value": "nombre_completo" },
+            "CSV_OPTION": { "value": "false" }
+          },
+          "columnas": [
+            { "name": "nombre", "type": "id_String" },
+            { "name": "apellido", "type": "id_String" }
+          ]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "normaliza" },
+        { "origen": "normaliza", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": ["Ana|Nunez", "Jose|Ramirez"]
+      }
+    },
+    {
       "nombre": "transformaciones: un tMap renombra y filtra",
       "job": "MCP_L5_TMap",
       "nodos": [
