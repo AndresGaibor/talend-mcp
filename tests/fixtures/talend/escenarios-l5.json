@@ -399,8 +399,8 @@
               "rows": [
                 {
                   "INPUT_COLUMN": "monto",
-                  "FUNCTION": "EMPTY",
-                  "OPERATOR": "GT_JAVA",
+                  "FUNCTION": "",
+                  "OPERATOR": ">",
                   "RVALUE": "150"
                 }
               ]
@@ -806,6 +806,7 @@
     {
       "nombre": "bases de datos: escribir en un Postgres y confirmar",
       "job": "MCP_L5_Escritura",
+      "pendiente": "el tDBOutput genera el INSERT con los nombres de columna a null: el generador los saca de las columnas de la tabla de salida del nodo y el bridge solo consigue ponerlas en el SCHEMA_FLOW (los 'elementValue') y en el metadata. Con MAPPING=PostgreSQL el INSERT sale bien formado pero sin los nombres ('INSERT INTO tabla (null,null,null,null)'), y el Postgres lo rechaza con 'column \"null\" does not exist'. La lectura si funciona (el otro escenario)",
       "nodos": [
         {
           "type": "tFixedFlowInput",
@@ -843,10 +844,10 @@
             "MAPPING": { "value": "PostgreSQL" },
             "SCHEMA_FLOW": {
               "value": [
-                { "SCHEMA_COLUMN": "id", "TYPE": "id_Integer" },
-                { "SCHEMA_COLUMN": "nombre", "TYPE": "id_String" },
-                { "SCHEMA_COLUMN": "ciudad", "TYPE": "id_String" },
-                { "SCHEMA_COLUMN": "monto", "TYPE": "id_Double" }
+                { "elementRef": "SCHEMA_COLUMN", "value": "id" },
+                { "elementRef": "SCHEMA_COLUMN", "value": "nombre" },
+                { "elementRef": "SCHEMA_COLUMN", "value": "ciudad" },
+                { "elementRef": "SCHEMA_COLUMN", "value": "monto" }
               ],
               "field": "SCHEMA_TYPE"
             }

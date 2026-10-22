@@ -223,22 +223,53 @@ public final class ComponentConfigurator {
   /**
    * Pone una lista de valores en un parametro.
    *
-   * El formato en memoria es una lista de mapas (uno por fila), que es como
-   * Talend guarda los parametros de tipo TABLE y SCHEMA: el `SCHEMA_FLOW` del
-   * `tDBOutput` (las columnas que se escriben) es una tabla mas.
+   * El formato en memoria depende del tipo de campo:
+   *
+   * - Los de tipo SCHEMA (el `SCHEMA_FLOW` del `tDBOutput`, que son las
+   *   columnas que se escriben) guardan una lista de
+   *   `ElementParameterValueModel`, cada uno con su `label` (el `elementRef`,
+   *   "SCHEMA_COLUMN") y su `value` (el nombre de la columna).
+   * - Los de tipo TABLE guardan una lista de mapas (una fila por mapa), que es
+   *   lo que ya se usa para las tablas de los componentes.
    */
   private static void setListValue(Object parameter, JsonArray valores) throws Exception {
+    String fieldType = null;
+    try {
+      Object tipo = parameter.getClass().getMethod("getFieldType").invoke(parameter);
+      fieldType = tipo == null ? null : String.valueOf(tipo);
+    } catch (Exception e) {
+      // Sin tipo: se usa el formato de las tablas.
+    }
+
     List<Object> lista = new ArrayList<>();
-    for (JsonElement item : valores) {
-      if (item.isJsonObject()) {
-        Map<String, Object> fila = new LinkedHashMap<>();
-        for (Map.Entry<String, JsonElement> campo : item.getAsJsonObject().entrySet()) {
-          JsonElement valor = campo.getValue();
-          fila.put(campo.getKey(), valor.isJsonPrimitive() ? valor.getAsString() : valor.toString());
+    if (fieldType != null && fieldType.contains("SCHEMA")) {
+      Class<?> valueClass = TalendClasses.load("org.talend.core.model.process.ElementParameterValueModel");
+      for (JsonElement item : valores) {
+        if (!item.isJsonObject()) {
+          continue;
         }
-        lista.add(fila);
-      } else if (item.isJsonPrimitive()) {
-        lista.add(item.getAsString());
+        JsonObject objeto = item.getAsJsonObject();
+        Object valor = valueClass.getConstructor().newInstance();
+        String label = objeto.has("elementRef") ? objeto.get("elementRef").getAsString() : null;
+        if (label != null) {
+          valor.getClass().getMethod("setLabel", String.class).invoke(valor, label);
+        }
+        String texto = objeto.has("value") ? objeto.get("value").getAsString() : "";
+        valor.getClass().getMethod("setValue", String.class).invoke(valor, texto);
+        lista.add(valor);
+      }
+    } else {
+      for (JsonElement item : valores) {
+        if (item.isJsonObject()) {
+          Map<String, Object> fila = new LinkedHashMap<>();
+          for (Map.Entry<String, JsonElement> campo : item.getAsJsonObject().entrySet()) {
+            JsonElement valor = campo.getValue();
+            fila.put(campo.getKey(), valor.isJsonPrimitive() ? valor.getAsString() : valor.toString());
+          }
+          lista.add(fila);
+        } else if (item.isJsonPrimitive()) {
+          lista.add(item.getAsString());
+        }
       }
     }
     parameter.getClass().getMethod("setValue", Object.class).invoke(parameter, lista);
