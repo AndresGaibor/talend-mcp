@@ -355,7 +355,6 @@ encolado (INTERNALS 45):
         "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
         "TABLE": { "value": "l5_salida" },
         "TABLE_ACTION": { "value": "TRUNCATE" },
-        "MAPPING": { "value": "PostgreSQL" },
         "END_OF_FLOW": { "value": "false" }
       },
       "tablas": {
@@ -386,7 +385,10 @@ Cinco detalles que no se ven en el JSON pero deciden si esto funciona:
   `literal: true` (va en crudo).
 - **No se encola un `tPostgresqlCommit`**: se ejecutaria dentro del bucle de filas y el lote final fallaria con
   `This connection has been closed`. El commit lo hace la conexion con `AUTO_COMMIT=true`.
-- `MAPPING` es el id del motor (`PostgreSQL`), no el nombre del componente.
+- `MAPPING` **no se toca**: su `DEFAULT` es el id del motor (`postgres_id`, `mysql_id`), y poner el nombre
+  que se ve en la interfaz (`"PostgreSQL"`) deja el job sin codigo generado: el IDE no encuentra el motor
+  (`DBMS Id : "PostgreSQL" can't be found`), salta un `NullPointerException` en `TypesManager.checkDBType`
+  y el `.java` del job se queda en 0 bytes (INTERNALS 45.6).
 
 El Postgres de pruebas es el de `testdata/docker-compose.yml` (puerto 5433):
 `docker compose -f testdata/docker-compose.yml up -d`.

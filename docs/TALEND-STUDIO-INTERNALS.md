@@ -2144,7 +2144,15 @@ El camino que funciona (probado contra un Postgres):
 5. Las columnas que se escriben van en la tabla `FIELD_OPTIONS` (cinco campos por columna: `SCHEMA_COLUMN`,
    `UPDATE_KEY`, `DELETE_KEY`, `UPDATABLE`, `INSERTABLE`). En el spec del arnes, `FIELD_OPTIONS` es un
    parametro de tipo TABLE: va en `tablas`, no en `parameters`.
-6. `MAPPING` es el id del motor (`PostgreSQL`, `MySQL`...), no el nombre del componente.
+6. `MAPPING` es el **id del motor de la base**, no el nombre que se ve en la interfaz: para Postgres es
+   `postgres_id` (el `DEFAULT` del parametro en el `tPostgresqlOutput_java.xml`), para MySQL
+   `mysql_id`. Poner el nombre de la interfaz (`"PostgreSQL"`) es peor que no poner nada: el IDE no
+   encuentra el motor, registra `DBMS Id : "PostgreSQL" can't be found` y lanza un
+   `NullPointerException` en `TypesManager.checkDBType` (el `mappingTypeRetriever` es null) dentro de
+   `ProcessorUtilities.generateJobInfo`. La generacion de codigo se corta ahi y deja el `.java` del job
+   **vacio** (0 bytes), sin `classpath.jar` y sin ningun error en la respuesta del bridge: el sintoma es
+   `El job no esta compilado: no existe target/classpath.jar`. Si no se toca, se queda el `DEFAULT` del
+   componente, que es el valor bueno.
 
 ## 46. Los valores de las celdas de tabla: los nombres sin comillas
 

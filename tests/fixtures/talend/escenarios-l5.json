@@ -1449,7 +1449,7 @@
               "value": "TRUNCATE"
             },
             "MAPPING": {
-              "value": "PostgreSQL"
+              "value": "postgres_id"
             },
             "END_OF_FLOW": {
               "value": "false"
@@ -1884,7 +1884,7 @@
               "value": "UPDATE"
             },
             "MAPPING": {
-              "value": "PostgreSQL"
+              "value": "postgres_id"
             },
             "END_OF_FLOW": {
               "value": "false"
@@ -2035,7 +2035,7 @@
               "value": "DELETE"
             },
             "MAPPING": {
-              "value": "PostgreSQL"
+              "value": "postgres_id"
             },
             "END_OF_FLOW": {
               "value": "false"
@@ -2211,7 +2211,7 @@
               "value": "UPDATE"
             },
             "MAPPING": {
-              "value": "PostgreSQL"
+              "value": "postgres_id"
             },
             "END_OF_FLOW": {
               "value": "false"
