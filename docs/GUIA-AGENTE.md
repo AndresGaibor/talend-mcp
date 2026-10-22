@@ -125,6 +125,13 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
 - **Un trigger de error necesita un fallo que lance**: con un `tDie` el manejador corre; con un
   `tFileInputDelimited` que apunta a un fichero inexistente, no (el job registra `[ERROR]` y termina con
   codigo 0).
+- **`tPrejob` y `tPostjob` solo tienen conector `COMPONENT_OK`**, no `FLOW`: se cuelgan con `OnComponentOk` del
+  `tFixedFlowInput` que arranca su subjob. El orden de ejecucion es prejob, subjobs normales, postjob.
+- **El fichero de salida**: si el escenario lo comprueba, el arnes lo borra antes de relanzar; aun asi, el primer
+  `tFileOutputDelimited` que escribe con `APPEND=false` va con `FILE_EXIST_EXCEPTION=false` (el Run de Studio ya
+  lo ha escrito antes).
+- **No ejecutar un job mientras Studio lo esta compilando**: Studio carga el job en su JVM y deja el
+  `classpath.jar` bloqueado; el build siguiente falla al borrarlo y la carpeta se queda sin codigo (INTERNALS 55).
 - **Parametros que el catalogo no declara** (p. ej. `FILENAME` de `tFileOutputDelimited`): el bridge
   los crea con el tipo indicado o deducido.
 - **Los parametros de lista van sin comillas.** Un parametro cuyo tipo acaba en `_LIST` (el
@@ -181,7 +188,7 @@ Un escenario declara el job, sus nodos, sus conexiones y **lo que se espera**:
 | `nodos` | Los componentes, en orden |
 | `conexiones` | `origen`, `destino` y, si hace falta, `tipo` (por defecto, el conector de salida del origen) |
 | `espera` | `lineas` (exactas o el numero), `contiene`, `fichero`, `contextos` o `consulta` (SQL contra el Postgres de pruebas) |
-| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que (hoy **ningun escenario lo usa**: los 23 estan en verde) |
+| `pendiente` | Si esta, el escenario se salta y el arnes informa de por que (hoy **ningun escenario lo usa**: los 25 estan en verde) |
 | `contextos` / `jobs` | Los entornos del job y los jobs auxiliares (el hijo de un `tRunJob`), que se montan antes que el principal |
 
 Y cada nodo:

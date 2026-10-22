@@ -129,7 +129,7 @@ type Escenario = {
     /** Lineas que tienen que aparecer. */
     contiene?: string[];
     /** Fichero que el job escribe. */
-    fichero?: { ruta: string; lineas?: number; contiene?: string[] };
+    fichero?: { ruta: string; lineas?: number | string[]; contiene?: string[] };
     /** Los contextos que tiene que tener el job, con sus variables. */
     contextos?: Array<{
       nombre: string;
@@ -393,6 +393,11 @@ async function esperarCompilado(
   job: string,
   intentos = 30,
 ): Promise<{ ok: boolean; mensaje?: string }> {
+  // Se espera un poco antes del primer intento: ejecutar el job abre su
+  // `classpath.jar`, y si Studio esta justo reemplazandolo el build falla con
+  // "El proceso no tiene acceso al archivo" y la carpeta se queda sin codigo
+  // (INTERNALS 55). Unos segundos de margen evitan casi siempre el choque.
+  await new Promise((resolve) => setTimeout(resolve, 12_000));
   for (let intento = 0; intento < intentos; intento++) {
     const ejecutado = await bridge.executeJob({ name: job, timeoutMs: 120_000 });
     const cuerpo = (ejecutado.data ?? {}) as {
@@ -911,7 +916,19 @@ for (const pendiente of mappersPorNodo) {
       fallos.push(`no se escribio el fichero ${ruta}`);
     } else {
       const contenido = readFileSync(ruta, "utf8").split("\n").filter((linea) => linea.length > 0);
-      if (espera.fichero.lineas !== undefined && contenido.length !== espera.fichero.lineas) {
+      if (Array.isArray(espera.fichero.lineas)) {
+        // Las lineas exactas, en orden: es la unica forma de comprobar el
+        // orden en que escriben varios subjobs (un tPrejob y un tPostjob).
+        const esperadas = espera.fichero.lineas;
+        const mismo =
+          esperadas.length === contenido.length &&
+          esperadas.every((linea, indice) => linea === contenido[indice]);
+        if (!mismo) {
+          fallos.push(
+            `el fichero no tiene las lineas esperadas: se esperaba ${JSON.stringify(esperadas)} y salio ${JSON.stringify(contenido.slice(0, 8))}`,
+          );
+        }
+      } else if (espera.fichero.lineas !== undefined && contenido.length !== espera.fichero.lineas) {
         fallos.push(`el fichero tiene ${contenido.length} lineas y se esperaban ${espera.fichero.lineas}`);
       }
       for (const texto of espera.fichero.contiene ?? []) {

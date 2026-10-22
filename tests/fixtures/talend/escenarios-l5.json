@@ -2133,6 +2133,303 @@
           "el job se corta a proposito"
         ]
       }
+    },
+    {
+      "nombre": "bases de datos: deshacer con rollback explicito",
+      "job": "MCP_L5_Rollback",
+      "prepara": [
+        "DROP TABLE IF EXISTS l5_rollback",
+        "CREATE TABLE l5_rollback (id integer, nombre varchar(50))",
+        "INSERT INTO l5_rollback VALUES (1, 'Ana'), (2, 'Jose')"
+      ],
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "2",
+              "Jose Cambiado"
+            ]
+          ]
+        },
+        {
+          "type": "tPostgresqlConnection",
+          "nombre": "conexion",
+          "parameters": {
+            "HOST": {
+              "value": "localhost"
+            },
+            "PORT": {
+              "value": "5433"
+            },
+            "USER": {
+              "value": "talend"
+            },
+            "PASS": {
+              "value": "talend"
+            },
+            "DBNAME": {
+              "value": "talend_test"
+            },
+            "AUTO_COMMIT": {
+              "value": "false"
+            }
+          }
+        },
+        {
+          "type": "tPostgresqlOutput",
+          "nombre": "actualiza",
+          "parameters": {
+            "USE_EXISTING_CONNECTION": {
+              "value": "true"
+            },
+            "CONNECTION": {
+              "value": "@uniqueName:conexion",
+              "literal": false
+            },
+            "TABLE": {
+              "value": "l5_rollback"
+            },
+            "TABLE_ACTION": {
+              "value": "NONE"
+            },
+            "USE_FIELD_OPTIONS": {
+              "value": "true"
+            },
+            "DATA_ACTION": {
+              "value": "UPDATE"
+            },
+            "MAPPING": {
+              "value": "PostgreSQL"
+            },
+            "END_OF_FLOW": {
+              "value": "false"
+            }
+          },
+          "tablas": {
+            "FIELD_OPTIONS": {
+              "columns": [
+                "SCHEMA_COLUMN",
+                "UPDATE_KEY",
+                "DELETE_KEY",
+                "UPDATABLE",
+                "INSERTABLE"
+              ],
+              "rows": [
+                {
+                  "SCHEMA_COLUMN": "id",
+                  "UPDATE_KEY": "true",
+                  "DELETE_KEY": "false",
+                  "UPDATABLE": "false",
+                  "INSERTABLE": "false"
+                },
+                {
+                  "SCHEMA_COLUMN": "nombre",
+                  "UPDATE_KEY": "false",
+                  "DELETE_KEY": "false",
+                  "UPDATABLE": "true",
+                  "INSERTABLE": "true"
+                }
+              ]
+            }
+          },
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer",
+              "sourceType": "INT4"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String",
+              "sourceType": "VARCHAR"
+            }
+          ],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tPostgresqlRollback",
+          "nombre": "deshace",
+          "parameters": {
+            "CONNECTION": {
+              "value": "@uniqueName:conexion",
+              "literal": false
+            },
+            "CLOSE": {
+              "value": "false"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "actualiza"
+        },
+        {
+          "origen": "entrada",
+          "destino": "deshace",
+          "tipo": "SUBJOB_OK"
+        }
+      ],
+      "espera": {
+        "consulta": {
+          "sql": "SELECT nombre FROM l5_rollback WHERE id = 2",
+          "valor": "Jose"
+        }
+      }
+    },
+    {
+      "nombre": "control de flujo: un tPrejob y un tPostjob",
+      "job": "MCP_L5_PrePost",
+      "nodos": [
+        {
+          "type": "tPrejob",
+          "nombre": "pre"
+        },
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "preFila",
+          "columnas": [
+            {
+              "name": "paso",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "pre"
+            ]
+          ]
+        },
+        {
+          "type": "tFileOutputDelimited",
+          "nombre": "preEscribe",
+          "parameters": {
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_prepost.txt"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "APPEND": {
+              "value": "false"
+            },
+            "FILE_EXIST_EXCEPTION": {
+              "value": "false"
+            }
+          }
+        },
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "principalFila",
+          "columnas": [
+            {
+              "name": "paso",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "principal"
+            ]
+          ]
+        },
+        {
+          "type": "tFileOutputDelimited",
+          "nombre": "principalEscribe",
+          "parameters": {
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_prepost.txt"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "APPEND": {
+              "value": "true"
+            }
+          }
+        },
+        {
+          "type": "tPostjob",
+          "nombre": "post"
+        },
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "postFila",
+          "columnas": [
+            {
+              "name": "paso",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "post"
+            ]
+          ]
+        },
+        {
+          "type": "tFileOutputDelimited",
+          "nombre": "postEscribe",
+          "parameters": {
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_prepost.txt"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "APPEND": {
+              "value": "true"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "preFila",
+          "destino": "preEscribe"
+        },
+        {
+          "origen": "principalFila",
+          "destino": "principalEscribe"
+        },
+        {
+          "origen": "postFila",
+          "destino": "postEscribe"
+        },
+        {
+          "origen": "pre",
+          "destino": "preFila",
+          "tipo": "COMPONENT_OK"
+        },
+        {
+          "origen": "post",
+          "destino": "postFila",
+          "tipo": "COMPONENT_OK"
+        }
+      ],
+      "espera": {
+        "fichero": {
+          "ruta": "@TESTDATA@/l5_prepost.txt",
+          "lineas": [
+            "pre",
+            "principal",
+            "post"
+          ]
+        }
+      }
     }
   ]
 }

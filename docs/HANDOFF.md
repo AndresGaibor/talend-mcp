@@ -30,7 +30,7 @@ L4 compila, L5 ejecuta con la salida esperada).
 - **Hay cambios sin commitear** en el arbol de trabajo: la puesta al dia de los cuatro documentos de estado
   (este `HANDOFF`, el `PLAN-DE-PRUEBAS`, la `GUIA-AGENTE` y el `ROADMAP`), las secciones 40 y 53-54 de INTERNALS,
   el plugin Java del bridge (`NodeOperations`, `JobExecutor`, `SchemaOperations`), el arnes
-  (`scripts/execution-check.ts`) y el fixture de escenarios, con los **23 escenarios L5 en verde**.
+  (`scripts/execution-check.ts`) y el fixture de escenarios, con los **25 escenarios L5 en verde**.
 
 ## Comandos de trabajo
 
@@ -121,19 +121,20 @@ El **nombre** de la conexion (`row1`, `row2`...) es la variable de la fila en el
 los componentes la referencian (`row1.monto`). El bridge la llamaba `conn_1` y las transformaciones no generaban
 codigo. Ademas, el **conector** no siempre es `FLOW`: el `tUniqRow` saca sus filas por `UNIQUE`. Ver INTERNALS 32.
 
-### Arnes de ejecucion (L5): 23 de 23 en verde
+### Arnes de ejecucion (L5): 25 de 25 en verde
 
 `scripts/execution-check.ts` monta un job, lo ejecuta y **compara la salida con la esperada** (declarada antes de
 ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json`; el informe sale en
-`testdata/resultados-l5.csv`. **Veintitres escenarios en verde y ninguno pendiente**: el de humo, el de leer un
+`testdata/resultados-l5.csv`. **Veinticinco escenarios en verde**: el de humo, el de leer un
 CSV, el de leer y escribir un CSV, el de transformaciones (`tUniqRow` + `tSortRow` sobre el CSV, quitando el
 duplicado y ordenando por importe), el `tFilterRow` con condicion, el `tUnite`, el `tMap` que renombra y filtra,
 la escritura de un JSON, la lectura de un JSON, el listado de los ficheros de una carpeta, el trigger de error, los
 contextos, la orquestacion padre/hijo, el `tAggregateRow`, la escritura en Postgres, la lectura de Postgres, el
 `tJavaRow`, el `tNormalize`, el `tRowGenerator`, el `tFilterColumns`, el **update con clave y commit explicito**,
-el **delete con clave** y el **`tDie` que corta el job**.
+el **delete con clave**, el **`tDie` que corta el job**, el **rollback explicito** y el **`tPrejob`/`tPostjob`**.
+Queda uno fuera: el `tWarn`, bloqueado por el jar que Studio deja abierto (INTERNALS 55).
 
-Los tres ultimos, y lo que ensenaron:
+Los cinco ultimos, y lo que ensenaron:
 
 - **"bases de datos: actualizar con clave y commit explicito"**: `tPostgresqlOutput` con `ACTION=UPDATE` y su
   `UPDATE_KEY`, y el `tPostgresqlCommit` colgado con `OnSubjobOk` **del arranque del subjob** (no del output):
@@ -144,6 +145,14 @@ Los tres ultimos, y lo que ensenaron:
 - **"control de flujo: un tDie corta el job"**: el `tDie` corta con codigo 1. Es tambien el fallo que usa el
   escenario del trigger de error: un `tFileInputDelimited` sin fichero **no** dispara el manejador (registra
   `[ERROR]` y termina con codigo 0).
+- **"bases de datos: deshacer con rollback explicito"**: el mismo `tPostgresqlOutput` con `UPDATE_KEY`, pero en
+  vez de commit un `tPostgresqlRollback` colgado con `OnSubjobOk` del arranque del subjob. La consulta de
+  comprobacion ve el valor **anterior**: el rollback deshace el update de verdad.
+- **"control de flujo: un tPrejob y un tPostjob"**: `tPrejob` y `tPostjob` solo tienen conector `COMPONENT_OK`
+  (no `FLOW`), asi que cada uno se cuelga de su propio `tFixedFlowInput` con `OnComponentOk` y los tres subjobs
+  escriben en el mismo fichero (`APPEND`). El orden comprobado es `pre`, `principal`, `post`: el arnes compara las
+  lineas exactas del fichero, no solo que aparezcan. El primer subjob escribe con `FILE_EXIST_EXCEPTION=false`
+  porque el Run de Studio deja el fichero escrito antes del relanzamiento.
 
 Ademas, el arnes reintenta mientras Studio compila tanto en la espera como en la ejecucion final (`no esta
 compilado` y `No se encontro la clase principal`), reabre el job y repite el `addNode` cuando Studio contesta
@@ -196,9 +205,9 @@ hace falta para que un `tRunJob` pueda llamar a su hijo.
 - Los valores de las celdas de tabla que son nombres van sin comillas y los demas como literales (INTERNALS 46):
   lo aplica el bridge (`ComponentConfigurator.valorDeCelda` y `esNombreDeCelda`).
 
-**Lo que queda pendiente de L5: nada.** Los escenarios que llevaban `pendiente` en el fixture ya estan en
-verde, y en la ultima tanda se anadieron el commit explicito, el delete con clave y el `tDie`: el arnes
-ejecuta los 23.
+**Lo que queda pendiente de L5: el `tWarn`.** Su job se quedo sin codigo generado porque Studio dejo bloqueado
+el `classpath.jar` (INTERNALS 55); hay que reiniciar Studio y volver a probarlo. Los demas escenarios que llevaban
+`pendiente` ya estan en verde: el arnes ejecuta los 25.
 
 ### Otros arreglos de esta sesion
 
@@ -219,7 +228,7 @@ ejecuta los 23.
   que la conexion quedo en el modelo.
 - **La memoria**: Studio se queda sin memoria con las mediciones largas (INTERNALS 39). Ahora la medicion lo
   vigila y cancela al 80 % del heap, y hay la tool `talend_studio_memory`.
-- **23 escenarios L5** con la salida verificada (ver PLAN-DE-PRUEBAS).
+- **25 escenarios L5** con la salida verificada (ver PLAN-DE-PRUEBAS).
 
 ### Contextos (entornos) de un job
 
@@ -267,7 +276,7 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
 | L3/L4 | **259 componentes medidos**: las nueve familias mas usadas (134, de los que 99 compilan) y las que no piden artefacto (`Logs_Errors`, `XML`, `Data_Quality`, `File/Management`, `PostgreSQL`, `MySQL`, `Data_Quality/Matching`, `DB_SCD`, `MS_SQL_Server`, `Oracle`): 125 de ellos, 117 compilan. **216 de 259 compilan (83 %)**. Los que no, necesitan una configuracion real (tablas, XSD, columnas), no un jar. Aparte, las **25 familias de `Databases/DB Specifics`**: **179 componentes, 177 compilan (99 %)**; fallan `tCosmosDBClose` (driver de MongoDB) y `tIngresBulkExec` (codigo generado) |
-| L5 | **23 escenarios con la salida verificada** (los 23 que ejecuta el arnes): humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, un `tFilterRow` con condicion, un `tUnite`, un `tMap` que renombra y filtra, escribir un JSON, **leer un JSON**, **listar los ficheros de una carpeta**, un trigger de error, contextos, orquestacion padre/hijo, un `tAggregateRow`, **escribir en un Postgres y verificar**, **leer de un Postgres**, un `tJavaRow`, un `tNormalize`, **un `tRowGenerator`**, **un `tFilterColumns`**, **un update con clave y commit explicito**, **un delete con clave** y **un `tDie` que corta el job**. **No queda ninguno pendiente** |
+| L5 | **25 escenarios con la salida verificada** (los 25 que ejecuta el arnes): humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, un `tFilterRow` con condicion, un `tUnite`, un `tMap` que renombra y filtra, escribir un JSON, **leer un JSON**, **listar los ficheros de una carpeta**, un trigger de error, contextos, orquestacion padre/hijo, un `tAggregateRow`, **escribir en un Postgres y verificar**, **leer de un Postgres**, un `tJavaRow`, un `tNormalize`, **un `tRowGenerator`**, **un `tFilterColumns`**, **un update con clave y commit explicito**, **un delete con clave**, **un `tDie` que corta el job**, **un rollback explicito** y **un `tPrejob`/`tPostjob`**. Pendiente: el `tWarn` (jar bloqueado por Studio, INTERNALS 55) |
 
 ## Lo siguiente (por prioridad)
 

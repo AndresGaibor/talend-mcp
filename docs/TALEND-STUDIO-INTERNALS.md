@@ -2418,3 +2418,28 @@ compilarse y ejecutarse desde el IDE.
 El sintoma tipico: en `poms/jobs/process/<JOB>/` hay una carpeta `mcp_<job>_0.1` vacia (sin `src` ni `target`)
 y el `MCP_<JOB>.java` esta en `PRJ_<PROYECTO>_MCP_<JOB>_0.1/src/main/java/...`.
 
+## 55. Studio bloquea el `classpath.jar` del job que ha cargado
+
+Cuando Studio carga las clases de un job en su propia JVM (el `Run` remoto o embebido), el
+`target/classpath.jar` se queda abierto mientras viva Studio. El siguiente build intenta limpiar la carpeta
+y falla antes de generar nada:
+
+```
+java.nio.file.FileSystemException: ...\target\classpath.jar: El proceso no tiene acceso al archivo.
+  at org.talend.designer.runprocess.java.TalendProcessJavaProject.cleanFolder
+  at org.talend.designer.maven.tools.MavenPomSynchronizer.cleanMavenFiles
+```
+
+La carpeta se queda con el `pom.xml`, `src/main/java` **vacio** y un `classpath.jar` de 1 KB (solo el
+manifiesto). A partir de ahi el job responde `No se encontro la clase principal del job en target/classes`
+en todos los intentos, `compile` contesta `compiles: true` porque no hay nada que compilar y la carpeta
+tampoco se puede borrar desde fuera (`Remove-Item` da acceso denegado). Lo unico que lo suelta es
+**reiniciar Studio**: no hay forma de liberar el jar desde el MCP.
+
+Medido con un job de tres nodos (`tFixedFlowInput` -> `tWarn` -> `tLogRow`): el primer Run lo dejo bloqueado
+y los builds siguientes ya no generaron codigo.
+
+Consecuencia practica: no lanzar `executeJob` mientras Studio esta compilando ese job. El arnes lo hace para
+saber si el build ha terminado, y justo ahi esta el riesgo: abre el jar en el momento en que Studio lo va a
+reemplazar.
+
