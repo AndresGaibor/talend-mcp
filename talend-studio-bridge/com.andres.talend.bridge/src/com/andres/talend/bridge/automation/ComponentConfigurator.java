@@ -543,7 +543,7 @@ public final class ComponentConfigurator {
     Map<String, Object> values = new LinkedHashMap<>();
     if (row.isJsonObject()) {
       for (Map.Entry<String, JsonElement> entry : row.getAsJsonObject().entrySet()) {
-        values.put(entry.getKey(), entry.getValue().isJsonNull() ? "" : entry.getValue().getAsString());
+        values.put(entry.getKey(), valorDeCelda(entry.getKey(), entry.getValue()));
       }
       return values;
     }
@@ -552,10 +552,60 @@ public final class ComponentConfigurator {
       for (int i = 0; i < array.size(); i++) {
         String code = i < columnCodes.size() ? columnCodes.get(i) : "column" + i;
         JsonElement value = array.get(i);
-        values.put(code, value.isJsonNull() ? "" : value.getAsString());
+        values.put(code, valorDeCelda(code, value));
       }
     }
     return values;
+  }
+
+  /**
+   * El valor de una celda de tabla, como literal Java.
+   *
+   * Los valores de las tablas van al codigo generado como literales, asi que
+   * el IDE los entrecomilla: la consulta de un `tFileInputJSON` sale como
+   * `"$.clientes[*].id"`. Los que son nombres (de columna, de funcion, de
+   * orden...) van sin comillas, y los booleanos y los numeros tampoco.
+   */
+  private static Object valorDeCelda(String code, JsonElement raw) {
+    if (raw == null || raw.isJsonNull()) {
+      return "";
+    }
+    String value = raw.getAsString();
+    if (esNombreDeCelda(code)) {
+      return value;
+    }
+    return asLiteral(value, null);
+  }
+
+  /**
+   * Si el codigo de una celda es un nombre y no un literal.
+   *
+   * Son las columnas que el componente declara como lista de columnas
+   * (`PREV_COLUMN_LIST`, `COLUMN_LIST`) o como lista cerrada: el nombre de
+   * la columna, la funcion, el operador, el orden... El IDE las escribe sin
+   * comillas.
+   */
+  private static boolean esNombreDeCelda(String code) {
+    if (code == null) {
+      return false;
+    }
+    switch (code) {
+      case "SCHEMA_COLUMN":
+      case "COLNAME":
+      case "INPUT_COLUMN":
+      case "OUTPUT_COLUMN":
+      case "FUNCTION":
+      case "OPERATOR":
+      case "SORT":
+      case "ORDER":
+      case "KEY_ATTRIBUTE":
+      case "CASE_SENSITIVE":
+      case "PARAMETER_NAME":
+      case "TARGET_COLUMN":
+        return true;
+      default:
+        return false;
+    }
   }
 
   // ---------------------------------------------------------------------

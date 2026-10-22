@@ -38,9 +38,9 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 | 0 | `tFixedFlowInput` -> `tLogRow` (humo) | Validada: `1\|Bogota\|100.5`, `2\|Medellin\|200.25` |
 | 1 | `tFileInputDelimited` -> `tLogRow`; -> `tFileOutputDelimited` (separador y encoding) | Validada: respeta tildes, ñ y nulos; falla en fechas `dd/MM/yyyy` (la trampa); salida UTF-8 correcta |
 | 2 | `tMap` (renombrar, expresiones, filtros, rechazo, lookups, nulos, fechas, Var) | **Validada en L5**: el modelo del mapper (entradas, salidas con expresiones, filtro) se monta con el `mapper` del bridge, el job compila y ejecuta. El `talend-tmap-dataset` del Exchange solo hace falta para el editor visual, no para generar codigo ni para ejecutar |
-| 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**. **Se ejecutan bien** el `tUniqRow`, el `tSortRow`, el `tFilterRow` (con su condicion), el `tUnite` y el `tAggregateRow` (con sus tablas `GROUPBYS` y `OPERATIONS`; ver INTERNALS 41). Sin probar: `tJoin`, `tReplicate`, `tDenormalize`, `tFilterColumns` y el `tNormalize` (ver L5) |
-| 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`). El `tJavaRow` cuya salida la define el parametro `SCHEMA` sigue pendiente (ver L5) |
-| 5 | Excel, posicional, JSON, Parquet | **Parcial**: la **escritura** de JSON funciona (el `tFileOutputJSON` escribe las filas). La **lectura** de JSON sigue bloqueada: el pom del job no hereda las librerias que declara el componente (json-simple) y el codigo no compila (`org.json.simple.JSONValue cannot be resolved to a type`); el jar si esta en el `.m2` de Studio, lo que falta es que el build lo anada al pom. `tFileInputPositional`: el `.item` es correcto |
+| 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**. **Se ejecutan bien** el `tUniqRow`, el `tSortRow`, el `tFilterRow` (con su condicion), el `tUnite`, el `tAggregateRow` (con sus tablas `GROUPBYS` y `OPERATIONS`; ver INTERNALS 41) y el `tNormalize` (que parte una columna en filas; la entrada y la salida tienen que declarar las columnas con el mismo nombre). Sin probar: `tJoin`, `tReplicate`, `tDenormalize` y `tFilterColumns` |
+| 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`) y con el `tJavaRow` cuya salida la define el parametro `SCHEMA` (el escenario L5, que aplica el esquema despues de conectar) |
+| 5 | Excel, posicional, JSON, Parquet | **Parcial**: la **escritura** de JSON funciona (el `tFileOutputJSON` escribe las filas). La **lectura** de JSON ya compila y se ejecuta (antes el pom del job no heredia las librerias que declara el componente, json-simple, y el codigo no compilaba), pero la salida no es la esperada: el codigo generado usa la ruta por defecto del componente (`$['bills']`) en vez del `MAPPING_JSONPATH` del escenario. `tFileInputPositional`: el `.item` es correcto |
 | 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes). Sin probar: `tFileList`, `tDie` |
 | 7 | Bases de datos (`tDB*`, commit/rollback, insert/update/delete) | **Parcial**: el `tPostgresqlInput` lee del Postgres de pruebas y la salida es la esperada, y el `tPostgresqlOutput` **escribe y se verifica** (con `AUTO_COMMIT=true` en la conexion y **sin** componente de commit; ver INTERNALS 45). Sin probar: el commit/rollback explicito (`tPostgresqlCommit`/`tPostgresqlRollback`) y las demas acciones de salida |
 | 8 | Migracion de un programa SAS real, comparado fila por fila | **Pendiente** |
@@ -198,7 +198,7 @@ Esto es lo que hace lento el catalogo completo: no es la medicion, es la red.
 
 Esto es L1/L2/L3/L4 (ver [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)): que el componente exista,
 acepte configuracion, se pueda conectar y compile. **No** dice que ejecute bien: eso es L5, y esta validado en
-**14 escenarios** con la salida verificada.
+**16 escenarios** con la salida verificada.
 
 ## Ejecucion con la salida esperada (L5)
 
@@ -236,15 +236,17 @@ docker compose -f testdata/docker-compose.yml up -d
 | contextos: crear un entorno y sus variables | Correcto: el job tiene los dos entornos con sus valores. El `tContextLoad` no saca filas (necesita su `nodeData` con la lista de variables a cargar), asi que el valor se comprueba en el modelo |
 | `tFileInputDelimited` -> `tAggregateRow` -> `tLogRow` | **Correcto** (nuevo): agrupa por ciudad y suma el monto (`Bogota\|201.0\|2`, `Medellin\|200.25\|1`, `Cali\|300.0\|1`). La tabla de salida del agregado va la primera en su lista de metadata (ver INTERNALS 41) |
 | `tPostgresqlConnection` -> `tPostgresqlOutput` (sin componente de commit) | **Correcto** (nuevo): escribe las dos filas y la consulta de comprobacion devuelve 2. La conexion va con `AUTO_COMMIT=true` y **no** hay ningun `tPostgresqlCommit` encolado (ver INTERNALS 45) |
-| `tFileInputJSON` -> `tLogRow` | **Pendiente**: el pom del job no hereda las librerias que declara el componente (json-simple) y el codigo no compila (`org.json.simple.JSONValue cannot be resolved to a type`). El jar si esta en el `.m2` de Studio; lo que falta es que el build lo anada al pom. La escritura de JSON si funciona |
+| `tFixedFlowInput` -> `tJavaRow` -> `tLogRow` | **Correcto** (nuevo): el `tJavaRow` deja la fila de salida con sus columnas (`ANA`, `JOSE`) si su esquema se aplica **despues de conectar** (`schemaDespuesDeConectar: true`) |
+| `tFixedFlowInput` -> `tNormalize` -> `tLogRow` | **Correcto** (nuevo): parte la columna `etiquetas` en filas (`Ana\|rojo`, `Ana\|verde`, `Jose\|azul`). La entrada y la salida declaran las columnas con el **mismo nombre** (el codigo generado las copia por el nombre) y la columna a normalizar (`NORMALIZE_COLUMN`) es un valor de lista cerrada: va sin comillas |
+| `tFileInputJSON` -> `tLogRow` | **Pendiente**: antes no compilaba (el pom del job no heredia las librerias que declara el componente, json-simple, y el codigo daba `org.json.simple.JSONValue cannot be resolved to a type`). Ahora **compila y se ejecuta**, pero la salida no es la esperada: el codigo generado usa la ruta por defecto del componente (`$['bills']`) en vez del `MAPPING_JSONPATH` del escenario (`$.clientes[*].id`). La escritura de JSON si funciona |
 | `tFileList` -> `tLogRow` | **Pendiente**: el `tFileList` saca las filas pero vacias: la columna `CURRENT_FILE` nunca se rellena (los valores que deja el componente van al `globalMap`, no a la fila). El listado de la carpeta si se hace |
-| `tFixedFlowInput` -> `tJavaRow` -> `tLogRow` | **Pendiente**: la salida del `tJavaRow` la define el parametro `SCHEMA`, que el bridge no deja con la forma que espera el generador (los `elementValue` de tipo `SCHEMA_COLUMN`/`TYPE`), asi que la fila de salida sale sin columnas (`nombre_mayus cannot be resolved`). Ademas, si el metadata lleva una columna entera, la salida la genera como `int` y el codigo hace `row.id != null`, que no compila |
-| `tFixedFlowInput` -> `tNormalize` -> `tLogRow` | **Pendiente**: el codigo generado del `tNormalize` copia las columnas de la salida desde las de la entrada por el mismo nombre, sin usar la columna a normalizar, asi que la entrada y la salida no pueden tener nombres distintos (`apellido cannot be resolved or is not a field`) |
 
-**Catorce escenarios en verde (los 14 pasan) y cuatro pendientes.** Los dos desbloqueados en esta tanda son el del
-`tAggregateRow` (que ya se ejecuta con su formato real de tabla, INTERNALS 41) y el de escritura en Postgres (que
-necesitaba el nombre de columna en la base de datos y el `AUTO_COMMIT` en la conexion, INTERNALS 43 y 45). El
-escenario de escritura en Postgres se llamaba antes "...y confirmar" y usaba un `tDBCommit`: asi no funcionaba.
+**Dieciseis escenarios en verde (los 16 pasan) y dos pendientes.** Los cuatro desbloqueados en esta tanda son el del
+`tAggregateRow` (que ya se ejecuta con su formato real de tabla, INTERNALS 41), el de escritura en Postgres (que
+necesitaba el nombre de columna en la base de datos y el `AUTO_COMMIT` en la conexion, INTERNALS 43 y 45), el del
+`tJavaRow` y el del `tNormalize`. El escenario de escritura en Postgres se llamaba antes "...y confirmar" y usaba un
+`tDBCommit`: asi no funcionaba. El informe de la ultima vuelta completa esta en `testdata/resultados-l5.csv` (una
+fila por escenario, con `ejecuta_ok` y `salida_correcta`).
 
 El `tMap` compila y se ejecuta **sin** el `talend-tmap-dataset` del Exchange: ese jar solo hace falta para el
 editor visual del mapper, no para generar codigo ni para ejecutar.
@@ -302,12 +304,30 @@ que el Postgres rechaza con `column "null" does not exist`. El bridge lo pone en
 columnas (`ComponentConfigurator` y `SchemaOperations`): si solo se pusiera en uno, el esquema se contagia por la
 conexion y el bug vuelve.
 
-### Los parametros de lista cerrada, sin comillas
+### Los parametros de lista, sin comillas
 
-El IDE escribe los valores de un parametro de tipo `CLOSED_LIST` **sin comillas** (`value="TRUNCATE"`) y los de
-tipo `TEXT` o `DBTABLE` **con comillas** (`value="&quot;l5_salida&quot;"`). Con comillas, ninguna comparacion de la
-plantilla encaja: el `TABLE_ACTION` de un `tDBOutput` valia `"TRUNCATE"` y la accion de tabla no se ejecutaba, sin
-ningun error visible. Lo mismo con `COMPONENT_LIST`.
+El IDE escribe los valores de un parametro de tipo lista (`CLOSED_LIST`, `COMPONENT_LIST`, `PREV_COLUMN_LIST`)
+**sin comillas** (`value="TRUNCATE"`) y los de tipo `TEXT` o `DBTABLE` **con comillas**
+(`value="&quot;l5_salida&quot;"`). Con comillas, ninguna comparacion de la plantilla encaja: el `TABLE_ACTION` de un
+`tDBOutput` valia `"TRUNCATE"` y la accion de tabla no se ejecutaba, sin ningun error visible. Lo mismo pasaba con la
+columna a normalizar del `tNormalize` (`PREV_COLUMN_LIST`): con comillas salia `fila."columna"`.
+
+La regla del bridge es general: **todo parametro cuyo tipo acaba en `_LIST` se guarda sin comillas**; el resto, como
+hasta ahora.
+
+### El `tNormalize`: la entrada y la salida con las mismas columnas
+
+El codigo generado del `tNormalize` copia las columnas de la salida desde las de la entrada **por el mismo nombre**
+(`row2.nombre = row1.nombre`), asi que la entrada y la salida tienen que declarar las columnas con el mismo nombre
+(antes decia `apellido cannot be resolved or is not a field`).
+
+La columna a normalizar va en un parametro de lista (`NORMALIZE_COLUMN`, de tipo `PREV_COLUMN_LIST`, sin comillas) y el
+separador en el `ITEMSEPARATOR`. El componente **parte esa columna en filas**, repitiendo las demas:
+
+| Entrada | Salida |
+|---|---|
+| `nombre=Ana`, `etiquetas=rojo;verde` | `Ana\|rojo` y `Ana\|verde` |
+| `nombre=Jose`, `etiquetas=azul` | `Jose\|azul` |
 
 ### Escribir en una base de datos
 

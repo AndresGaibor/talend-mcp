@@ -114,9 +114,10 @@ Lo mismo en una sola linea de comandos: `bun run scripts/studio-job.ts fase0`.
   usan las tablas de los componentes (`row1.monto`). Ver INTERNALS 32.
 - **Parametros que el catalogo no declara** (p. ej. `FILENAME` de `tFileOutputDelimited`): el bridge
   los crea con el tipo indicado o deducido.
-- **Los parametros de lista cerrada van sin comillas.** Un `CLOSED_LIST` (el `TABLE_ACTION` de un
-  `tDBOutput`, por ejemplo) se escribe como el IDE: `value="TRUNCATE"`, sin comillas. Con comillas
-  el valor es `"TRUNCATE"` y la accion de tabla no se ejecuta, sin ningun error visible. Ver INTERNALS 44.
+- **Los parametros de lista van sin comillas.** Un parametro cuyo tipo acaba en `_LIST` (el
+  `TABLE_ACTION` de un `tDBOutput`, la columna a normalizar de un `tNormalize`...) se escribe como el
+  IDE: `value="TRUNCATE"`, sin comillas. Con comillas el valor es `"TRUNCATE"` y la accion de tabla no
+  se ejecuta, sin ningun error visible. Ver INTERNALS 44.
 - **El nombre de la columna en la base de datos** se pone con `setOriginalDbColumnName` (no hay
   `setColumnName`). Sin eso, el `tDBOutput` genera el `INSERT` con los nombres a `null` y el Postgres
   lo rechaza con `column "null" does not exist`. Ver INTERNALS 43.
@@ -170,7 +171,12 @@ El `TABLE` de un `tDBOutput` (que es la tabla `FIELD_OPTIONS`) es un parametro d
 **El orden de los esquemas:** al conectar, Talend propaga el esquema del destino hacia atras, asi que el origen se
 queda con las columnas del destino. Por eso el esquema del origen se pone **despues de conectar** (con
 `"schemaDespuesDeConectar": true`), y los esquemas "despues" se aplican **con los nodos origen al final**: son los que
-se han quedado descolocados. Ver INTERNALS 42.
+se han quedado descolocados. Los nodos que ademas tienen filas (un `tFixedFlowInput`) se reponen tambien despues de
+conectar: al conectar, el esquema del destino se propaga hacia atras y se lleva las columnas del origen. Ver INTERNALS 42.
+
+**Cuando hace falta `schemaDespuesDeConectar`:** en el `tAggregateRow` (la tabla de salida va la primera), en el
+`tJavaRow` (su salida la define el parametro `SCHEMA`) y en el `tNormalize` (la entrada y la salida declaran las
+columnas con el mismo nombre).
 
 **Ejemplo: un `tAggregateRow`.** El origen declara el **mismo numero de columnas** que la salida del agregado (el
 generador del `tFileInputDelimited` las asigna por posicion), y la tabla de salida del agregado va la primera en su
@@ -435,10 +441,11 @@ token puede modificar el proyecto. Los comandos del IDE solo corren si estan en 
 | `tMap` | El `.item` sale correcto (expresiones, filtros, joins) pero **no compila** sin `talend-tmap-dataset-1.2.16.jar`, de Talend Exchange (no esta en Maven Central). Para generar codigo y ejecutar no hace falta: el jar solo lo usa el editor visual del mapper |
 | `tFilterRow`, `tSortRow`, `tUniqRow`, `tAggregateRow` | Se configuran con el plan de la definicion (sus tablas se rellenan con las columnas del schema) y **compilan**. Ademas, **se ejecutan bien** con filas y condiciones reales (escenarios L5): el `tAggregateRow` necesita las cuatro reglas de INTERNALS 41 |
 | `tFileInputPositional` | Genera codigo que no compila en 8.0.1 (usa `onSubJobError` inexistente). Usa `tFileInputDelimited` si puedes |
-| `tFileInputJSON` | El pom del job no hereda las librerias que declara el componente (json-simple) y el codigo no compila (`org.json.simple.JSONValue cannot be resolved to a type`). El jar si esta en el `.m2` de Studio: lo que falta es que el build lo anada al pom. La **escritura** de JSON (`tFileOutputJSON`) si funciona |
+| `tFileInputJSON` | El pom del job no heredia las librerias que declara el componente (json-simple) y el codigo no compilaba (`org.json.simple.JSONValue cannot be resolved to a type`). Ahora compila y se ejecuta, pero la salida no es la esperada: el codigo generado usa la ruta por defecto del componente (`$['bills']`) en vez del `MAPPING_JSONPATH` del escenario. La **escritura** de JSON (`tFileOutputJSON`) si funciona |
+| `tFileList` | Saca las filas pero **vacias**: la columna `CURRENT_FILE` no se rellena (los valores que deja el componente van al `globalMap`, no a la fila). El listado de la carpeta si se hace |
 | `tFileOutputARFF`, `tFileInputARFF`, `tFileInputXML` | El componente esta escrito para otra version de Weka que la que trae Studio |
 | `tFileOutputDelimited` | Necesita librerias que pueden faltar en el `.m2` de Studio |
-| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, 216 de los 259 medidos compilan (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) esta verificado en **14 escenarios** |
+| Cobertura del catalogo | Medida sobre los 897 componentes Standard: 877 (98 %) se crean, configuran, guardan y borran (L1/L2). Con el montaje (L3) y los parametros obligatorios del XML, 216 de los 259 medidos compilan (L4). Las 397 variantes de Spark/Streaming necesitan un job de ese tipo (no soportado). Ejecutar con la salida esperada (L5) esta verificado en **16 escenarios** |
 | Componentes de la generacion nueva | Los 120 de los `.car` (AWS, JDBC, Snowflake...) no tienen XML: su definicion esta en el codigo Java y hay que preguntarsela a Studio (`talend_studio_component_parameters`) |
 | Salida de la vista Run | No se puede leer; por eso existe `talend_job_execute` |
 

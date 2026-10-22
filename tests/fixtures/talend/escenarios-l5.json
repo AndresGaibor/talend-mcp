@@ -590,7 +590,6 @@
     {
       "nombre": "archivos: leer un JSON",
       "job": "MCP_L5_Json",
-      "pendiente": "el pom del job no hereda las librerias que declara el componente (json-simple), asi que el codigo generado no compila ('org.json.simple.JSONValue cannot be resolved to a type'). El jar si esta en el .m2 de Studio; lo que falta es que el build lo anada al pom. La escritura de JSON si funciona",
       "nodos": [
         {
           "type": "tFileInputJSON",
@@ -601,6 +600,9 @@
             },
             "READ_BY": {
               "value": "JSONPATH"
+            },
+            "JSON_LOOP_QUERY": {
+              "value": "$.clientes[*]"
             }
           },
           "columnas": [
@@ -626,15 +628,15 @@
               "rows": [
                 {
                   "SCHEMA_COLUMN": "id",
-                  "QUERY": "$.clientes[*].id"
+                  "QUERY": "$.id"
                 },
                 {
                   "SCHEMA_COLUMN": "nombre",
-                  "QUERY": "$.clientes[*].nombre"
+                  "QUERY": "$.nombre"
                 },
                 {
                   "SCHEMA_COLUMN": "ciudad",
-                  "QUERY": "$.clientes[*].ciudad"
+                  "QUERY": "$.ciudad"
                 }
               ]
             }
@@ -725,22 +727,55 @@
     {
       "nombre": "archivos: listar los ficheros de una carpeta",
       "job": "MCP_L5_Lista",
-      "pendiente": "el tFileList saca las filas pero vacias: la columna CURRENT_FILE nunca se rellena en el codigo generado (los valores que deja el componente van al globalMap, no a la fila). El listado de la carpeta si se hace (el job lista los ficheros)",
       "nodos": [
         {
           "type": "tFileList",
           "nombre": "lista",
           "parameters": {
             "DIRECTORY": {
-              "value": "@TESTDATA@"
+              "value": "@TESTDATA@/l5_lista"
             },
             "GLOBEXPRESSIONS": {
               "value": "false"
+            },
+            "LIST_MODE": {
+              "value": "FILES"
+            },
+            "ORDER_BY_FILENAME": {
+              "value": "true"
+            },
+            "ORDER_ACTION_ASC": {
+              "value": "true"
+            }
+          }
+        },
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "schemaDespuesDeConectar": true,
+          "columnas": [
+            {
+              "name": "marca",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "x"
+            ]
+          ]
+        },
+        {
+          "type": "tJavaRow",
+          "nombre": "lee",
+          "parameters": {
+            "CODE": {
+              "value": "output_row.fichero = (String) globalMap.get(\"@uniqueName:lista\" + \"_CURRENT_FILE\");"
             }
           },
           "columnas": [
             {
-              "name": "CURRENT_FILE",
+              "name": "fichero",
               "type": "id_String"
             }
           ]
@@ -752,13 +787,17 @@
       ],
       "conexiones": [
         {
-          "origen": "lista",
+          "origen": "entrada",
+          "destino": "lee"
+        },
+        {
+          "origen": "lee",
           "destino": "salida"
         }
       ],
       "espera": {
         "contiene": [
-          "l5_clientes.csv"
+          "b.txt"
         ]
       }
     },
