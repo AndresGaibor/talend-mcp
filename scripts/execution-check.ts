@@ -584,6 +584,21 @@ for (const pendiente of tablasPorNodo) {
     };
   }
 }
+// El modelo del tMap: las tablas de entrada, las de salida (con las
+// expresiones de cada columna) y las variables.
+for (const pendiente of mappersPorNodo) {
+  const conMapper = await bridge.configureNode({
+    job: spec.job,
+    uniqueName: pendiente.uniqueName,
+    mapper: pendiente.mapper as unknown as Record<string, unknown>,
+  });
+  if (!conMapper.ok) {
+    return {
+      ok: false,
+      mensaje: `no se pudo poner el modelo del tMap: ${errorDe(conMapper)}`,
+    };
+  }
+}
   return { ok: true };
 }
 

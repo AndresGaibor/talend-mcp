@@ -36,7 +36,7 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 |---|---|---|
 | 0 | `tFixedFlowInput` -> `tLogRow` (humo) | Validada: `1\|Bogota\|100.5`, `2\|Medellin\|200.25` |
 | 1 | `tFileInputDelimited` -> `tLogRow`; -> `tFileOutputDelimited` (separador y encoding) | Validada: respeta tildes, ñ y nulos; falla en fechas `dd/MM/yyyy` (la trampa); salida UTF-8 correcta |
-| 2 | `tMap` (renombrar, expresiones, filtros, rechazo, lookups, nulos, fechas, Var) | **Bloqueada por entorno**: el `.item` sale bien pero no compila sin `talend-tmap-dataset-1.2.16.jar` (Talend Exchange) |
+| 2 | `tMap` (renombrar, expresiones, filtros, rechazo, lookups, nulos, fechas, Var) | **Validada en L5**: el modelo del mapper (entradas, salidas con expresiones, filtro) se monta con el `mapper` del bridge, el job compila y ejecuta. El `talend-tmap-dataset` del Exchange solo hace falta para el editor visual, no para generar codigo ni para ejecutar |
 | 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**. El `tUniqRow` y el `tSortRow` **se ejecutan bien** con su formato real de tabla (ver INTERNALS 32). Falta el `tAggregateRow` (su tabla de entrada y la de salida van en el mismo conector) y el `tFilterRow` con condiciones |
 | 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`) |
 | 5 | Excel, posicional, JSON, Parquet | **Bloqueada**: `tFileInputPositional` y `tFileInputJSON` generan codigo que no compila en 8.0.1; el `.item` es correcto |
@@ -91,7 +91,20 @@ conectores en el modelo y exigen tener una conexion de salida.
 | Se crean, guardan, listan y borran | **134 de 134** |
 | Compilan (L4) | **99 de 134 (74 %)** |
 
-Los 35 que no compilan se agrupan en:
+**Medicion de los componentes que no piden artefacto** (44 de las familias `Logs_Errors`, `XML`, `Data_Quality`,
+`File/Management` y `Databases/DB Specifics/PostgreSQL`), con `--sin-artefacto` (96 s):
+
+| | Resultado |
+|---|---|
+| Se crean, guardan, listan y borran | **44 de 44** |
+| Compilan (L4) | **38 de 44 (86 %)** |
+
+Los 6 que no compilan necesitan una configuracion real: `tFileInputXML` (los espacios de nombres del XML),
+`tIntervalMatch` (la conexion de referencia), `tReplaceList` (la tabla de reemplazos), `tReservoirSampling` (la
+columna de muestreo) y los dos de XML (`tWriteXMLField` y `tWriteXMLFieldIn`, que necesitan el arbol XML de
+entrada). Ninguno falla por falta de artefacto.
+
+Los 35 que no compilan en la medicion de las nueve familias se agrupan en:
 
 | Causa | Cuantos | Que significa |
 |---|---|---|
@@ -176,9 +189,14 @@ el fichero que escribe). El informe queda en `testdata/resultados-l5.csv`.
 | `tFileInputDelimited` -> `tLogRow` | Correcto: las cuatro filas, con el separador y los decimales tal cual |
 | `tFileInputDelimited` -> `tFileOutputDelimited` | Correcto: el fichero escrito tiene las cuatro filas |
 | `tFileInputDelimited` -> `tUniqRow` -> `tSortRow` -> `tLogRow` | Correcto: quita el duplicado y ordena por monto descendente |
+| `tFileInputDelimited` -> `tMap` -> `tLogRow` | Correcto: el `tMap` renombra la columna con `toUpperCase()` y filtra por monto (`2\|JOSE`, `3\|LUCIA`). El modelo del `tMap` (entradas, salidas con sus expresiones y filtros) lo monta el arnes con el `mapper` del bridge |
 | `tPrejob` -> `tRunJob` (hijo) -> `tPostjob` | Correcto: el padre llama al hijo y su salida sale en la del padre |
 | `tPostgresqlConnection` -> `tPostgresqlInput` -> `tLogRow` | Correcto: lee las diez filas del Postgres de pruebas (ver INTERNALS 35) |
+| contextos: crear un entorno y sus variables | Correcto: el job tiene los dos entornos con sus valores. El `tContextLoad` no saca filas (necesita su `nodeData` con la lista de variables a cargar), asi que el valor se comprueba en el modelo |
 | `tFileInputDelimited` -> `tAggregateRow` -> `tLogRow` | **Pendiente**: el `tAggregateRow` necesita dos tablas de metadata y al rellenar el schema se rompe la tabla que la conexion tiene asignada (ver INTERNALS 32) |
+
+**Ocho escenarios en verde.** El `tMap` compila y se ejecuta **sin** el `talend-tmap-dataset` del Exchange: ese jar
+solo hace falta para el editor visual del mapper, no para generar codigo ni para ejecutar.
 
 Los pasos para ejecutar y leer la salida estan en INTERNALS 33: primero el Run de Studio (que genera y compila),
 despues el relanzamiento que devuelve las lineas. El formato de las tablas de las transformaciones, en INTERNALS 32.

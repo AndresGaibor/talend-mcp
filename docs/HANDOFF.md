@@ -134,8 +134,8 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 | Nivel | Resultado |
 |---|---|
 | L1/L2 | 877 de 897 componentes Standard (98 %). Fallan 20 sin runtime de Maven (`components-jdbc-runtime:0.37.61`) |
-| L3/L4 | Medidos por familias: 134 componentes de las nueve familias mas usadas, **134 se crean, guardan y borran, y 99 compilan (74 %)**. Los que no compilan: 12 son la mitad de un par (`tAggregateIn`, `tSortIn`...) y 17 necesitan una configuracion real (tablas, schema, contexto) |
-| L5 | 6 escenarios con la salida verificada (humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, bases de datos con Postgres, orquestacion padre/hijo) |
+| L3/L4 | 134 componentes de las nueve familias mas usadas: **134 se crean, guardan y borran, y 99 compilan (74 %)**. Ademas, los 44 componentes que **no piden artefacto** (`Logs_Errors`, `XML`, `Data_Quality`, `File/Management` y `PostgreSQL`): **44 de 44 y 38 compilan (86 %)**, en 96 s. Los que no compilan necesitan una configuracion real (tablas, XSD, columnas), no un jar |
+| L5 | **8 escenarios con la salida verificada**: humo, leer un CSV, leer y escribir un CSV, transformaciones con `tUniqRow` y `tSortRow`, **un `tMap` que renombra y filtra**, bases de datos con Postgres, contextos y orquestacion padre/hijo. Queda pendiente el `tAggregateRow` |
 
 ## Lo siguiente (por prioridad)
 
@@ -145,14 +145,18 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 2. **El `tAggregateRow`**: necesita dos tablas de metadata (la de entrada y la de salida, las dos en el conector
    `FLOW`) y al rellenar el schema del nodo se rompe la tabla que la conexion de entrada tiene asignada. Habria que
    fusionar el schema con el que ya tiene el nodo en vez de sustituirlo (ver INTERNALS 32).
-3. **Tipos de job (Spark Batch, Streaming)**: el MCP ya los crea con la estructura correcta (el `.item` con
+3. **Medir lo que pide artefacto**: con `--sin-artefacto` la medicion se salta los componentes que piden un jar que
+   no esta en el `.m2` de Studio. Los que faltan y se pueden bajar de Maven Central se instalan con
+   `talend_studio_install_artifact` (y despues se miden). Los de **Talend Exchange** (el `talend-tmap-dataset` del
+   `tMap`) no: `exchange.talend.com` no resuelve en DNS desde esta maquina. **Ojo: el `tMap` compila y ejecuta sin
+   ese jar** (solo lo necesita el editor visual del mapper), asi que no es un bloqueo.
+4. **Tipos de job (Spark Batch, Streaming)**: el MCP ya los crea con la estructura correcta (el `.item` con
    `jobType="Big_Data_Batch" framework="Spark"`, el item de MapReduce en el repositorio y el `FRAMEWORK=Spark` en
    las propiedades; INTERNALS 34), pero **este workspace no los abre**: ni el job de Spark del usuario
    (`prueba_3_Spark`) ni los del MCP ("No se pudo resolver el ProcessItem"). Es un estado del repositorio del
    proyecto, no del MCP. Habria que mirar por que el repositorio no indexa los items de Big Data.
-4. **Metadata del repositorio** (conexiones de base de datos, esquemas de archivo), imprescindible para los `tDB*`.
-5. Otros, en el roadmap:
-   - `tMap`: necesita `talend-tmap-dataset-1.2.16.jar` (de Talend Exchange).
+5. **Metadata del repositorio** (conexiones de base de datos, esquemas de archivo), imprescindible para los `tDB*`.
+6. Otros, en el roadmap:
    - Postgres de pruebas.
    - Los 120 componentes de la generacion nueva (los `.car`) no tienen XML: su definicion esta en el codigo Java.
 

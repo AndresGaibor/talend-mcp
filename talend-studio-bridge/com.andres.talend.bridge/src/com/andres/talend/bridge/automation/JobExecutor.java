@@ -103,9 +103,9 @@ public final class JobExecutor {
     // Los valores del contexto no viajan en el codigo generado: los inyecta
     // el runtime, y aqui se le pasan como argumentos ("--context_type
     // CLAVE=VALOR"). Sin esto, un job relanzado a mano no ve sus variables.
+    // Ojo: el "=" va pegado, el runtime lee el argumento entero.
     for (String value : contextValuesOf(name, context)) {
-      command.add("--context_type");
-      command.add(value);
+      command.add("--context_type=" + value);
     }
 
     ProcessBuilder builder = new ProcessBuilder(command);
