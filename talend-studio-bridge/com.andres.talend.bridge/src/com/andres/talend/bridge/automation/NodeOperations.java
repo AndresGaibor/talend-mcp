@@ -188,7 +188,7 @@ public final class NodeOperations {
     Object command = commandClass
         .getConstructor(TalendClasses.load("org.talend.designer.core.ui.editor.nodes.Node"),
             String.class, List.class)
-        .newInstance(source, connectorOf(spec), meta);
+        .newInstance(source, connectorNameOf(spec), meta);
     commandClass.getMethod("setTarget", TalendClasses.load("org.talend.designer.core.ui.editor.nodes.Node"))
         .invoke(command, target);
     // La conexion se ejecuta por el command stack, igual que cuando se
@@ -605,6 +605,18 @@ public final class NodeOperations {
     // llama rowN: ese nombre es la variable de la fila en el codigo
     // generado, y las tablas de los componentes la referencian ("row1.monto").
     return uniqueFlowName(process);
+  }
+
+  /**
+   * Nombre del conector, con la convencion de Studio.
+   *
+   * Los triggers se llaman `OnComponentOk`, `OnComponentError`, `If`... y no
+   * con el tipo del catalogo (`COMPONENT_OK`, `COMPONENT_ERROR`...): con el
+   * tipo, Studio no crea la conexion.
+   */
+  private static String connectorNameOf(JsonObject spec) {
+    String connector = connectorOf(spec);
+    return isTriggerConnector(connector) ? triggerName(connector) : connector;
   }
 
   /** Los triggers (OnComponentOk, If...) no son conexiones de datos. */

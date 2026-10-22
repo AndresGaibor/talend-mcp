@@ -134,6 +134,8 @@ type Escenario = {
      * Es la forma de comprobar lo que el job escribe en una base de datos:
      * el `tDBOutput` no saca filas, asi que no hay nada que mirar en la salida.
      */
+    /** El job termina en error a proposito (un trigger de error, por ejemplo). */
+    error_esperado?: boolean;
     consulta?: { sql: string; valor: string | number };
   };
 };
@@ -689,11 +691,15 @@ for (const pendiente of mappersPorNodo) {
     return { ejecutaOk: false, salidaCorrecta: false, mensaje: `error al ejecutar: ${cuerpo.error}` };
   }
   if (cuerpo.exitCode !== undefined && cuerpo.exitCode !== null && cuerpo.exitCode !== 0) {
-    return {
-      ejecutaOk: false,
-      salidaCorrecta: false,
-      mensaje: `salida con codigo ${cuerpo.exitCode}: ${lineas.slice(0, 3).join(" | ")}`,
-    };
+    // Un job puede terminar en error a proposito: lo que importa es que el
+    // trigger de error se ejecuto (su salida se comprueba mas abajo).
+    if (!escenario.espera?.error_esperado) {
+      return {
+        ejecutaOk: false,
+        salidaCorrecta: false,
+        mensaje: `salida con codigo ${cuerpo.exitCode}: ${lineas.slice(0, 3).join(" | ")}`,
+      };
+    }
   }
 
   // 5. Comparacion con lo esperado.

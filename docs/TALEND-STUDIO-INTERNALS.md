@@ -1979,3 +1979,24 @@ Que se hizo para que no vuelva a pasar:
 Y la moraleja: **entre mediciones largas hay que reiniciar Studio**. Una medicion de 44 componentes tarda un minuto
 y no pasa nada; tres o cuatro seguidas, con todo el codigo generado, pueden tumbar el IDE. Ademas, `jcmd <pid>
 GC.run` recupera a un Studio que se ha quedado sin memoria (si el proceso no ha muerto todavia).
+
+## 40. Los triggers: el conector se llama "OnComponentError", no "COMPONENT_ERROR"
+
+Una conexion de trigger (el "On component error" de un componente) **no se crea** si se le pasa el tipo del
+catalogo. El tipo es `COMPONENT_ERROR` (y `COMPONENT_OK`, `SUBJOB_OK`, `SUBJOB_ERROR`, `RUN_IF`,
+`ITERATE`), pero el nombre del conector en el job es el que da Studio:
+
+| Tipo del catalogo | Nombre en el job |
+|---|---|
+| `COMPONENT_ERROR` | `OnComponentError` |
+| `COMPONENT_OK` | `OnComponentOk` |
+| `SUBJOB_ERROR` | `OnSubjobError` |
+| `SUBJOB_OK` | `OnSubjobOk` |
+| `RUN_IF` | `If` |
+| `ITERATE` | `Iterate` |
+
+Con el tipo, el `ConnectionCreateCommand` acepta la conexion pero no la deja en el modelo: el job se guarda sin
+la conexion y el trigger nunca se dispara. Sin ningun error visible: el `connect` responde "ok".
+
+Ademas, los triggers **no son conexiones de datos**: no consumen la fila y su nombre no es `row1`. Por eso el
+nombre de la conexion de un trigger es el del conector (`OnComponentError`) y no el numerado de filas.

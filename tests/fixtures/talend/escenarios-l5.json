@@ -510,6 +510,63 @@
       }
     },
     {
+      "nombre": "control de flujo: un trigger de error se dispara",
+      "job": "MCP_L5_Trigger",
+      "nodos": [
+        {
+          "type": "tFileInputDelimited",
+          "nombre": "lector",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/no_existe_este_fichero.csv" },
+            "FIELDSEPARATOR": { "value": ";" },
+            "HEADER": { "value": "1" }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" }
+          ]
+        },
+        { "type": "tLogRow", "nombre": "normal" },
+        {
+          "type": "tFileOutputDelimited",
+          "nombre": "manejador",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_trigger.txt" },
+            "FIELDSEPARATOR": { "value": ";" }
+          }
+        }
+      ],
+      "conexiones": [
+        { "origen": "lector", "destino": "normal" },
+        { "origen": "normal", "destino": "manejador", "tipo": "COMPONENT_ERROR" }
+      ],
+      "espera": {
+        "error_esperado": true,
+        "fichero": { "ruta": "@TESTDATA@/l5_trigger.txt" }
+      }
+    },
+    {
+      "nombre": "archivos: listar los ficheros de una carpeta",
+      "job": "MCP_L5_Lista",
+      "pendiente": "el tFileList saca las filas pero vacias: la columna CURRENT_FILE nunca se rellena en el codigo generado (los valores que deja el componente van al globalMap, no a la fila). El listado de la carpeta si se hace (el job lista los ficheros)",
+      "nodos": [
+        {
+          "type": "tFileList",
+          "nombre": "lista",
+          "parameters": {
+            "DIRECTORY": { "value": "@TESTDATA@" },
+            "GLOBEXPRESSIONS": { "value": "false" }
+          },
+          "columnas": [{ "name": "CURRENT_FILE", "type": "id_String" }]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "lista", "destino": "salida" }],
+      "espera": {
+        "contiene": ["l5_clientes.csv"]
+      }
+    },
+    {
       "nombre": "archivos: escribir un JSON",
       "job": "MCP_L5_JsonSalida",
       "nodos": [
