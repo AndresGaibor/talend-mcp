@@ -30,7 +30,7 @@ type Nodo = {
   type: string;
   /** Nombre con el que se le conoce en las conexiones. */
   nombre?: string;
-  parameters?: Record<string, { value: string; literal?: boolean }>;
+  parameters?: Record<string, { value: string | Array<Record<string, string>>; literal?: boolean }>;
   /** Columnas del nodo, en su conector principal. */
   columnas?: Columna[];
   /**
@@ -128,6 +128,13 @@ type Escenario = {
       nombre: string;
       variables: Array<{ nombre: string; valor: string }>;
     }>;
+    /**
+     * Consulta a la base de datos de pruebas despues de ejecutar.
+     *
+     * Es la forma de comprobar lo que el job escribe en una base de datos:
+     * el `tDBOutput` no saca filas, asi que no hay nada que mirar en la salida.
+     */
+    consulta?: { sql: string; valor: string | number };
   };
 };
 
@@ -140,6 +147,33 @@ const carpetaTestdata = resolve(process.cwd(), "testdata");
 /** Sustituye `@TESTDATA@` por la ruta absoluta de los datos de prueba. */
 function conRutas(valor: string): string {
   return valor.replace(/@TESTDATA@/g, carpetaTestdata.replace(/\\/g, "/"));
+}
+
+/**
+ * Consulta a la base de datos de pruebas.
+ *
+ * Es el Postgres de `testdata/docker-compose.yml` (puerto 5433). Se usa el
+ * cliente de SQL que trae Bun, sin dependencias.
+ */
+async function consultar(sqlTexto: string): Promise<string | number | null> {
+  const url =
+    process.env.L5_POSTGRES_URL ??
+    "postgres://talend:talend@127.0.0.1:5433/talend_test";
+  try {
+    const sql = new Bun.SQL(url);
+    try {
+      const filas = (await sql.unsafe(sqlTexto)) as Array<Record<string, unknown>>;
+      const primera = filas[0];
+      if (!primera) return null;
+      const valores = Object.values(primera);
+      const valor = valores[0];
+      return valor === null || valor === undefined ? null : (valor as string | number);
+    } finally {
+      await sql.close();
+    }
+  } catch (error) {
+    return null;
+  }
 }
 
 function errorDe(respuesta: { error?: { message?: string }; rawText?: string }): string {
@@ -436,10 +470,12 @@ async function montarJob(
           {
             // "@uniqueName:<nodo>" es el nombre unico de otro nodo del job
             // (el tPostgresqlInput necesita el de su conexion).
-            value: conRutas(valor.value).replace(
-              /@uniqueName:([A-Za-z0-9_]+)/g,
-              (_, nombre: string) => nombres.get(nombre) ?? `@uniqueName:${nombre}`,
-            ),
+            value: Array.isArray(valor.value)
+              ? valor.value
+              : conRutas(valor.value).replace(
+                  /@uniqueName:([A-Za-z0-9_]+)/g,
+                  (_, nombre: string) => nombres.get(nombre) ?? `@uniqueName:${nombre}`,
+                ),
             literal: valor.literal,
           },
         ]),
@@ -721,6 +757,19 @@ for (const pendiente of mappersPorNodo) {
           fallos.push(`el fichero no contiene '${texto}'`);
         }
       }
+    }
+  }
+
+  if (espera.consulta) {
+    // Lo que el job escribe en la base de datos: se consulta despues de
+    // ejecutar (el `tDBOutput` no saca filas, asi que no hay nada en la salida).
+    const valor = await consultar(espera.consulta.sql);
+    if (valor === null) {
+      fallos.push(`la consulta fallo: ${espera.consulta.sql}`);
+    } else if (String(valor) !== String(espera.consulta.valor)) {
+      fallos.push(
+        `la consulta devolvio '${valor}' y se esperaba '${espera.consulta.valor}'`,
+      );
     }
   }
 

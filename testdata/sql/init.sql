@@ -49,3 +49,11 @@ INSERT INTO transacciones (id_tx, id_cliente, monto, fecha) VALUES
 ALTER TABLE transacciones
   ADD CONSTRAINT transacciones_id_cliente_fkey
   FOREIGN KEY (id_cliente) REFERENCES clientes(id) NOT VALID;
+
+-- Tabla donde se prueba la escritura a base de datos (el `tPostgresqlOutput`).
+CREATE TABLE IF NOT EXISTS l5_salida (
+  id            integer,
+  nombre        varchar(120),
+  ciudad        varchar(60),
+  monto         numeric(12,2)
+);

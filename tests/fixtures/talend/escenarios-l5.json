@@ -694,6 +694,80 @@
       }
     },
     {
+      "nombre": "bases de datos: escribir en un Postgres y confirmar",
+      "job": "MCP_L5_Escritura",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" }
+          ],
+          "values": [
+            ["1", "Ana", "Bogota", "100.5"],
+            ["2", "Jose", "Medellin", "200.25"]
+          ]
+        },
+        {
+          "type": "tPostgresqlConnection",
+          "nombre": "conexion",
+          "parameters": {
+            "HOST": { "value": "localhost" },
+            "PORT": { "value": "5433" },
+            "USER": { "value": "talend" },
+            "PASS": { "value": "talend" },
+            "DBNAME": { "value": "talend_test" }
+          }
+        },
+        {
+          "type": "tPostgresqlOutput",
+          "nombre": "escribe",
+          "parameters": {
+            "USE_EXISTING_CONNECTION": { "value": "true" },
+            "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
+            "TABLE": { "value": "l5_salida" },
+            "TABLE_ACTION": { "value": "DELETE" },
+            "MAPPING": { "value": "PostgreSQL" },
+            "SCHEMA_FLOW": {
+              "value": [
+                { "SCHEMA_COLUMN": "id", "TYPE": "id_Integer" },
+                { "SCHEMA_COLUMN": "nombre", "TYPE": "id_String" },
+                { "SCHEMA_COLUMN": "ciudad", "TYPE": "id_String" },
+                { "SCHEMA_COLUMN": "monto", "TYPE": "id_Double" }
+              ],
+              "field": "SCHEMA_TYPE"
+            }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" }
+          ]
+        },
+        {
+          "type": "tPostgresqlCommit",
+          "nombre": "confirma",
+          "parameters": {
+            "USE_EXISTING_CONNECTION": { "value": "true" },
+            "CONNECTION": { "value": "@uniqueName:conexion", "literal": false }
+          }
+        }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "escribe" }
+      ],
+      "espera": {
+        "consulta": {
+          "sql": "SELECT count(*)::int FROM l5_salida",
+          "valor": 2
+        }
+      }
+    },
+    {
       "nombre": "contextos: cada entorno tiene su valor",
       "job": "MCP_L5_Contextos",
       "contexto": "produccion",

@@ -685,7 +685,13 @@ export class TalendStudioBridgeClient {
     job?: string;
     label?: string;
     position?: { x: number; y: number };
-    parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
+    /**
+     * Parametros del componente.
+     *
+     * El valor es un texto, o una lista de valores (los parametros de tipo
+     * SCHEMA, como el `SCHEMA_FLOW` del `tDBOutput`, guardan una lista).
+     */
+    parameters?: Record<string, { value: string | Array<Record<string, string>>; field?: string; literal?: boolean }>;
     tables?: Record<string, { columns?: string[]; rows?: Array<string[] | Record<string, string>> }>;
     schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
     mapper?: Record<string, unknown>;
@@ -702,7 +708,13 @@ export class TalendStudioBridgeClient {
     /** Job en el que esta el componente. Sin esto, se usa el que este abierto. */
     job?: string;
     label?: string;
-    parameters?: Record<string, { value: string; field?: string; literal?: boolean }>;
+    /**
+     * Parametros del componente.
+     *
+     * El valor es un texto, o una lista de valores (los parametros de tipo
+     * SCHEMA, como el `SCHEMA_FLOW` del `tDBOutput`, guardan una lista).
+     */
+    parameters?: Record<string, { value: string | Array<Record<string, string>>; field?: string; literal?: boolean }>;
     tables?: Record<string, { columns?: string[]; rows?: Array<string[] | Record<string, string>> }>;
     schema?: Array<{ connector?: string; name: string; columns: Array<Record<string, unknown>> }>;
     mapper?: Record<string, unknown>;

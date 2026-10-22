@@ -176,12 +176,14 @@ public final class ComponentConfigurator {
       JsonObject definition = new JsonObject();
       String value;
       Boolean literal = null;
+      boolean lista = false;
       if (raw.isJsonObject()) {
         definition = raw.getAsJsonObject();
         JsonElement element = definition.get("value");
         if (element == null || element.isJsonNull()) {
           continue;
         }
+        lista = element.isJsonArray();
         value = element.isJsonPrimitive() ? element.getAsString() : element.toString();
         if (definition.has("literal") && !definition.get("literal").isJsonNull()) {
           literal = definition.get("literal").getAsBoolean();
@@ -206,10 +208,40 @@ public final class ComponentConfigurator {
           continue;
         }
       }
+      if (lista) {
+        // Los parametros de tipo SCHEMA (el `SCHEMA_FLOW` del tDBOutput, que
+        // son las columnas que se escriben) guardan una lista de valores.
+        setListValue(parameter, definition.get("value").getAsJsonArray());
+        continue;
+      }
       parameter.getClass().getMethod("setValue", Object.class)
           .invoke(parameter, valueOf(parameter, value, literal));
       completeProcessReference(node, parameter, value);
     }
+  }
+
+  /**
+   * Pone una lista de valores en un parametro.
+   *
+   * El formato en memoria es una lista de mapas (uno por fila), que es como
+   * Talend guarda los parametros de tipo TABLE y SCHEMA: el `SCHEMA_FLOW` del
+   * `tDBOutput` (las columnas que se escriben) es una tabla mas.
+   */
+  private static void setListValue(Object parameter, JsonArray valores) throws Exception {
+    List<Object> lista = new ArrayList<>();
+    for (JsonElement item : valores) {
+      if (item.isJsonObject()) {
+        Map<String, Object> fila = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> campo : item.getAsJsonObject().entrySet()) {
+          JsonElement valor = campo.getValue();
+          fila.put(campo.getKey(), valor.isJsonPrimitive() ? valor.getAsString() : valor.toString());
+        }
+        lista.add(fila);
+      } else if (item.isJsonPrimitive()) {
+        lista.add(item.getAsString());
+      }
+    }
+    parameter.getClass().getMethod("setValue", Object.class).invoke(parameter, lista);
   }
 
   /**
