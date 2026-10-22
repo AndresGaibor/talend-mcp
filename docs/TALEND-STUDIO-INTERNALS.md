@@ -1945,3 +1945,37 @@ Al borrar un job hay que hacer dos cosas, y las dos estan en `JobRepository.dele
 2. **Borrar el proyecto Maven generado**, como proyecto de Eclipse (`IProject.delete`), no solo la carpeta: si se
    borra la carpeta y el proyecto de Eclipse sigue dado de alta, m2e se queda con su entrada en
    `workspacestate.properties` y el build de cualquier job falla con "El recurso .../pom.xml no existe".
+
+## 39. El heap de Studio se llena y el IDE deja de responder
+
+Una sesion de mediciones largas (unas 150 en total: las familias de archivos, las locales, MySQL y las que se
+cancelaron) dejo a Studio **sin memoria**: el heap del JVM (4 GB) estaba al 100 % y el IDE se quedo colgado
+(hacia el 100 % de CPU en varios nucleos, que es el recolector de basura en espiral). La interfaz no respondia, el
+bridge tampoco (todas sus rutas esperan al hilo de la UI) y al final el proceso de Studio murio.
+
+Como se ve:
+
+```bash
+jcmd <pid> GC.heap_info
+# garbage-first heap   total 4194304K, used 4191494K   <- lleno
+```
+
+Que se llena, en este orden:
+
+| Sospechoso | Por que |
+|---|---|
+| El codigo generado de cada job | Cada medicion compila el job de pruebas: quedan el proyecto Maven, su `target` y el codigo fuente generados. Con 150 mediciones son cientos de megabytes que Eclipse indexa (el hilo "Indexado Java" se dispara) |
+| Los proyectos Maven que se borran a posteriori | Al borrar el proyecto de Eclipse, m2e actualiza su estado (`workspacestate.properties`) y el indexer vuelve a indexar |
+| El `run_code` del bridge | Cada ejecucion cargaba las clases en un `URLClassLoader` que no se cerraba nunca: las clases compiladas se quedaban en el heap |
+
+Que se hizo para que no vuelva a pasar:
+
+1. **La medicion vigila la memoria**: `scripts/coverage.ts` consulta la memoria del JVM en cada vuelta y **cancela la
+   medicion al 80 %** del heap, en vez de dejar que el IDE se quede sin memoria.
+2. **Una ruta nueva para ver la memoria**: `/automation/memory` (y la tool `talend_studio_memory`) dicen cuanto
+   heap se lleva, y con `gc: true` piden una recoleccion.
+3. **El `run_code` cierra su classloader** al terminar.
+
+Y la moraleja: **entre mediciones largas hay que reiniciar Studio**. Una medicion de 44 componentes tarda un minuto
+y no pasa nada; tres o cuatro seguidas, con todo el codigo generado, pueden tumbar el IDE. Ademas, `jcmd <pid>
+GC.run` recupera a un Studio que se ha quedado sin memoria (si el proceso no ha muerto todavia).

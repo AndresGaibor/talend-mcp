@@ -25,6 +25,14 @@ import type { ComponentDefinition } from "../src/modules/component-definitions/d
 
 const args = process.argv.slice(2);
 
+/**
+ * Porcentaje de memoria del JVM a partir del cual se cancela la medicion.
+ *
+ * Con el heap lleno, el IDE deja de responder y hay que reiniciarlo: mejor
+ * parar la medicion a tiempo.
+ */
+const LIMITE_MEMORIA_PORCENTAJE = 80;
+
 function valorDe(flag: string): string | undefined {
   const index = args.indexOf(flag);
   if (index < 0 || index + 1 >= args.length) {
@@ -220,7 +228,21 @@ async function main(): Promise<void> {
     const hechos = estado.tested ?? 0;
     const total = estado.total ?? 0;
     const segundos = Math.round((Date.now() - inicio) / 1000);
-    process.stdout.write(`\r  ${hechos}/${total} componentes, ${estado.failed ?? 0} fallidos, ${segundos} s   ${estado.current ?? ""}`.padEnd(100));
+
+    // La memoria de Studio: las mediciones largas la llenan (el codigo generado
+    // de cada job) y el IDE deja de responder. Si se pasa del limite, se
+    // cancela la medicion en vez de tumbar el Studio.
+    const memoria = await bridge.memory();
+    const usado = (memoria.data?.result as { usedPercent?: number } | undefined)?.usedPercent ?? 0;
+    if (usado >= LIMITE_MEMORIA_PORCENTAJE) {
+      console.error(
+        `\n\nStudio lleva el ${usado}% de su memoria: se cancela la medicion (si no, el IDE se queda sin memoria).`,
+      );
+      await bridge.coverageStatus({ cancel: true });
+      process.exit(1);
+    }
+
+    process.stdout.write(`\r  ${hechos}/${total} componentes, ${estado.failed ?? 0} fallidos, ${segundos} s, memoria ${usado}%   ${estado.current ?? ""}`.padEnd(110));
   }
   console.log("");
 

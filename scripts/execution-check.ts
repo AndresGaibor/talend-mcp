@@ -117,8 +117,8 @@ type Escenario = {
   conexiones: Array<{ origen: string; destino: string; tipo?: string }>;
   /** Que se espera al ejecutar. */
   espera?: {
-    /** Lineas exactas de la salida del job. */
-    lineas?: string[];
+    /** Lineas exactas de la salida del job, o solo cuantas lineas. */
+    lineas?: string[] | number;
     /** Lineas que tienen que aparecer. */
     contiene?: string[];
     /** Fichero que el job escribe. */
@@ -726,14 +726,21 @@ for (const pendiente of mappersPorNodo) {
     }
   }
 
-  if (espera.lineas) {
-    const mismo =
-      espera.lineas.length === lineas.length &&
-      espera.lineas.every((linea, indice) => linea === lineas[indice]);
-    if (!mismo) {
-      fallos.push(
-        `las lineas no son las esperadas: se esperaba ${JSON.stringify(espera.lineas)} y salio ${JSON.stringify(lineas.slice(0, 6))}`,
-      );
+  if (espera.lineas !== undefined) {
+    if (typeof espera.lineas === "number") {
+      // Solo el numero de lineas.
+      if (lineas.length !== espera.lineas) {
+        fallos.push(`salieron ${lineas.length} lineas y se esperaban ${espera.lineas}`);
+      }
+    } else {
+      const mismo =
+        espera.lineas.length === lineas.length &&
+        espera.lineas.every((linea, indice) => linea === lineas[indice]);
+      if (!mismo) {
+        fallos.push(
+          `las lineas no son las esperadas: se esperaba ${JSON.stringify(espera.lineas)} y salio ${JSON.stringify(lineas.slice(0, 6))}`,
+        );
+      }
     }
   }
   if (espera.contiene) {

@@ -179,6 +179,9 @@ final class BridgeServer {
       // Los contextos (entornos) del job: se editan con la API de Studio, no
       // escribiendo el XML a mano.
       server.createContext("/automation/job/contexts", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "contexts")));
+      // Memoria del JVM: las mediciones largas llenan el heap y el IDE deja de
+      // responder. Con esta ruta se ve cuanto queda.
+      server.createContext("/automation/memory", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.memory(readJsonBody(exchange)))));
       server.createContext("/automation/job/contexts/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createContext")));
       server.createContext("/automation/job/contexts/parameter", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setContextParameter")));
       server.createContext("/automation/job/contexts/parameter/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteContextParameter")));

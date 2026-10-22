@@ -162,6 +162,11 @@ error (el job compila y no sale ninguna fila), asi que la comprobacion evita un 
 
 ## Cuidados
 
+- **El heap de Studio se llena con las mediciones largas** (INTERNALS 39): el codigo generado de cada job se queda
+  indexado y, con unas 150 mediciones, el IDE se queda sin memoria y deja de responder (el bridge tampoco). La
+  medicion **cancela sola al 80 % del heap** (`scripts/coverage.ts` lo vigila) y hay una tool para verlo:
+  `talend_studio_memory` (con `gc: true` fuerza una recoleccion). **Entre sesiones de medicion hay que reiniciar
+  Studio**. Si se queda colgado y el proceso sigue vivo: `jcmd <pid> GC.run`.
 - Todo lo que hagas por el bridge afecta al Studio real del usuario. Los jobs de prueba `MCP_*` se borran con
   `/automation/job/delete`; borrar cierra sus editores. Si tocas un job que no es tuyo, pregunta.
 - `readOnly` en `config.json` solo protege comandos, lanzamientos y `run-code`, **no** las rutas que crean o borran

@@ -81,6 +81,7 @@ public final class CodeRunnerService {
       // 1. Compilar contra las clases de Studio.
       Path sourceDir = Files.createTempDirectory("talend-bridge-code");
       Path outputDir = Files.createTempDirectory("talend-bridge-classes");
+      ClassLoader loader = null;
       try {
         Path sourceFile = sourceDir.resolve(className.replace('.', '/') + ".java");
         Files.createDirectories(sourceFile.getParent());
@@ -96,7 +97,7 @@ public final class CodeRunnerService {
         }
 
         // 2. Cargar la clase con un classloader que ve los jars de Studio.
-        ClassLoader loader = studioClassLoader(outputDir);
+        loader = studioClassLoader(outputDir);
         Class<?> compiledClass = loader.loadClass(className);
 
         // 3. Ejecutar. En el hilo de la UI si se pide.
@@ -130,6 +131,9 @@ public final class CodeRunnerService {
         payload.put("uiThread", onUiThread);
         payload.put("result", toJson(result));
       } finally {
+        // El classloader se cierra: si no, cada ejecucion deja las clases
+        // cargadas y el heap de Studio se llena sin que se note.
+        closeQuietly(loader);
         deleteRecursively(sourceDir);
         deleteRecursively(outputDir);
       }
@@ -140,6 +144,17 @@ public final class CodeRunnerService {
       BridgeLog.warn("Fallo la ejecucion de codigo en el bridge", e);
     }
     return payload;
+  }
+
+  /** Cierra un classloader, sin que falle la ejecucion si ya esta cerrado. */
+  private static void closeQuietly(ClassLoader loader) {
+    try {
+      if (loader instanceof java.io.Closeable) {
+        ((java.io.Closeable) loader).close();
+      }
+    } catch (Exception e) {
+      // Da igual: lo que importa es no dejar el classloader abierto.
+    }
   }
 
   /**

@@ -553,6 +553,29 @@ export const jobOperationsTools = [
     },
   },
   {
+    name: "talend_studio_memory",
+    description:
+      "Dice cuanto heap de memoria lleva usado el JVM de Talend Studio. Las mediciones largas (el codigo generado de cada job) llenan la memoria y el IDE deja de responder: con esta tool se comprueba antes y despues, y con `gc` se pide una recoleccion.",
+    inputSchema: z.object({
+      gc: z
+        .boolean()
+        .optional()
+        .describe("Fuerza una recoleccion de basura antes de medir"),
+    }),
+    handler: async ({ gc }: { gc?: boolean }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.memory({ gc });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/memory",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
     name: "talend_job_execute",
     description: "Ejecuta un job ya generado y devuelve su salida (las filas que imprime el tLogRow). Sirve para comprobar que el resultado es el esperado: la vista Run de Studio no se puede leer desde el MCP.",
     inputSchema: z.object({

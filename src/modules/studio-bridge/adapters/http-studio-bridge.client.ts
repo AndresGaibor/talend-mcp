@@ -605,9 +605,21 @@ export class TalendStudioBridgeClient {
     });
   }
 
+  /**
+   * Memoria del JVM de Studio.
+   *
+   * Las mediciones largas llenan el heap y el IDE deja de responder: con esto
+   * se puede ver cuanto queda y pedir una recoleccion.
+   */
+  async memory(options?: { gc?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/memory", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
   /** Progreso de la medicion de cobertura y, al terminar, su informe. */
-  async coverageStatus(options?: { cancel?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
-    return await this.request<Record<string, unknown>>("/automation/coverage/status", {
+  async coverageStatus(options?: { cancel?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {    return await this.request<Record<string, unknown>>("/automation/coverage/status", {
       method: "POST",
       body: options ?? {},
     });

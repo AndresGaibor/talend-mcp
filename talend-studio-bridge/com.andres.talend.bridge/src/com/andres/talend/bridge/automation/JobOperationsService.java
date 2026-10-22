@@ -204,6 +204,36 @@ public final class JobOperationsService {
   }
 
   /**
+   * Memoria del JVM de Studio.
+   *
+   * Las mediciones largas (el codigo generado de cada job) llenan el heap: el
+   * IDE se queda sin memoria y deja de responder. Con esta ruta se puede ver
+   * cuanto queda y pedir una recoleccion.
+   *
+   * @param spec `gc: true` para forzar una recoleccion de basura.
+   */
+  public static Map<String, Object> memory(JsonObject spec) {
+    Runtime runtime = Runtime.getRuntime();
+    long max = runtime.maxMemory();
+    long total = runtime.totalMemory();
+    long free = runtime.freeMemory();
+    long used = total - free;
+
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("usedMb", used / (1024 * 1024));
+    result.put("totalMb", total / (1024 * 1024));
+    result.put("maxMb", max / (1024 * 1024));
+    result.put("usedPercent", max > 0 ? (int) ((used * 100) / max) : 0);
+    boolean gc = spec != null && spec.has("gc") && !spec.get("gc").isJsonNull()
+        && spec.get("gc").getAsBoolean();
+    if (gc) {
+      System.gc();
+      result.put("gc", true);
+    }
+    return result;
+  }
+
+  /**
    * Los contextos (entornos) del job con sus variables.
    *
    * @param spec `job` opcional.
