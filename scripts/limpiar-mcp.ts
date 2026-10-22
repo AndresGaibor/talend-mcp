@@ -16,14 +16,14 @@ import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createBridgeClient } from "../src/modules/studio-bridge/adapters/http-studio-bridge.client";
 import { TalendJobRepository } from "../src/modules/jobs/adapters/talend-job.repository";
-import { getConfiguredProjectPath } from "../src/talend/workspace";
+import { resolveProjectPath } from "../src/talend/workspace";
 
 const PREFIJO = "MCP";
 const simular = process.argv.includes("--simular");
 
 const repositorio = new TalendJobRepository();
 const bridge = await createBridgeClient({ config: { timeoutMs: 120000 } });
-const proyecto = getConfiguredProjectPath();
+const proyecto = await resolveProjectPath();
 if (!proyecto) {
   console.error("No se sabe cual es el proyecto de Talend (TALEND_PROJECT).");
   process.exit(1);
@@ -61,14 +61,24 @@ if (existsSync(processDir)) {
   }
 }
 
-// Los proyectos Maven huerfanos: los de los jobs que no existen.
+// Los proyectos Maven huerfanos de NUESTROS jobs: los `mcp*` que ya no tienen job.
+//
+// Solo se tocan los que empiezan por `mcp`: en `poms/jobs/process` viven tambien
+// carpetas del usuario (`Pruebas`, `PRJ_BANCOLOMBIA`...) que no son nuestras.
+// Se compara contra los jobs que QUEDAN (sin los que acabamos de borrar): si no,
+// el proyecto Maven del job recien borrado se quedaria huerfano para siempre.
 const poms = join(proyecto, "poms", "jobs", "process");
 if (existsSync(poms)) {
-  const nombres = new Set(jobs.map((job) => job.name.toLowerCase()));
+  const borrados = new Set(dePrueba.map((job) => job.name.toLowerCase()));
+  const quedan = new Set(
+    jobs.filter((job) => !borrados.has(job.name.toLowerCase())).map((job) => job.name.toLowerCase()),
+  );
   for (const carpeta of readdirSync(poms)) {
     const ruta = join(poms, carpeta);
     if (!statSync(ruta).isDirectory()) continue;
-    if (nombres.has(carpeta.toLowerCase())) continue;
+    const nombre = carpeta.toLowerCase();
+    if (!nombre.startsWith(PREFIJO.toLowerCase())) continue; // no es nuestro
+    if (quedan.has(nombre)) continue; // el job sigue existiendo
     rmSync(ruta, { recursive: true, force: true });
     console.log(`  Proyecto Maven huerfano fuera: ${carpeta}`);
   }
