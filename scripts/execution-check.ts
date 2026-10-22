@@ -61,6 +61,29 @@ type Nodo = {
    * deja vacia la de salida.
    */
   schemaDespuesDeConectar?: boolean;
+  /**
+   * Modelo del `tMap`: las tablas de entrada (una por conexion), las de salida
+   * (con la expresion de cada columna) y las variables.
+   *
+   * Se aplica **despues de conectar**, porque las columnas de entrada las
+   * necesita el `tMap` para poder evaluar las expresiones.
+   */
+  mapper?: {
+    inputs?: Array<{
+      name: string;
+      matchingMode?: string;
+      lookupMode?: string;
+      columns?: Columna[];
+      filter?: string;
+    }>;
+    outputs?: Array<{
+      name: string;
+      reject?: boolean;
+      columns?: Array<Columna & { expression?: string }>;
+      filter?: string;
+    }>;
+    vars?: Array<{ name: string; type?: string; expression?: string }>;
+  };
 };
 
 type Escenario = {
@@ -404,6 +427,7 @@ async function montarJob(
   const nombres = new Map<string, string>();
   const tablasPorNodo: Array<{ uniqueName: string; tablas: NonNullable<Nodo["tablas"]> }> = [];
   const esquemasDespues: Array<{ uniqueName: string; schema: unknown[] }> = [];
+  const mappersPorNodo: Array<{ uniqueName: string; mapper: NonNullable<Nodo["mapper"]> }> = [];
   for (const nodo of spec.nodos) {
   const parameters = nodo.parameters
     ? Object.fromEntries(
@@ -499,6 +523,11 @@ async function montarJob(
     // las tablas del componente y se pierde lo que se habia puesto antes
     // (es lo que pasa con el tMap y con el tAggregateRow).
     tablasPorNodo.push({ uniqueName, tablas: nodo.tablas });
+  }
+  if (nodo.mapper) {
+    // El modelo del tMap tambien va despues de conectar: necesita las
+    // columnas de la conexion de entrada para evaluar las expresiones.
+    mappersPorNodo.push({ uniqueName, mapper: nodo.mapper });
   }
 }
 // 3. Conexiones. El conector se saca de la definicion del componente de

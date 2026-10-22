@@ -1898,3 +1898,50 @@ Dos cosas que se-ahead por el camino:
 Y el orden de los entornos: el que trae `defaultContext="Default"` en el `.properties` es el de por defecto.
 
 
+
+## 38. El proyecto Maven duplicado: "duplicated in the reactor"
+
+Cuando un job se borra y se vuelve a crear, Studio deja en el workspace **dos** proyectos Maven con el mismo
+nombre, y entonces **ningun job compila**:
+
+```
+[ERROR] Project 'org.example.prj_bancolombia.job:MCP_Coverage:0.1.0' is duplicated in the reactor
+```
+
+Los dos sitios posibles, bajo `poms/jobs/process` del proyecto de Eclipse:
+
+| Sitio | Cuando pasa |
+|---|---|
+| `process/mcp_coverage_0.1/` | El proyecto generado, junto a los demas jobs |
+| `process/MCP_Coverage/mcp_coverage_0.1/` | El proyecto generado, dentro de la carpeta del job |
+
+La carpeta se llama `<etiqueta>_<version>` y en minusculas (`mcp_coverage_0.1`), **no** la etiqueta. Por eso el
+borrado del bridge no la encontraba: buscaba una carpeta llamada `MCP_Coverage` y seakia el proyecto por debajo,
+y se dejaba el otro. El fallo era silencioso: el job se creaba, se guardaba y se montaba bien, pero el build
+fallaba siempre, asi que la medicion de cobertura daba **0 compilados** sin que se entendiera el por que.
+
+Arreglo: al borrar un job se borran **todos** los proyectos generados con ese nombre (haya item en el repositorio
+o no), en los dos sitios. Y si aparece el error, se mira si hay dos carpetas con el mismo `pom.xml`.
+
+## 39. El proceso viejo: el build compila el job que no es
+
+Al borrar un job y volverlo a crear, el **editor del proceso anterior** puede seguir abierto en Studio. Entonces el
+build (`ProcessorUtilities.generateCode`) usa el proceso viejo, cuyo `JobInfo` tiene el `projectFolderName` a null, y
+el agregador de Maven lista el modulo sin la carpeta del job:
+
+```
+[ERROR] Child module .../poms/jobs/process/mcp_coverage_0.1 of .../poms/build-aggregator.pom does not exist
+```
+
+El proyecto Maven, en cambio, si esta en `poms/jobs/process/MCP_Coverage/mcp_coverage_0.1` (con la carpeta). O sea:
+el error no es que falte el proyecto, es que **el build esta mirando el job anterior**.
+
+Se ve tambien en el `JobInfo` que devuelve `ProcessorUtilities.getMainJobInfo()`: `getJobName` es el job nuevo y
+`getProjectFolderName` es null (en un job sano, es la carpeta del job en el arbol del repositorio).
+
+Al borrar un job hay que hacer dos cosas, y las dos estan en `JobRepository.delete`:
+
+1. **Cerrar sus editores** (`closeEditorsOfJob`), para que no quede el proceso viejo.
+2. **Borrar el proyecto Maven generado**, como proyecto de Eclipse (`IProject.delete`), no solo la carpeta: si se
+   borra la carpeta y el proyecto de Eclipse sigue dado de alta, m2e se queda con su entrada en
+   `workspacestate.properties` y el build de cualquier job falla con "El recurso .../pom.xml no existe".

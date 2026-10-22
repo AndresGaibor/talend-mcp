@@ -175,6 +175,70 @@
       }
     },
     {
+      "nombre": "transformaciones: un tMap renombra y filtra",
+      "job": "MCP_L5_TMap",
+      "nodos": [
+        {
+          "type": "tFileInputDelimited",
+          "nombre": "lector",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_clientes.csv" },
+            "FIELDSEPARATOR": { "value": ";" },
+            "HEADER": { "value": "1" },
+            "ENCODING": { "value": "UTF-8" }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" }
+          ]
+        },
+        {
+          "type": "tMap",
+          "nombre": "mapeo",
+          "mapper": {
+            "inputs": [
+              {
+                "name": "row1",
+                "matchingMode": "UNIQUE_MATCH",
+                "lookupMode": "LOAD_ONCE",
+                "columns": [
+                  { "name": "id", "type": "id_Integer" },
+                  { "name": "nombre", "type": "id_String" },
+                  { "name": "ciudad", "type": "id_String" },
+                  { "name": "monto", "type": "id_Double" }
+                ]
+              }
+            ],
+            "outputs": [
+              {
+                "name": "out1",
+                "reject": false,
+                "columns": [
+                  { "name": "id", "type": "id_Integer", "expression": "row1.id" },
+                  {
+                    "name": "nombre_mayus",
+                    "type": "id_String",
+                    "expression": "row1.nombre.toUpperCase()"
+                  }
+                ],
+                "filter": "row1.monto > 150"
+              }
+            ]
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "lector", "destino": "mapeo" },
+        { "origen": "mapeo", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": ["2|JOSE", "3|LUCIA"]
+      }
+    },
+    {
       "nombre": "transformaciones: agregar por ciudad",
       "job": "MCP_L5_Agrega",
       "pendiente": "el tAggregateRow no propaga su schema (SCHEMA_AUTO_PROPAGATE=false): al poner sus columnas de salida, Talend las propaga hacia atras y el origen se queda con ellas en vez de las suyas, y el generador no encuentra la columna de entrada ('inputColumn is null')",

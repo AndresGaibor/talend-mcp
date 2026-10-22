@@ -169,17 +169,16 @@ public final class JobRepository {
     Map<String, Object> summary = new LinkedHashMap<>();
     summary.put("jobName", name);
     summary.put("editorsClosed", editorsClosed);
+    // El proyecto Java generado se borra siempre, haya job o no: si se queda
+    // una copia, Maven ve el proyecto dos veces y el build falla con "Project
+    // ... is duplicated in the reactor".
+    summary.put("generatedProjectRemoved", deleteGeneratedProject(name, version(spec)));
     if (viewObject == null) {
       summary.put("deleted", false);
       summary.put("message", "No habia ningun job con esa etiqueta");
       return summary;
     }
     delete(repositoryFactory, project, viewObject);
-    // Ademas del item, se borra el proyecto Java que Studio dejo generado en
-    // el workspace (poms/jobs/process/<job>). Si no, al recrear el job
-    // Talend reutiliza ese proyecto, con su target y su .project viejos, y
-    // la ejecucion falla con "El recurso .../src/main/java/... no existe".
-    summary.put("generatedProjectRemoved", deleteGeneratedProject(name));
     summary.put("deleted", true);
     return summary;
   }
@@ -187,38 +186,84 @@ public final class JobRepository {
   /**
    * Borra el proyecto Java que Studio genero para un job.
    *
-   * Vive en el proyecto de Eclipse, bajo `poms/jobs/process`. Se busca en
-   * cualquier subcarpeta, porque el job puede estar dentro de una carpeta.
+   * Vive en el proyecto de Eclipse, bajo `poms/jobs/process`, y su carpeta se
+   * llama `<etiqueta>_<version>` (en minusculas). Hay dos sitios posibles: junto
+   * a los demas (`process/mcp_coverage_0.1`) o dentro de la carpeta del job
+   * (`process/MCP_Coverage/mcp_coverage_0.1`).
+   *
+   * Si se deja uno, Maven ve el mismo proyecto dos veces y el build falla con
+   * "Project ... is duplicated in the reactor": el job no compila.
    */
-  private static boolean deleteGeneratedProject(String name) {
+  private static boolean deleteGeneratedProject(String name, String version) {
     try {
       IProject iProject = TalendApi.resourceProject();
       if (iProject == null) {
         return false;
       }
-      org.eclipse.core.resources.IFolder root = iProject.getFolder("poms/jobs/process");
-      if (!root.exists()) {
-        return false;
-      }
-      for (org.eclipse.core.resources.IResource member : root.members()) {
-        if (member instanceof org.eclipse.core.resources.IFolder
-            && name.equals(((org.eclipse.core.resources.IFolder) member).getName())) {
-          return deleteFolder((org.eclipse.core.resources.IFolder) member);
+      boolean deleted = false;
+
+      // El proyecto Maven de un job es un proyecto de Eclipse (su carpeta
+      // lleva un `.project`). Se borra el proyecto entero, no solo la carpeta:
+      // si no, m2e se queda con su entrada en el estado del workspace y el
+      // build de cualquier job falla con "El recurso .../pom.xml no existe".
+      for (org.eclipse.core.resources.IProject candidate
+          : iProject.getWorkspace().getRoot().getProjects()) {
+        if (isGeneratedProject(candidate.getLocation() == null ? ""
+            : candidate.getLocation().toOSString(), name, version)) {
+          deleted |= deleteProject(candidate);
         }
-        if (member instanceof org.eclipse.core.resources.IFolder) {
+      }
+
+      // Y por si queda alguna carpeta suelta (un proyecto sin `.project`),
+      // se borra tambien.
+      org.eclipse.core.resources.IFolder root = iProject.getFolder("poms/jobs/process");
+      if (root.exists()) {
+        for (org.eclipse.core.resources.IResource member : root.members()) {
+          if (!(member instanceof org.eclipse.core.resources.IFolder)) {
+            continue;
+          }
           org.eclipse.core.resources.IFolder folder = (org.eclipse.core.resources.IFolder) member;
+          if (isGeneratedProject(folder.getName(), name, version)) {
+            deleted |= deleteFolder(folder);
+            continue;
+          }
           for (org.eclipse.core.resources.IResource child : folder.members()) {
             if (child instanceof org.eclipse.core.resources.IFolder
-                && name.equals(((org.eclipse.core.resources.IFolder) child).getName())) {
-              return deleteFolder((org.eclipse.core.resources.IFolder) child);
+                && isGeneratedProject(((org.eclipse.core.resources.IFolder) child).getName(),
+                    name, version)) {
+              deleted |= deleteFolder((org.eclipse.core.resources.IFolder) child);
             }
           }
         }
       }
+      return deleted;
     } catch (Exception e) {
       BridgeLog.warn("No se pudo borrar el proyecto generado del job '" + name + "'", e);
     }
     return false;
+  }
+
+  /** Borra un proyecto de Eclipse con todo su contenido. */
+  private static boolean deleteProject(org.eclipse.core.resources.IProject project) {
+    try {
+      project.delete(true, true, null);
+      return true;
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo borrar el proyecto " + project.getName(), e);
+      return false;
+    }
+  }
+
+  /**
+   * Si una ruta es el proyecto generado de un job.
+   *
+   * La carpeta se llama `<etiqueta>_<version>`, y Studio la crea en minusculas.
+   */
+  private static boolean isGeneratedProject(String ruta, String name, String version) {
+    String carpeta = ruta.replace('\\', '/').toLowerCase();
+    String etiqueta = name.toLowerCase();
+    String v = version.toLowerCase();
+    return carpeta.equals(etiqueta + "_" + v) || carpeta.endsWith("/" + etiqueta + "_" + v);
   }
 
   /** Borra una carpeta y todo su contenido. */
