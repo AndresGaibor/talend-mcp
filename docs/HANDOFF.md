@@ -89,6 +89,21 @@ el driver tiene que estar en el `.m2` de Studio con la version exacta, la `QUERY
 Un escenario puede declarar jobs auxiliares (`jobs`): se montan y compilan antes que el principal, que es lo que
 hace falta para que un `tRunJob` pueda llamar a su hijo.
 
+### Lo que se ha hecho en esta sesion
+
+- **Los contextos de un job**, de punta a punta, con la API de Studio (crear entorno, poner variable con su valor
+  en cada entorno, listar, borrar).
+- **Los contextos del proyecto** (los items de tipo Contexts): antes las tools devolvian una lista vacia; ahora
+  listan (con sus entornos y variables), leen y borran. Crearlos sigue sin poder (Studio no deja enganchar el
+  entorno a un item recien creado) y la tool lo dice y borra lo creado.
+- **Las tools de jobs** (`talend_jobs_list`, `talend_jobs_read`, `talend_jobs_create`): leen el proyecto y crean
+  con la API de Studio. Antes usaban un repositorio vacio.
+- **Los triggers**: era un bug del bridge (el conector de un trigger se llama `OnComponentError`, no
+  `COMPONENT_ERROR`), asi que nunca se disparaban. Ahora hay un escenario L5 que lo comprueba.
+- **La memoria**: Studio se queda sin memoria con las mediciones largas (INTERNALS 39). Ahora la medicion lo
+  vigila y cancela al 80 % del heap, y hay la tool `talend_studio_memory`.
+- **12 escenarios L5** con la salida verificada (ver PLAN-DE-PRUEBAS).
+
 ### Contextos (entornos) de un job
 
 El MCP ya edita los contextos de un job con la API de Studio: listarlos, crear un entorno, poner o cambiar una
