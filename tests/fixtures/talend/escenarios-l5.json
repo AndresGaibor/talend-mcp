@@ -372,30 +372,67 @@
           "type": "tFileInputDelimited",
           "nombre": "lector",
           "parameters": {
-            "FILENAME": { "value": "@TESTDATA@/l5_clientes.csv" },
-            "FIELDSEPARATOR": { "value": ";" },
-            "HEADER": { "value": "1" },
-            "ENCODING": { "value": "UTF-8" }
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_clientes.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "HEADER": {
+              "value": "1"
+            },
+            "ENCODING": {
+              "value": "UTF-8"
+            }
           },
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" },
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "monto", "type": "id_Double" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_Double"
+            }
           ]
         },
         {
           "type": "tFilterRow",
           "nombre": "filtra",
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" },
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "monto", "type": "id_Double" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_Double"
+            }
           ],
           "tablas": {
             "CONDITIONS": {
-              "columns": ["INPUT_COLUMN", "FUNCTION", "OPERATOR", "RVALUE"],
+              "columns": [
+                "INPUT_COLUMN",
+                "FUNCTION",
+                "OPERATOR",
+                "RVALUE"
+              ],
               "rows": [
                 {
                   "INPUT_COLUMN": "monto",
@@ -407,14 +444,26 @@
             }
           }
         },
-        { "type": "tLogRow", "nombre": "salida" }
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
       ],
       "conexiones": [
-        { "origen": "lector", "destino": "filtra" },
-        { "origen": "filtra", "destino": "salida" }
+        {
+          "origen": "lector",
+          "destino": "filtra"
+        },
+        {
+          "origen": "filtra",
+          "destino": "salida"
+        }
       ],
       "espera": {
-        "lineas": ["2|Jose|Medellin|200.25", "3|Lucia|Cali|300.0"]
+        "lineas": [
+          "2|Jose|Medellin|200.25",
+          "3|Lucia|Cali|300.0"
+        ]
       }
     },
     {
@@ -425,50 +474,114 @@
           "type": "tFileInputDelimited",
           "nombre": "lector1",
           "parameters": {
-            "FILENAME": { "value": "@TESTDATA@/l5_clientes.csv" },
-            "FIELDSEPARATOR": { "value": ";" },
-            "HEADER": { "value": "1" },
-            "ENCODING": { "value": "UTF-8" }
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_clientes.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "HEADER": {
+              "value": "1"
+            },
+            "ENCODING": {
+              "value": "UTF-8"
+            }
           },
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" },
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "monto", "type": "id_Double" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_Double"
+            }
           ]
         },
         {
           "type": "tFileInputDelimited",
           "nombre": "lector2",
           "parameters": {
-            "FILENAME": { "value": "@TESTDATA@/l5_clientes.csv" },
-            "FIELDSEPARATOR": { "value": ";" },
-            "HEADER": { "value": "1" },
-            "ENCODING": { "value": "UTF-8" }
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_clientes.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "HEADER": {
+              "value": "1"
+            },
+            "ENCODING": {
+              "value": "UTF-8"
+            }
           },
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" },
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "monto", "type": "id_Double" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_Double"
+            }
           ]
         },
         {
           "type": "tUnite",
           "nombre": "une",
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" },
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "monto", "type": "id_Double" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_Double"
+            }
           ]
         },
-        { "type": "tLogRow", "nombre": "salida" }
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
       ],
       "conexiones": [
-        { "origen": "lector1", "destino": "une" },
-        { "origen": "lector2", "destino": "une" },
-        { "origen": "une", "destino": "salida" }
+        {
+          "origen": "lector1",
+          "destino": "une"
+        },
+        {
+          "origen": "lector2",
+          "destino": "une"
+        },
+        {
+          "origen": "une",
+          "destino": "salida"
+        }
       ],
       "espera": {
         "lineas": 8
@@ -483,30 +596,66 @@
           "type": "tFileInputJSON",
           "nombre": "lector",
           "parameters": {
-            "FILENAME": { "value": "@TESTDATA@/l5_clientes.json" },
-            "READ_BY": { "value": "JSONPATH" }
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_clientes.json"
+            },
+            "READ_BY": {
+              "value": "JSONPATH"
+            }
           },
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" },
-            { "name": "ciudad", "type": "id_String" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            }
           ],
           "tablas": {
             "MAPPING_JSONPATH": {
-              "columns": ["SCHEMA_COLUMN", "QUERY"],
+              "columns": [
+                "SCHEMA_COLUMN",
+                "QUERY"
+              ],
               "rows": [
-                { "SCHEMA_COLUMN": "id", "QUERY": "$.clientes[*].id" },
-                { "SCHEMA_COLUMN": "nombre", "QUERY": "$.clientes[*].nombre" },
-                { "SCHEMA_COLUMN": "ciudad", "QUERY": "$.clientes[*].ciudad" }
+                {
+                  "SCHEMA_COLUMN": "id",
+                  "QUERY": "$.clientes[*].id"
+                },
+                {
+                  "SCHEMA_COLUMN": "nombre",
+                  "QUERY": "$.clientes[*].nombre"
+                },
+                {
+                  "SCHEMA_COLUMN": "ciudad",
+                  "QUERY": "$.clientes[*].ciudad"
+                }
               ]
             }
           }
         },
-        { "type": "tLogRow", "nombre": "salida" }
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
       ],
-      "conexiones": [{ "origen": "lector", "destino": "salida" }],
+      "conexiones": [
+        {
+          "origen": "lector",
+          "destino": "salida"
+        }
+      ],
       "espera": {
-        "lineas": ["1|Ana|Bogota", "2|Jose|Medellin"]
+        "lineas": [
+          "1|Ana|Bogota",
+          "2|Jose|Medellin"
+        ]
       }
     },
     {
@@ -517,32 +666,60 @@
           "type": "tFileInputDelimited",
           "nombre": "lector",
           "parameters": {
-            "FILENAME": { "value": "@TESTDATA@/no_existe_este_fichero.csv" },
-            "FIELDSEPARATOR": { "value": ";" },
-            "HEADER": { "value": "1" }
+            "FILENAME": {
+              "value": "@TESTDATA@/no_existe_este_fichero.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "HEADER": {
+              "value": "1"
+            }
           },
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
           ]
         },
-        { "type": "tLogRow", "nombre": "normal" },
+        {
+          "type": "tLogRow",
+          "nombre": "normal"
+        },
         {
           "type": "tFileOutputDelimited",
           "nombre": "manejador",
           "parameters": {
-            "FILENAME": { "value": "@TESTDATA@/l5_trigger.txt" },
-            "FIELDSEPARATOR": { "value": ";" }
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_trigger.txt"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            }
           }
         }
       ],
       "conexiones": [
-        { "origen": "lector", "destino": "normal" },
-        { "origen": "normal", "destino": "manejador", "tipo": "COMPONENT_ERROR" }
+        {
+          "origen": "lector",
+          "destino": "normal"
+        },
+        {
+          "origen": "normal",
+          "destino": "manejador",
+          "tipo": "COMPONENT_ERROR"
+        }
       ],
       "espera": {
         "error_esperado": true,
-        "fichero": { "ruta": "@TESTDATA@/l5_trigger.txt" }
+        "fichero": {
+          "ruta": "@TESTDATA@/l5_trigger.txt"
+        }
       }
     },
     {
@@ -554,16 +731,35 @@
           "type": "tFileList",
           "nombre": "lista",
           "parameters": {
-            "DIRECTORY": { "value": "@TESTDATA@" },
-            "GLOBEXPRESSIONS": { "value": "false" }
+            "DIRECTORY": {
+              "value": "@TESTDATA@"
+            },
+            "GLOBEXPRESSIONS": {
+              "value": "false"
+            }
           },
-          "columnas": [{ "name": "CURRENT_FILE", "type": "id_String" }]
+          "columnas": [
+            {
+              "name": "CURRENT_FILE",
+              "type": "id_String"
+            }
+          ]
         },
-        { "type": "tLogRow", "nombre": "salida" }
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
       ],
-      "conexiones": [{ "origen": "lista", "destino": "salida" }],
+      "conexiones": [
+        {
+          "origen": "lista",
+          "destino": "salida"
+        }
+      ],
       "espera": {
-        "contiene": ["l5_clientes.csv"]
+        "contiene": [
+          "l5_clientes.csv"
+        ]
       }
     },
     {
@@ -574,29 +770,62 @@
           "type": "tFixedFlowInput",
           "nombre": "entrada",
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
           ],
-          "values": [["1", "Ana"], ["2", "Jose"]]
+          "values": [
+            [
+              "1",
+              "Ana"
+            ],
+            [
+              "2",
+              "Jose"
+            ]
+          ]
         },
         {
           "type": "tFileOutputJSON",
           "nombre": "escribe",
           "parameters": {
-            "FILENAME": { "value": "@TESTDATA@/l5_salida.json" },
-            "GENERATE_JSON_ARRAY": { "value": "true" }
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_salida.json"
+            },
+            "GENERATE_JSON_ARRAY": {
+              "value": "true"
+            }
           },
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
           ]
         }
       ],
-      "conexiones": [{ "origen": "entrada", "destino": "escribe" }],
+      "conexiones": [
+        {
+          "origen": "entrada",
+          "destino": "escribe"
+        }
+      ],
       "espera": {
         "fichero": {
           "ruta": "@TESTDATA@/l5_salida.json",
-          "contiene": ["Ana", "Jose"]
+          "contiene": [
+            "Ana",
+            "Jose"
+          ]
         }
       }
     },
@@ -609,10 +838,25 @@
           "type": "tFixedFlowInput",
           "nombre": "entrada",
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            }
           ],
-          "values": [["1", "Ana"], ["2", "Jose"]]
+          "values": [
+            [
+              "1",
+              "Ana"
+            ],
+            [
+              "2",
+              "Jose"
+            ]
+          ]
         },
         {
           "type": "tJavaRow",
@@ -623,16 +867,33 @@
               "value": "output_row.nombre_mayus = input_row.nombre.toUpperCase();"
             }
           },
-          "columnas": [{ "name": "nombre_mayus", "type": "id_String" }]
+          "columnas": [
+            {
+              "name": "nombre_mayus",
+              "type": "id_String"
+            }
+          ]
         },
-        { "type": "tLogRow", "nombre": "salida" }
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
       ],
       "conexiones": [
-        { "origen": "entrada", "destino": "codigo" },
-        { "origen": "codigo", "destino": "salida" }
+        {
+          "origen": "entrada",
+          "destino": "codigo"
+        },
+        {
+          "origen": "codigo",
+          "destino": "salida"
+        }
       ],
       "espera": {
-        "lineas": ["ANA", "JOSE"]
+        "lineas": [
+          "ANA",
+          "JOSE"
+        ]
       }
     },
     {
@@ -643,30 +904,64 @@
         {
           "type": "tFixedFlowInput",
           "nombre": "entrada",
-          "columnas": [{ "name": "nombre_completo", "type": "id_String" }],
-          "values": [["Ana;Nunez"], ["Jose;Ramirez"]]
+          "columnas": [
+            {
+              "name": "nombre_completo",
+              "type": "id_String"
+            }
+          ],
+          "values": [
+            [
+              "Ana;Nunez"
+            ],
+            [
+              "Jose;Ramirez"
+            ]
+          ]
         },
         {
           "type": "tNormalize",
           "nombre": "normaliza",
           "schemaDespuesDeConectar": true,
           "parameters": {
-            "NORMALIZE_COLUMN": { "value": "nombre_completo" },
-            "CSV_OPTION": { "value": "false" }
+            "NORMALIZE_COLUMN": {
+              "value": "nombre_completo"
+            },
+            "CSV_OPTION": {
+              "value": "false"
+            }
           },
           "columnas": [
-            { "name": "nombre", "type": "id_String" },
-            { "name": "apellido", "type": "id_String" }
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "apellido",
+              "type": "id_String"
+            }
           ]
         },
-        { "type": "tLogRow", "nombre": "salida" }
+        {
+          "type": "tLogRow",
+          "nombre": "salida"
+        }
       ],
       "conexiones": [
-        { "origen": "entrada", "destino": "normaliza" },
-        { "origen": "normaliza", "destino": "salida" }
+        {
+          "origen": "entrada",
+          "destino": "normaliza"
+        },
+        {
+          "origen": "normaliza",
+          "destino": "salida"
+        }
       ],
       "espera": {
-        "lineas": ["Ana|Nunez", "Jose|Ramirez"]
+        "lineas": [
+          "Ana|Nunez",
+          "Jose|Ramirez"
+        ]
       }
     },
     {
@@ -794,8 +1089,43 @@
     {
       "nombre": "transformaciones: agregar por ciudad",
       "job": "MCP_L5_Agrega",
-      "pendiente": "el tAggregateRow no propaga su schema (SCHEMA_AUTO_PROPAGATE=false): al poner sus columnas de salida, Talend las propaga hacia atras y el origen se queda con ellas en vez de las suyas, y el generador no encuentra la columna de entrada ('inputColumn is null')",
       "nodos": [
+        {
+          "type": "tFileInputDelimited",
+          "nombre": "lector",
+          "parameters": {
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_clientes.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "HEADER": {
+              "value": "1"
+            },
+            "ENCODING": {
+              "value": "UTF-8"
+            }
+          },
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_Double"
+            }
+          ]
+        },
         {
           "type": "tAggregateRow",
           "nombre": "agrega",
@@ -829,7 +1159,7 @@
               "rows": [
                 {
                   "OUTPUT_COLUMN": "ciudad",
-                  "INPUT_COLUMN": "row1.ciudad"
+                  "INPUT_COLUMN": "ciudad"
                 }
               ]
             },
@@ -843,56 +1173,19 @@
               "rows": [
                 {
                   "OUTPUT_COLUMN": "total_monto",
-                  "FUNCTION": "SUM",
-                  "INPUT_COLUMN": "row1.monto",
+                  "FUNCTION": "sum",
+                  "INPUT_COLUMN": "monto",
                   "IGNORE_NULL": "true"
                 },
                 {
                   "OUTPUT_COLUMN": "num_clientes",
-                  "FUNCTION": "COUNT",
-                  "INPUT_COLUMN": "row1.id",
+                  "FUNCTION": "count",
+                  "INPUT_COLUMN": "id",
                   "IGNORE_NULL": "true"
                 }
               ]
             }
           }
-        },
-        {
-          "type": "tFileInputDelimited",
-          "nombre": "lector",
-          "schemaDespuesDeConectar": true,
-          "parameters": {
-            "FILENAME": {
-              "value": "@TESTDATA@/l5_clientes.csv"
-            },
-            "FIELDSEPARATOR": {
-              "value": ";"
-            },
-            "HEADER": {
-              "value": "1"
-            },
-            "ENCODING": {
-              "value": "UTF-8"
-            }
-          },
-          "columnas": [
-            {
-              "name": "id",
-              "type": "id_Integer"
-            },
-            {
-              "name": "nombre",
-              "type": "id_String"
-            },
-            {
-              "name": "ciudad",
-              "type": "id_String"
-            },
-            {
-              "name": "monto",
-              "type": "id_Double"
-            }
-          ]
         },
         {
           "type": "tLogRow",
@@ -1007,43 +1300,116 @@
           "type": "tFixedFlowInput",
           "nombre": "entrada",
           "columnas": [
-            { "name": "id", "type": "id_Integer" },
-            { "name": "nombre", "type": "id_String" },
-            { "name": "ciudad", "type": "id_String" },
-            { "name": "monto", "type": "id_Double" }
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_Double"
+            }
           ],
           "values": [
-            ["1", "Ana", "Bogota", "100.5"],
-            ["2", "Jose", "Medellin", "200.25"]
+            [
+              "1",
+              "Ana",
+              "Bogota",
+              "100.5"
+            ],
+            [
+              "2",
+              "Jose",
+              "Medellin",
+              "200.25"
+            ]
           ]
         },
         {
           "type": "tPostgresqlConnection",
           "nombre": "conexion",
           "parameters": {
-            "HOST": { "value": "localhost" },
-            "PORT": { "value": "5433" },
-            "USER": { "value": "talend" },
-            "PASS": { "value": "talend" },
-            "DBNAME": { "value": "talend_test" }
+            "HOST": {
+              "value": "localhost"
+            },
+            "PORT": {
+              "value": "5433"
+            },
+            "USER": {
+              "value": "talend"
+            },
+            "PASS": {
+              "value": "talend"
+            },
+            "DBNAME": {
+              "value": "talend_test"
+            }
           }
         },
         {
           "type": "tPostgresqlOutput",
           "nombre": "escribe",
           "parameters": {
-            "USE_EXISTING_CONNECTION": { "value": "true" },
-            "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
-            "TABLE": { "value": "l5_salida" },
-            "TABLE_ACTION": { "value": "DELETE" },
-            "MAPPING": { "value": "PostgreSQL" },
+            "USE_EXISTING_CONNECTION": {
+              "value": "true"
+            },
+            "CONNECTION": {
+              "value": "@uniqueName:conexion",
+              "literal": false
+            },
+            "TABLE": {
+              "value": "l5_salida"
+            },
+            "TABLE_ACTION": {
+              "value": "DELETE"
+            },
+            "MAPPING": {
+              "value": "PostgreSQL"
+            },
             "FIELD_OPTIONS": {
-              "columns": ["SCHEMA_COLUMN", "UPDATE_KEY", "DELETE_KEY", "UPDATABLE", "INSERTABLE"],
+              "columns": [
+                "SCHEMA_COLUMN",
+                "UPDATE_KEY",
+                "DELETE_KEY",
+                "UPDATABLE",
+                "INSERTABLE"
+              ],
               "rows": [
-                { "SCHEMA_COLUMN": "id", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
-                { "SCHEMA_COLUMN": "nombre", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
-                { "SCHEMA_COLUMN": "ciudad", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
-                { "SCHEMA_COLUMN": "monto", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" }
+                {
+                  "SCHEMA_COLUMN": "id",
+                  "UPDATE_KEY": "false",
+                  "DELETE_KEY": "false",
+                  "UPDATABLE": "true",
+                  "INSERTABLE": "true"
+                },
+                {
+                  "SCHEMA_COLUMN": "nombre",
+                  "UPDATE_KEY": "false",
+                  "DELETE_KEY": "false",
+                  "UPDATABLE": "true",
+                  "INSERTABLE": "true"
+                },
+                {
+                  "SCHEMA_COLUMN": "ciudad",
+                  "UPDATE_KEY": "false",
+                  "DELETE_KEY": "false",
+                  "UPDATABLE": "true",
+                  "INSERTABLE": "true"
+                },
+                {
+                  "SCHEMA_COLUMN": "monto",
+                  "UPDATE_KEY": "false",
+                  "DELETE_KEY": "false",
+                  "UPDATABLE": "true",
+                  "INSERTABLE": "true"
+                }
               ]
             }
           }
@@ -1052,13 +1418,21 @@
           "type": "tPostgresqlCommit",
           "nombre": "confirma",
           "parameters": {
-            "USE_EXISTING_CONNECTION": { "value": "true" },
-            "CONNECTION": { "value": "@uniqueName:conexion", "literal": false }
+            "USE_EXISTING_CONNECTION": {
+              "value": "true"
+            },
+            "CONNECTION": {
+              "value": "@uniqueName:conexion",
+              "literal": false
+            }
           }
         }
       ],
       "conexiones": [
-        { "origen": "entrada", "destino": "escribe" }
+        {
+          "origen": "entrada",
+          "destino": "escribe"
+        }
       ],
       "espera": {
         "consulta": {
