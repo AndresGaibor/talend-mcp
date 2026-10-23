@@ -1,8 +1,39 @@
 import * as z from "zod/v4";
-import { bridgeFail, bridgeOk } from "./tools-base";
+import { bridgeFail, bridgeOk, loadBridge } from "./tools-base";
 import { getJobInspector } from "./job-inspector.service";
 
 export const bridgeInspectionTools = [
+  {
+    name: "talend_bridge_active_job_dependencies",
+    description:
+      "Lista rutinas, módulos y bibliotecas que Talend declara para el job activo. Omite rutas locales y credenciales.",
+    inputSchema: z.object({}),
+    handler: async () => {
+      try {
+        const bridge = await loadBridge();
+        const result = await bridge.activeJobDependencies();
+        return bridgeOk({
+          ok: result.ok,
+          source: result.source,
+          confidence: result.confidence,
+          endpoint: "/talend/active-job/dependencies",
+          data: result.data,
+          error: result.error,
+        });
+      } catch (error) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint: "/talend/active-job/dependencies",
+          error: {
+            code: "JOB_DEPENDENCIES_ERROR",
+            message: error instanceof Error ? error.message : "Error al obtener dependencias del job",
+          },
+        });
+      }
+    },
+  },
   {
     name: "talend_bridge_active_job_details",
     description: "Obtiene los detalles profundos del job activo en Talend Studio (componentes con posiciones, conexiones).",

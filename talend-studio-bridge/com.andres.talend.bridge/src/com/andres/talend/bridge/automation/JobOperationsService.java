@@ -285,6 +285,16 @@ public final class JobOperationsService {
     return run("repository-contexts", () -> RepositoryContexts.list(spec));
   }
 
+  /** Lista conexiones compartidas del proyecto sin devolver sus parametros sensibles. */
+  public static Map<String, Object> repositoryConnections(JsonObject spec) {
+    return run("repository-connections", () -> RepositoryConnections.list(spec));
+  }
+
+  /** Lista schemas y columnas del repositorio sin devolver valores de configuracion. */
+  public static Map<String, Object> repositorySchemas(JsonObject spec) {
+    return run("repository-schemas", () -> RepositoryConnections.listSchemas(spec));
+  }
+
   /**
    * Crea un contexto del proyecto.
    *

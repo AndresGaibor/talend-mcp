@@ -99,13 +99,16 @@ Hoy se crean nodos, conexiones FLOW, schema y parametros. Falta lo que hace un j
   contextos de un job se listan, crean, editan y borran con la API de Studio
   (`talend_job_contexts_list`, `talend_job_context_create`, `talend_job_context_set`,
   `talend_job_context_delete`, `talend_job_context_delete_variable`), y el relanzamiento les inyecta los
-  valores. Los contextos **del proyecto** se listan y se borran; crearlos no (Studio no deja enganchar el
-  entorno a un item recien creado). Falta el `tContextLoad` con los valores del entorno.
-- **Metadata del repositorio**: conexiones a base de datos, esquemas de archivo (delimitado,
-  Excel, JSON, XML), esquemas genericos, y **usarlos en los nodos** (propiedad "Repository" en vez
-  de "Built-in"). Es lo que abre los `tDB*` en modo "Repository": la parte de las conexiones
-  compartidas de base de datos sigue pendiente (P0, fila 8) y, mientras tanto, el modo "built-in"
-  (HOST, PORT, USER y PASS en el propio componente) es lo que funciona.
+  valores. Los contextos **del proyecto** tambien se listan, crean, actualizan y borran con la API del
+  repositorio (`talend_list_repository_contexts`, `talend_create_repository_context` y herramientas
+  relacionadas). Crear un contexto con una etiqueta existente lo reemplaza. Falta profundizar la
+  reutilizacion de conexiones y schemas compartidos del repositorio, y validar `tContextLoad` con
+  valores del entorno.
+- **Metadata del repositorio**: ya se pueden enumerar las conexiones compartidas con
+  `talend_list_repository_connections` (solo devuelve nombre y tipo). Pendiente: leer schemas de
+  archivo (delimitado, Excel, JSON, XML), schemas genericos y **asignarlos a nodos** mediante la
+  propiedad "Repository". El uso de conexiones de base de datos compartidas en `tDB*` sigue pendiente
+  (P0, fila 8); por ahora se usa el modo "built-in" (HOST, PORT, USER y PASS en el componente).
 - **Joblets, rutinas y librerias**: crear y usar joblets; rutinas Java propias; jars de terceros;
   test cases.
 - **Gestion de jobs**: versiones nuevas, carpetas, renombrar, mover, duplicar, dependencias

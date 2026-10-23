@@ -155,6 +155,7 @@ final class BridgeServer {
       server.createContext("/talend/active-editor/introspect", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeEditorIntrospect))));
       server.createContext("/talend/active-job/model", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeJobModel))));
       server.createContext("/talend/active-job/details", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeJobDetails))));
+      server.createContext("/talend/active-job/dependencies", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeJobDependencies))));
       server.createContext("/talend/active-component/details", exchange -> guarded(exchange, () -> handleActiveComponentDetails(exchange)));
       server.createContext("/talend/active-job/select-component", exchange -> guarded(exchange, () -> handleSelectComponent(exchange)));
       server.createContext("/commands/list", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(CommandAuditService::listCommands))));
@@ -188,6 +189,8 @@ final class BridgeServer {
       server.createContext("/automation/job/contexts/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteContext")));
       // Los contextos del proyecto (los items de tipo Contexts del repositorio).
       server.createContext("/automation/repository/contexts", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "repositoryContexts")));
+      server.createContext("/automation/repository/connections", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "repositoryConnections")));
+      server.createContext("/automation/repository/schemas", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "repositorySchemas")));
       server.createContext("/automation/repository/contexts/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createRepositoryContext")));
       server.createContext("/automation/repository/contexts/parameter", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setRepositoryContextParameter")));
       server.createContext("/automation/repository/contexts/parameter/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteRepositoryContextParameter")));
@@ -470,6 +473,10 @@ final class BridgeServer {
           return JobOperationsService.deleteContext(body);
         case "repositoryContexts":
           return JobOperationsService.repositoryContexts(body);
+        case "repositoryConnections":
+          return JobOperationsService.repositoryConnections(body);
+        case "repositorySchemas":
+          return JobOperationsService.repositorySchemas(body);
         case "createRepositoryContext":
           return JobOperationsService.createRepositoryContext(body);
         case "setRepositoryContextParameter":

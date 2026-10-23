@@ -183,6 +183,10 @@ export class TalendStudioBridgeClient {
     return await this.request<any>("/talend/active-job/details");
   }
 
+  async activeJobDependencies(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/talend/active-job/dependencies");
+  }
+
   async activeComponentDetails(uniqueName: string, includeRaw?: boolean): Promise<BridgeResult<any>> {
     return await this.request<any>("/talend/active-component/details", {
       method: "POST",
@@ -428,6 +432,14 @@ export class TalendStudioBridgeClient {
     return await this.request<Record<string, unknown>>("/automation/repository/contexts", {
       method: "POST",
       body: options ?? {},
+    });
+  }
+
+  /** Lista conexiones compartidas del proyecto, sin parametros ni credenciales. */
+  async repositoryConnections(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/repository/connections", {
+      method: "POST",
+      body: {},
     });
   }
 

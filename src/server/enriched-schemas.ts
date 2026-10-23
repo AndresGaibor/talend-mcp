@@ -118,14 +118,35 @@ export function getEnrichedOutputSchema(toolName: string, pattern: "A" | "B" = "
     });
   }
 
-  // Return the standard ok/fail envelope (Pattern A)
+  // Return the standard ok/fail envelope (Pattern A).
+  // Las tools devuelven el envelope TalendResult (okResult/errorResult) o el
+  // envelope corto (ok/fail); el schema publicado debe aceptar ambos, o los
+  // clientes MCP con validacion estricta rechazan toda respuesta.
   return z.object({
     ok: z.boolean().describe("Whether the operation succeeded"),
+    source: z.string().optional().describe("Tool name that produced this result"),
+    confidence: z.enum(["high", "medium", "low", "none"]).optional().describe("Confidence level of the result"),
     data: dataSchema.optional().describe("The result payload"),
     durationMs: z.number().optional().describe("Operation duration in milliseconds"),
+    warnings: z.array(z.string()).optional().describe("Non-fatal warnings"),
+    errors: z.array(
+      z.object({
+        code: z.string(),
+        message: z.string(),
+        details: z.record(z.string(), z.unknown()).optional(),
+      })
+    ).optional().describe("Errors if ok is false"),
+    nextActions: z.array(
+      z.object({
+        label: z.string(),
+        toolName: z.string(),
+        input: z.record(z.string(), z.unknown()).optional(),
+      })
+    ).optional().describe("Suggested follow-up tool calls"),
     error: z.object({
       code: z.string(),
       message: z.string(),
+      details: z.record(z.string(), z.unknown()).optional(),
     }).optional().describe("Error payload if operation failed"),
   });
 }

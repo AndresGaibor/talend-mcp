@@ -38,10 +38,15 @@ export const jobsAndComponentsSchemas: Record<string, z.ZodTypeAny> = {
   talend_list_jobs: z.object({
     jobs: z.array(z.object({
       name: z.string(),
+      version: z.string().optional(),
       path: z.string(),
+      folder: z.string().optional(),
       modified: z.string(),
       size: z.number(),
+      components: z.number().optional(),
     })),
+    count: z.number().optional(),
+    total: z.number().optional(),
   }),
   talend_move_job_to_folder: z.object({
     moved: z.boolean(),
@@ -49,12 +54,14 @@ export const jobsAndComponentsSchemas: Record<string, z.ZodTypeAny> = {
     newPath: z.string(),
   }),
   talend_read_contexts: z.object({
+    jobName: z.string().optional(),
     contexts: z.array(z.object({
       name: z.string(),
-      type: z.string(),
-      value: z.string(),
-      source: z.string(),
+      type: z.string().optional(),
+      value: z.string().optional(),
+      prompt: z.string().optional(),
     })),
+    count: z.number().optional(),
   }),
   talend_read_job: z.object({
     job: ParsedJobSchema,

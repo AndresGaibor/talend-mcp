@@ -146,6 +146,86 @@ public final class TalendIntrospectionService {
     return payload;
   }
 
+  /** Dependencias declaradas por el modelo del job activo. */
+  public static Map<String, Object> activeJobDependencies() {
+    IWorkbenchPage page = activePage();
+    IEditorPart editor = page != null ? page.getActiveEditor() : null;
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", editor != null ? "medium" : "low");
+    payload.put("endpoint", "/talend/active-job/dependencies");
+
+    Object process = editor == null ? null : invokeFirst(editor, "getProcess", "getProcessItem");
+    if (process == null) {
+      payload.put("ok", false);
+      payload.put("unsupported", "No hay un job activo que exponga el modelo de proceso");
+      return payload;
+    }
+
+    payload.put("job", inspectObject(process, java.util.Arrays.asList("getLabel", "getName", "getVersion")));
+    payload.put("routines", safeNames(invoke(process, "getNeededRoutines")));
+    payload.put("modules", inspectNeededModules(process));
+    payload.put("libraries", safeLibraryNames(process));
+    return payload;
+  }
+
+  private static List<Map<String, Object>> inspectNeededModules(Object process) {
+    List<Map<String, Object>> modules = new ArrayList<>();
+    Object value = invokeWithInt(process, "getNeededModules", 0);
+    if (!(value instanceof Iterable)) return modules;
+
+    for (Object module : (Iterable<?>) value) {
+      if (module == null) continue;
+      Map<String, Object> item = new LinkedHashMap<>();
+      item.put("name", invokeString(module, "getModuleName"));
+      String version = invokeString(module, "getBundleVersion");
+      if (version != null && !version.trim().isEmpty()) item.put("version", version);
+      Object required = invoke(module, "isRequired");
+      if (required instanceof Boolean) item.put("required", required);
+      Object status = invoke(module, "getStatus");
+      if (status != null) item.put("status", String.valueOf(status));
+      modules.add(item);
+    }
+    return modules;
+  }
+
+  private static List<String> safeLibraryNames(Object process) {
+    List<String> libraries = new ArrayList<>();
+    Object value = invokeWithInt(process, "getNeededLibraries", 0);
+    if (!(value instanceof Iterable)) return libraries;
+
+    for (Object library : (Iterable<?>) value) {
+      if (library == null) continue;
+      String name = String.valueOf(library).replace('\\', '/');
+      int separator = name.lastIndexOf('/');
+      libraries.add(separator >= 0 ? name.substring(separator + 1) : name);
+    }
+    return libraries;
+  }
+
+  private static List<String> safeNames(Object value) {
+    List<String> names = new ArrayList<>();
+    if (!(value instanceof Iterable)) return names;
+    for (Object item : (Iterable<?>) value) {
+      if (item == null) continue;
+      String name = item instanceof String ? (String) item : invokeString(item, "getName");
+      if (name == null) name = invokeString(item, "getLabel");
+      if (name != null) names.add(name);
+    }
+    return names;
+  }
+
+  private static Object invokeWithInt(Object target, String methodName, int argument) {
+    if (target == null) return null;
+    try {
+      Method method = target.getClass().getMethod(methodName, int.class);
+      return method.invoke(target, argument);
+    } catch (Exception ignored) {
+      return null;
+    }
+  }
+
   public static Map<String, Object> activeComponentDetails(String uniqueName, boolean includeRaw) {
     IWorkbenchPage page = activePage();
     IEditorPart editor = page != null ? page.getActiveEditor() : null;

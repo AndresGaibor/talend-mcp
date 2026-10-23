@@ -33,11 +33,11 @@ servidor.
 | Medicion | Resultado |
 |---|---|
 | Componentes instalados en el catalogo | 913 en 139 familias |
-| Componentes intentados a L4 | 498 |
-| Compilan | 418 (84 % de los intentados, 45 % del catalogo) |
-| Fallan | 80 (ver seccion 5: al menos 19 no son del componente) |
-| Sin medir | 415 |
-| Componentes con L5 verificado | 63, en 60 escenarios |
+| Componentes con resultado L4 | 571 |
+| Compilan | 470 (82 % de los resultados L4, 51 % del catalogo) |
+| Fallan al compilar | 101 (ver seccion 5: algunos fallos son del arnes o del entorno) |
+| Sin resultado L4 | 342 |
+| Componentes con L5 verificado | 66, en 63 escenarios |
 
 El catalogo de 913 incluye todo lo que declara XML en los plugins instalados. La medicion L1/L2
 de los 897 Standard (98 %) esta en `testdata/cobertura.csv` y no entra en este recuento.
@@ -49,6 +49,7 @@ Son las que usa un ETL normal. La mayoria ya esta medida; los huecos son pocos y
 | Familia | Total | Compilan | Fallan | Sin medir | Estado |
 |---|---:|---:|---:|---:|---|
 | File/Output | 18 | 16 | 2 | 0 | cerrada; fallan `tAdvancedFileOutputXML` y `tFileOutputARFF` (Weka) |
+| File/Hadoop | 14 | 10 | 1 | 3 | 11 componentes HDFS medidos en L4; sin cluster no se valida ejecucion |
 | Logs_Errors | 11 | 11 | 0 | 0 | cerrada |
 | Custom_Code | 9 | 9 | 0 | 0 | cerrada |
 | Misc | 12 | 11 | 1 | 0 | cerrada; falla `tContextLoad` |
@@ -60,7 +61,24 @@ Son las que usa un ETL normal. La mayoria ya esta medida; los huecos son pocos y
 | XML | 10 | 3 | 6 | 1 | a medias; `tXSLT`, `tWriteXMLField`, `tExtractXMLField`, `tWriteJSONFieldIn` |
 | Data_Quality | 18 | 2 | 14 | 2 | a medias; 9 de los 14 fallos son del arnes |
 | Technical | 38 | 22 | 16 | 0 | no vale la pena: casi todos son mitades de un par |
-| Databases/DB Specifics | 290 | 247 | 2 | 41 | las 25 familias base estan medidas; quedan 41 sueltos |
+| Databases/DB Specifics | 290 | 248 | 2 | 40 | las 25 familias base estan medidas; queda un componente Synapse menos sin medir |
+| Databases NoSQL/Cassandra | 8 | 8 | 0 | 0 | compilaron cuatro componentes Cassandra nuevos; no se ejecuto contra cluster |
+| Databases NoSQL/HBase | 8 | 6 | 2 | 0 | compilacion L4; fallos de dependencias/generacion |
+| Databases NoSQL/MongoDB | 12 | 9 | 2 | 1 | componentes de entrada/salida compilan; queda uno sin medir |
+| Internet/Kafka | 5 | 3 | 2 | 0 | fallan `tKafkaCommit` y `tKafkaInput` por generacion/montaje |
+| Internet/FTP | 10 | 9 | 1 | 0 | transferencias y conexion compilan; L5 requiere servidor local |
+| Internet/MOM and JMS | 10 | 5 | 2 | 3 | runtime IBM MQ/JMS ausente; sin conexion a broker |
+
+**Continuacion L4 sin repetir componentes con resultado previo:** los nuevos informes son
+`testdata/cobertura-l4-nosql-messaging-tanda1.csv`, `testdata/cobertura-l4-nosql-messaging-tanda2.csv`,
+`testdata/cobertura-l4-local-utils-tanda1.csv`, `testdata/cobertura-l4-hdfs-prueba.csv`,
+`testdata/cobertura-l4-hdfs-tanda1.csv`, `testdata/cobertura-l4-mapr-sqoop-tanda1.csv`,
+`testdata/cobertura-l4-ftp-tanda1.csv` y `testdata/cobertura-l4-config-connectors-tanda1.csv`.
+De los componentes nuevos, 54 compilaron: Cassandra (4), MongoDB (9), Kafka (3), HDFS (10),
+FTP (4), utilidades locales (6), Synapse (1) y MapR/Sqoop (1). Otros 25 no compilaron; dos no
+llegaron a la fase de compilacion por un timeout de Studio y porque el montaje generico rechaza el
+conector FLOW de `tSystem`. No se ejecutaron jobs contra servicios externos. El consolidado paso
+de 416 compilados, 76 fallidos y 421 sin medir a 470, 101 y 342, respectivamente.
 
 Las familias base de `Databases/DB Specifics` se midieron en tandas (las 25 que cubren desde
 PostgreSQL y MySQL hasta DB2, Informix, Teradata o Vertica) y **compilan sin instalar el driver**:
@@ -105,6 +123,9 @@ copiado el nombre, la fecha y el estado de la ultima fila; la fuente se conservo
 archivo de ancho fijo, con `MD5` desactivado.
 `tFileUnarchive` paso al extraer `productos.xlsx` como ZIP y comprobar el `xl/workbook.xml` extraido;
 el XLSX se usa aqui solo como archivo ZIP, no se lee como hoja de calculo.
+En la tanda actual, `tFileInputRaw` leyo un registro completo como texto, `tFileInputRegex` capturo
+cuenta/fecha/saldo/estado de dos registros delimitados y `tFileInputXML` extrajo dos movimientos
+mediante XPath; las salidas se compararon con valores esperados en L5.
 
 La tanda local de AWS verifico contra Moto `S3BucketCreate`, `S3BucketExist`, `S3Put`, `S3Get`,
 `S3Copy`, `S3Delete` y `S3BucketDelete`. Se comprobo el contenido descargado y copiado, la
@@ -122,7 +143,7 @@ Blob/Storage en la paleta DI; solo aparecen los conectores Azure Synapse.
 `java.lang.invoke.MethodHandles$Lookup` en Java 21. El comando del job ya incluye
 `--add-opens=java.base/java.lang.invoke=ALL-UNNAMED`, pero la reflexion sigue fallando antes de
 conectar con Moto; no es un error de endpoint ni de credenciales. El fixture registra ambos
-candidatos, pero no se incluyen en los 60 escenarios L5 verificados. `SQSQueueAttributes` tambien
+candidatos, pero no se incluyen en los 63 escenarios L5 verificados. `SQSQueueAttributes` tambien
 falla al convertir el esquema de salida, y `SQSQueuePurge` choca con el limite de una purga por
 minuto que aplica Moto; no se cuentan como aprobados.
 

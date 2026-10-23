@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { duplicateTalendJob } from "../../../talend/job-crud";
+import { resolveProjectPath } from "../../../talend/workspace";
 import { ok, fail } from "../common/response";
 
 const DuplicateJobSchema = z.object({
@@ -17,8 +18,8 @@ export function createDuplicateJobTool() {
     inputSchema: DuplicateJobSchema,
     handler: async (input: z.infer<typeof DuplicateJobSchema>) => {
       try {
-        const projectPath = process.env.TALEND_PROJECT;
-        if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT.");
+        const projectPath = await resolveProjectPath();
+        if (!projectPath) return fail("NO_PROJECT", "No se detectó el proyecto de Talend: abre un proyecto en Studio o define TALEND_PROJECT.");
         const result = await duplicateTalendJob(projectPath, {
           sourceJobName: input.sourceJobName,
           sourceFolderPath: input.sourceFolderPath,

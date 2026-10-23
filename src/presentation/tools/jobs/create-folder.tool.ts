@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { createTalendFolder } from "../../../talend/job-crud";
+import { resolveProjectPath } from "../../../talend/workspace";
 import { ok, fail } from "../common/response";
 
 const CreateFolderSchema = z.object({
@@ -13,8 +14,8 @@ export function createCreateFolderTool() {
     inputSchema: CreateFolderSchema,
     handler: async (input: z.infer<typeof CreateFolderSchema>) => {
       try {
-        const projectPath = process.env.TALEND_PROJECT;
-        if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT.");
+        const projectPath = await resolveProjectPath();
+        if (!projectPath) return fail("NO_PROJECT", "No se detectó el proyecto de Talend: abre un proyecto en Studio o define TALEND_PROJECT.");
         const result = createTalendFolder(projectPath, input.folderPath);
         return ok({ folderPath: result.folderPath, directoryPath: result.directoryPath });
       } catch (err) {

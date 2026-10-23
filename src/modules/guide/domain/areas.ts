@@ -69,7 +69,7 @@ const RULES: AreaRule[] = [
   { area: "repo", match: starts("talend_repo_") },
   { area: "mastery", match: contains("mastery") },
   { area: "components", match: starts("talend_components_") },
-  { area: "connections", match: starts("talend_connection_") },
+  { area: "connections", match: starts("talend_connection_") || contains("repository_connections") },
   { area: "studio", match: starts("talend_studio_") },
   { area: "live", match: (name) => name.startsWith("talend_live_") || name === "talend_latest_changes" },
   { area: "sync", match: starts("talend_sync_") },
@@ -105,6 +105,13 @@ export function requiresStudio(toolName: string): boolean {
     "talend_job_list_nodes",
     "talend_job_run_by_name",
     "talend_job_wait_run",
+    "talend_list_repository_contexts",
+    "talend_read_repository_context",
+    "talend_create_repository_context",
+    "talend_delete_repository_context",
+    "talend_delete_repository_context_parameter",
+    "talend_upsert_repository_context_parameter",
+    "talend_list_repository_connections",
   ]);
 
   return (

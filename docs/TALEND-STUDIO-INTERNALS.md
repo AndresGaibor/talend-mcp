@@ -2544,3 +2544,44 @@ del flujo, aunque el nodo se haya conectado despues de `tSetGlobalVar`. Por eso 
 variable que se asigna por fila. El consumidor debe ejecutarse en el flujo (por ejemplo, `tJavaRow`); el escenario
 L5 confirma que entonces puede leer `l5_global=Talend`.
 
+## 59. Inventario del repositorio y dependencias del job
+
+### Conexiones compartidas
+
+`ProxyRepositoryFactory.getInstance().getMetadataConnectionsItem()` devuelve los items de conexión de
+metadatos y permite obtener la etiqueta y el tipo de conexión. No es equivalente a
+`getAll(ERepositoryObjectType.METADATA_CONNECTIONS)`: en la instalación probada, esta última consulta devolvió
+cero, mientras `getAll(METADATA_FILE_DELIMITED)` devolvió un item. Para inventariar conexiones se usa el método
+específico `getMetadataConnectionsItem()` y no se asume que todos los tipos del enum se comporten igual.
+
+El item expone `getConnection()`. Los modelos de conexión pueden contener valores sensibles, como
+`getPassword()` y `getFilePath()`. `talend_list_repository_connections` solo devuelve etiqueta, versión, clase del
+item y tipo de conexión; no serializar el objeto de conexión completo ni sus parámetros.
+
+La prueba en el workspace disponible encontró una conexión de archivo delimitado y ninguna conexión de base de
+datos. Por eso el listado quedó validado en vivo para ese tipo; la presencia y lectura de conexiones DB debe
+probarse en un proyecto que contenga esos items.
+
+### Dependencias declaradas por un job
+
+El modelo `IProcess2` permite consultar:
+
+| Método | Resultado observado |
+|---|---|
+| `getNeededRoutines()` | Conjunto de nombres de rutinas Talend. |
+| `getNeededModules(int)` | Conjunto de `ModuleNeeded`, con nombre, indicador `isRequired()` y estado `getStatus()`. |
+| `getNeededLibraries(int)` | Nombres de las bibliotecas requeridas por el proceso. |
+
+Los métodos de módulos y bibliotecas reciben un `int`, no un `boolean`; pasar `true`/`false` produce
+`IllegalArgumentException`. El bridge usa `0` y solo expone nombres, obligatoriedad y estado, sin rutas locales.
+Si Studio proporciona una versión explícita, también se incluye. La consulta está disponible en
+`/talend/active-job/dependencies` y en la tool
+`talend_bridge_active_job_dependencies`.
+
+### Bundle de origen de una clase
+
+`Bundle.loadClass()` puede delegar la carga a otro bundle. El bundle desde el que se hizo la consulta no tiene por
+qué ser el propietario de la clase: en esta instalación varias clases Talend aparecían incorrectamente como
+pertenecientes a `com.cedarsoftware.json-io`. Para identificar el bundle real, usar
+`FrameworkUtil.getBundle(loadedClass)`; `TalendClassProbeService` ya aplica esa regla.
+
