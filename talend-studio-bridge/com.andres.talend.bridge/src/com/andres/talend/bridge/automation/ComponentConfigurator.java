@@ -481,7 +481,7 @@ public final class ComponentConfigurator {
       JsonElement rawRows = definition.get("rows");
       if (rawRows != null && rawRows.isJsonArray()) {
         for (JsonElement row : rawRows.getAsJsonArray()) {
-          rows.add(toRow(row, columnCodes));
+           rows.add(toRow(row, columnCodes, entry.getKey()));
         }
       }
       Object parameter = node.getClass().getMethod("getElementParameter", String.class)
@@ -539,11 +539,11 @@ public final class ComponentConfigurator {
   }
 
   /** Convierte una fila del spec en el mapa que espera la tabla. */
-  private static Object toRow(JsonElement row, List<String> columnCodes) {
+  private static Object toRow(JsonElement row, List<String> columnCodes, String tableName) {
     Map<String, Object> values = new LinkedHashMap<>();
     if (row.isJsonObject()) {
       for (Map.Entry<String, JsonElement> entry : row.getAsJsonObject().entrySet()) {
-        values.put(entry.getKey(), valorDeCelda(entry.getKey(), entry.getValue()));
+          values.put(entry.getKey(), valorDeCelda(tableName, entry.getKey(), entry.getValue()));
       }
       return values;
     }
@@ -552,7 +552,7 @@ public final class ComponentConfigurator {
       for (int i = 0; i < array.size(); i++) {
         String code = i < columnCodes.size() ? columnCodes.get(i) : "column" + i;
         JsonElement value = array.get(i);
-        values.put(code, valorDeCelda(code, value));
+        values.put(code, valorDeCelda(tableName, code, value));
       }
     }
     return values;
@@ -566,11 +566,34 @@ public final class ComponentConfigurator {
    * `"$.clientes[*].id"`. Los que son nombres (de columna, de funcion, de
    * orden...) van sin comillas, y los booleanos y los numeros tampoco.
    */
-  private static Object valorDeCelda(String code, JsonElement raw) {
+  private static Object valorDeCelda(String tableName, String code, JsonElement raw) {
     if (raw == null || raw.isJsonNull()) {
       return "";
     }
     String value = raw.getAsString();
+    // El JavaJet de tDataMasking agrega las comillas a estos enums. Guardarlos
+    // como literales Java aqui produciria `""SET_TO_NULL""` en el codigo generado.
+    if ("MODIF_TABLE".equals(tableName)
+        && ("CATEGORY".equals(code) || "FUNCTION".equals(code)
+            || "METHOD".equals(code) || "ALPHABET".equals(code))) {
+      return value;
+    }
+    // El JavaJet de los formatos posicionales inserta estos valores como
+    // expresiones Java (por ejemplo, ' ' y 'L'), no como cadenas entrecomilladas.
+    if ("FORMATS".equals(tableName)
+        && ("PADDING_CHAR".equals(code) || "ALIGN".equals(code) || "KEEP".equals(code))) {
+      return value;
+    }
+    // tDataShuffling inserta estos nombres dentro de sus propios literales Java.
+    if (("SHUFFLING_COLUMNS".equals(tableName) && "COLUMN".equals(code))
+        || ("PARTITIONING_COLUMNS".equals(tableName) && "PARTITIONING_COLUMN".equals(code))) {
+      return value;
+    }
+    // tSynonymSearch usa estos valores como identificadores Java y enum Lucene.
+    if ("SEARCH_INDEXS".equals(tableName)
+        && ("PRE_COLUMN".equals(code) || "COLUMN".equals(code) || "SEARCH_MODE".equals(code))) {
+      return value;
+    }
     if (esNombreDeCelda(code)) {
       return value;
     }
@@ -593,6 +616,7 @@ public final class ComponentConfigurator {
       case "SCHEMA_COLUMN":
       case "COLNAME":
       case "INPUT_COLUMN":
+      case "LOOKUP_COLUMN":
       case "OUTPUT_COLUMN":
       case "FUNCTION":
       case "OPERATOR":
@@ -645,7 +669,7 @@ public final class ComponentConfigurator {
       // sustitucion rompe las referencias que tienen las conexiones (el
       // tAggregateRow se queda sin las columnas de entrada: "inputColumn is
       // null").
-      Object existente = tableNamed(actuales, name);
+      Object existente = tableNamed(actuales, name, connector);
       if (existente != null) {
         setColumnsOf(existente, columns.getAsJsonArray());
         tables.add(existente);
@@ -764,14 +788,14 @@ public final class ComponentConfigurator {
   }
 
   /** La tabla del nodo que tiene ese nombre, si la hay. */
-  private static Object tableNamed(List<Object> tables, String name) {
-    if (name == null) {
+  private static Object tableNamed(List<Object> tables, String name, String connector) {
+    if (name == null || connector == null) {
       return null;
     }
     for (Object table : tables) {
       try {
         Object tableName = table.getClass().getMethod("getTableName").invoke(table);
-        if (name.equals(String.valueOf(tableName))) {
+        if (name.equals(String.valueOf(tableName)) && connector.equals(conectorDe(table))) {
           return table;
         }
       } catch (Exception e) {

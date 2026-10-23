@@ -33,11 +33,11 @@ servidor.
 | Medicion | Resultado |
 |---|---|
 | Componentes instalados en el catalogo | 913 en 139 familias |
-| Componentes intentados a L4 | 474 |
-| Compilan | 407 (86 % de los intentados, 45 % del catalogo) |
-| Fallan | 67 (ver seccion 5: 19 no son del componente) |
-| Sin medir | 439 |
-| Componentes con L5 verificado | 29, en 28 escenarios |
+| Componentes intentados a L4 | 498 |
+| Compilan | 418 (84 % de los intentados, 45 % del catalogo) |
+| Fallan | 80 (ver seccion 5: al menos 19 no son del componente) |
+| Sin medir | 415 |
+| Componentes con L5 verificado | 63, en 60 escenarios |
 
 El catalogo de 913 incluye todo lo que declara XML en los plugins instalados. La medicion L1/L2
 de los 897 Standard (98 %) esta en `testdata/cobertura.csv` y no entra en este recuento.
@@ -56,7 +56,7 @@ Son las que usa un ETL normal. La mayoria ya esta medida; los huecos son pocos y
 | Processing | 24 | 22 | 2 | 0 | cerrada; fallan `tAggregateSortedRow` y `tAvroMap` |
 | Processing/Fields | 19 | 13 | 6 | 0 | a medias; `tDenormalize`, `tExtractDelimitedFields`, `tWriteJSONField` |
 | File/Input | 27 | 23 | 3 | 1 | a medias; `tFileInputExcel`, `tFileInputXML`, `tFileInputMSXML`, `tAvroInput` |
-| File/Management | 13 | 9 | 3 | 1 | a medias; `tFileUnarchive`; dos fallos son del arnes |
+| File/Management | 13 | 9 | 3 | 1 | a medias; `tFileTouch`, `tFileExist`, `tFileCopy`, `tFileProperties` y `tFileUnarchive` verificados funcionalmente en L5; dos fallos son del arnes |
 | XML | 10 | 3 | 6 | 1 | a medias; `tXSLT`, `tWriteXMLField`, `tExtractXMLField`, `tWriteJSONFieldIn` |
 | Data_Quality | 18 | 2 | 14 | 2 | a medias; 9 de los 14 fallos son del arnes |
 | Technical | 38 | 22 | 16 | 0 | no vale la pena: casi todos son mitades de un par |
@@ -81,6 +81,100 @@ Amazon Oracle 1, FireBird 1, SQLite 1.
 | System | 4 | `tSystem` y `tSetEnv` son locales; `tSSH` necesita un host |
 | Data_Quality/Standardization | 6 | telefono, nombres y transliteracion |
 | File/NamedPipe | 3 | local y barato, aunque de bajo uso |
+
+`tTransliterate` queda pendiente de L5: en este Studio falta el modulo requerido `junidecode-0.2.jar`,
+por lo que no se genera la clase ejecutable. No se cuenta como componente validado ni se incluye en
+la suite L5 hasta instalar esa dependencia.
+
+La lectura XLSX con `tFileInputExcel` tambien queda pendiente: Studio reporta ausentes `poi-ooxml`,
+`xmlbeans`, `poi-ooxml-lite`, `poi-scratchpad` y `curvesapi`; no se pudo generar la clase principal.
+
+El ida y vuelta `.xls` 97-2003 con `tFileOutputExcel` y `tFileInputExcel` sí pasó L5 usando JXL.
+
+`tFileOutputPositional` paso L5: escribio `AB` alineado a la izquierda y completado con espacios
+hasta cinco caracteres; la comprobacion fue exacta sobre el archivo generado.
+`tFileInputPositional` tambien paso L5 al leer las cinco filas de `testdata/ancho_fijo.txt` con el
+patron de anchuras `8,30,10,12,10` y producir fecha, monto y texto esperados.
+`tFileTouch` paso L5 al crear `testdata/l5_touch_marker.txt`; el arnes verifico la existencia del
+archivo vacio despues de ejecutar el job.
+`tFileExist` tambien paso: comprobo que `testdata/ancho_fijo.txt` existe y un `tJava` posterior
+verifico el booleano que el componente deja en `globalMap`.
+`tFileCopy` paso al copiar `ancho_fijo.txt` a un nombre de destino nuevo y comprobar en el archivo
+copiado el nombre, la fecha y el estado de la ultima fila; la fuente se conservo.
+`tFileProperties` paso al emitir una fila con el nombre base y el tamaño esperado (`355` bytes) del
+archivo de ancho fijo, con `MD5` desactivado.
+`tFileUnarchive` paso al extraer `productos.xlsx` como ZIP y comprobar el `xl/workbook.xml` extraido;
+el XLSX se usa aqui solo como archivo ZIP, no se lee como hoja de calculo.
+
+La tanda local de AWS verifico contra Moto `S3BucketCreate`, `S3BucketExist`, `S3Put`, `S3Get`,
+`S3Copy`, `S3Delete` y `S3BucketDelete`. Se comprobo el contenido descargado y copiado, la
+desaparicion del objeto borrado y la eliminacion del bucket temporal. `SQSQueueCreate` y
+`SQSQueueDelete` tambien pasaron: se confirmo la cola creada y la desaparicion de la cola temporal.
+`S3Put`, `S3BucketDelete` y `SQSQueueDelete` requieren `dieOnError=false` en esta version del runtime
+para que un segundo intento tras completar la operacion no convierta la respuesta repetida del
+emulador en fallo del job. Ademas, Moto acepto crear una tabla DynamoDB y escribir y
+leer un registro con su API, aunque el job Talend `dynamoDBOutput` no puede inicializar el runtime.
+Los emuladores se ejecutan enlazados solo a `127.0.0.1`; esto valida conectores/protocolos, no IAM
+ni servicios AWS reales. Azurite esta instalado, pero este Studio no ofrece componentes Azure
+Blob/Storage en la paleta DI; solo aparecen los conectores Azure Synapse.
+
+`dynamoDBOutput` y `SQSOutput` siguen pendientes: el runtime `stream-json` falla al inicializar
+`java.lang.invoke.MethodHandles$Lookup` en Java 21. El comando del job ya incluye
+`--add-opens=java.base/java.lang.invoke=ALL-UNNAMED`, pero la reflexion sigue fallando antes de
+conectar con Moto; no es un error de endpoint ni de credenciales. El fixture registra ambos
+candidatos, pero no se incluyen en los 60 escenarios L5 verificados. `SQSQueueAttributes` tambien
+falla al convertir el esquema de salida, y `SQSQueuePurge` choca con el limite de una purga por
+minuto que aplica Moto; no se cuentan como aprobados.
+
+Se intento instalar `components-jdbc-runtime:0.37.61` desde Maven Central y el repositorio devolvio
+404. Athena requiere ese artefacto desde un repositorio Talend autorizado o el `.car` correspondiente;
+el driver JDBC de Athena disponible como POM no basta para generar el job Talend.
+
+En L5, `tSetEnv` establecio una propiedad Java y un `tJavaRow` posterior leyo el valor dentro del
+mismo job; el proceso de prueba termina al salir el job y no modifica el entorno del servidor MCP.
+
+**Tanda L4 Data_Privacy (Talend 8.0.1, 10 componentes):** los diez se crearon, configuraron,
+guardaron, listaron y borraron; tres compilaron (`tDataDecrypt`, `tDataEncrypt`, `tDataMasking`).
+Fallaron al compilar `tDataShuffling`, `tDataShufflingIn` y `tDataShufflingOut` por schemas/tablas
+de entrada o salida vacios; `tDataUnmasking` y `tPatternMasking` generan `nullStruct` sin resolver;
+`tDuplicateRow` y `tPatternUnmasking` generan un metodo sin tipo de retorno. `tDataUnmasking`
+tampoco aplico parametros en la prueba automatica. Informe: `testdata/cobertura-l4-privacy.csv`.
+Los fallos requieren revisar montaje/configuracion y codigo generado antes de considerarlos fallos
+funcionales definitivos.
+
+En L5 ya se verificaron `tDataMasking` (marca `ORIGINAL_MARK=false` y deja vacia la cuenta), el
+ciclo `tDataEncrypt` -> `tDataDecrypt` con AES y una clave de prueba de 256 bits (recupera exactamente
+el valor claro), `tDuplicateRow` (genera copias marcadas y conserva las originales) y `tDataShuffling`
+(procesa cuatro valores de una columna con semilla fija y conserva las cuatro filas). Los escenarios
+usan schemas y tablas explicitos.
+
+**Tanda L4 Data_Quality/Standardization (Talend 8.0.1, 6 componentes):** seis creados, guardados,
+listados y borrados; cuatro compilaron (`tStandardizePhoneNumber`, `tSynonymOutput`,
+`tTransliterate` y `tFirstnameMatch`). `tStandardizeRow` falla porque la rutina generada no se
+resuelve; `tSynonymSearch` genera un error de sintaxis. `tFirstnameMatch` y `tSynonymOutput` no
+recibieron parametros en el montaje automatico. Informe:
+`testdata/cobertura-l4-standardization.csv`.
+
+En L5, `tSynonymOutput` inicializo el indice Lucene local con dos entradas y devolvio ambas con estado
+`inserted`. `tSynonymSearch` consulto ese indice con `NY` y encontro su sinonimo; este escenario depende
+del indice que crea `tSynonymOutput` y usa ruta relativa `testdata/l5_synonym_index` porque las celdas
+de `SEARCH_INDEXS` no expanden el marcador `@TESTDATA@`.
+
+Un intento L5 de `tFirstnameMatch` queda bloqueado: falta en el `.m2` el modulo
+`org.talend.dataquality.data.index-8.0.1-Talend_v20260630-1613.jar`; Studio no genera la clase
+principal. No se incluye en el recuento L5.
+
+**Tanda L4 de componentes con escenarios L5 pendientes (4 componentes):** `tJavaFlex` y
+`tLogCatcher` compilaron; `tDenormalize` no, porque el montaje generico usa un schema que no
+contiene `ciudad`; `tContextLoad` no, por variable local duplicada. Con schemas y filas explicitos,
+`tDenormalize` y `tContextLoad` ya ejecutaron en escenarios L5. Informe:
+`testdata/cobertura-l4-pendientes-l5.csv`.
+
+**Tanda L4 System (4 componentes):** `tSetEnv` y `tSSH` compilaron. `tRunJob` no compilo en el
+job generico porque no se creo el job hijo requerido; su ejecucion padre-hijo ya esta validada en
+L5. El montaje L4 generico de `tSystem` falla porque el componente startable no acepta el conector
+FLOW como entrada; en L5 sí se validó como subjob independiente, capturando la salida de `cmd /c echo`.
+Informe: `testdata/cobertura-l4-system.csv`.
 
 ### 4.2 Necesitan un servicio local (Docker o similar)
 

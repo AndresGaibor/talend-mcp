@@ -1539,8 +1539,21 @@
       ],
       "nodos": [
         {
+          "type": "tFixedFlowInput",
+          "nombre": "variables",
+          "columnas": [
+            { "name": "key", "type": "id_String" },
+            { "name": "value", "type": "id_String" }
+          ],
+          "values": [["L5_VALOR", "recargado"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
           "type": "tContextLoad",
           "nombre": "contexto",
+          "parameters": {
+            "PRINT_OPERATIONS": { "value": "true" }
+          },
           "columnas": [
             {
               "name": "key",
@@ -1559,11 +1572,16 @@
       ],
       "conexiones": [
         {
+          "origen": "variables",
+          "destino": "contexto"
+        },
+        {
           "origen": "contexto",
           "destino": "salida"
         }
       ],
       "espera": {
+        "contiene": ["set key \"L5_VALOR\" with value \"recargado\"", "L5_VALOR", "recargado"],
         "contextos": [
           {
             "nombre": "Default",
@@ -2696,6 +2714,1329 @@
           "2|Beto|Cali"
         ]
       }
+    },
+    {
+      "nombre": "transformaciones: replicar filas a dos salidas",
+      "job": "MCP_L5_Replicate",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "valor", "type": "id_String" }
+          ],
+          "values": [["1", "uno"], ["2", "dos"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tReplicate",
+          "nombre": "replica",
+          "schemaDespuesDeConectar": true
+        },
+        { "type": "tLogRow", "nombre": "salidaA" },
+        { "type": "tLogRow", "nombre": "salidaB" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "replica" },
+        { "origen": "replica", "destino": "salidaA" },
+        { "origen": "replica", "destino": "salidaB" }
+      ],
+      "espera": {
+        "contiene": ["1|uno", "2|dos"]
+      }
+    },
+    {
+      "nombre": "codigo: transformar filas con tJavaFlex",
+      "job": "MCP_L5_JavaFlex",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "valor", "type": "id_String" }
+          ],
+          "values": [["1", "uno"], ["2", "dos"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tJavaFlex",
+          "nombre": "flex",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "valor", "type": "id_String" }
+          ],
+          "parameters": {
+            "CODE_MAIN": {
+              "value": "output_row.valor = input_row.valor + \"_flex\";"
+            }
+          },
+          "schemaDespuesDeConectar": true
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "flex" },
+        { "origen": "flex", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": ["1|uno_flex", "2|dos_flex"]
+      }
+    },
+    {
+      "nombre": "control de flujo: capturar aviso con tLogCatcher",
+      "job": "MCP_L5_LogCatcher",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [{ "name": "id", "type": "id_Integer" }],
+          "values": [["1"]]
+        },
+        { "type": "tLogRow", "nombre": "salidaPrincipal" },
+        {
+          "type": "tWarn",
+          "nombre": "aviso",
+          "parameters": {
+            "MESSAGE": { "value": "capturable_l5" },
+            "CODE": { "value": "1001" },
+            "PRIORITY": { "value": "4" }
+          }
+        },
+        { "type": "tLogCatcher", "nombre": "capturador" },
+        { "type": "tLogRow", "nombre": "salidaAvisos" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "salidaPrincipal" },
+        { "origen": "entrada", "destino": "aviso", "tipo": "SUBJOB_OK" },
+        { "origen": "capturador", "destino": "salidaAvisos" }
+      ],
+      "espera": {
+        "contiene": ["capturable_l5"]
+      }
+    },
+    {
+      "nombre": "transformaciones: agrupar valores con tDenormalize",
+      "job": "MCP_L5_Denormalize",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "producto", "type": "id_String" }
+          ],
+          "values": [
+            ["1", "Bogota", "libro"],
+            ["1", "Bogota", "lapiz"]
+          ],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tDenormalize",
+          "nombre": "agrupa",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "ciudad", "type": "id_String" },
+            { "name": "producto", "type": "id_String" }
+          ],
+          "schemaDespuesDeConectar": true,
+          "tablas": {
+            "DENORMALIZE_COLUMNS": {
+              "columns": ["INPUT_COLUMN", "DELIMITER", "MERGE"],
+              "rows": [
+                { "INPUT_COLUMN": "producto", "DELIMITER": ",", "MERGE": "false" }
+              ]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "agrupa" },
+        { "origen": "agrupa", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": ["1|Bogota|libro,lapiz"]
+      }
+    },
+    {
+      "nombre": "privacidad: quitar un dato sensible con tDataMasking",
+      "job": "MCP_L5_DataMasking",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "cuenta", "type": "id_String" }
+          ],
+          "values": [["1", "123456789"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tDataMasking",
+          "nombre": "mascara",
+          "parameters": {
+            "OUTPUT_ORIGINAL": { "value": "false" }
+          },
+          "esquemas": [
+            {
+              "conector": "FLOW",
+              "nombre": "@uniqueName",
+              "columnas": [
+                { "name": "id", "type": "id_Integer" },
+                { "name": "cuenta", "type": "id_String" }
+              ]
+            },
+            {
+              "conector": "FLOW_OUTPUT",
+              "nombre": "@uniqueName",
+              "columnas": [
+                { "name": "id", "type": "id_Integer" },
+                { "name": "cuenta", "type": "id_String" },
+                { "name": "ORIGINAL_MARK", "type": "id_Boolean" }
+              ]
+            }
+          ],
+          "schemaDespuesDeConectar": true,
+          "tablas": {
+            "MODIF_TABLE": {
+              "columns": [
+                "INPUT_COLUMN",
+                "CATEGORY",
+                "FUNCTION",
+                "METHOD",
+                "ALPHABET",
+                "EXTRA_PARAMETER",
+                "KEEP_FORMAT"
+              ],
+              "rows": [
+                {
+                  "INPUT_COLUMN": "cuenta",
+                  "CATEGORY": "SET_TO_NULL",
+                  "FUNCTION": "SET_TO_NULL",
+                  "METHOD": "EMPTY",
+                  "ALPHABET": "BEST_GUESS",
+                  "EXTRA_PARAMETER": "",
+                  "KEEP_FORMAT": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "tLogRow",
+          "nombre": "salida",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "cuenta", "type": "id_String" },
+            { "name": "ORIGINAL_MARK", "type": "id_Boolean" }
+          ],
+          "schemaDespuesDeConectar": true
+        }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "mascara" },
+        { "origen": "mascara", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": ["1||false"]
+      }
+    },
+    {
+      "nombre": "privacidad: cifrar y descifrar una columna con clave AES",
+      "job": "MCP_L5_EncryptDecrypt",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [{ "name": "secreto", "type": "id_String" }],
+          "values": [["dato_l5_confidencial"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tDataEncrypt",
+          "nombre": "cifra",
+          "columnas": [{ "name": "secreto", "type": "id_String" }],
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "SECRET_TYPE": { "value": "CRYPTO_KEY" },
+            "CRYPTO_METHOD": { "value": "AES" },
+            "SECRET_KEY": { "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "literal": true }
+          },
+          "tablas": {
+            "TABLE_CONFIG": {
+              "columns": ["SCHEMA_COLUMN", "COLUMNS_ENCRYPT"],
+              "rows": [{ "SCHEMA_COLUMN": "secreto", "COLUMNS_ENCRYPT": "true" }]
+            }
+          }
+        },
+        {
+          "type": "tDataDecrypt",
+          "nombre": "descifra",
+          "columnas": [{ "name": "secreto", "type": "id_String" }],
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "SECRET_TYPE": { "value": "CRYPTO_KEY" },
+            "CRYPTO_METHOD": { "value": "AES" },
+            "SECRET_KEY": { "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "literal": true }
+          },
+          "tablas": {
+            "TABLE_CONFIG": {
+              "columns": ["SCHEMA_COLUMN", "COLUMNS_DECRYPT"],
+              "rows": [{ "SCHEMA_COLUMN": "secreto", "COLUMNS_DECRYPT": "true" }]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "cifra" },
+        { "origen": "cifra", "destino": "descifra" },
+        { "origen": "descifra", "destino": "salida" }
+      ],
+      "espera": {
+        "contiene": ["dato_l5_confidencial"]
+      }
+    },
+    {
+      "nombre": "privacidad: duplicar una fila y modificar la copia",
+      "job": "MCP_L5_DuplicateRow",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" }
+          ],
+          "values": [["1", "Ana"], ["2", "Beto"], ["3", "Caro"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tDuplicateRow",
+          "nombre": "duplica",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "ORIGINAL_MARK", "type": "id_Boolean" }
+          ],
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "PERCENTAGE_DUPLICATES": { "value": "100" },
+            "DISTRIBUTION_NAME": { "value": "BERNOULLI" },
+            "AVERAGE_GROUP_SIZE": { "value": "2" },
+            "RANDOM_SEED": { "value": "12345678" }
+          },
+          "tablas": {
+            "MODIF_TABLE": {
+              "columns": [
+                "INPUT_COLUMN",
+                "MODIF_RATE",
+                "FUNCTION",
+                "MAX_MODIF_COUNT",
+                "SYNONYM_INDEX_PATH"
+              ],
+              "rows": [
+                {
+                  "INPUT_COLUMN": "nombre",
+                  "MODIF_RATE": "1.0",
+                  "FUNCTION": "SET_TO_BLANK",
+                  "MAX_MODIF_COUNT": "1",
+                  "SYNONYM_INDEX_PATH": "\"\""
+                }
+              ]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "duplica" },
+        { "origen": "duplica", "destino": "salida" }
+      ],
+      "espera": {
+        "contiene": ["false", "||false", "true"]
+      }
+    },
+    {
+      "nombre": "calidad: normalizar un telefono a E164",
+      "job": "MCP_L5_StandardizePhone",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "phone", "type": "id_String" },
+            { "name": "region", "type": "id_String" }
+          ],
+          "values": [["+14155552671", "US"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tStandardizePhoneNumber",
+          "nombre": "normaliza",
+          "columnas": [
+            { "name": "phone", "type": "id_String" },
+            { "name": "region", "type": "id_String" },
+            { "name": "StandardizedPhoneNumber", "type": "id_String" },
+            { "name": "IsValidPhoneNumber", "type": "id_Boolean" },
+            { "name": "IsValidPhoneNumberForRegion", "type": "id_Boolean" },
+            { "name": "IsPossiblePhoneNumber", "type": "id_Boolean" },
+            { "name": "IsAlreadyStandard", "type": "id_Boolean" },
+            { "name": "PhoneNumberType", "type": "id_String" },
+            { "name": "ErrorMessage", "type": "id_String" }
+          ],
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "PHONE_NUMBER": { "value": "phone" },
+            "COUNTRY_CODE": { "value": "region" },
+            "COUNTRY_CUSTOME": { "value": "false" },
+            "PHONE_NUMBER_FORMAT": { "value": "E164" }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "normaliza" },
+        { "origen": "normaliza", "destino": "salida" }
+      ],
+      "espera": {
+        "contiene": ["+14155552671", "true"]
+      }
+    },
+    {
+      "nombre": "sistema: establecer una propiedad y leerla en el job",
+      "job": "MCP_L5_SetEnv",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [{ "name": "id", "type": "id_Integer" }],
+          "values": [["1"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tSetEnv",
+          "nombre": "configura",
+          "schemaDespuesDeConectar": true,
+          "tablas": {
+            "PARAMS": {
+              "columns": ["NAME", "VALUE", "APPEND"],
+              "rows": [
+                {
+                  "NAME": "\"MCP_L5_PROPERTY\"",
+                  "VALUE": "\"valor_l5\"",
+                  "APPEND": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "tJavaRow",
+          "nombre": "lee",
+          "columnas": [{ "name": "propiedad", "type": "id_String" }],
+          "parameters": {
+            "CODE": {
+              "value": "output_row.propiedad = System.getProperty(\"MCP_L5_PROPERTY\");"
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "configura" },
+        { "origen": "configura", "destino": "lee" },
+        { "origen": "lee", "destino": "salida" }
+      ],
+      "espera": {
+        "contiene": ["valor_l5"]
+      }
+    },
+    {
+      "nombre": "formatos: escribir una fila de ancho fijo",
+      "job": "MCP_L5_PositionalOutput",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [{ "name": "codigo", "type": "id_String" }],
+          "values": [["AB"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tFileOutputPositional",
+          "nombre": "escribe",
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_salida_posicional.txt" },
+            "INCLUDEHEADER": { "value": "false" },
+            "APPEND": { "value": "false" },
+            "CREATE": { "value": "true" },
+            "USE_BYTE": { "value": "false" }
+          },
+          "tablas": {
+            "FORMATS": {
+              "columns": ["SCHEMA_COLUMN", "SIZE", "PADDING_CHAR", "ALIGN", "KEEP"],
+              "rows": [
+                {
+                  "SCHEMA_COLUMN": "codigo",
+                  "SIZE": "5",
+                  "PADDING_CHAR": "' '",
+                  "ALIGN": "'L'",
+                  "KEEP": "'A'"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "escribe" }
+      ],
+      "espera": {
+        "fichero": {
+          "ruta": "@TESTDATA@/l5_salida_posicional.txt",
+          "lineas": ["AB   "]
+        }
+      }
+    },
+    {
+      "nombre": "formatos: leer registros de ancho fijo",
+      "job": "MCP_L5_PositionalInput",
+      "nodos": [
+        {
+          "type": "tFileInputPositional",
+          "nombre": "lector",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "fecha", "type": "id_String" },
+            { "name": "monto", "type": "id_Double" },
+            { "name": "estado", "type": "id_String" }
+          ],
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/ancho_fijo.txt" },
+            "PATTERN": { "value": "8,30,10,12,10", "literal": true },
+            "HEADER": { "value": "0" },
+            "TRIMALL": { "value": "true" }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "lector", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": 5,
+        "contiene": ["Ana Maria Nunez", "2023-01-15", "1500.5", "SUSPENDIDO"]
+      }
+    },
+    {
+      "nombre": "formatos: escribir y releer un libro Excel 97-2003",
+      "job": "MCP_L5_ExcelRoundtrip",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "codigo", "type": "id_String" },
+            { "name": "nombre", "type": "id_String" }
+          ],
+          "values": [["P001", "Ana"], ["P002", "Beto"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tFileOutputExcel",
+          "nombre": "escribe",
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "VERSION_2007": { "value": "false" },
+            "FILENAME": { "value": "@TESTDATA@/l5_excel_roundtrip.xls" },
+            "SHEETNAME": { "value": "Sheet1" },
+            "INCLUDEHEADER": { "value": "true" },
+            "IS_ALL_AUTO_SZIE": { "value": "true" }
+          }
+        },
+        {
+          "type": "tFileInputExcel",
+          "nombre": "lector",
+          "columnas": [
+            { "name": "codigo", "type": "id_String" },
+            { "name": "nombre", "type": "id_String" }
+          ],
+          "parameters": {
+            "VERSION_2007": { "value": "false" },
+            "FILENAME": { "value": "@TESTDATA@/l5_excel_roundtrip.xls" },
+            "ALL_SHEETS": { "value": "false" },
+            "HEADER": { "value": "1" },
+            "FIRST_COLUMN": { "value": "1" },
+            "LAST_COLUMN": { "value": "2" },
+            "TRIMALL": { "value": "true" }
+          },
+          "tablas": {
+            "SHEETLIST": {
+              "columns": ["SHEETNAME", "USE_REGEX"],
+              "rows": [{ "SHEETNAME": "Sheet1", "USE_REGEX": "false" }]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "escribe" },
+        { "origen": "entrada", "destino": "lector", "tipo": "SUBJOB_OK" },
+        { "origen": "lector", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": 2,
+        "contiene": ["P001", "Ana", "P002", "Beto"]
+      }
+    },
+    {
+      "nombre": "sistema: ejecutar un comando local y capturar su salida",
+      "job": "MCP_L5_System",
+      "nodos": [
+        {
+          "type": "tSystem",
+          "nombre": "comando",
+          "columnas": [{ "name": "outputline", "type": "id_String" }],
+          "parameters": {
+            "COMMAND": { "value": "cmd /c echo MCP_L5_SYSTEM_OK", "literal": true },
+            "OUTPUT": { "value": "NORMAL_OUTPUT" },
+            "ERROROUTPUT": { "value": "OUTPUT_TO_CONSOLE" }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "comando", "destino": "salida" }
+      ],
+      "espera": {
+        "contiene": ["MCP_L5_SYSTEM_OK"]
+      }
+    },
+    {
+      "nombre": "archivos: crear un archivo vacio con tFileTouch",
+      "job": "MCP_L5_FileTouch",
+      "nodos": [
+        {
+          "type": "tFileTouch",
+          "nombre": "crea",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_touch_marker.txt" },
+            "CREATEDIR": { "value": "false" }
+          }
+        }
+      ],
+      "conexiones": [],
+      "espera": {
+        "fichero": { "ruta": "@TESTDATA@/l5_touch_marker.txt" }
+      }
+    },
+    {
+      "nombre": "archivos: comprobar la existencia de un fichero local",
+      "job": "MCP_L5_FileExist",
+      "nodos": [
+        {
+          "type": "tFileExist",
+          "nombre": "existe",
+          "parameters": {
+            "FILE_NAME": { "value": "@TESTDATA@/ancho_fijo.txt" }
+          }
+        },
+        {
+          "type": "tJava",
+          "nombre": "valida",
+          "parameters": {
+            "CODE": {
+              "value": "if (Boolean.TRUE.equals(globalMap.get(\"tFileExist_2_EXISTS\"))) { System.out.println(\"L5_FILE_EXISTS\"); } else { throw new RuntimeException(\"El fichero de prueba deberia existir\"); }"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        { "origen": "existe", "destino": "valida", "tipo": "SUBJOB_OK" }
+      ],
+      "espera": {
+        "contiene": ["L5_FILE_EXISTS"]
+      }
+    },
+    {
+      "nombre": "archivos: copiar un fichero local y comprobar su contenido",
+      "job": "MCP_L5_FileCopy",
+      "nodos": [
+        {
+          "type": "tFileCopy",
+          "nombre": "copia",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/ancho_fijo.txt" },
+            "ENABLE_COPY_DIRECTORY": { "value": "false" },
+            "DESTINATION": { "value": "@TESTDATA@" },
+            "RENAME": { "value": "true" },
+            "DESTINATION_RENAME": { "value": "l5_copia_ancho_fijo.txt" },
+            "REMOVE_FILE": { "value": "false" },
+            "REPLACE_FILE": { "value": "true" },
+            "CREATE_DIRECTORY": { "value": "true" },
+            "FAILON": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": [],
+      "espera": {
+        "fichero": {
+          "ruta": "@TESTDATA@/l5_copia_ancho_fijo.txt",
+          "contiene": ["Ana Maria Nunez", "2023-01-15", "SUSPENDIDO"]
+        }
+      }
+    },
+    {
+      "nombre": "archivos: leer propiedades y tamaño de un fichero",
+      "job": "MCP_L5_FileProperties",
+      "nodos": [
+        {
+          "type": "tFileProperties",
+          "nombre": "propiedades",
+          "columnas": [
+            { "name": "abs_path", "type": "id_String" },
+            { "name": "dirname", "type": "id_String" },
+            { "name": "basename", "type": "id_String" },
+            { "name": "mode_string", "type": "id_String" },
+            { "name": "size", "type": "id_Long" },
+            { "name": "mtime", "type": "id_Long" },
+            { "name": "mtime_string", "type": "id_String" }
+          ],
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/ancho_fijo.txt" },
+            "MD5": { "value": "false" }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "propiedades", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": 1,
+        "contiene": ["ancho_fijo.txt", "355"]
+      }
+    },
+    {
+      "nombre": "privacidad: barajar valores de una columna",
+      "job": "MCP_L5_DataShuffling",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [{ "name": "cliente", "type": "id_String" }],
+          "values": [["ALFA"], ["BRAVO"], ["CHARLIE"], ["DELTA"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tDataShuffling",
+          "nombre": "baraja",
+          "columnas": [{ "name": "cliente", "type": "id_String" }],
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "RANDOM_SEED": { "value": "17" },
+            "SEPERATION_SIZE": { "value": "1000" }
+          },
+          "tablas": {
+            "SHUFFLING_COLUMNS": {
+              "columns": ["COLUMN", "GROUP_ID"],
+              "rows": [{ "COLUMN": "cliente", "GROUP_ID": "1" }]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "baraja" },
+        { "origen": "baraja", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": 4,
+        "contiene": ["ALFA", "BRAVO", "CHARLIE", "DELTA"]
+      }
+    },
+    {
+      "nombre": "archivos: extraer entradas de un libro XLSX",
+      "job": "MCP_L5_FileUnarchive",
+      "nodos": [
+        {
+          "type": "tFileUnarchive",
+          "nombre": "extrae",
+          "parameters": {
+            "ZIPFILE": { "value": "@TESTDATA@/productos.xlsx" },
+            "DIRECTORY": { "value": "@TESTDATA@/l5_unarchive" },
+            "ROOTNAME": { "value": "false" },
+            "INTEGRITY": { "value": "false" },
+            "EXTRACTPATH": { "value": "true" },
+            "CHECKPASSWORD": { "value": "false" },
+            "DIE_ON_ERROR": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": [],
+      "espera": {
+        "fichero": {
+          "ruta": "@TESTDATA@/l5_unarchive/xl/workbook.xml",
+          "contiene": ["Productos"]
+        }
+      }
+    },
+    {
+      "nombre": "calidad: crear un indice de sinonimos local",
+      "job": "MCP_L5_SynonymOutput",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "word", "type": "id_String" },
+            { "name": "synonyms", "type": "id_String" }
+          ],
+          "values": [
+            ["NY", "New York|Big Apple"],
+            ["SF", "San Francisco|City by the Bay"]
+          ],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tSynonymOutput",
+          "nombre": "indice",
+          "esquemas": [
+            {
+              "conector": "FLOW",
+              "nombre": "@uniqueName",
+              "columnas": [
+                { "name": "word", "type": "id_String" },
+                { "name": "synonyms", "type": "id_String" }
+              ]
+            },
+            {
+              "conector": "MAIN",
+              "nombre": "@uniqueName",
+              "columnas": [
+                { "name": "word", "type": "id_String" },
+                { "name": "synonyms", "type": "id_String" },
+                { "name": "status", "type": "id_String" }
+              ]
+            }
+          ],
+          "parameters": {
+            "FILE_PATH": { "value": "@TESTDATA@/l5_synonym_index" },
+            "OPERATION": { "value": "INIT" },
+            "ENTRY": { "value": "word" },
+            "SYNONYMS": { "value": "synonyms" }
+          },
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tLogRow",
+          "nombre": "salida",
+          "columnas": [
+            { "name": "word", "type": "id_String" },
+            { "name": "synonyms", "type": "id_String" },
+            { "name": "status", "type": "id_String" }
+          ]
+        }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "indice" },
+        { "origen": "indice", "destino": "salida", "tipo": "MAIN" }
+      ],
+      "espera": {
+        "lineas": 2,
+        "contiene": ["NY", "SF", "inserted"]
+      }
+    },
+    {
+      "nombre": "calidad: buscar una entrada en el indice de sinonimos",
+      "job": "MCP_L5_SynonymSearch",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "word", "type": "id_String" },
+            { "name": "suggestion", "type": "id_String" },
+            { "name": "GID", "type": "id_String" },
+            { "name": "GRP_SIZE", "type": "id_Integer" },
+            { "name": "SCORE", "type": "id_Double" },
+            { "name": "SCORES", "type": "id_String" },
+            { "name": "NB_MATCHED_FIELDS", "type": "id_Integer" }
+          ],
+          "values": [["NY", "", "", "0", "0.0", "", "0"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "tSynonymSearch",
+          "nombre": "busca",
+          "esquemas": [
+            {
+              "conector": "FLOW",
+              "nombre": "@uniqueName",
+              "columnas": [
+                { "name": "word", "type": "id_String" },
+                { "name": "suggestion", "type": "id_String" },
+                { "name": "GID", "type": "id_String" },
+                { "name": "GRP_SIZE", "type": "id_Integer" },
+                { "name": "SCORE", "type": "id_Double" },
+                { "name": "SCORES", "type": "id_String" },
+                { "name": "NB_MATCHED_FIELDS", "type": "id_Integer" }
+              ]
+            }
+          ],
+          "parameters": {
+            "LIMIT": { "value": "1" }
+          },
+          "schemaDespuesDeConectar": true,
+          "tablas": {
+            "SEARCH_INDEXS": {
+              "columns": [
+                "PRE_COLUMN",
+                "COLUMN",
+                "INDEX_PATH",
+                "SEARCH_MODE",
+                "SCORE_THRESHOLD",
+                "MAX_EDITS_FOR_FUZZY_MATCH",
+                "SLOP_FOR_PARTIAL_MATCH",
+                "NUM_TOPS"
+              ],
+              "rows": [
+                {
+                  "PRE_COLUMN": "word",
+                  "COLUMN": "suggestion",
+                  "INDEX_PATH": "testdata/l5_synonym_index",
+                  "SEARCH_MODE": "MATCH_ANY",
+                  "SCORE_THRESHOLD": "0.0",
+                  "MAX_EDITS_FOR_FUZZY_MATCH": "1",
+                  "SLOP_FOR_PARTIAL_MATCH": "1",
+                  "NUM_TOPS": "5"
+                }
+              ]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [
+        { "origen": "entrada", "destino": "busca" },
+        { "origen": "busca", "destino": "salida" }
+      ],
+      "espera": {
+        "lineas": 1,
+        "contiene": ["NY"]
+      }
+    },
+    {
+      "nombre": "bases de datos: upsert de registros en Postgres",
+      "job": "MCP_L5_PostgresUpsert",
+      "prepara": [
+        "DROP TABLE IF EXISTS l5_upsert",
+        "CREATE TABLE l5_upsert (id integer PRIMARY KEY, nombre varchar(80), estado varchar(20))",
+        "INSERT INTO l5_upsert VALUES (1, 'Nombre anterior', 'ACTIVO')"
+      ],
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer", "key": true },
+            { "name": "nombre", "type": "id_String" },
+            { "name": "estado", "type": "id_String" }
+          ],
+          "values": [["1", "Nombre actualizado", "INACTIVO"], ["2", "Nuevo cliente", "ACTIVO"]]
+        },
+        {
+          "type": "tPostgresqlConnection",
+          "nombre": "conexion",
+          "parameters": {
+            "HOST": { "value": "localhost" },
+            "PORT": { "value": "5433" },
+            "USER": { "value": "talend" },
+            "PASS": { "value": "talend" },
+            "DBNAME": { "value": "talend_test" },
+            "AUTO_COMMIT": { "value": "true" }
+          }
+        },
+        {
+          "type": "tPostgresqlOutput",
+          "nombre": "upsert",
+          "parameters": {
+            "USE_EXISTING_CONNECTION": { "value": "true" },
+            "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
+            "TABLE": { "value": "l5_upsert" },
+            "TABLE_ACTION": { "value": "NONE" },
+            "DATA_ACTION": { "value": "INSERT_OR_UPDATE" },
+            "USE_FIELD_OPTIONS": { "value": "true" },
+            "MAPPING": { "value": "postgres_id" },
+            "END_OF_FLOW": { "value": "false" }
+          },
+          "tablas": {
+            "FIELD_OPTIONS": {
+              "columns": ["SCHEMA_COLUMN", "UPDATE_KEY", "DELETE_KEY", "UPDATABLE", "INSERTABLE"],
+              "rows": [
+                { "SCHEMA_COLUMN": "id", "UPDATE_KEY": "true", "DELETE_KEY": "false", "UPDATABLE": "false", "INSERTABLE": "true" },
+                { "SCHEMA_COLUMN": "nombre", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" },
+                { "SCHEMA_COLUMN": "estado", "UPDATE_KEY": "false", "DELETE_KEY": "false", "UPDATABLE": "true", "INSERTABLE": "true" }
+              ]
+            }
+          },
+          "columnas": [
+            { "name": "id", "type": "id_Integer", "sourceType": "INT4", "key": true },
+            { "name": "nombre", "type": "id_String", "sourceType": "VARCHAR" },
+            { "name": "estado", "type": "id_String", "sourceType": "VARCHAR" }
+          ],
+          "schemaDespuesDeConectar": true
+        }
+      ],
+      "conexiones": [{ "origen": "entrada", "destino": "upsert" }],
+      "espera": {
+        "consulta": {
+          "sql": "SELECT count(*)::text || ':' || max(CASE WHEN id = 1 THEN nombre END) || ':' || max(CASE WHEN id = 2 THEN nombre END) FROM l5_upsert",
+          "valor": "2:Nombre actualizado:Nuevo cliente"
+        }
+      }
+    },
+    {
+      "nombre": "aws: crear bucket de prueba en S3 local",
+      "job": "MCP_L5_S3BucketCreate",
+      "nodos": [
+        {
+          "type": "S3BucketCreate",
+          "nombre": "creaBucket",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.datastore.enablePathStyleAccess": { "value": "true" },
+            "configuration.bucket": { "value": "talend-l5-bank-test" },
+            "configuration.dieOnError": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: cargar archivo a S3 local",
+      "job": "MCP_L5_S3Put",
+      "nodos": [
+        {
+          "type": "S3Put",
+          "nombre": "carga",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.datastore.enablePathStyleAccess": { "value": "true" },
+            "configuration.bucket": { "value": "talend-l5-bank-test" },
+            "configuration.key": { "value": "l5/ancho_fijo.txt" },
+            "configuration.file": { "value": "@TESTDATA@/ancho_fijo.txt" },
+            "configuration.dieOnError": { "value": "false" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: descargar objeto desde S3 local",
+      "job": "MCP_L5_S3Get",
+      "nodos": [
+        {
+          "type": "S3Get",
+          "nombre": "descarga",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.datastore.enablePathStyleAccess": { "value": "true" },
+            "configuration.bucket": { "value": "talend-l5-bank-test" },
+            "configuration.key": { "value": "l5/ancho_fijo.txt" },
+            "configuration.file": { "value": "@TESTDATA@/l5_s3_download.txt" },
+            "configuration.dieOnError": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": [],
+      "espera": {
+        "fichero": {
+          "ruta": "@TESTDATA@/l5_s3_download.txt",
+          "contiene": ["Ana Maria Nunez", "2023-01-15", "SUSPENDIDO"]
+        }
+      }
+    },
+    {
+      "nombre": "aws: comprobar bucket en S3 local",
+      "job": "MCP_L5_S3BucketExist",
+      "nodos": [
+        {
+          "type": "S3BucketExist",
+          "nombre": "compruebaBucket",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.datastore.enablePathStyleAccess": { "value": "true" },
+            "configuration.bucket": { "value": "talend-l5-bank-test" },
+            "configuration.dieOnError": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: borrar bucket temporal de S3 local",
+      "job": "MCP_L5_S3BucketDelete",
+      "nodos": [
+        {
+          "type": "S3BucketDelete",
+          "nombre": "borraBucket",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.datastore.enablePathStyleAccess": { "value": "true" },
+            "configuration.bucket": { "value": "talend-l5-delete-temp" },
+            "configuration.dieOnError": { "value": "false" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: copiar objeto entre buckets S3 locales",
+      "job": "MCP_L5_S3Copy",
+      "nodos": [
+        {
+          "type": "S3Copy",
+          "nombre": "copiaObjeto",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.datastore.enablePathStyleAccess": { "value": "true" },
+            "configuration.bucket": { "value": "talend-l5-bank-test" },
+            "configuration.sourceKey": { "value": "l5/ancho_fijo.txt" },
+            "configuration.destinationBucket": { "value": "talend-l5-bank-test" },
+            "configuration.destinationKey": { "value": "l5/ancho_fijo-copia.txt" },
+            "configuration.enableServerSideEncryption": { "value": "false" },
+            "configuration.dieOnError": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: borrar objeto de prueba de S3 local",
+      "job": "MCP_L5_S3Delete",
+      "nodos": [
+        {
+          "type": "S3Delete",
+          "nombre": "borraObjeto",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.datastore.enablePathStyleAccess": { "value": "true" },
+            "configuration.bucket": { "value": "talend-l5-bank-test" },
+            "configuration.key": { "value": "l5/ancho_fijo-copia.txt" },
+            "configuration.dieOnError": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: escribir una fila en DynamoDB local",
+      "job": "MCP_L5_DynamoDBOutput",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "cuenta", "type": "id_String" },
+            { "name": "estado", "type": "id_String" }
+          ],
+          "values": [["9001", "CTA-9001", "ACTIVA"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "dynamoDBOutput",
+          "nombre": "escribe",
+          "columnas": [
+            { "name": "id", "type": "id_Integer", "key": true },
+            { "name": "cuenta", "type": "id_String" },
+            { "name": "estado", "type": "id_String" }
+          ],
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "configuration.dataset.datastore.awsAuthConfig.basicAuthConfig.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.awsAuthConfig.basicAuthConfig.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useServerUrl": { "value": "true" },
+            "configuration.dataset.datastore.url": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.tableName": { "value": "l5_bank_accounts" },
+            "configuration.createTableIfNotExist": { "value": "true" },
+            "configuration.primaryKeyType": { "value": "SIMPLE_PRIMARY_KEY" },
+            "configuration.partitionKey": { "value": "id" },
+            "configuration.partitionKeyType": { "value": "NUMBER" },
+            "configuration.readCapacityUnits": { "value": "5" },
+            "configuration.writeCapacityUnits": { "value": "5" }
+          }
+        }
+      ],
+      "conexiones": [{ "origen": "entrada", "destino": "escribe" }]
+    },
+    {
+      "nombre": "aws: crear una cola SQS local",
+      "job": "MCP_L5_SQSQueueCreate",
+      "nodos": [
+        {
+          "type": "SQSQueueCreate",
+          "nombre": "creaCola",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.queueName": { "value": "talend-l5-bank-alerts" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: leer atributos de cola SQS local",
+      "job": "MCP_L5_SQSQueueAttributes",
+      "nodos": [
+        {
+          "type": "SQSQueueAttributes",
+          "nombre": "leeAtributos",
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.queueName": { "value": "talend-l5-bank-alerts" },
+            "configuration.dieOnError": { "value": "true" }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "leeAtributos", "destino": "salida" }]
+    },
+    {
+      "nombre": "aws: vaciar cola de prueba SQS local",
+      "job": "MCP_L5_SQSQueuePurge",
+      "nodos": [
+        {
+          "type": "SQSQueuePurge",
+          "nombre": "vaciarCola",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.queueName": { "value": "talend-l5-bank-alerts" },
+            "configuration.dieOnError": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: borrar cola temporal SQS local",
+      "job": "MCP_L5_SQSQueueDelete",
+      "nodos": [
+        {
+          "type": "SQSQueueDelete",
+          "nombre": "borraCola",
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.queueName": { "value": "talend-l5-delete-queue" },
+            "configuration.dieOnError": { "value": "false" }
+          }
+        }
+      ],
+      "conexiones": []
+    },
+    {
+      "nombre": "aws: enviar un mensaje bancario a SQS local",
+      "job": "MCP_L5_SQSOutput",
+      "nodos": [
+        {
+          "type": "tFixedFlowInput",
+          "nombre": "entrada",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "cuenta", "type": "id_String" },
+            { "name": "evento", "type": "id_String" }
+          ],
+          "values": [["9001", "CTA-9001", "ALERTA_FRAUDE"]],
+          "schemaDespuesDeConectar": true
+        },
+        {
+          "type": "SQSOutput",
+          "nombre": "envia",
+          "columnas": [
+            { "name": "id", "type": "id_Integer" },
+            { "name": "cuenta", "type": "id_String" },
+            { "name": "evento", "type": "id_String" }
+          ],
+          "schemaDespuesDeConectar": true,
+          "parameters": {
+            "configuration.dataset.datastore.credentialProvider": { "value": "STATIC_CREDENTIALS" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": { "value": "talend-test" },
+            "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": { "value": "talend-test-secret" },
+            "configuration.dataset.datastore.region": { "value": "us-east-1" },
+            "configuration.dataset.datastore.useRegionEndpoint": { "value": "true" },
+            "configuration.dataset.datastore.regionEndpoint": { "value": "http://127.0.0.1:4566" },
+            "configuration.dataset.queueName": { "value": "talend-l5-bank-alerts" },
+            "configuration.dieOnError": { "value": "true" }
+          }
+        }
+      ],
+      "conexiones": [{ "origen": "entrada", "destino": "envia" }]
     }
   ]
 }

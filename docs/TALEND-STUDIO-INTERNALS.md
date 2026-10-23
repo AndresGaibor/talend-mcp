@@ -2183,6 +2183,7 @@ Las celdas cuyo codigo es un **nombre** van sin comillas:
 | `SCHEMA_COLUMN` | La columna del esquema |
 | `COLNAME` | La columna que se ordena o se filtra |
 | `INPUT_COLUMN` / `OUTPUT_COLUMN` | Las columnas de entrada y de salida de una transformacion |
+| `LOOKUP_COLUMN` | La columna del flujo lookup en `tJoin` |
 | `FUNCTION` | La funcion de agregacion (`sum`, `count`...) |
 | `OPERATOR` | El operador de una condicion (`>`, `=`...) |
 | `SORT` / `ORDER` | Como se ordena (`num`, `desc`...) |
@@ -2190,7 +2191,14 @@ Las celdas cuyo codigo es un **nombre** van sin comillas:
 | `PARAMETER_NAME` | El nombre de un parametro |
 | `TARGET_COLUMN` | La columna destino |
 
-Las demas van **como literales Java** (con comillas), como hace el IDE. Asi la consulta JSONPath de un
+Las demas van **como literales Java** (con comillas), como hace el IDE. Excepcion: en la tabla
+`MODIF_TABLE` de `tDataMasking`, `CATEGORY`, `FUNCTION`, `METHOD` y `ALPHABET` se guardan como texto
+sin comillas Java: el JavaJet del componente agrega las comillas al generar el codigo. En la tabla
+`FORMATS` de `tFileOutputPositional`, `PADDING_CHAR`, `ALIGN` y `KEEP` tambien se pasan como expresiones
+Java sin envolverlas en otro literal: el JavaJet inserta el caracter de relleno y compara los enums
+con valores como `'L'` directamente. En `SHUFFLING_COLUMNS` y `PARTITIONING_COLUMNS` de
+`tDataShuffling`, los campos `COLUMN` y `PARTITIONING_COLUMN` tambien van sin comillas porque el
+JavaJet ya las agrega; si no, se genera `""cliente""` y el job no compila. Asi la consulta JSONPath de un
 `tFileInputJSON` sale como `"$.clientes[*].id"` y compila: entrecomillada, el generador la buscaba con
 las comillas dentro y no encontraba la ruta.
 
@@ -2200,6 +2208,10 @@ literales).
 Donde esta: `ComponentConfigurator.valorDeCelda` (decide que hacer con cada celda) y
 `ComponentConfigurator.esNombreDeCelda` (la lista de codigos que son nombres). Antes el bridge
 entrecomillaba **todas** las celdas: por eso la consulta JSONPath salia mal.
+
+Al aplicar schemas con varias tablas en el mismo nodo, la coincidencia usa el nombre **y** el
+conector. `tDataMasking` puede tener `FLOW` y `FLOW_OUTPUT` con el mismo nombre de tabla; buscar solo
+por nombre reemplaza los metadatos del conector equivocado y deja incompletas las filas generadas.
 
 Ojo: esta regla es para las celdas de una **tabla**. Los **parametros** tienen la suya (seccion 44:
 sin comillas si el tipo acaba en `_LIST`).

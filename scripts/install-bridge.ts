@@ -1,5 +1,5 @@
 import { spawnSync, execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { homedir, platform, tmpdir } from "node:os";
 import { createInterface } from "node:readline";
@@ -596,6 +596,11 @@ function publishHotJar(jarPath: string): string | undefined {
     const target = hotJarPath();
     mkdirSync(dirname(target), { recursive: true });
     cpSync(jarPath, target, { force: true });
+    // `cpSync` conserva el mtime del jar de origen. Si el bundle se compiló
+    // antes de iniciar Studio, el watcher puede haber memorizado esa misma
+    // firma y no detectar la copia aunque haya que cargar una versión nueva.
+    const now = new Date();
+    utimesSync(target, now, now);
     return target;
   } catch (error) {
     warn(`No se pudo publicar el jar para carga en caliente: ${error instanceof Error ? error.message : String(error)}`);
