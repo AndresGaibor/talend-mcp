@@ -1,16 +1,67 @@
-# talend-mcp
+# Talend MCP
 
-Servidor MCP para analizar y editar proyectos de Qlik Talend Studio.
+Una forma sencilla de trabajar con proyectos de **Qlik Talend Studio** desde un asistente compatible
+con [MCP](https://modelcontextprotocol.io/).
 
-Sirve para inspeccionar jobs, componentes, contextos, flujos, logs y ejecutar modificaciones
-sobre archivos `.item` y `.properties` de Talend.
+Talend MCP permite consultar proyectos y, cuando Talend Studio está abierto, crear, modificar y
+probar jobs con ayuda de un asistente. La integración está pensada para ejecutarse en el equipo
+local y mantener los proyectos bajo tu control.
 
-## Instalación rápida
+## Qué puedes hacer
 
-Necesitas [Bun](https://bun.sh) y un workspace de Talend Studio accesible desde esta máquina.
-En Windows instala Bun desde PowerShell con `powershell -c "irm bun.sh/install.ps1|iex"`;
-en macOS o Linux usa `curl -fsSL https://bun.sh/install | bash`. Abre una terminal nueva
-después de instalarlo.
+- Explorar jobs, componentes, contextos y resultados.
+- Crear y modificar jobs directamente en Talend Studio.
+- Revisar problemas y ejecutar jobs para comprobar sus resultados.
+- Pedir al asistente que te guíe: no necesitas conocer de memoria todas las herramientas.
+
+Para empezar, dile al asistente que use **`talend_guide`**. Te indicará qué puede hacer y cómo
+continuar según la tarea.
+
+## Estado del proyecto
+
+El soporte se prueba por etapas: desde comprobar que un componente se puede añadir y configurar,
+hasta ejecutar un job y verificar que produce el resultado esperado.
+
+| Cobertura | Resultado más reciente | Qué significa |
+|---|---:|---|
+| Componentes básicos | **877 de 897** | Se comprobó que se pueden crear y configurar. |
+| Componentes que compilan | **418 de 498 probados** | Talend pudo generar y compilar el job de prueba. |
+| Ejecuciones verificadas | **66 componentes, en 63 escenarios** | Se ejecutaron jobs y se compararon sus resultados con lo esperado. |
+
+Estas cifras corresponden a pruebas en **Talend Studio 8.0.1**. No significan que todos los
+componentes estén probados en todos los escenarios: algunos necesitan drivers, servicios externos
+o módulos que no están disponibles en ese entorno. Un componente sin pruebas no necesariamente
+está fuera de soporte.
+
+### Ejemplos probados
+
+Las pruebas de ejecución incluyen lectura y escritura de archivos y JSON, transformaciones de datos,
+control de flujo, contextos, operaciones con PostgreSQL, privacidad y algunas operaciones de S3 y
+SQS mediante un emulador. Las pruebas con emulador no sustituyen una validación en AWS real.
+
+### En qué se está trabajando
+
+- Ampliar las pruebas de componentes, empezando por las familias de uso común.
+- Investigar dependencias que hoy impiden probar algunos componentes, como la lectura de XLSX.
+- Probar más conectores de bases de datos y servicios cloud en entornos adecuados.
+- Validar una migración de SAS a Talend comparando los resultados.
+
+Los resultados, componentes probados y pendientes se mantienen en la
+[cobertura por familia](docs/COBERTURA-POR-FAMILIA.md) y el [plan de pruebas](docs/PLAN-DE-PRUEBAS.md).
+La [hoja de ruta](docs/ROADMAP-DOMINIO-TALEND.md) describe el objetivo general.
+
+## Empezar
+
+### 1. Requisitos
+
+- [Bun](https://bun.sh/), para instalar y ejecutar el servidor.
+- Un proyecto de Talend Studio accesible desde el equipo.
+- Talend Studio abierto si quieres crear, modificar o ejecutar jobs desde el asistente.
+
+Puedes consultar archivos del proyecto sin abrir Talend Studio. Para trabajar con jobs en vivo,
+también necesitarás instalar el plugin de integración incluido en este repositorio.
+
+### 2. Instalar
 
 ```bash
 git clone https://github.com/AndresGaibor/talend-mcp.git
@@ -18,108 +69,38 @@ cd talend-mcp
 bun install
 ```
 
-Indica el proyecto Talend en `.env.local` para que el MCP lo encuentre directamente y no tenga
-que explorar todo el workspace cada vez que usa una herramienta:
+Indica dónde está tu proyecto creando un archivo `.env.local`:
 
 ```dotenv
 TALEND_PROJECT="C:/ruta/al/workspace/MI_PROYECTO"
 ```
 
-El proyecto es la carpeta que contiene `talend.project`. En WSL usa su ruta Linux, por ejemplo
-`/mnt/c/Users/usuario/Talend/workspace/MI_PROYECTO`.
+La ruta debe señalar la carpeta que contiene `talend.project`.
 
-### Conectar en esta máquina
+### 3. Iniciar
 
 ```bash
 bun run start:server
 ```
 
-El servidor queda en `http://127.0.0.1:3927/mcp`. Para clientes que usan el protocolo stdio,
-configura `bun run index.ts` como se muestra en [Clientes MCP](#uso-con-otros-clientes-mcp-stdio).
+El servidor estará disponible localmente en `http://127.0.0.1:3927/mcp`. Configura esa dirección
+en tu cliente MCP y comienza con `talend_guide`.
 
-El script `bun run start` hace lo mismo que `start:server` y además libera el puerto si
-estaba ocupado.
+### 4. Habilitar el trabajo en vivo con Talend Studio
 
-### Instalar el plugin opcional de Talend Studio
-
-El plugin habilita la integración del bridge con Studio (job abierto, selección, ejecuciones,
-markers). El instalador todo por CLI: detecta la instalación de Talend Studio y su JDK,
-compila el plugin con Maven + Tycho y **reemplaza** la versión anterior.
+Con Talend Studio instalado, ejecuta:
 
 ```bash
 bun run scripts/start.ts --install-bridge
 ```
 
-**No hace falta reiniciar Talend Studio.** Si Studio está corriendo, el instalador publica el
-bundle en `~/.talend-bridge/hot/bridge.jar` y el plugin lo detecta y se recarga solo (el
-servidor HTTP del bridge se reinicia con el código nuevo). Si Studio está cerrado, se instala
-con el p2 director como siempre.
+El plugin conecta el servidor con Studio. Si Studio está abierto, normalmente se actualiza sin
+reiniciarlo. El bridge funciona en modo de solo lectura por defecto; las acciones que modifican el
+proyecto requieren la autorización correspondiente en el entorno.
 
-Para verificar que quedó activo:
+## Conectar otro cliente MCP
 
-```bash
-curl http://127.0.0.1:3930/ping
-```
-
-El bridge escucha en `127.0.0.1:3930` y pide un token que vive en
-`~/.talend-bridge/token`. La configuración (`~/.talend-bridge/config.json`) deja el bridge en
-modo solo lectura por defecto.
-
-## Variables de entorno
-
-| Variable | Default | Descripcion |
-|---|---|---|
-| `TALEND_MCP_MODE` | `http` | `http` o `stdio` |
-| `TALEND_MCP_PORT` | `3927` | Puerto del servidor HTTP |
-| `TALEND_MCP_HOST` | `127.0.0.1` | Host del servidor HTTP |
-| `TALEND_MCP_LIVE` | `true` | Modo live (logs en stderr) |
-| `TALEND_MCP_FILTER` | `canonical` | Preset de tools expuestas (`canonical`, `core`, `all`) |
-| `TALEND_WORKSPACE` | - | Workspace de Talend Studio; el proyecto se autodetecta |
-| `TALEND_PROJECT` | - | Ruta directa al proyecto; preferible para inicio rápido |
-| `TALEND_DISABLE_AUTODETECT` | - | `1` desactiva la detección automática del proyecto |
-
-## Herramientas disponibles
-
-### Para agentes externos: empezar por `talend_guide`
-
-El servidor entrega instrucciones MCP al inicializar. La primera llamada recomendada es
-`talend_guide` en modo `overview`; devuelve las tareas, las familias disponibles y enlaces
-`nextActions` para continuar. No hace falta aprenderse los nombres de las ~230 tools.
-
-```json
-{ "mode": "task", "task": "crear-job" }
-```
-
-Modos de `talend_guide`: `overview` (mapa), `task` (flujo paso a paso), `search` (busqueda en
-lenguaje natural), `tool` (schema y condiciones de una tool), `rules` (reglas de Talend) y
-`environment` (proyecto y estado del bridge). Siempre empieza con `overview` si no sabes que
-pedir. Para clientes nuevos se recomienda `TALEND_MCP_FILTER=agent`: expone un subconjunto para
-el ciclo habitual de un job sin cargar de golpe las ~230 tools. Usa `all` para descubrir todo y
-`core` para una sesion restringida a herramientas esenciales. La guia sigue disponible con
-cualquier preset y advierte cuando una tarea necesita tools no expuestas.
-
-Consulta [docs/CATALOGO-DE-TOOLS.md](docs/CATALOGO-DE-TOOLS.md) para el inventario completo y
-[docs/GUIA-AGENTE.md](docs/GUIA-AGENTE.md) para los detalles operativos de Talend Studio.
-
-### Areas funcionales
-
-El MCP agrupa capacidades para descubrir e inspeccionar jobs, crear y editar jobs en Studio,
-contextos, componentes y schemas, ejecuciones e historiales, diagnostico de errores, validacion,
-secretos, datasets, conexiones, Git, snapshots, Data Quality, mastery de componentes y entregables.
-Usa `talend_guide` para elegir el flujo y [docs/CATALOGO-DE-TOOLS.md](docs/CATALOGO-DE-TOOLS.md)
-para consultar nombres y argumentos exactos. No uses listas copiadas de versiones anteriores: el
-catalogo se genera desde las tools registradas.
-
-Las tools que leen archivos del proyecto funcionan sin Studio. Las que operan sobre el job abierto,
-crean componentes o ejecutan codigo requieren Studio y el plugin bridge. Para modificar un job,
-sigue el flujo `crear-job` o `editar-job` de `talend_guide`; no edites su `.item` a mano.
-
-Tambien se puede llamar la API local del bridge directamente para diagnostico:
-`bun run scripts/bridge-call.ts /ping`.
-
----
-
-## Uso con otros clientes MCP (stdio)
+Si tu cliente usa el modo `stdio`, puedes configurarlo así:
 
 ```json
 {
@@ -128,7 +109,7 @@ Tambien se puede llamar la API local del bridge directamente para diagnostico:
       "command": "bun",
       "args": ["run", "index.ts"],
       "env": {
-        "TALEND_WORKSPACE": "<ruta-al-workspace-de-talend>",
+        "TALEND_PROJECT": "<ruta-a-tu-proyecto>",
         "TALEND_MCP_FILTER": "agent"
       }
     }
@@ -136,43 +117,40 @@ Tambien se puede llamar la API local del bridge directamente para diagnostico:
 }
 ```
 
-### CLI local
+El preset `agent` ofrece una selección práctica para empezar. Puedes consultar la lista completa
+en el [catálogo de herramientas](docs/CATALOGO-DE-TOOLS.md).
 
-```bash
-bun run jobs list
-bun run jobs read mi_job --folder-path carpeta_a
-bun run jobs create mi_job --folder-path carpeta_nueva
-bun run jobs duplicate mi_job mi_job_copia --source-folder-path carpeta_a --folder-path carpeta_b
-bun run jobs move mi_job carpeta_destino/subcarpeta
-bun run jobs create-folder carpeta_nueva/subcarpeta
-bun run contexts list
-```
+## Documentación
 
-Para comprobar el estado del servidor, abre `http://127.0.0.1:3927/healthz`.
+- [Guía para asistentes](docs/GUIA-AGENTE.md): tareas habituales y recomendaciones de uso.
+- [Cobertura por familia](docs/COBERTURA-POR-FAMILIA.md): componentes probados y pendientes.
+- [Plan de pruebas](docs/PLAN-DE-PRUEBAS.md): escenarios y resultados detallados.
+- [Arquitectura](docs/ARQUITECTURA.md): cómo está organizado el proyecto.
+- [Ayuda para contribuir](AGENTS.md): comandos y convenciones de desarrollo.
 
 ## Desarrollo
 
 ```bash
-bun install          # dependencias
-bun test             # suite completa (330+ tests)
-bun run typecheck    # TypeScript sin emitir
-bun run docs:tools   # regenera el catálogo navegable de tools
+bun run typecheck
+bun test
 ```
 
-La guia de trabajo para agentes de IA esta en [AGENTS.md](AGENTS.md). El mapa del repositorio
-y las convenciones de arquitectura estan en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md), y
-las recetas para agregar tools y cambios del plugin en
-[docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md). Las APIs internas de Talend Studio que usa
-el plugin Java estan en [docs/TALEND-STUDIO-INTERNALS.md](docs/TALEND-STUDIO-INTERNALS.md).
+## Configuración adicional
 
-## Solucion de problemas
+Por defecto, el servidor usa HTTP local. Si necesitas ajustar el modo, el puerto o las herramientas
+visibles, puedes configurar estas variables:
 
-- **No se ve la URL**: el modo por defecto es `http`; si ves `$ bun run index.ts` sin mas,
-  el servidor esta vivo pero en modo stdio. Verifica que `TALEND_MCP_MODE` sea `http`.
-- **No detecta el proyecto**: verifica que `TALEND_WORKSPACE` apunte a una ruta existente o
-  define `TALEND_PROJECT`.
-- **Job abierto no aparece**: asegurate de tener Talend Studio abierto con un editor activo.
-- **El puerto 3927 esta ocupado**: `bun run start` termina el proceso anterior antes de
-  arrancar.
-- **El bridge no responde en 3930**: el plugin debe estar instalado y Talend Studio abierto.
-  Ver `docs/PLAN-DE-TRABAJO.md` para la tabla de errores del plugin.
+| Variable | Uso |
+|---|---|
+| `TALEND_MCP_MODE` | `http` o `stdio`. |
+| `TALEND_MCP_PORT` | Puerto HTTP (por defecto `3927`). |
+| `TALEND_MCP_HOST` | Dirección de escucha (por defecto `127.0.0.1`). |
+| `TALEND_WORKSPACE` | Ubicación del workspace, si no defines `TALEND_PROJECT`. |
+| `TALEND_MCP_FILTER` | Herramientas visibles: `agent`, `core` o `all`. |
+
+## Solución rápida de problemas
+
+- **El asistente no encuentra el proyecto:** revisa la ruta de `TALEND_PROJECT`.
+- **No aparecen jobs abiertos:** abre el job en Talend Studio.
+- **No conecta con Studio:** confirma que el plugin esté instalado y Studio abierto.
+- **Necesitas saber si un componente está probado:** consulta la [cobertura por familia](docs/COBERTURA-POR-FAMILIA.md).
