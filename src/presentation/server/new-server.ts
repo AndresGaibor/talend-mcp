@@ -106,7 +106,7 @@ function toCallToolResult(result: unknown): Record<string, unknown> {
     return result as Record<string, unknown>;
   }
 
-  const text = typeof result === "string" ? result : JSON.stringify(result, null, 2);
+  const text = typeof result === "string" ? result : JSON.stringify(result);
   const payload: Record<string, unknown> = { content: [{ type: "text", text }] };
 
   if (result && typeof result === "object" && typeof (result as { ok?: unknown }).ok === "boolean") {

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readTalendStudioBridgeConfig, readTalendStudioBridgeToken } from "../../src/modules/studio-bridge/adapters/bridge-config";
+import { clearBridgeClientCache, createBridgeClient } from "../../src/modules/studio-bridge/adapters/http-studio-bridge.client";
 
 const originalEnv = {
   config: process.env.TALEND_BRIDGE_CONFIG,
@@ -19,6 +20,7 @@ function temporaryDirectory(): string {
 }
 
 afterEach(() => {
+  clearBridgeClientCache();
   for (const directory of tempDirs.splice(0)) rmSync(directory, { recursive: true, force: true });
   for (const [name, value] of [
     ["TALEND_BRIDGE_CONFIG", originalEnv.config],
@@ -54,5 +56,32 @@ describe("configuracion del cliente del bridge", () => {
     process.env.TALEND_BRIDGE_TOKEN = file;
 
     await expect(readTalendStudioBridgeToken()).resolves.toBe("test-token");
+  });
+
+  test("reutiliza el cliente predeterminado y comparte su creacion concurrente", async () => {
+    const file = join(temporaryDirectory(), "bridge.json");
+    writeFileSync(file, JSON.stringify({ port: 3947 }), "utf8");
+    process.env.TALEND_BRIDGE_CONFIG = file;
+
+    const [first, concurrent] = await Promise.all([createBridgeClient(), createBridgeClient()]);
+    const subsequent = await createBridgeClient();
+
+    expect(first).toBe(concurrent);
+    expect(first).toBe(subsequent);
+    expect(first.getConfig().port).toBe(3947);
+  });
+
+  test("permite invalidar el cliente para recoger cambios de configuracion", async () => {
+    const file = join(temporaryDirectory(), "bridge.json");
+    writeFileSync(file, JSON.stringify({ port: 3948 }), "utf8");
+    process.env.TALEND_BRIDGE_CONFIG = file;
+
+    const first = await createBridgeClient();
+    writeFileSync(file, JSON.stringify({ port: 3949 }), "utf8");
+    clearBridgeClientCache();
+    const refreshed = await createBridgeClient();
+
+    expect(refreshed).not.toBe(first);
+    expect(refreshed.getConfig().port).toBe(3949);
   });
 });

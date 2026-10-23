@@ -91,12 +91,43 @@ export async function getBridgeToken(): Promise<string | undefined> {
   return await readTalendStudioBridgeToken();
 }
 
+const DEFAULT_CLIENT_CACHE_MS = 5_000;
+let cachedDefaultClient: { client: TalendStudioBridgeClient; expiresAt: number } | undefined;
+let defaultClientInFlight: Promise<TalendStudioBridgeClient> | undefined;
+
 export async function createBridgeClient(options?: { config?: Partial<BridgeConfig>; token?: string }): Promise<TalendStudioBridgeClient> {
-  const config = {
-    ...(await readTalendStudioBridgeConfig()),
-    ...(options?.config ?? {}),
+  const useDefaultCache = !options || (options.config === undefined && options.token === undefined);
+  if (useDefaultCache) {
+    if (cachedDefaultClient && cachedDefaultClient.expiresAt > Date.now()) return cachedDefaultClient.client;
+    if (defaultClientInFlight) return defaultClientInFlight;
+  }
+
+  const create = async (): Promise<TalendStudioBridgeClient> => {
+    const [fileConfig, fileToken] = await Promise.all([
+      readTalendStudioBridgeConfig(),
+      options?.token === undefined ? readTalendStudioBridgeToken() : Promise.resolve(options.token),
+    ]);
+    const config = { ...fileConfig, ...(options?.config ?? {}) };
+    return new TalendStudioBridgeClient(config, options?.token ?? fileToken);
   };
-  return new TalendStudioBridgeClient(config, options?.token ?? (await readTalendStudioBridgeToken()));
+
+  if (!useDefaultCache) return create();
+
+  const pending = create();
+  defaultClientInFlight = pending;
+  try {
+    const client = await pending;
+    cachedDefaultClient = { client, expiresAt: Date.now() + DEFAULT_CLIENT_CACHE_MS };
+    return client;
+  } finally {
+    if (defaultClientInFlight === pending) defaultClientInFlight = undefined;
+  }
+}
+
+/** Invalida el cliente compartido; util para cambios de configuracion en proceso y tests. */
+export function clearBridgeClientCache(): void {
+  cachedDefaultClient = undefined;
+  defaultClientInFlight = undefined;
 }
 
 export class TalendStudioBridgeClient {
@@ -113,11 +144,7 @@ export class TalendStudioBridgeClient {
   }
 
   static async create(options?: { config?: Partial<BridgeConfig>; token?: string }): Promise<TalendStudioBridgeClient> {
-    const config = {
-      ...(await readTalendStudioBridgeConfig()),
-      ...(options?.config ?? {}),
-    };
-    return new TalendStudioBridgeClient(config, options?.token ?? (await readTalendStudioBridgeToken()));
+    return createBridgeClient(options);
   }
 
   getConfig(): BridgeConfig {

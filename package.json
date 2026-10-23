@@ -18,6 +18,7 @@
     "jobs": "bun run scripts/jobs.ts",
     "contexts": "bun run scripts/contexts.ts",
     "docs:tools": "bun run scripts/generate-tool-catalog.ts",
+    "benchmark:performance": "bun run scripts/performance-benchmark.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

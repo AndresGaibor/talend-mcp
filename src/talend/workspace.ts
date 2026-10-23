@@ -157,6 +157,11 @@ function collectProjectCandidates(rutaDirectorio: string, candidatos: string[]):
 export function discoverProjectPathFromWorkspace(workspacePath: string): string | undefined {
   const ctx = createPlatformContext();
   const mcpWorkspacePath = toMcpPath(workspacePath, ctx);
+  const cacheKey = resolve(mcpWorkspacePath);
+  const now = Date.now();
+  const cached = workspaceProjectCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.projectPath;
+
   const metadataPath = join(mcpWorkspacePath, ".metadata");
   const launchesDir = join(metadataPath, ".plugins", "org.eclipse.debug.core", ".launches");
   const projectNames = new Set<string>();
@@ -180,16 +185,27 @@ export function discoverProjectPathFromWorkspace(workspacePath: string): string 
   const projectCandidates: string[] = [];
   collectProjectCandidates(mcpWorkspacePath, projectCandidates);
 
-  if (projectCandidates.length === 0) return undefined;
+  if (projectCandidates.length === 0) {
+    workspaceProjectCache.set(cacheKey, { projectPath: undefined, expiresAt: now + WORKSPACE_DISCOVERY_CACHE_MS });
+    return undefined;
+  }
 
   const uniqueCandidates = [...new Set(projectCandidates)].sort();
   if (projectNames.size > 0) {
     const matched = uniqueCandidates.find((projectPath) => projectNames.has(basename(projectPath)));
-    if (matched) return matched;
+    if (matched) {
+      workspaceProjectCache.set(cacheKey, { projectPath: matched, expiresAt: now + WORKSPACE_DISCOVERY_CACHE_MS });
+      return matched;
+    }
   }
 
-  return uniqueCandidates[0];
+  const projectPath = uniqueCandidates[0];
+  workspaceProjectCache.set(cacheKey, { projectPath, expiresAt: now + WORKSPACE_DISCOVERY_CACHE_MS });
+  return projectPath;
 }
+
+const WORKSPACE_DISCOVERY_CACHE_MS = 5_000;
+const workspaceProjectCache = new Map<string, { projectPath: string | undefined; expiresAt: number }>();
 
 export function getConfiguredProjectPath(
   env: Record<string, string | undefined> = process.env,
@@ -240,6 +256,8 @@ function eclipseLocationToPath(location: string): string | undefined {
 }
 
 let cachedBridgeProjectPath: string | undefined;
+let bridgeProjectMissExpiresAt = 0;
+let bridgeProjectDetectionInFlight: Promise<string | undefined> | undefined;
 
 /**
  * Detecta el proyecto Talend abierto en Studio usando el bridge.
@@ -249,30 +267,44 @@ let cachedBridgeProjectPath: string | undefined;
  */
 export async function detectProjectFromBridge(): Promise<string | undefined> {
   if (cachedBridgeProjectPath) return cachedBridgeProjectPath;
+  if (bridgeProjectMissExpiresAt > Date.now()) return undefined;
+  if (bridgeProjectDetectionInFlight) return bridgeProjectDetectionInFlight;
 
-  try {
-    const { createBridgeClient } = await import("../modules/studio-bridge/adapters/http-studio-bridge.client");
-    const bridge = await createBridgeClient();
-    const result = await bridge.workspaceState();
+  const detection = async (): Promise<string | undefined> => {
+    try {
+      const { createBridgeClient } = await import("../modules/studio-bridge/adapters/http-studio-bridge.client");
+      const bridge = await createBridgeClient();
+      const result = await bridge.workspaceState();
 
-    if (!result.ok || !result.data) return undefined;
+      if (!result.ok || !result.data) return undefined;
 
-    const projects = (result.data as { projects?: Array<{ name?: string; open?: boolean; location?: string }> }).projects ?? [];
+      const projects = (result.data as { projects?: Array<{ name?: string; open?: boolean; location?: string }> }).projects ?? [];
 
-    for (const project of projects) {
-      if (project.open === false) continue;
-      const path = project.location ? eclipseLocationToPath(project.location) : undefined;
-      if (!path) continue;
-      if (!existsSync(join(path, "talend.project"))) continue;
+      for (const project of projects) {
+        if (project.open === false) continue;
+        const path = project.location ? eclipseLocationToPath(project.location) : undefined;
+        if (!path) continue;
+        if (!existsSync(join(path, "talend.project"))) continue;
 
-      cachedBridgeProjectPath = path;
-      return path;
+        cachedBridgeProjectPath = path;
+        bridgeProjectMissExpiresAt = 0;
+        return path;
+      }
+    } catch {
+      // El bridge puede no estar instalado o Studio no estar abierto.
     }
-  } catch {
-    // El bridge puede no estar instalado o Studio no estar abierto.
-  }
+    // Evita repetir una consulta que puede esperar hasta el timeout del bridge.
+    bridgeProjectMissExpiresAt = Date.now() + 3_000;
+    return undefined;
+  };
 
-  return undefined;
+  const pending = detection();
+  bridgeProjectDetectionInFlight = pending;
+  try {
+    return await pending;
+  } finally {
+    if (bridgeProjectDetectionInFlight === pending) bridgeProjectDetectionInFlight = undefined;
+  }
 }
 
 /**

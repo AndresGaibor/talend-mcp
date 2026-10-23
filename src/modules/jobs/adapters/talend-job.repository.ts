@@ -33,9 +33,10 @@ export class TalendJobRepository implements IJobRepository {
     const recursos = await listTalendJobs(projectPath);
 
     let jobs: Job[] = [];
-    for (const recurso of recursos) {
-      const job = await toJob(projectPath, recurso);
-      if (job) jobs.push(job);
+    const batchSize = 16;
+    for (let i = 0; i < recursos.length; i += batchSize) {
+      const batch = await Promise.all(recursos.slice(i, i + batchSize).map((recurso) => toJob(projectPath, recurso)));
+      jobs.push(...batch.filter((job): job is Job => job !== null));
     }
 
     // El filtro por ruta: la carpeta dentro de `process`.
@@ -55,19 +56,21 @@ export class TalendJobRepository implements IJobRepository {
 
   /** Un job por su id (la ruta de su `.item`). */
   async findById(id: string): Promise<Job | null> {
-    const jobs = await this.list();
-    return jobs.find((job) => job.id === id) ?? null;
+    const projectPath = resolveProjectPath();
+    const recursos = await listTalendJobs(projectPath);
+    const wanted = normalize(id);
+    const recurso = recursos.find((item) => normalize(item.itemPath) === wanted);
+    return recurso ? toJob(projectPath, recurso) : null;
   }
 
   /** Un job por la ruta de su `.item` o de su `.properties`. */
   async findByPath(path: string): Promise<Job | null> {
+    const projectPath = resolveProjectPath();
     const wanted = normalize(path);
-    const jobs = await this.list();
-    return (
-      jobs.find((job) => normalize(job.path) === wanted) ??
-      jobs.find((job) => normalize(job.path.replace(/\.item$/, ".properties")) === wanted) ??
-      null
-    );
+    const recursos = await listTalendJobs(projectPath);
+    const recurso = recursos.find((item) => normalize(item.itemPath) === wanted)
+      ?? recursos.find((item) => normalize(item.propertiesPath) === wanted);
+    return recurso ? toJob(projectPath, recurso) : null;
   }
 
   /** Si existe el job. */
@@ -148,16 +151,15 @@ export class TalendJobRepository implements IJobRepository {
    * @param folder carpeta dentro de `process` (opcional).
    */
   async findByName(name: string, folder?: string): Promise<Job | null> {
-    const jobs = await this.list();
-    const candidates = jobs.filter((job) => job.name === name);
+    const projectPath = resolveProjectPath();
+    const recursos = await listTalendJobs(projectPath);
+    const candidates = recursos.filter((recurso) => recurso.label === name);
     if (candidates.length === 0) return null;
-    if (!folder) return candidates[0] ?? null;
+    if (!folder) return toJob(projectPath, candidates[0]!);
     const wanted = normalize(folder);
-    return (
-      candidates.find((job) => normalize(job.path).includes(`/process/${wanted}/`)) ??
-      candidates.find((job) => normalize(job.path).includes(wanted)) ??
-      null
-    );
+    const matching = candidates.find((recurso) => normalize(recurso.itemPath).includes(`/process/${wanted}/`))
+      ?? candidates.find((recurso) => normalize(recurso.itemPath).includes(wanted));
+    return matching ? toJob(projectPath, matching) : null;
   }
 }
 

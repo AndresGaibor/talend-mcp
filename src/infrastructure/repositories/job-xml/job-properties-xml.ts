@@ -40,10 +40,16 @@ export async function listTalendJobs(projectPath: string): Promise<TalendJobReso
   const propertiesFiles = await listFilesRecursive(processPath, (ruta) => ruta.endsWith(".properties"));
   const jobs: TalendJobResource[] = [];
 
-  for (const propertiesPath of propertiesFiles) {
-    const xml = await readTextFile(propertiesPath, projectPath);
-    const job = parseJobProperties(xml, propertiesPath);
-    if (job.label && job.itemPath.endsWith(".item")) jobs.push(job);
+  // Lecturas limitadas por lote: evita el coste de una lectura en serie sin
+  // abrir cientos o miles de archivos simultaneamente en proyectos grandes.
+  const batchSize = 32;
+  for (let i = 0; i < propertiesFiles.length; i += batchSize) {
+    const batch = await Promise.all(propertiesFiles.slice(i, i + batchSize).map(async (propertiesPath) => {
+      const xml = await readTextFile(propertiesPath, projectPath);
+      const job = parseJobProperties(xml, propertiesPath);
+      return job.label && job.itemPath.endsWith(".item") ? job : null;
+    }));
+    jobs.push(...batch.filter((job): job is TalendJobResource => job !== null));
   }
 
   return jobs;

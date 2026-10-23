@@ -39,17 +39,23 @@ export async function listFilesRecursive(
   filtro: (ruta: string) => boolean,
 ): Promise<string[]> {
   const resultados: string[] = [];
-  const entradas = await readdir(rutaDirectorio, { withFileTypes: true });
+  const pendientes = [rutaDirectorio];
+  const concurrency = 32;
 
-  for (const entrada of entradas) {
-    const rutaEntrada = join(rutaDirectorio, entrada.name);
-    if (entrada.isDirectory()) {
-      resultados.push(...await listFilesRecursive(rutaEntrada, filtro));
-      continue;
-    }
+  while (pendientes.length > 0) {
+    const directorios = pendientes.splice(0, concurrency);
+    const grupos = await Promise.all(directorios.map((directorio) => readdir(directorio, { withFileTypes: true })));
 
-    if (entrada.isFile() && filtro(rutaEntrada)) {
-      resultados.push(rutaEntrada);
+    for (let i = 0; i < grupos.length; i++) {
+      const directorio = directorios[i]!;
+      for (const entrada of grupos[i]!) {
+        const rutaEntrada = join(directorio, entrada.name);
+        if (entrada.isDirectory()) {
+          pendientes.push(rutaEntrada);
+        } else if (entrada.isFile() && filtro(rutaEntrada)) {
+          resultados.push(rutaEntrada);
+        }
+      }
     }
   }
 

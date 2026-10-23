@@ -30,7 +30,7 @@ export type ToolEnvelope = {
 export function bridgeOk(payload: ToolEnvelope): CallToolResult {
   const structuredContent = payload as Record<string, unknown>;
   return {
-    content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+    content: [{ type: "text", text: JSON.stringify(structuredContent) }],
     structuredContent,
   };
 }
@@ -39,7 +39,7 @@ export function bridgeFail(payload: ToolEnvelope): CallToolResult {
   const structuredContent = payload as Record<string, unknown>;
   return {
     isError: true,
-    content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+    content: [{ type: "text", text: JSON.stringify(structuredContent) }],
     structuredContent,
   };
 }
@@ -115,12 +115,17 @@ export async function readOpenJobFallback(): Promise<{ job?: Record<string, unkn
   const xmiFiles = await listFilesRecursive(workbenchDir, (ruta) => ruta.endsWith(".xmi"));
 
   const openJobs: Array<{ jobName: string; version: string; label: string; workbenchPath: string; selected: boolean }> = [];
-  for (const xmiPath of xmiFiles) {
-    try {
-      const content = await readTextFile(xmiPath, projectPath);
-      const jobs = parseOpenJobsFromWorkbench(content, xmiPath);
-      openJobs.push(...jobs);
-    } catch { /* skip */ }
+  const batchSize = 16;
+  for (let i = 0; i < xmiFiles.length; i += batchSize) {
+    const batch = await Promise.all(xmiFiles.slice(i, i + batchSize).map(async (xmiPath) => {
+      try {
+        const content = await readTextFile(xmiPath, projectPath);
+        return parseOpenJobsFromWorkbench(content, xmiPath);
+      } catch {
+        return [];
+      }
+    }));
+    openJobs.push(...batch.flat());
   }
 
   const selected = openJobs.find((j) => j.selected);
