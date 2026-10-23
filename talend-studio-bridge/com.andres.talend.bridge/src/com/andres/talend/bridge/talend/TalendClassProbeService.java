@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.FrameworkUtil;
 
 public final class TalendClassProbeService {
   private static final List<String> PROBES = new ArrayList<String>();
@@ -34,9 +35,12 @@ public final class TalendClassProbeService {
       item.put("loadedFromBundle", null);
       for (Bundle bundle : context.getBundles()) {
         try {
-          bundle.loadClass(className);
+          Class<?> loadedClass = bundle.loadClass(className);
           item.put("available", true);
-          item.put("loadedFromBundle", bundle.getSymbolicName());
+          // Bundle.loadClass puede delegar en otro bundle. El bundle del
+          // class object es el origen real, no el bundle que hizo la consulta.
+          Bundle sourceBundle = FrameworkUtil.getBundle(loadedClass);
+          item.put("loadedFromBundle", sourceBundle == null ? null : sourceBundle.getSymbolicName());
           break;
         } catch (Throwable ignored) {
         }

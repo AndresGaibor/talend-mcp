@@ -3705,6 +3705,102 @@
       }
     },
     {
+      "nombre": "archivos: leer un registro completo como texto",
+      "job": "MCP_L5_FileInputRaw",
+      "nodos": [
+        {
+          "type": "tFileInputRaw",
+          "nombre": "leeRegistro",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_raw_record.txt" },
+            "AS_STRING": { "value": "true" },
+            "AS_BYTEARRAY": { "value": "false" },
+            "AS_INPUTSTREAM": { "value": "false" },
+            "ENCODING": { "value": "UTF-8" },
+            "DIE_ON_ERROR": { "value": "true" }
+          },
+          "columnas": [{ "name": "contenido", "type": "id_String" }]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "leeRegistro", "destino": "salida" }],
+      "espera": { "contiene": ["cuenta=CTA-001;saldo=150.25;estado=ACTIVA"] }
+    },
+    {
+      "nombre": "archivos: extraer campos de registros con expresion regular",
+      "job": "MCP_L5_FileInputRegex",
+      "nodos": [
+        {
+          "type": "tFileInputRegex",
+          "nombre": "leeMovimientos",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_regex_records.txt" },
+            "REGEX": { "value": "\"^([^;]+);([^;]+);([^;]+);([^;]+)$\"" },
+            "HEADER": { "value": "0" },
+            "FOOTER": { "value": "0" },
+            "IGNORE_ERROR_MESSAGE": { "value": "false" },
+            "REMOVE_EMPTY_ROW": { "value": "true" },
+            "FAIL_ON_UNMATCHED_REGEX": { "value": "true" },
+            "ENCODING": { "value": "UTF-8" },
+            "DIE_ON_ERROR": { "value": "true" }
+          },
+          "columnas": [
+            { "name": "cuenta", "type": "id_String" },
+            { "name": "fecha", "type": "id_String" },
+            { "name": "saldo", "type": "id_String" },
+            { "name": "estado", "type": "id_String" }
+          ]
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "leeMovimientos", "destino": "salida" }],
+      "espera": {
+        "lineas": [
+          "CTA-001|2026-01-10|150.25|ACTIVA",
+          "CTA-002|2026-01-11|0.00|BLOQUEADA"
+        ]
+      }
+    },
+    {
+      "nombre": "archivos: leer movimientos bancarios desde XML",
+      "job": "MCP_L5_FileInputXML",
+      "nodos": [
+        {
+          "type": "tFileInputXML",
+          "nombre": "leeMovimientosXML",
+          "parameters": {
+            "FILENAME": { "value": "@TESTDATA@/l5_movimientos.xml" },
+            "LOOP_QUERY": { "value": "\"/movimientos/movimiento\"" },
+            "DIE_ON_ERROR": { "value": "true" },
+            "ENCODING": { "value": "UTF-8" }
+          },
+          "columnas": [
+            { "name": "cuenta", "type": "id_String" },
+            { "name": "fecha", "type": "id_String" },
+            { "name": "saldo", "type": "id_String" }
+          ],
+          "tablas": {
+            "MAPPING": {
+              "columns": ["SCHEMA_COLUMN", "QUERY", "NODECHECK"],
+              "rows": [
+                { "SCHEMA_COLUMN": "cuenta", "QUERY": "cuenta", "NODECHECK": "false" },
+                { "SCHEMA_COLUMN": "fecha", "QUERY": "fecha", "NODECHECK": "false" },
+                { "SCHEMA_COLUMN": "saldo", "QUERY": "saldo", "NODECHECK": "false" }
+              ]
+            }
+          }
+        },
+        { "type": "tLogRow", "nombre": "salida" }
+      ],
+      "conexiones": [{ "origen": "leeMovimientosXML", "destino": "salida" }],
+      "espera": {
+        "lineas": [
+          "CTA-001|2026-01-10|150.25",
+          "CTA-002|2026-01-11|0.00"
+        ]
+      }
+    },
+    {
       "nombre": "aws: crear bucket de prueba en S3 local",
       "job": "MCP_L5_S3BucketCreate",
       "nodos": [

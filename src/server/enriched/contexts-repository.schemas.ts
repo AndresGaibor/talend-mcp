@@ -21,6 +21,15 @@ export const contextsRepositorySchemas: Record<string, z.ZodTypeAny> = {
   talend_list_repository_contexts: z.object({
     contexts: z.array(RepositoryContextSchema),
   }),
+  talend_list_repository_connections: z.object({
+    count: z.number(),
+    connections: z.array(z.object({
+      name: z.string().nullable(),
+      version: z.string().nullable(),
+      itemType: z.string(),
+      connectionType: z.string().nullable(),
+    })),
+  }),
   talend_read_repository_context: z.object({
     context: RepositoryContextSchema,
   }),

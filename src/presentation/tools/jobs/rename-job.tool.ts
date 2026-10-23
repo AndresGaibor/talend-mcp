@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { renameTalendJob } from "../../../talend/job-crud";
+import { resolveProjectPath } from "../../../talend/workspace";
 import { ok, fail } from "../common/response";
 
 const RenameJobSchema = z.object({
@@ -15,8 +16,8 @@ export function createRenameJobTool() {
     inputSchema: RenameJobSchema,
     handler: async (input: z.infer<typeof RenameJobSchema>) => {
       try {
-        const projectPath = process.env.TALEND_PROJECT;
-        if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT.");
+        const projectPath = await resolveProjectPath();
+        if (!projectPath) return fail("NO_PROJECT", "No se detectó el proyecto de Talend: abre un proyecto en Studio o define TALEND_PROJECT.");
         const result = await renameTalendJob(projectPath, {
           oldJobName: input.oldJobName,
           newJobName: input.newJobName,

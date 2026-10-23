@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<movimientos>
+  <movimiento>
+    <cuenta>CTA-001</cuenta>
+    <fecha>2026-01-10</fecha>
+    <saldo>150.25</saldo>
+  </movimiento>
+  <movimiento>
+    <cuenta>CTA-002</cuenta>
+    <fecha>2026-01-11</fecha>
+    <saldo>0.00</saldo>
+  </movimiento>
+</movimientos>

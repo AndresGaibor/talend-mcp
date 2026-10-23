@@ -127,6 +127,18 @@ describe("schemas de salida enriquecidos por dominio", () => {
       ok: true,
       data: { contexts: [{ name: "Default", parameters: [] }] },
     }).success).toBe(true);
+    expect(getEnrichedOutputSchema("talend_list_repository_connections").safeParse({
+      ok: true,
+      data: {
+        count: 1,
+        connections: [{
+          name: "Shared connection",
+          version: "0.1",
+          itemType: "DatabaseConnectionItemImpl",
+          connectionType: "PostgreSQL",
+        }],
+      },
+    }).success).toBe(true);
     expect(getEnrichedOutputSchema("talend_repo_status").safeParse({
       ok: true,
       data: { branch: "main", commit: "abc", remote: "origin", project: null },

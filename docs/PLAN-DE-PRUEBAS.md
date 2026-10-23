@@ -40,7 +40,7 @@ jobs, asi que Docker solo hace falta si no se quiere tocar ese.
 | 2 | `tMap` (renombrar, expresiones, filtros, rechazo, lookups, nulos, fechas, Var) | **Validada en L5**: el modelo del mapper (entradas, salidas con expresiones, filtro) se monta con el `mapper` del bridge, el job compila y ejecuta. El `talend-tmap-dataset` del Exchange solo hace falta para el editor visual, no para generar codigo ni para ejecutar |
 | 3 | `tSortRow`, `tUniqRow`, `tAggregateRow`, `tJoin`, `tUnite`, `tReplicate`, `tNormalize`, `tDenormalize`, `tFilterRow`, `tFilterColumns` | **Parcial**: el `.item` sale bien, sus tablas se rellenan con el plan (columnas y valores por defecto del XML) y **compilan**. **Se ejecutan bien** el `tUniqRow`, el `tSortRow`, el `tFilterRow` (con su condicion), el `tUnite`, el `tAggregateRow` (con sus tablas `GROUPBYS` y `OPERATIONS`; ver INTERNALS 41), el `tNormalize` (entrada y salida declaran columnas con el mismo nombre), `tJoin` (flujo principal unido a lookup por clave; ver INTERNALS 46), `tReplicate` (dos salidas reciben las filas) y `tDenormalize` (concatena `producto` dentro de cada grupo). `tFilterColumns` ya tiene escenario L5. |
 | 4 | `tConvertType`, `tJavaRow`, `tJava`, `tJavaFlex` | Validada con `tJavaRow` (acumulado tipo `RETAIN`), con `tJavaRow` cuya salida la define el parametro `SCHEMA`, con `tJava` y con `tJavaFlex` (transforma filas; escenarios L5). |
-| 5 | Excel, posicional, JSON, Parquet | **Parcial en L5**: `tFileOutputExcel` y `tFileInputExcel` completan ida y vuelta `.xls` 97-2003; la lectura XLSX queda pendiente porque a este Studio le faltan modulos de Apache POI. La lectura de JSON (`tFileInputJSON`) y la escritura (`tFileOutputJSON`) funcionan; `tFileOutputPositional` escribe una fila con ancho fijo y padding exacto; `tFileInputPositional` lee cinco registros con el patrón `8,30,10,12,10`. Ver COBERTURA-POR-FAMILIA. |
+| 5 | Excel, posicional, JSON, XML, regex, Parquet | **Parcial en L5**: `tFileOutputExcel` y `tFileInputExcel` completan ida y vuelta `.xls` 97-2003; la lectura XLSX queda pendiente porque a este Studio le faltan modulos de Apache POI. La lectura/escritura JSON funcionan; posicional lee y escribe con formato exacto. Añadidos y validados: `tFileInputRaw` como texto completo, `tFileInputRegex` con cuatro grupos y `tFileInputXML` con XPath y dos movimientos. Ver COBERTURA-POR-FAMILIA. |
 | 6 | `tPrejob`/`tPostjob`, `tRunJob` padre-hijo, contextos, `tFileList`, triggers, `tDie`/`tWarn`, `tFlowToIterate`, `tSetGlobalVar`, `tSetEnv`, `tSystem`, `tLogCatcher` | Validada: el padre llama al hijo y la salida del hijo sale en la del padre (escenario del arnes), el `tFileList` lista la carpeta (no emite filas: deja los valores en el `globalMap`; ver INTERNALS 47), el `tDie` corta el job con codigo 1, un trigger de error (`SUBJOB_ERROR` desde el arranque del subjob) ejecuta su manejador, `tPrejob`/`tPostjob` corren antes y despues del subjob principal, `tWarn` avisa sin cortar el job, `tLogCatcher` captura su mensaje, `tFlowToIterate` convierte dos filas en dos iteraciones, `tSetGlobalVar` permite leer una variable global, `tSetEnv` establecer/leer una propiedad del job y `tSystem` ejecutar un comando local y emitir su salida normal. `tContextLoad` recibe filas `key/value`, carga `L5_VALOR` y confirma la operacion con `PRINT_OPERATIONS`. Un trigger se genera solo si sale del **arranque** del subjob (INTERNALS 53). El `PRIORITY` del `tWarn` va con su `VALUE` (`4`), no con el nombre `WARNING` (INTERNALS 57) |
 | 10 | Privacidad (`tDataMasking`, `tDataEncrypt`, `tDataDecrypt`, `tDuplicateRow`, `tDataShuffling`) | **Validada en L5**: `SET_TO_NULL` sobre `cuenta` produce cadena vacia y `ORIGINAL_MARK=false`; el ciclo de cifrado/descifrado AES recupera el valor original; `tDuplicateRow` emite copias marcadas y conserva las originales; `tDataShuffling` procesa cuatro valores con semilla fija y conserva sus filas. Los enums de `MODIF_TABLE` y los nombres de columnas de shuffling se configuran sin comillas Java; ver INTERNALS 46. |
 | 11 | Data Quality/Standardization (`tStandardizePhoneNumber`, `tSynonymOutput`, `tSynonymSearch`, `tFirstnameMatch`) | **Parcial en L5**: `tStandardizePhoneNumber` normaliza a E.164; `tSynonymOutput` crea un índice Lucene local y `tSynonymSearch` recupera un sinónimo de ese índice; `tFirstnameMatch` sigue pendiente porque falta el módulo local `org.talend.dataquality.data.index-8.0.1-Talend_v20260630-1613.jar`. La búsqueda depende del índice que genera el escenario de salida. |
@@ -97,6 +97,24 @@ conectores en el modelo y exigen tener una conexion de salida.
 |---|---|
 | Se crean, guardan, listan y borran | **134 de 134** |
 | Compilan (L4) | **99 de 134 (74 %)** |
+
+**Reevaluacion prioritaria L4** (`testdata/cobertura-l4-banca-prioritarios.csv`): 114 componentes de
+`File`, `Processing`, `Data_Quality`, `Data_Privacy`, `Technical`, `Orchestration`, `Custom_Code`,
+`Misc` y `Logs_Errors`, excluyendo dependencias Maven requeridas. Compilaron 85; 27 dieron error de
+compilacion y 2 no llegaron a compilar porque Studio rechazo la conexion generica del arnes. Esta
+tanda se solapa con informes anteriores y por eso no se suma al total unico del catalogo. L4 solo
+confirma generacion y compilacion, no ejecucion correcta.
+
+**Continuacion L4 sin repetir componentes con resultado previo:** se midieron 81 componentes de
+MongoDB, Cassandra, Kafka, HBase, FTP, JMS, HDFS, MapR/Sqoop y utilidades locales. **54 compilaron,
+25 fallaron al compilar y 2 no alcanzaron esa fase** (un timeout de Studio y `tSystem`, rechazado por
+la conexion generica del arnes). Los informes son `testdata/cobertura-l4-nosql-messaging-tanda1.csv`,
+`testdata/cobertura-l4-nosql-messaging-tanda2.csv`, `testdata/cobertura-l4-local-utils-tanda1.csv`,
+`testdata/cobertura-l4-hdfs-prueba.csv`, `testdata/cobertura-l4-hdfs-tanda1.csv`,
+`testdata/cobertura-l4-mapr-sqoop-tanda1.csv`, `testdata/cobertura-l4-ftp-tanda1.csv` y
+`testdata/cobertura-l4-config-connectors-tanda1.csv`. El consolidado unico queda en **470 compilados,
+101 con fallo y 342 sin resultado L4** de 913. `tAzureSynapseInput` solo se compilo; no se configuro
+ni ejecuto contra Azure. L4 no valida ejecucion funcional.
 
 **Medicion de los componentes que no piden artefacto**, con `--sin-artefacto`:
 

@@ -41,6 +41,13 @@ testdata/*.xlsx
 testdata/*.txt
 testdata/resultados.csv
 
+# Indice Lucene generado por tSynonymOutput al ejecutar los escenarios L5.
+testdata/l5_synonym_index/
+
+# Workspace local de Qlik Talend Studio (Eclipse): .metadata, .JETEmitters y
+# proyectos con rutas absolutas de la maquina. No se versiona.
+workspace/
+
 # Indice local de CodeGraph
 .codegraph/
 

@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { moveTalendJobToFolder } from "../../../talend/job-crud";
+import { resolveProjectPath } from "../../../talend/workspace";
 import { ok, fail } from "../common/response";
 
 const MoveJobSchema = z.object({
@@ -14,8 +15,8 @@ export function createMoveJobTool() {
     inputSchema: MoveJobSchema,
     handler: async (input: z.infer<typeof MoveJobSchema>) => {
       try {
-        const projectPath = process.env.TALEND_PROJECT;
-        if (!projectPath) return fail("NO_PROJECT", "No se detectó TALEND_PROJECT.");
+        const projectPath = await resolveProjectPath();
+        if (!projectPath) return fail("NO_PROJECT", "No se detectó el proyecto de Talend: abre un proyecto en Studio o define TALEND_PROJECT.");
         const result = await moveTalendJobToFolder(projectPath, {
           jobName: input.jobName,
           folderPath: input.folderPath,

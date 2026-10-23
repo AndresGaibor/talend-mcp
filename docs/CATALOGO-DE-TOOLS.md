@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **229**.
+Tools registradas en el preset actual: **231**.
 
 ## Empezar
 
@@ -463,7 +463,7 @@ Argumentos principales:
 
 Crea un contexto del proyecto de Talend (un item de tipo Contexts) con su entorno y sus variables. Si ya existe uno con la misma etiqueta, lo reemplaza.
 
-**Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
+**Uso:** escribe/ejecuta; requiere confirmacion; requiere Studio + bridge.
 
 Argumentos principales:
 
@@ -479,7 +479,7 @@ Argumentos principales:
 
 Elimina un contexto completo del proyecto de Talend.
 
-**Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
+**Uso:** escribe/ejecuta; requiere confirmacion; requiere Studio + bridge.
 
 Argumentos principales:
 
@@ -490,7 +490,7 @@ Argumentos principales:
 
 Elimina una variable de un entorno de un contexto del proyecto de Talend.
 
-**Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
+**Uso:** escribe/ejecuta; requiere confirmacion; requiere Studio + bridge.
 
 Argumentos principales:
 
@@ -571,7 +571,7 @@ Argumentos principales:
 
 Lista los contextos del proyecto de Talend (los items de tipo Contexts), con sus entornos y sus variables.
 
-**Uso:** solo lectura; funciona sin Studio.
+**Uso:** solo lectura; requiere Studio + bridge.
 
 Argumentos principales:
 
@@ -592,7 +592,7 @@ Argumentos principales:
 
 Lee un contexto del proyecto de Talend: sus entornos y las variables de cada uno, con su valor.
 
-**Uso:** solo lectura; funciona sin Studio.
+**Uso:** solo lectura; requiere Studio + bridge.
 
 Argumentos principales:
 
@@ -614,7 +614,7 @@ Argumentos principales:
 
 Crea o actualiza una variable de un contexto del proyecto de Talend, en el entorno indicado.
 
-**Uso:** escribe/ejecuta; funciona sin Studio.
+**Uso:** escribe/ejecuta; requiere Studio + bridge.
 
 Argumentos principales:
 
@@ -695,6 +695,12 @@ Argumentos principales:
 #### `talend_bridge_active_editor_introspect`
 
 Introspecciona el editor activo.
+
+**Uso:** escribe/ejecuta; requiere Studio + bridge.
+
+#### `talend_bridge_active_job_dependencies`
+
+Lista rutinas, módulos y bibliotecas que Talend declara para el job activo. Omite rutas locales y credenciales.
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -2238,21 +2244,24 @@ Argumentos principales:
 
 #### `talend_job_apply_custom_spec`
 
-Genera y escribe un job en el proyecto Talend a partir de una especificación custom (componentes, conexiones y variables de contexto).
+Crea o completa una estructura de Jobs con la API de Studio. Valida componentes y conexiones, conserva valores existentes y rechaza destinos ajenos. No compila, ejecuta ni publica Jobs.
 
 **Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
 
 Argumentos principales:
 
-- `jobName` (string, obligatorio): Nombre del job
-- `version` (string, opcional): Versión del job
-- `defaultContext` (string, opcional): Contexto por defecto
-- `folderPath` (string, opcional): Carpeta de destino dentro de process/
-- `description` (string, opcional): Descripción del job
-- `purpose` (string, opcional): Propósito del job
-- `components` (array, obligatorio): Componentes del job
-- `connections` (array, opcional): Conexiones entre componentes
-- `contexts` (array, opcional): Variables de contexto
+- `jobName` (string, obligatorio)
+- `version` (string, opcional)
+- `defaultContext` (string, opcional)
+- `folderPath` (string, opcional)
+- `description` (string, opcional)
+- `purpose` (string, opcional)
+- `components` (array, obligatorio)
+- `connections` (array, opcional)
+- `contexts` (array, opcional)
+- `childJobs` (array, opcional)
+- `instructions` (object, opcional)
+- `replaceManagedTodoContexts` (boolean, opcional)
 
 #### `talend_job_compile`
 
@@ -2697,6 +2706,12 @@ Argumentos principales:
 Lista los editores abiertos desde los archivos workbench XMI del workspace.
 
 **Uso:** solo lectura; funciona sin Studio.
+
+#### `talend_list_repository_connections`
+
+Lista las conexiones compartidas del proyecto abierto en Talend Studio. Devuelve nombres y tipos, pero no rutas, parametros ni credenciales.
+
+**Uso:** solo lectura; requiere Studio + bridge.
 
 #### `talend_move_component`
 

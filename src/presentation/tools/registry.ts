@@ -48,6 +48,7 @@ import { createListProjectContextsTool } from "./contexts/list-project-contexts.
 import { createListRepositoryContextsTool } from "./contexts/list-repository-contexts.tool";
 import { createReadRepositoryContextTool } from "./contexts/read-repository-context.tool";
 import { createUpsertRepositoryContextParameterTool } from "./contexts/upsert-repository-context-parameter.tool";
+import { createListRepositoryConnectionsTool } from "./contexts/list-repository-connections.tool";
 
 import { createFindExportedJobsTool } from "./execution/find-exported-jobs.tool";
 import { createTailRunOutputTool } from "./execution/read-run.tool";
@@ -122,6 +123,7 @@ export const allTools = [
   createDeleteRepositoryContextParameterTool(),
   createListProjectContextsTool(),
   createListRepositoryContextsTool(),
+  createListRepositoryConnectionsTool(),
   createReadRepositoryContextTool(),
   createUpsertRepositoryContextParameterTool(),
 
