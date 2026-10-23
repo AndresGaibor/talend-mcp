@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { getAllRuntimeTools } from "../../src/server/registered-tools";
 import { createListJobsTool } from "../../src/presentation/tools/jobs/list-jobs.tool";
 import { createReadContextsTool } from "../../src/presentation/tools/jobs/read-contexts.tool";
+import { createRepoSourcesTool } from "../../src/presentation/tools/repo/repo-sources.tool";
 import { clearActiveRepo } from "../../src/talend/workspace";
 
 /**
@@ -125,6 +126,56 @@ describe("OutputSchema publicado contra la respuesta real", () => {
       restoreEnv("TALEND_PROJECT", anterior);
       rmSync(project, { recursive: true, force: true });
     }
+  });
+
+  // Payload real capturado contra un workspace con Studio abierto: el item del
+  // repositorio trae versión y entornos, no `parameters` en la raíz. El SDK de
+  // Python rechazaba toda la respuesta por ese campo obligatorio inexistente.
+  test("talend_list_repository_contexts: un item real valida contra su outputSchema", () => {
+    const respuesta = {
+      ok: true,
+      source: "list-repository-contexts",
+      confidence: "high",
+      data: {
+        contexts: [
+          { name: "prueba_4", version: "0.1", contexts: [] },
+          {
+            name: "produccion",
+            version: "0.1",
+            defaultContext: "Datasets",
+            contexts: [
+              { name: "Datasets", parameters: [{ name: "db_host", type: "id_String", value: "10.0.0.1" }] },
+            ],
+          },
+        ],
+        project: "PRJ_CONFORMANCE",
+      },
+    };
+    expect(validar("talend_list_repository_contexts", respuesta)).toEqual([]);
+  });
+
+  test("talend_read_repository_context: el item leido valida contra su outputSchema", () => {
+    const respuesta = {
+      ok: true,
+      source: "read-repository-context",
+      confidence: "high",
+      data: {
+        context: {
+          name: "prueba_4",
+          version: "0.1",
+          contexts: [{ name: "Datasets", parameters: [{ name: "fichero_entrada" }] }],
+        },
+      },
+    };
+    expect(validar("talend_read_repository_context", respuesta)).toEqual([]);
+  });
+
+  test("talend_repo_sources: la respuesta real valida contra su outputSchema", async () => {
+    // Ejecuta la tool de verdad (solo lee la caché local): el schema publicado
+    // declaraba `sources: string[]` y la tool devuelve `repos: CachedRepo[]`.
+    const tool = createRepoSourcesTool();
+    const resultado = await (tool.handler as () => Promise<unknown>)();
+    expect(validar("talend_repo_sources", resultado)).toEqual([]);
   });
 });
 

@@ -123,9 +123,26 @@ describe("schemas de salida enriquecidos por dominio", () => {
   });
 
   test("conserva los schemas de contextos y repositorio en la fachada", () => {
+    // El bridge devuelve el item completo: versión, entornos y sus variables.
+    expect(getEnrichedOutputSchema("talend_list_repository_contexts").safeParse({
+      ok: true,
+      data: {
+        contexts: [{
+          name: "produccion",
+          version: "0.1",
+          defaultContext: "Datasets",
+          contexts: [{ name: "Datasets", parameters: [{ name: "db_host", type: "id_String", value: "10.0.0.1" }] }],
+        }],
+      },
+    }).success).toBe(true);
+    // La forma plana antigua sigue siendo válida para no romper consumidores.
     expect(getEnrichedOutputSchema("talend_list_repository_contexts").safeParse({
       ok: true,
       data: { contexts: [{ name: "Default", parameters: [] }] },
+    }).success).toBe(true);
+    expect(getEnrichedOutputSchema("talend_read_repository_context").safeParse({
+      ok: true,
+      data: { context: { name: "prueba_4", version: "0.1", contexts: [] } },
     }).success).toBe(true);
     expect(getEnrichedOutputSchema("talend_list_repository_connections").safeParse({
       ok: true,

@@ -50,7 +50,12 @@ export const contextsRepositorySchemas: Record<string, z.ZodTypeAny> = {
     path: z.string(),
   }),
   talend_repo_sources: z.object({
-    sources: z.array(z.string()),
+    repos: z.array(z.object({
+      name: z.string().describe("Folder name inside the local cache"),
+      source: z.string().describe("Original source; cached clones report cache:<name>"),
+      path: z.string().describe("Local path of the cached repository"),
+      branch: z.string().describe("Current branch"),
+    })),
   }),
   talend_repo_status: z.object({
     branch: z.string(),

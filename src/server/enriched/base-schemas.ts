@@ -67,9 +67,30 @@ export const SchemaIssueSchema = z.object({
   issue: z.enum(["empty-column-name", "null-column-name"]),
 });
 
+/** Entorno ("environment") dentro de un grupo de contextos del repositorio. */
+export const RepositoryEnvironmentSchema = z.object({
+  name: z.string().describe("Environment name inside the group (e.g. Datasets, Processes)"),
+  parameters: z.array(TalendContextParameterSchema).describe("Parameters defined in this environment"),
+});
+
+/**
+ * Item de tipo "Contexts" del repositorio, tal como lo devuelve el bridge:
+ * nombre y versión del item, entornos con sus variables y, si el item no trae
+ * entornos, los parámetros planos. `parameters` sigue siendo opcional para no
+ * romper consumidores que esperan la forma plana antigua.
+ */
 export const RepositoryContextSchema = z.object({
   name: z.string().describe("Context group name"),
-  parameters: z.array(TalendContextParameterSchema).describe("Context parameters in this group"),
+  version: z.string().optional().describe("Version of the repository item"),
+  defaultContext: z.string().optional().describe("Environment used by default"),
+  contexts: z
+    .array(RepositoryEnvironmentSchema)
+    .optional()
+    .describe("Environments of the group with their parameters"),
+  parameters: z
+    .array(TalendContextParameterSchema)
+    .optional()
+    .describe("Context parameters when the group is returned without environments"),
 });
 
 export const DQIndicatorSchema = z.object({
