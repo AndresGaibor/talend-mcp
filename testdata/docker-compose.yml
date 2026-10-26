@@ -12,5 +12,57 @@ services:
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - pgdata:/var/lib/postgresql/data
 
+  # HiveServer2 para las pruebas de tHive*. Impala no se emula: su driver JDBC no esta en Maven Central.
+  # Los ficheros de testdata se ven en /data (LOAD DATA LOCAL INPATH '/data/...').
+  hive:
+    image: apache/hive:4.0.1
+    container_name: talend_mcp_hive
+    environment:
+      SERVICE_NAME: hiveserver2
+    ports:
+      - "10000:10000"
+      - "10002:10002"
+    volumes:
+      - ./:/data
+
+  # Emulacion de un impalad para tImpala* con IMPALA_DRIVER=HIVE2: HiveServer2 sin SASL (auth=noSasl) en el
+  # puerto 21050. Es lo que usa el driver HIVE2 de Talend; no emula el comportamiento propio de Impala.
+  impala-emu:
+    image: apache/hive:4.0.1
+    container_name: talend_mcp_impala_emu
+    environment:
+      SERVICE_NAME: hiveserver2
+      SERVICE_OPTS: "-Dhive.server2.thrift.port=21050 -Dhive.server2.authentication=NOSASL"
+    ports:
+      - "21050:21050"
+
+  # HDFS para tHDFSPut / tHDFSGet / tHDFSInput. Un namenode y un datanode de Apache Hadoop 3.3.6 (el cliente
+  # de Talend usa Hadoop 3.3.4). El datanode anuncia localhost para que el cliente del host lo alcance.
+  hdfs-namenode:
+    image: apache/hadoop:3.3.6
+    container_name: talend_mcp_hdfs_namenode
+    command: ["hdfs", "namenode"]
+    environment: &hdfs-env
+      ENSURE_NAMENODE_DIR: /tmp/hadoop-hadoop/dfs/name
+      CORE-SITE.XML_fs.defaultFS: hdfs://hdfs-namenode:9000
+      HDFS-SITE.XML_dfs.replication: "1"
+      HDFS-SITE.XML_dfs.permissions.enabled: "false"
+      HDFS-SITE.XML_dfs.namenode.rpc-bind-host: 0.0.0.0
+      HDFS-SITE.XML_dfs.client.use.datanode.hostname: "true"
+    ports:
+      - "9000:9000"
+      - "9870:9870"
+
+  hdfs-datanode:
+    image: apache/hadoop:3.3.6
+    container_name: talend_mcp_hdfs_datanode
+    command: ["hdfs", "datanode"]
+    environment:
+      <<: *hdfs-env
+      HDFS-SITE.XML_dfs.datanode.hostname: localhost
+    ports:
+      - "9866:9866"
+      - "9864:9864"
+
 volumes:
   pgdata:

@@ -1,7 +1,8 @@
 # Configuración de Bun para el repositorio talend-mcp.
 #
-# `root` acota `bun test` a la carpeta tests/ para que no intente ejecutar
-# los tests de Vitest que viven en apps-ui/ (esos corren con `bun run test:ui`).
+# `root` acota `bun test` a la carpeta tests/ para que no recoja archivos de
+# prueba que vivan en scripts/ o docs/. Para correr un solo archivo:
+# `bun test tests/<area>/<archivo>.test.ts`.
 
 [test]
 root = "tests"

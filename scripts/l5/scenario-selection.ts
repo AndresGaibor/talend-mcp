@@ -7,17 +7,35 @@ export type ScenarioSelectionInput = {
 
 export type SelectableScenario = { nombre: string; pendiente?: string };
 
-export function suiteOf(nombre: string): string {
+/**
+ * Categorias (prefijo antes de `:`) reconocidas y la suite a la que pertenecen.
+ * Una categoria nueva se agrega aca: el archivo de escenarios, la validacion de
+ * `--suite` y el filtro se derivan de este mapa.
+ */
+export const SCENARIO_SUITES = {
+  humo: "humo",
+  archivos: "archivos",
+  transformaciones: "transformaciones",
+  "bases de datos": "bd",
+  "control de flujo": "control",
+  contextos: "contextos",
+  orquestacion: "orquestacion",
+  codigo: "codigo",
+  aws: "aws",
+  privacidad: "privacidad",
+  calidad: "calidad",
+  formatos: "formatos",
+  sistema: "sistema",
+  conciliacion: "conciliacion",
+} as const satisfies Record<string, string>;
+
+export type ScenarioSuite = (typeof SCENARIO_SUITES)[keyof typeof SCENARIO_SUITES] | "otros";
+
+export const KNOWN_SUITES: ReadonlySet<string> = new Set(Object.values(SCENARIO_SUITES));
+
+export function suiteOf(nombre: string): ScenarioSuite {
   const categoria = nombre.split(":", 1)[0]?.trim().toLowerCase() ?? "";
-  if (categoria === "humo") return "humo";
-  if (categoria === "archivos") return "archivos";
-  if (categoria === "transformaciones") return "transformaciones";
-  if (categoria === "bases de datos") return "bd";
-  if (categoria === "control de flujo") return "control";
-  if (categoria === "contextos") return "contextos";
-  if (categoria === "orquestacion") return "orquestacion";
-  if (categoria === "codigo") return "codigo";
-  return "otros";
+  return (SCENARIO_SUITES as Record<string, ScenarioSuite>)[categoria] ?? "otros";
 }
 
 export function selectScenarios<T extends SelectableScenario>(

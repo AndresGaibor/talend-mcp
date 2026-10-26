@@ -3,28 +3,36 @@ import { detectProjectFromBridge } from "./src/talend/workspace";
 
 const mode = process.env.TALEND_MCP_MODE ?? "http";
 
-// Detecta el proyecto Talend abierto en Studio (via el bridge). Si el bridge no
-// esta instalado o Studio no esta abierto, se sigue sin proyecto: las tools
-// vuelven a resolverlo en cada llamada.
-const detectedProject = await detectProjectFromBridge();
-if (detectedProject) {
-  console.error(`Proyecto Talend detectado: ${detectedProject}`);
+/**
+ * Calienta la deteccion del proyecto sin bloquear el arranque.
+ *
+ * Si el bridge no esta instalado o Studio no esta abierto, la consulta puede
+ * esperar hasta el timeout del bridge. El servidor ya atiende `/healthz` y
+ * `tools/list` mientras tanto; las tools que necesitan el proyecto lo resuelven
+ * en su propia llamada.
+ */
+function prewarmProjectDetection(): void {
+  void detectProjectFromBridge()
+    .then((project) => {
+      if (project) console.error(`Proyecto Talend detectado: ${project}`);
+    })
+    .catch(() => {});
 }
 
 if (mode === "http") {
   const port = Number(process.env.TALEND_MCP_PORT) || 3927;
   const host = process.env.TALEND_MCP_HOST || "127.0.0.1";
-  const live = process.env.TALEND_MCP_LIVE !== "false";
 
   const handle = await runNewHttpServer({
     port,
     host,
-    live,
   });
 
   console.error(`Talend MCP server running:`);
   console.error(`  Local:  ${handle.localUrl}/mcp`);
   console.error(`  Health: ${handle.localUrl}/healthz`);
+
+  prewarmProjectDetection();
 
   process.on("SIGINT", async () => {
     await handle.close();
@@ -37,6 +45,6 @@ if (mode === "http") {
     });
   }
 } else {
-  const live = process.env.TALEND_MCP_LIVE !== "false";
-  await runNewStdioServer({ live });
+  prewarmProjectDetection();
+  await runNewStdioServer();
 }

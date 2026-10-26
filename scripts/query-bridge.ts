@@ -26,4 +26,7 @@ async function main() {
   console.log(JSON.stringify(markers, null, 2));
 }
 
-main().catch(console.error);
+main().catch((error: unknown) => {
+  console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+  process.exitCode = 1;
+});

@@ -38,11 +38,19 @@ evidencias/
 # Los ficheros grandes no se versionan: se regeneran con `bun run scripts/make-testdata.ts`.
 testdata/*.csv
 testdata/*.xlsx
+testdata/*.xls
 testdata/*.txt
+testdata/*.log
 testdata/resultados.csv
 
 # Indice Lucene generado por tSynonymOutput al ejecutar los escenarios L5.
 testdata/l5_synonym_index/
+
+# Carpeta que deja el escenario L5 de tUnarchive al descomprimir el xlsx.
+testdata/l5_unarchive/
+
+# Destino de los escenarios L5 de HDFS: salida generada, no datos de prueba versionados.
+testdata/hdfs-destino/
 
 # Workspace local de Qlik Talend Studio (Eclipse): .metadata, .JETEmitters y
 # proyectos con rutas absolutas de la maquina. No se versiona.

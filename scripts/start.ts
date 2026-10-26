@@ -4,40 +4,43 @@ import { join } from "node:path";
 import { platform } from "node:os";
 
 import { installBridge } from "./install-bridge";
+import { runningBridgeVersion } from "./lib/bridge-hot-reload";
+import { detectStudio } from "./lib/studio-detect";
+import { createUi } from "../src/shared/cli/ui";
 
 /**
  * Arranque del servidor MCP de Talend.
  *
- *   bun run scripts/start.ts                 -> levanta el servidor HTTP local
- *   bun run scripts/start.ts --install-bridge -> compila e instala el plugin Java
+ *   bun run start                      -> actualiza el plugin si hace falta y levanta el MCP
+ *   bun run start --install-bridge     -> compila e instala el plugin Java
+ *   bun run start --skip-bridge        -> no toca el plugin (arranque minimo)
+ *
+ * La actualizacion automatica solo actua cuando el bridge no responde y Talend
+ * Studio esta abierto: compila con javac y publica el jar para carga en
+ * caliente. Nunca lanza Maven ni p2 en el arranque. Se desactiva con
+ * `TALEND_BRIDGE_AUTO_INSTALL=0` o `--skip-bridge`.
  */
 
 const IS_WIN = platform() === "win32";
+const ui = createUi();
 
-const C = {
-  reset: "\x1b[0m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  red: "\x1b[31m",
-  cyan: "\x1b[36m",
-  dim: "\x1b[2m",
-  bold: "\x1b[1m",
-};
+async function ensureBridge(): Promise<void> {
+  const disabled = process.env.TALEND_BRIDGE_AUTO_INSTALL;
+  if (disabled === "0" || disabled === "false") return;
 
-function c(valor: unknown, color: string): string {
-  return `${color}${valor}${C.reset}`;
-}
+  const version = await runningBridgeVersion();
+  if (version) {
+    ui.debug(`Bridge activo (version ${version}).`);
+    return;
+  }
 
-function log(icono: string, msg: string, color = C.reset): void {
-  console.error(`${color}${icono}${C.reset} ${msg}`);
-}
-function ok(msg: string): void { log("✓", msg, C.green); }
-function info(msg: string): void { log("•", msg, C.cyan); }
-function warn(msg: string): void { log("⚠", msg, C.yellow); }
-function fail(msg: string): void { log("✖", msg, C.red); }
+  if (!detectStudio()) {
+    ui.debug("Bridge sin respuesta y sin Talend Studio detectable: se arranca sin bridge.");
+    return;
+  }
 
-function separador(): void {
-  console.error(`  ${c("─".repeat(40), C.dim)}`);
+  ui.info("Bridge sin respuesta: actualizando el plugin en Talend Studio...");
+  await installBridge({ auto: true });
 }
 
 async function processMcpOutput(stream: ReadableStream<Uint8Array> | null): Promise<void> {
@@ -55,8 +58,8 @@ async function processMcpOutput(stream: ReadableStream<Uint8Array> | null): Prom
       for (const line of lines) {
         const t = line.trim();
         if (!t) continue;
-        if (t.startsWith("error:")) console.error(`  ${c("✖", C.red)} ${c(t, C.red)}`);
-        else console.error(`  ${c("│", C.dim)} ${t}`);
+        if (t.startsWith("error:")) ui.fail(t);
+        else ui.line(`  ${t}`);
       }
     }
   } catch {}
@@ -67,7 +70,9 @@ function waitForHealth(url: string, timeoutMs = 15_000): Promise<void> {
     const start = Date.now();
     function check() {
       if (Date.now() - start > timeoutMs) { reject(new Error("Timeout")); return; }
-      fetch(url).then((res) => { if (res.ok) resolve(); else setTimeout(check, 300); }).catch(() => setTimeout(check, 300));
+      fetch(url)
+        .then((res) => { if (res.ok) resolve(); else setTimeout(check, 50); })
+        .catch(() => setTimeout(check, 50));
     }
     check();
   });
@@ -79,26 +84,27 @@ function killProcess(proc: { pid?: number; kill: (signal?: any) => any } | null,
 }
 
 async function startServer(): Promise<void> {
-  console.error(`\n  ${c("Talend MCP", C.bold)} ${c("— Inicio automatizado", C.dim)}\n`);
-
-  separador();
-  info("Iniciando servidor MCP...");
+  ui.banner("Talend MCP", ["Inicio automatizado"]);
+  ui.separator();
+  ui.info("Iniciando servidor MCP...");
 
   const mcpPort = process.env.TALEND_MCP_PORT || "3927";
-  const mcpFilter = process.env.TALEND_MCP_FILTER || "canonical";
+  // `agent` mantiene el catalogo en ~90 KB en vez de ~370 KB. Para descubrir
+  // todas las capacidades: TALEND_MCP_FILTER=canonical (o all).
+  const mcpFilter = process.env.TALEND_MCP_FILTER || "agent";
 
   if (!IS_WIN) {
     try {
       const lsof = spawnSync("lsof", ["-ti", `tcp:${mcpPort}`], { encoding: "utf8" });
       const pids = (lsof.stdout ?? "").trim().split("\n").filter(Boolean);
       for (const pid of pids) {
-        info(`Puerto ${mcpPort} ocupado por PID ${pid} — terminando proceso anterior...`);
+        ui.info(`Puerto ${mcpPort} ocupado por PID ${pid}: terminando el proceso anterior...`);
         spawnSync("kill", ["-9", pid], { stdio: "ignore" });
       }
     } catch {}
   }
 
-  info(`Filtro de tools: ${c(mcpFilter, C.cyan)}`);
+  ui.info(`Filtro de tools: ${mcpFilter}`);
 
   const mcpServer = Bun.spawn(["bun", "run", join(import.meta.dir, "..", "index.ts")], {
     env: { ...process.env, TALEND_MCP_FILTER: mcpFilter },
@@ -108,30 +114,18 @@ async function startServer(): Promise<void> {
   processMcpOutput(mcpServer.stderr).catch(() => {});
 
   const healthUrl = `http://127.0.0.1:${mcpPort}/healthz`;
-  let mcpReady = false;
-  info("Esperando al servidor MCP...");
+  ui.info("Esperando al servidor MCP...");
   try {
     await waitForHealth(healthUrl);
-    ok(`Servidor MCP listo en puerto ${mcpPort} (${mcpFilter} tools)`);
-    mcpReady = true;
+    ui.ok(`Servidor MCP listo en el puerto ${mcpPort} (${mcpFilter}).`);
   } catch {
-    warn("Servidor MCP no responde");
-  }
-
-  if (!mcpReady) {
-    setTimeout(() => {
-      console.error();
-      console.error(`  ${c("MCP server no disponible", C.yellow)}`);
-      console.error(`  ${c("El servidor MCP local fallo al iniciar. Revisa el error de Bun arriba.", C.dim)}`);
-      console.error(`  ${c(`• Puerto ${mcpPort} ocupado`, C.dim)}`);
-      console.error();
-    }, 2000);
+    ui.warn("El servidor MCP no responde.");
+    ui.line(`  Revisa el error de Bun de arriba y que el puerto ${mcpPort} este libre.`);
   }
 
   function cleanup() {
-    info("Cerrando servicios...");
-    if (IS_WIN) killProcess(mcpServer, "SIGBREAK");
-    else killProcess(mcpServer, "SIGTERM");
+    ui.info("Cerrando servicios...");
+    killProcess(mcpServer, IS_WIN ? "SIGBREAK" : "SIGTERM");
     setTimeout(() => {
       if (IS_WIN) {
         spawnSync("taskkill", ["/F", "/T", "/PID", String(mcpServer.pid)], { stdio: "pipe" });
@@ -147,7 +141,7 @@ async function startServer(): Promise<void> {
 
   mcpServer.exited.then((code: number | null) => {
     if (code !== null && code !== 0) {
-      fail(`Servidor MCP termino inesperadamente (codigo ${code})`);
+      ui.fail(`El servidor MCP termino inesperadamente (codigo ${code}).`);
       cleanup();
     }
   });
@@ -165,12 +159,19 @@ async function main() {
   }
 
   if (!existsSync(join(import.meta.dir, "..", "index.ts"))) {
-    fail("No se encontro el entrypoint index.ts del servidor MCP.");
+    ui.fail("No se encontro el entrypoint index.ts del servidor MCP.");
     process.exitCode = 1;
     return;
+  }
+
+  if (!args.includes("--skip-bridge")) {
+    await ensureBridge();
   }
 
   await startServer();
 }
 
-main();
+main().catch((error: unknown) => {
+  ui.fail(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});

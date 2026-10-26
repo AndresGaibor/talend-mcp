@@ -28,6 +28,9 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Validate L5 fixtures
+        run: bun run l5:validar
+
       - name: Run tests
         run: bun test
 
