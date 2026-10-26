@@ -17,7 +17,7 @@ import { nodeConnectionTools } from "../tools-node-connection";
 export const nodesCreateConfigure = [
 {
     name: "talend_job_add_node",
-    description: "Anade un componente al job abierto. El componente se crea con la API de Studio, con todos sus parametros por defecto, y se configura de forma declarativa (parametros, tablas, schema y, en el tMap, sus transformaciones).",
+    description: "Anade un componente al job abierto, con sus parametros por defecto de Studio, y lo configura de forma declarativa (parametros, tablas, schema y, en el tMap, sus transformaciones). Orden recomendado: 1) talend_components_definition {name} para ver que parametros tu pones; 2) esta tool con type y lo que pusiste; 3) talend_job_connect_nodes para conectar; 4) talend_job_compile para comprobar que el codigo compila. El tMap se configura despues de conectar: sus tablas tienen que llamarse como sus conexiones (row1, row2...).",
     inputSchema: z.object({
       type: z.string().describe("Nombre del componente: tFileInputDelimited, tLogRow, tMap, tMysqlOutput..."),
       label: z.string().optional().describe("Etiqueta del componente"),
@@ -49,7 +49,7 @@ export const nodesCreateConfigure = [
   },
 {
     name: "talend_job_configure_node",
-    description: "Configura un componente ya anadido al job: sus parametros, sus tablas, su schema o las transformaciones de un tMap. Es la via para retocar un job existente sin recrearlo.",
+    description: "Configura un componente ya anadido al job: sus parametros, sus tablas, su schema o las transformaciones de un tMap. Es la via para retocar un job existente sin recrearlo. Solo cambia lo que le pases; los parametros que no nombres se quedan como estaban. Usa el uniqueName que devolvio talend_job_add_node o talend_job_list_nodes.",
     inputSchema: z.object({
       uniqueName: z.string().describe("Unique name del nodo"),
       ...componentSpecShape,
