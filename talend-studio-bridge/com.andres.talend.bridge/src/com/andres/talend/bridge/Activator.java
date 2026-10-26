@@ -52,6 +52,7 @@ public final class Activator extends AbstractUIPlugin {
       bridgeServer = null;
     }
     EventsService.stop();
+    LaunchTrackerService.stopObservers();
     super.stop(context);
   }
 }

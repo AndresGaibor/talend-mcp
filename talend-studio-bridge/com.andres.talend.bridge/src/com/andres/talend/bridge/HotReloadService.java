@@ -2,30 +2,35 @@ package com.andres.talend.bridge;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.jar.Manifest;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleException;
 
 /**
  * Carga en caliente del bundle.
  *
  * Vigila el jar en `~/.talend-bridge/hot/bridge.jar`. Cuando el archivo cambia
- * (el instalador lo copia despues de compilar), recarga el bundle con
- * {@link Bundle#update(java.io.InputStream)}: OSGi descarta el classloader,
- * detiene el Activator y lo vuelve a iniciar, asi que el servidor HTTP queda
- * sirviendo el codigo nuevo sin reiniciar Talend Studio.
+ * (el instalador lo publica despues de compilar), comprueba que sea este bundle
+ * y lo recarga con {@link Bundle#update(java.io.InputStream)}: OSGi descarta el
+ * classloader, detiene el Activator y lo vuelve a iniciar, asi que el servidor
+ * HTTP queda sirviendo el codigo nuevo sin reiniciar Talend Studio.
  *
- * El jar que queda cargado en disco es el que instalo p2, de modo que un
- * reinicio posterior de Studio arranca con la misma version.
+ * La comprobacion va antes de parar el servidor: un jar roto o de otro bundle
+ * se ignora y el bridge sigue como estaba, en lugar de quedarse caido.
  */
 public final class HotReloadService {
   private static final long POLL_INTERVAL_MS = 500;
   private static final String HOT_DIR_ENV = "TALEND_BRIDGE_HOT_DIR";
   private static final String HOT_FILE_NAME = "bridge.jar";
+  private static final String MANIFEST_ENTRY = "META-INF/MANIFEST.MF";
 
   private final AtomicBoolean running = new AtomicBoolean(false);
   private volatile Thread watcher;
@@ -46,9 +51,9 @@ public final class HotReloadService {
    * Accion que se ejecuta justo antes de recargar el bundle.
    *
    * Es el sitio donde hay que soltar lo que usa el classloader viejo: el
-   * servidor HTTP y los hilos del guardian. Si no, el servidor sigue
-   * atendiendo peticiones con las clases del bundle ya descartado y Eclipse
-   * falla con "Invalid class loader from a refreshed bundle is being used".
+   * servidor HTTP y el guardian. Si no, el servidor sigue atendiendo peticiones
+   * con las clases del bundle ya descartado y Eclipse falla con "Invalid class
+   * loader from a refreshed bundle is being used".
    */
   public void setBeforeReload(Runnable action) {
     this.beforeReload = action;
@@ -73,12 +78,12 @@ public final class HotReloadService {
   }
 
   private void watch(Bundle bundle) {
+    Path hotJar = hotJarPath();
     // La firma se guarda en un archivo aparte porque el classloader del bundle se
     // reemplaza al recargar: sin esto, la instancia nueva detectaria el mismo
     // jar como "cambiado" y volveria a recargar en bucle.
-    Path signatureFile = signaturePath();
+    Path signatureFile = signaturePath(hotJar);
     String lastSignature = readSignature(signatureFile);
-    Path hotJar = hotJarPath();
 
     while (running.get()) {
       try {
@@ -97,6 +102,13 @@ public final class HotReloadService {
         byte[] bytes = Files.readAllBytes(hotJar);
         if (bytes.length == 0) continue;
 
+        String symbolicName = bundleSymbolicName(bytes);
+        if (!Activator.PLUGIN_ID.equals(symbolicName)) {
+          BridgeLog.warn("El jar de carga en caliente no es el bundle del bridge (" + symbolicName
+              + "), se ignora: " + hotJar);
+          continue;
+        }
+
         writeSignature(signatureFile, signature);
 
         // El framework reinicia el Activator al recargar: la instancia vieja ya no
@@ -111,21 +123,38 @@ public final class HotReloadService {
     }
   }
 
-  /** Firma del jar: tamaño y fecha de modificacion. */
+  /**
+   * Nombre simbolico del bundle que trae el jar, o null si no es un jar con MANIFEST.
+   * Solo lee el manifiesto: no carga clases ni toca el bundle en ejecucion.
+   */
+  static String bundleSymbolicName(byte[] jar) throws IOException {
+    try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(jar))) {
+      ZipEntry entry;
+      while ((entry = zip.getNextEntry()) != null) {
+        if (MANIFEST_ENTRY.equals(entry.getName())) {
+          String header = new Manifest(zip).getMainAttributes().getValue("Bundle-SymbolicName");
+          return header == null ? null : header.split(";", 2)[0].trim();
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Firma del jar: tamano y fecha de modificacion. */
   private static String signatureOf(Path jar) throws IOException {
     return Files.size(jar) + ":" + Files.getLastModifiedTime(jar).toMillis();
   }
 
-  private static Path signaturePath() {
-    Path jar = hotJarPath();
+  private static Path signaturePath(Path jar) {
     Path parent = jar.getParent();
-    return parent == null ? Paths.get(jar.getFileName() + ".sig") : parent.resolve(jar.getFileName() + ".sig");
+    String name = jar.getFileName() + ".sig";
+    return parent == null ? Paths.get(name) : parent.resolve(name);
   }
 
   private static String readSignature(Path file) {
     try {
       if (!Files.isRegularFile(file)) return "";
-      return new String(Files.readAllBytes(file), java.nio.charset.StandardCharsets.UTF_8).trim();
+      return new String(Files.readAllBytes(file), StandardCharsets.UTF_8).trim();
     } catch (IOException e) {
       return "";
     }
@@ -133,7 +162,7 @@ public final class HotReloadService {
 
   private static void writeSignature(Path file, String signature) {
     try {
-      Files.write(file, signature.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      Files.write(file, signature.getBytes(StandardCharsets.UTF_8));
     } catch (IOException e) {
       BridgeLog.warn("No se pudo guardar la firma del jar", e);
     }
@@ -141,72 +170,21 @@ public final class HotReloadService {
 
   private void reload(Bundle bundle, byte[] bytes) {
     try {
-      // Antes de recargar hay que soltar lo que usa el classloader viejo: el
-      // servidor HTTP (que si no sigue atendiendo peticiones con las clases
-      // del bundle descartado) y los hilos del guardian.
-      stopBackgroundThreads();
+      releaseBeforeReload();
       bundle.update(new ByteArrayInputStream(bytes));
       BridgeLog.info("Bundle recargado en caliente");
-    } catch (org.osgi.framework.BundleException e) {
-      BridgeLog.error("Fallo la recarga en caliente del bundle", e);
-    } catch (RuntimeException e) {
+    } catch (BundleException | RuntimeException e) {
       BridgeLog.error("Fallo la recarga en caliente del bundle", e);
     }
   }
 
-  /**
-   * Para lo que usa las clases del bundle que se va a recargar.
-   *
-   * Se hace por reflexion para no atar este servicio a las clases del
-   * guardian: si el bundle se recarga, la referencia a la clase vieja dejaria
-   * de valer.
-   */
-  private void stopBackgroundThreads() {
+  private void releaseBeforeReload() {
     Runnable action = beforeReload;
-    if (action != null) {
-      try {
-        action.run();
-      } catch (RuntimeException e) {
-        BridgeLog.warn("No se pudieron soltar los recursos del bundle viejo", e);
-      }
-    }
+    if (action == null) return;
     try {
-      Class<?> guard = Class.forName("com.andres.talend.bridge.workbench.ModalGuard");
-      guard.getMethod("stopWatchdog").invoke(null);
-    } catch (Throwable t) {
-      // El guardian puede no estar: no es critico.
-    }
-  }
-
-  /**
-   * Copia el jar recargado sobre el jar que tiene abierto el sistema operativo.
-   * Es best effort: en Windows el archivo puede estar bloqueado.
-   */
-  public static void persistHotJar(byte[] bytes) {
-    try {
-      Bundle bundle = BundleUtilOwn.bundle();
-      if (bundle == null) return;
-
-      String location = bundle.getLocation();
-      if (location == null || !location.startsWith("file:")) return;
-
-      String path = location.substring("file:".length());
-      if (path.startsWith("/")) path = path.substring(1);
-      Path target = Paths.get(path);
-
-      Files.createDirectories(target.getParent());
-      Files.copy(new ByteArrayInputStream(bytes), target, StandardCopyOption.REPLACE_EXISTING);
-    } catch (IOException | RuntimeException e) {
-      BridgeLog.warn("No se pudo persistir el jar recargado", e);
-    }
-  }
-
-  /** Acceso al bundle propio sin acoplar el servicio a una clase concreta. */
-  static final class BundleUtilOwn {
-    private BundleUtilOwn() {}
-
-    static Bundle bundle() {
-      return org.osgi.framework.FrameworkUtil.getBundle(HotReloadService.class);
+      action.run();
+    } catch (RuntimeException e) {
+      BridgeLog.warn("No se pudieron soltar los recursos del bundle viejo", e);
     }
   }
 }

@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -16,8 +17,10 @@ import java.util.concurrent.TimeUnit;
 import com.andres.talend.bridge.audit.CapabilityAuditService;
 import com.andres.talend.bridge.audit.CommandAuditService;
 import com.andres.talend.bridge.audit.PluginAuditService;
+import com.andres.talend.bridge.automation.BuildJobService;
 import com.andres.talend.bridge.automation.CodeRunnerService;
 import com.andres.talend.bridge.automation.JobOperationsService;
+import com.andres.talend.bridge.diagnostics.LogTailService;
 import com.andres.talend.bridge.events.EventsService;
 import com.andres.talend.bridge.launch.LaunchConfigService;
 import com.andres.talend.bridge.launch.LaunchTrackerService;
@@ -30,6 +33,7 @@ import com.andres.talend.bridge.workbench.WorkbenchService;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 
@@ -40,6 +44,20 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
 
+/**
+ * Servidor HTTP del bridge: escucha solo en 127.0.0.1 y exige el token en cada
+ * peticion, salvo {@code /ping}.
+ *
+ * Todas las rutas se declaran en {@link #registerRoutes()}. Al anadir una, la
+ * decision que hay que tomar es el hilo en el que corre:
+ *
+ * <ul>
+ *   <li>Hilo de trabajo ({@code worker}, {@code workerBody}): no toca widgets ni el
+ *       modelo del job. Lectura del workspace, procesos, descargas, ejecuciones.</li>
+ *   <li>Hilo de la UI ({@code ui}, {@code uiBody}): toca widgets o el modelo del job,
+ *       asi que se ejecuta con {@link UiThread#sync}. Debe ser corto.</li>
+ * </ul>
+ */
 final class BridgeServer {
   /** Tamanio maximo admitido para el cuerpo de una peticion. */
   private static final int MAX_BODY_BYTES = 1_048_576;
@@ -47,8 +65,41 @@ final class BridgeServer {
   /** Maximo de peticiones concurrentes atendidas por el bridge. */
   private static final int MAX_WORKER_THREADS = 16;
 
+  /** Por encima de este tiempo, una peticion queda registrada en el Error Log. */
+  private static final long SLOW_REQUEST_MS = 5_000L;
+
+  /** Rutas que tardan a proposito (esperas, compilaciones, ejecuciones): no se registran como lentas. */
+  private static final Set<String> LONG_RUNNING_ROUTES = Set.of(
+      "/automation/artifacts/install",
+      "/automation/coverage",
+      "/automation/job/compile",
+      "/automation/job/execute",
+      "/automation/run-active-job",
+      "/launch/wait");
+
+  private static final long STARTED_AT = System.currentTimeMillis();
+
+  /** Accion sin cuerpo que devuelve el payload de la respuesta. */
+  @FunctionalInterface
+  private interface Action {
+    Map<String, Object> run() throws Exception;
+  }
+
+  /** Accion que recibe el cuerpo JSON de la peticion y devuelve el payload. */
+  @FunctionalInterface
+  private interface BodyAction {
+    Map<String, Object> run(JsonObject body) throws Exception;
+  }
+
+  /** Ruta que escribe la respuesta por si misma (query string o validaciones propias). */
+  @FunctionalInterface
+  private interface Handler {
+    void handle(HttpExchange exchange) throws Exception;
+  }
+
+  @FunctionalInterface
   private interface ThrowingAction {
-    void run() throws IOException;
+    void run() throws Exception;
   }
 
   /** El cuerpo de la peticion supera el limite permitido. */
@@ -72,37 +123,44 @@ final class BridgeServer {
     }
   }
 
+  /** Configuracion leida, con la huella del archivo con el que se leyo. */
+  private record ConfigSnapshot(BridgeConfig config, String signature) {}
+
   private final BundleContext bundleContext;
   private final String token;
-  private volatile BridgeConfig config;
+  private volatile ConfigSnapshot configSnapshot;
   private HttpServer server;
   private ExecutorService executor;
 
   BridgeServer(BundleContext bundleContext) {
     this.bundleContext = bundleContext;
-    this.config = BridgeConfig.load();
+    this.configSnapshot = loadSnapshot();
     this.token = BridgeConfig.ensureToken();
   }
 
   /**
-   * Configuracion vigente.
-   *
-   * Se relee cuando cambia el archivo para que ajustar permisos (por ejemplo
-   * habilitar ejecuciones) no exija reiniciar Talend Studio.
+   * Configuracion vigente. Se relee solo cuando cambia el archivo (fecha y
+   * tamanio) en lugar de parsear el JSON en cada peticion. Asi ajustar permisos,
+   * por ejemplo habilitar ejecuciones, sigue sin reiniciar Talend Studio.
    */
   private BridgeConfig config() {
-    BridgeConfig current = this.config;
-    BridgeConfig reloaded = BridgeConfig.load();
-    if (reloaded != null) {
-      this.config = reloaded;
+    ConfigSnapshot current = configSnapshot;
+    if (!BridgeConfig.signature().equals(current.signature())) {
+      current = loadSnapshot();
+      configSnapshot = current;
     }
-    return this.config;
+    return current.config();
+  }
+
+  private static ConfigSnapshot loadSnapshot() {
+    String signature = BridgeConfig.signature();
+    return new ConfigSnapshot(BridgeConfig.load(), signature);
   }
 
   void start() {
-    // Al recargar el bundle en caliente, el socket del servidor viejo puede
-    // tardar un instante en liberarse. Si no se reintenta, el bundle nuevo no
-    // arranca y el bridge se queda caido.
+    // Al recargar el bundle en caliente, el socket del servidor viejo puede tardar
+    // un instante en liberarse. Si no se reintenta, el bundle nuevo no arranca y
+    // el bridge se queda caido.
     IOException lastError = null;
     for (int intento = 1; intento <= 6; intento++) {
       try {
@@ -110,7 +168,7 @@ final class BridgeServer {
         return;
       } catch (IOException e) {
         lastError = e;
-        BridgeLog.warn("El puerto " + config.port + " esta ocupado (intento " + intento + "), reintentando");
+        BridgeLog.warn("El puerto " + config().port + " esta ocupado (intento " + intento + "), reintentando");
         try {
           Thread.sleep(500L * intento);
         } catch (InterruptedException interrupted) {
@@ -119,110 +177,24 @@ final class BridgeServer {
         }
       }
     }
-    BridgeLog.error("No se pudo iniciar el bridge HTTP en el puerto " + config.port, lastError);
+    BridgeLog.error("No se pudo iniciar el bridge HTTP en el puerto " + config().port, lastError);
     throw new IllegalStateException("No se pudo iniciar el bridge HTTP", lastError);
   }
 
   private void startServer() throws IOException {
-    try {
-      server = HttpServer.create(new InetSocketAddress("127.0.0.1", config.port), 0);
-      server.createContext("/ping", exchange -> guarded(exchange, () -> respond(exchange, 200, pingPayload())));
-      server.createContext("/capabilities", exchange -> guarded(exchange, () -> respond(exchange, 200, CapabilityAuditService.capabilities(config()))));
-      server.createContext("/audit/environment", exchange -> guarded(exchange, () -> respond(exchange, 200, PluginAuditService.auditEnvironment(bundleContext))));
-      server.createContext("/workbench/state", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::state))));
-      server.createContext("/workbench/selection", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::selection))));
-      server.createContext("/workbench/views", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::views))));
-      server.createContext("/workbench/open-resource", exchange -> guarded(exchange, () -> handleOpenResource(exchange)));
-      server.createContext("/workbench/save-active", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::saveActiveEditor))));
-      server.createContext("/workbench/save-all", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkbenchService::saveAllEditors))));
-      server.createContext("/workbench/close-editor", exchange -> guarded(exchange, () -> handleCloseEditor(exchange)));
-      server.createContext("/workbench/activate-editor", exchange -> guarded(exchange, () -> handleActivateEditor(exchange)));
-      server.createContext("/workbench/find-editor", exchange -> guarded(exchange, () -> handleFindEditor(exchange)));
-      server.createContext("/workbench/show-view", exchange -> guarded(exchange, () -> handleShowView(exchange)));
-      server.createContext("/workbench/dialogs", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(ModalGuard::dismissBlockingDialogs))));
-      server.createContext("/workbench/modules/install", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(ModalGuard::installMissingModules))));
-      // Descarga de la red: no toca ningun widget, asi que no entra en la UI.
-      server.createContext("/automation/artifacts/install", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.installArtifact(readJsonBody(exchange)))));
-      // La cobertura recorre el catalogo entero. El bucle corre en este hilo de
-      // trabajo y solo cede a la UI componente a componente (ver CoverageChecker):
-      // si todo fuera en la UI, Studio quedaria congelado durante minutos.
-      server.createContext("/automation/coverage", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.coverage(readJsonBody(exchange)))));
-      server.createContext("/automation/coverage/status", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.coverageStatus(readJsonBody(exchange)))));
-      server.createContext("/workspace/state", exchange -> guarded(exchange, () -> respond(exchange, 200, WorkspaceService.state())));
-      server.createContext("/workspace/refresh", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(WorkspaceService::refresh))));
-      server.createContext("/problems/markers", exchange -> guarded(exchange, () -> respond(exchange, 200, ProblemMarkerService.markers())));
-      server.createContext("/talend/probe/classes", exchange -> guarded(exchange, () -> respond(exchange, 200, TalendClassProbeService.probe(bundleContext))));
-      server.createContext("/talend/active-editor/introspect", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeEditorIntrospect))));
-      server.createContext("/talend/active-job/model", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeJobModel))));
-      server.createContext("/talend/active-job/details", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeJobDetails))));
-      server.createContext("/talend/active-job/dependencies", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(TalendIntrospectionService::activeJobDependencies))));
-      server.createContext("/talend/active-component/details", exchange -> guarded(exchange, () -> handleActiveComponentDetails(exchange)));
-      server.createContext("/talend/active-job/select-component", exchange -> guarded(exchange, () -> handleSelectComponent(exchange)));
-      server.createContext("/commands/list", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(CommandAuditService::listCommands))));
-      server.createContext("/commands/execute", exchange -> guarded(exchange, () -> handleExecuteCommand(exchange)));
-      server.createContext("/launch/configs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchConfigService.listConfigs())));
-      server.createContext("/launch/run", exchange -> guarded(exchange, () -> handleLaunchRun(exchange)));
-      server.createContext("/events/recent", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.recent())));
-      server.createContext("/events/clear", exchange -> guarded(exchange, () -> respond(exchange, 200, EventsService.clear())));
-      server.createContext("/automation/run-active-job", exchange -> guarded(exchange, () -> handleAutomationRunActiveJob(exchange)));
-      server.createContext("/automation/job/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createJob")));
-      server.createContext("/automation/job/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteJob")));
-      // Estas tres no tocan widgets ni el modelo: van en el hilo de trabajo
-      // HTTP, que si no congela Studio. Ver docs/TALEND-STUDIO-INTERNALS.md
-      // seccion 26.
-      server.createContext("/automation/job/execute",
-          exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.executeJob(readJsonBody(exchange)))));
-      server.createContext("/automation/job/open", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "openJob")));
-      // Generar el codigo toca widgets (validateSyntax), asi que va en la UI, y tarda
-      // varios segundos: de ahi el tiempo de espera largo.
-      server.createContext("/automation/job/compile", exchange -> guarded(exchange, () -> handleCompile(exchange)));
-      server.createContext("/automation/job/problems", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "problems")));
-      // Los contextos (entornos) del job: se editan con la API de Studio, no
-      // escribiendo el XML a mano.
-      server.createContext("/automation/job/contexts", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "contexts")));
-      // Memoria del JVM: las mediciones largas llenan el heap y el IDE deja de
-      // responder. Con esta ruta se ve cuanto queda.
-      server.createContext("/automation/memory", exchange -> guarded(exchange, () -> respond(exchange, 200, JobOperationsService.memory(readJsonBody(exchange)))));
-      server.createContext("/automation/job/contexts/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createContext")));
-      server.createContext("/automation/job/contexts/parameter", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setContextParameter")));
-      server.createContext("/automation/job/contexts/parameter/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteContextParameter")));
-      server.createContext("/automation/job/contexts/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteContext")));
-      // Los contextos del proyecto (los items de tipo Contexts del repositorio).
-      server.createContext("/automation/repository/contexts", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "repositoryContexts")));
-      server.createContext("/automation/repository/connections", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "repositoryConnections")));
-      server.createContext("/automation/repository/schemas", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "repositorySchemas")));
-      server.createContext("/automation/repository/contexts/create", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "createRepositoryContext")));
-      server.createContext("/automation/repository/contexts/parameter", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setRepositoryContextParameter")));
-      server.createContext("/automation/repository/contexts/parameter/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteRepositoryContextParameter")));
-      server.createContext("/automation/repository/contexts/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteRepositoryContext")));
-      server.createContext("/automation/nodes/add", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "addNode")));
-      server.createContext("/automation/nodes/connect", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "connect")));
-      server.createContext("/automation/nodes/update", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "updateNode")));
-      server.createContext("/automation/nodes/delete", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "deleteNodes")));
-      server.createContext("/automation/nodes/copy", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "copyNode")));
-      server.createContext("/automation/nodes/list", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "listNodes")));
-      server.createContext("/automation/nodes/schema", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "setSchema")));
-      server.createContext("/automation/nodes/configure", exchange -> guarded(exchange, () -> handleNodeOperation(exchange, "configureNode")));
-      server.createContext("/automation/run-code", exchange -> guarded(exchange, () -> handleRunCode(exchange)));
-      server.createContext("/automation/components", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(() -> JobOperationsService.listComponents(readJsonBody(exchange))))));
-      server.createContext("/automation/components/parameters", exchange -> guarded(exchange, () -> respond(exchange, 200, UiThread.sync(() -> JobOperationsService.componentParameters(readJsonBody(exchange))))));
-      server.createContext("/launch/runs", exchange -> guarded(exchange, () -> respond(exchange, 200, LaunchTrackerService.runs())));
-      server.createContext("/launch/run-status", exchange -> guarded(exchange, () -> handleLaunchRunStatus(exchange)));
-      server.createContext("/launch/wait", exchange -> guarded(exchange, () -> handleLaunchWait(exchange)));
+    server = HttpServer.create(new InetSocketAddress("127.0.0.1", config().port), 0);
+    registerRoutes();
 
-      executor = Executors.newFixedThreadPool(MAX_WORKER_THREADS, runnable -> {
-        Thread thread = new Thread(runnable, "talend-bridge");
-        thread.setDaemon(true);
-        return thread;
-      });
-      server.setExecutor(executor);
-      server.start();
+    executor = Executors.newFixedThreadPool(MAX_WORKER_THREADS, runnable -> {
+      Thread thread = new Thread(runnable, "talend-bridge");
+      thread.setDaemon(true);
+      return thread;
+    });
+    server.setExecutor(executor);
+    server.start();
 
-      BridgeLog.info("Bridge escuchando en http://127.0.0.1:" + config.port
-          + " (token en " + BridgeConfig.tokenPath() + ")");
-    } catch (IOException e) {
-      throw e;
-    }
+    BridgeLog.info("Bridge escuchando en http://127.0.0.1:" + config().port
+        + " (token en " + BridgeConfig.tokenPath() + ")");
   }
 
   void stop() {
@@ -241,7 +213,137 @@ final class BridgeServer {
     }
   }
 
+  /** Tabla de rutas del bridge. Cada ruta aparece una sola vez. */
+  private void registerRoutes() {
+    // Latido: sin token. Es lo unico que se ve sin autenticarse.
+    route("/ping", exchange -> respond(exchange, 200, pingPayload()));
+    worker("/capabilities", () -> CapabilityAuditService.capabilities(config()));
+    worker("/audit/environment", () -> PluginAuditService.auditEnvironment(bundleContext));
+    route("/logs/tail", this::handleLogTail);
+
+    // Workbench: editores, vistas y dialogos.
+    ui("/workbench/state", WorkbenchService::state);
+    ui("/workbench/selection", WorkbenchService::selection);
+    ui("/workbench/views", WorkbenchService::views);
+    ui("/workbench/save-active", WorkbenchService::saveActiveEditor);
+    ui("/workbench/save-all", WorkbenchService::saveAllEditors);
+    ui("/workbench/dialogs", ModalGuard::dismissBlockingDialogs);
+    ui("/workbench/modules/install", ModalGuard::installMissingModules);
+    route("/workbench/open-resource", this::handleOpenResource);
+    route("/workbench/close-editor", this::handleCloseEditor);
+    route("/workbench/activate-editor", this::handleActivateEditor);
+    route("/workbench/find-editor", this::handleFindEditor);
+    route("/workbench/show-view", this::handleShowView);
+
+    // Workspace y problemas. Solo leen disco; el refresh toca la vista del workspace.
+    worker("/workspace/state", WorkspaceService::state);
+    ui("/workspace/refresh", WorkspaceService::refresh);
+    worker("/problems/markers", ProblemMarkerService::markers);
+    worker("/talend/probe/classes", () -> TalendClassProbeService.probe(bundleContext));
+
+    // Comandos de Studio, ejecuciones (launch configs) y eventos.
+    ui("/commands/list", CommandAuditService::listCommands);
+    route("/commands/execute", this::handleExecuteCommand);
+    worker("/launch/configs", LaunchConfigService::listConfigs);
+    route("/launch/run", this::handleLaunchRun);
+    worker("/launch/runs", LaunchTrackerService::runs);
+    route("/launch/run-status", this::handleLaunchRunStatus);
+    route("/launch/wait", this::handleLaunchWait);
+    worker("/events/recent", EventsService::recent);
+    worker("/events/clear", EventsService::clear);
+
+    // Introspeccion del editor y del job activo.
+    ui("/talend/active-editor/introspect", TalendIntrospectionService::activeEditorIntrospect);
+    ui("/talend/active-job/model", TalendIntrospectionService::activeJobModel);
+    ui("/talend/active-job/details", TalendIntrospectionService::activeJobDetails);
+    ui("/talend/active-job/dependencies", TalendIntrospectionService::activeJobDependencies);
+    route("/talend/active-component/details", this::handleActiveComponentDetails);
+    route("/talend/active-job/select-component", this::handleSelectComponent);
+
+    // Automatizacion fuera de la UI: descargas, ejecuciones, build y cobertura.
+    // La cobertura recorre el catalogo entero y cede a la UI componente a componente
+    // (ver CoverageChecker), asi que no puede correr entera dentro de ella.
+    workerBody("/automation/artifacts/install", JobOperationsService::installArtifact);
+    workerBody("/automation/build-job", body -> {
+      requireWritable(config());
+      return BuildJobService.build(body);
+    });
+    workerBody("/automation/coverage", JobOperationsService::coverage);
+    workerBody("/automation/coverage/status", JobOperationsService::coverageStatus);
+    workerBody("/automation/memory", JobOperationsService::memory);
+    workerBody("/automation/job/execute", JobOperationsService::executeJob);
+    route("/automation/run-active-job", this::handleAutomationRunActiveJob);
+    route("/automation/run-code", this::handleRunCode);
+
+    // Operaciones sobre el job abierto. Usan la API del IDE (cada nodo nace con sus
+    // parametros y el XML lo escribe Studio), asi que van en el hilo de la UI.
+    uiBody("/automation/components", JobOperationsService::listComponents);
+    uiBody("/automation/components/parameters", JobOperationsService::componentParameters);
+    uiBody("/automation/job/create", JobOperationsService::createJob);
+    uiBody("/automation/job/delete", JobOperationsService::deleteJob);
+    uiBody("/automation/job/open", JobOperationsService::openJob);
+    // Generar el codigo valida la sintaxis en la UI y tarda varios segundos.
+    uiBody("/automation/job/compile", 180_000L, JobOperationsService::compile);
+    uiBody("/automation/job/problems", JobOperationsService::problems);
+    uiBody("/automation/job/contexts", JobOperationsService::contexts);
+    uiBody("/automation/job/contexts/create", JobOperationsService::createContext);
+    uiBody("/automation/job/contexts/parameter", JobOperationsService::setContextParameter);
+    uiBody("/automation/job/contexts/parameter/delete", JobOperationsService::deleteContextParameter);
+    uiBody("/automation/job/contexts/delete", JobOperationsService::deleteContext);
+    uiBody("/automation/nodes/list", JobOperationsService::listNodes);
+    uiBody("/automation/nodes/add", JobOperationsService::addNode);
+    uiBody("/automation/nodes/connect", JobOperationsService::connect);
+    uiBody("/automation/nodes/update", JobOperationsService::updateNode);
+    uiBody("/automation/nodes/delete", JobOperationsService::deleteNodes);
+    uiBody("/automation/nodes/copy", JobOperationsService::copyNode);
+    uiBody("/automation/nodes/schema", JobOperationsService::setSchema);
+    uiBody("/automation/nodes/configure", JobOperationsService::configureNode);
+
+    // Contextos y conexiones del repositorio del proyecto.
+    uiBody("/automation/repository/contexts", JobOperationsService::repositoryContexts);
+    uiBody("/automation/repository/connections", JobOperationsService::repositoryConnections);
+    uiBody("/automation/repository/schemas", JobOperationsService::repositorySchemas);
+    uiBody("/automation/repository/contexts/create", JobOperationsService::createRepositoryContext);
+    uiBody("/automation/repository/contexts/parameter", JobOperationsService::setRepositoryContextParameter);
+    uiBody("/automation/repository/contexts/parameter/delete", JobOperationsService::deleteRepositoryContextParameter);
+    uiBody("/automation/repository/contexts/delete", JobOperationsService::deleteRepositoryContext);
+  }
+
+  /** Ruta sin cuerpo que responde con el resultado de la accion, en el hilo de trabajo. */
+  private void worker(String path, Action action) {
+    route(path, exchange -> respond(exchange, 200, action.run()));
+  }
+
+  /** Ruta que lee el cuerpo JSON y responde con el resultado, en el hilo de trabajo. */
+  private void workerBody(String path, BodyAction action) {
+    route(path, exchange -> respond(exchange, 200, action.run(readJsonBody(exchange))));
+  }
+
+  /** Ruta sin cuerpo que ejecuta la accion en el hilo de la UI de Studio. */
+  private void ui(String path, Action action) {
+    route(path, exchange -> respond(exchange, 200, UiThread.sync(action::run)));
+  }
+
+  /** Ruta que lee el cuerpo JSON y ejecuta la accion en el hilo de la UI de Studio. */
+  private void uiBody(String path, BodyAction action) {
+    uiBody(path, UiThread.DEFAULT_TIMEOUT_MS, action);
+  }
+
+  private void uiBody(String path, long timeoutMs, BodyAction action) {
+    route(path, exchange -> {
+      // El cuerpo se lee fuera de la UI: leer la peticion no necesita widgets.
+      JsonObject body = readJsonBody(exchange);
+      respond(exchange, 200, UiThread.sync(() -> action.run(body), timeoutMs));
+    });
+  }
+
+  /** Registra una ruta con autenticacion, validacion de metodo y manejo de errores. */
+  private void route(String path, Handler handler) {
+    server.createContext(path, exchange -> guarded(exchange, () -> handler.handle(exchange)));
+  }
+
   private Map<String, Object> pingPayload() {
+    BridgeConfig current = config();
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ok", true);
     payload.put("source", "studio-bridge");
@@ -249,9 +351,13 @@ final class BridgeServer {
     payload.put("endpoint", "/ping");
     payload.put("plugin", Activator.PLUGIN_ID);
     payload.put("version", pluginVersion());
-    payload.put("mode", config().readOnly ? "readOnly" : "readWrite");
-    payload.put("unsafeActions", config().unsafeActions);
+    payload.put("mode", current.readOnly ? "readOnly" : "readWrite");
+    payload.put("unsafeActions", current.unsafeActions);
     payload.put("hotReload", true);
+    payload.put("pid", ProcessHandle.current().pid());
+    payload.put("javaVersion", System.getProperty("java.version"));
+    payload.put("startedAt", STARTED_AT);
+    payload.put("uptimeMs", System.currentTimeMillis() - STARTED_AT);
     return payload;
   }
 
@@ -261,39 +367,49 @@ final class BridgeServer {
   }
 
   /**
-   * Aplica autenticacion, validacion de metodo y manejo de errores a todas las
-   * rutas, para que ninguna respuesta quede sin cuerpo o sin contexto.
+   * Aplica autenticacion, validacion de metodo, medicion de tiempos y manejo de
+   * errores a todas las rutas, para que ninguna respuesta quede sin cuerpo o sin
+   * contexto.
    */
   private void guarded(HttpExchange exchange, ThrowingAction action) throws IOException {
     String path = exchange.getHttpContext().getPath();
 
-    if ("/ping".equals(path)) {
-      action.run();
-      return;
+    if (!"/ping".equals(path)) {
+      if (!authorized(exchange)) {
+        respond(exchange, 401, errorPayload(path, "AUTH_REQUIRED", "Falta Authorization: Bearer <token>"));
+        return;
+      }
+      String method = exchange.getRequestMethod();
+      if (!"GET".equals(method) && !"POST".equals(method)) {
+        exchange.getResponseHeaders().set("Allow", "GET, POST");
+        respond(exchange, 405, errorPayload(path, "METHOD_NOT_ALLOWED", "Metodo no permitido: " + method));
+        return;
+      }
     }
 
-    if (!authorized(exchange)) {
-      respond(exchange, 401, errorPayload(path, "AUTH_REQUIRED", "Falta Authorization: Bearer <token>"));
-      return;
-    }
-
-    String method = exchange.getRequestMethod();
-    if (!"GET".equals(method) && !"POST".equals(method)) {
-      exchange.getResponseHeaders().set("Allow", "GET, POST");
-      respond(exchange, 405, errorPayload(path, "METHOD_NOT_ALLOWED", "Metodo no permitido: " + method));
-      return;
-    }
-
+    long started = System.nanoTime();
     try {
       action.run();
     } catch (PayloadTooLargeException e) {
       respond(exchange, 413, errorPayload(path, "PAYLOAD_TOO_LARGE", e.getMessage()));
     } catch (BadRequestException e) {
       respond(exchange, 400, errorPayload(path, e.code, e.getMessage()));
-    } catch (RuntimeException e) {
+    } catch (IOException e) {
+      // Casi siempre es el cliente que corto la conexion: ya no hay a quien responder.
+      BridgeLog.warn("Conexion interrumpida atendiendo " + path, e);
+    } catch (Exception e) {
       BridgeLog.error("Fallo atendiendo " + path, e);
       String message = e.getMessage() == null ? e.toString() : e.getMessage();
       respond(exchange, 500, errorPayload(path, "INTERNAL_ERROR", message));
+    } finally {
+      logIfSlow(path, started);
+    }
+  }
+
+  private void logIfSlow(String path, long startedNanos) {
+    long elapsedMs = (System.nanoTime() - startedNanos) / 1_000_000L;
+    if (elapsedMs > SLOW_REQUEST_MS && !LONG_RUNNING_ROUTES.contains(path)) {
+      BridgeLog.warn("Peticion lenta a " + path + ": " + elapsedMs + " ms");
     }
   }
 
@@ -307,208 +423,111 @@ final class BridgeServer {
     return MessageDigest.isEqual(expected, provided);
   }
 
-  private void handleExecuteCommand(HttpExchange exchange) throws IOException {
-    JsonObject body = readJsonBody(exchange);
-    String commandId = optString(body, "commandId");
-    if (commandId == null || commandId.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'commandId'");
-    }
-    boolean dryRun = optBoolean(body, "dryRun", true);
-    respond(exchange, 200, UiThread.sync(() -> CommandAuditService.executeCommand(commandId, dryRun, config())));
-  }
-
-  private void handleLaunchRun(HttpExchange exchange) throws IOException {
-    JsonObject body = readJsonBody(exchange);
-    String name = optString(body, "name");
-    if (name == null || name.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'name'");
-    }
-    String mode = optString(body, "mode");
-    boolean dryRun = optBoolean(body, "dryRun", true);
-    respond(exchange, 200, LaunchConfigService.runLaunchConfig(name, mode, dryRun, config()));
-  }
-
   private void handleOpenResource(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
-    String path = optString(body, "path");
-    if (path == null || path.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'path'");
-    }
+    String path = requiredParam(exchange, body, "path");
     respond(exchange, 200, UiThread.sync(() -> WorkbenchService.openResource(path)));
   }
 
   private void handleCloseEditor(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
-    String title = optString(body, "title");
-    if (title == null || title.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'title'");
-    }
+    String title = requiredParam(exchange, body, "title");
     boolean save = optBoolean(body, "save", true);
     respond(exchange, 200, UiThread.sync(() -> WorkbenchService.closeEditor(title, save)));
   }
 
   private void handleActivateEditor(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
-    String title = optString(body, "title");
-    if (title == null || title.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'title'");
-    }
+    String title = requiredParam(exchange, body, "title");
     respond(exchange, 200, UiThread.sync(() -> WorkbenchService.activateEditor(title)));
   }
 
   private void handleFindEditor(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
-    String titleContains = optString(body, "titleContains");
-    if (titleContains == null || titleContains.isEmpty()) {
-      titleContains = queryParam(exchange, "titleContains");
-    }
-    if (titleContains == null || titleContains.isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'titleContains'");
-    }
-    final String finalTitle = titleContains;
-    respond(exchange, 200, UiThread.sync(() -> WorkbenchService.findEditor(finalTitle)));
+    String titleContains = requiredParam(exchange, body, "titleContains");
+    respond(exchange, 200, UiThread.sync(() -> WorkbenchService.findEditor(titleContains)));
   }
 
   private void handleShowView(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
-    String viewId = optString(body, "viewId");
-    if (viewId == null || viewId.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'viewId'");
-    }
+    String viewId = requiredParam(exchange, body, "viewId");
     respond(exchange, 200, UiThread.sync(() -> WorkbenchService.showView(viewId)));
   }
 
   private void handleActiveComponentDetails(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
-    String uniqueName = optString(body, "uniqueName");
-    if (uniqueName == null || uniqueName.trim().isEmpty()) {
-      uniqueName = queryParam(exchange, "uniqueName");
-    }
-    if (uniqueName == null || uniqueName.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'uniqueName'");
-    }
+    String uniqueName = requiredParam(exchange, body, "uniqueName");
     boolean includeRaw = optBoolean(body, "includeRaw", false);
-    final String finalUniqueName = uniqueName;
-    final boolean finalIncludeRaw = includeRaw;
-    respond(exchange, 200, UiThread.sync(() -> TalendIntrospectionService.activeComponentDetails(finalUniqueName, finalIncludeRaw)));
+    respond(exchange, 200, UiThread.sync(
+        () -> TalendIntrospectionService.activeComponentDetails(uniqueName, includeRaw)));
   }
 
   private void handleSelectComponent(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
-    String uniqueName = optString(body, "uniqueName");
-    if (uniqueName == null || uniqueName.trim().isEmpty()) {
-      uniqueName = queryParam(exchange, "uniqueName");
-    }
-    if (uniqueName == null || uniqueName.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'uniqueName'");
-    }
-    final String finalUniqueName = uniqueName;
-    respond(exchange, 200, UiThread.sync(() -> TalendIntrospectionService.selectComponent(finalUniqueName)));
+    String uniqueName = requiredParam(exchange, body, "uniqueName");
+    respond(exchange, 200, UiThread.sync(() -> TalendIntrospectionService.selectComponent(uniqueName)));
   }
 
+  private void handleExecuteCommand(HttpExchange exchange) throws IOException {
+    JsonObject body = readJsonBody(exchange);
+    String commandId = requiredParam(exchange, body, "commandId");
+    boolean dryRun = optBoolean(body, "dryRun", true);
+    respond(exchange, 200, UiThread.sync(() -> CommandAuditService.executeCommand(commandId, dryRun, config())));
+  }
+
+  private void handleLaunchRun(HttpExchange exchange) throws IOException {
+    JsonObject body = readJsonBody(exchange);
+    String name = requiredParam(exchange, body, "name");
+    String mode = optString(body, "mode");
+    boolean dryRun = optBoolean(body, "dryRun", true);
+    respond(exchange, 200, LaunchConfigService.runLaunchConfig(name, mode, dryRun, config()));
+  }
+
+  private void handleLaunchRunStatus(HttpExchange exchange) throws IOException {
+    JsonObject body = readJsonBody(exchange);
+    String launchId = requiredParam(exchange, body, "launchId");
+    respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
+  }
+
+  private void handleLaunchWait(HttpExchange exchange) throws IOException {
+    JsonObject body = readJsonBody(exchange);
+    String launchId = requiredParam(exchange, body, "launchId");
+    int timeoutMs = optInt(body, "timeoutMs", 60000);
+    LaunchTrackerService.LaunchRunInfo info = LaunchTrackerService.waitForLaunch(launchId, timeoutMs);
+    if (info != null && info.terminatedAt != null) {
+      respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
+      return;
+    }
+    // Al expirar se devuelve el estado actual: el cliente debe ver que el job sigue
+    // en marcha (o no se puede confirmar) y no solo que hubo timeout.
+    Map<String, Object> payload = new LinkedHashMap<>(LaunchTrackerService.runStatus(launchId));
+    payload.put("endpoint", "/launch/wait");
+    payload.put("timedOut", true);
+    respond(exchange, 200, payload);
+  }
+
+  /**
+   * Ejecuta el job abierto. La ejecucion NO va dentro de UiThread.sync: lanzar el
+   * job y esperar su terminacion tarda decenas de segundos y congelaria Studio.
+   */
   private void handleAutomationRunActiveJob(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
     boolean dryRun = optBoolean(body, "dryRun", true);
     boolean saveBefore = optBoolean(body, "saveBefore", true);
     boolean waitForTermination = optBoolean(body, "waitForTermination", true);
     int timeoutMs = optInt(body, "timeoutMs", 120000);
-
-    // Ojo: la ejecucion NO va dentro de UiThread.sync. Lanzar el job y esperar
-    // su terminacion tarda decenas de segundos y bloquearia el hilo de la UI,
-    // congelando Talend Studio.
     respond(exchange, 200, AutomationService.runActiveJob(saveBefore, waitForTermination, timeoutMs, dryRun, config()));
   }
 
   /**
-   * Opera sobre los nodos del job abierto en Talend.
-   *
-   * Las operaciones usan la API del IDE, de modo que cada nodo nace con sus
-   * parametros y valores por defecto y el XML lo escribe Studio.
-   */
-  private void handleNodeOperation(HttpExchange exchange, String operation) throws IOException {
-    JsonObject body = readJsonBody(exchange);
-
-    // Ejecutar el job lanza una JVM aparte y espera su salida (hasta minutos):
-    // en el hilo de la UI congelaria Studio. Solo lee el workspace, sin widgets.
-    if ("executeJob".equals(operation)) {
-      respond(exchange, 200, JobOperationsService.executeJob(body));
-      return;
-    }
-
-    respond(exchange, 200, UiThread.sync(() -> {
-      switch (operation) {
-        case "createJob":
-          return JobOperationsService.createJob(body);
-        case "deleteJob":
-          return JobOperationsService.deleteJob(body);
-        case "executeJob":
-          return JobOperationsService.executeJob(body);
-        case "openJob":
-          return JobOperationsService.openJob(body);
-        case "addNode":
-          return JobOperationsService.addNode(body);
-        case "connect":
-          return JobOperationsService.connect(body);
-        case "updateNode":
-          return JobOperationsService.updateNode(body);
-        case "deleteNodes":
-          return JobOperationsService.deleteNodes(body);
-        case "copyNode":
-          return JobOperationsService.copyNode(body);
-        case "setSchema":
-          return JobOperationsService.setSchema(body);
-        case "configureNode":
-          return JobOperationsService.configureNode(body);
-        case "problems":
-          return JobOperationsService.problems(body);
-        case "contexts":
-          return JobOperationsService.contexts(body);
-        case "createContext":
-          return JobOperationsService.createContext(body);
-        case "setContextParameter":
-          return JobOperationsService.setContextParameter(body);
-        case "deleteContextParameter":
-          return JobOperationsService.deleteContextParameter(body);
-        case "deleteContext":
-          return JobOperationsService.deleteContext(body);
-        case "repositoryContexts":
-          return JobOperationsService.repositoryContexts(body);
-        case "repositoryConnections":
-          return JobOperationsService.repositoryConnections(body);
-        case "repositorySchemas":
-          return JobOperationsService.repositorySchemas(body);
-        case "createRepositoryContext":
-          return JobOperationsService.createRepositoryContext(body);
-        case "setRepositoryContextParameter":
-          return JobOperationsService.setRepositoryContextParameter(body);
-        case "deleteRepositoryContextParameter":
-          return JobOperationsService.deleteRepositoryContextParameter(body);
-        case "deleteRepositoryContext":
-          return JobOperationsService.deleteRepositoryContext(body);
-        default:
-          return JobOperationsService.listNodes(body);
-      }
-    }));
-  }
-
-  private void handleCompile(HttpExchange exchange) throws IOException {
-    JsonObject body = readJsonBody(exchange);
-    respond(exchange, 200, UiThread.sync(() -> JobOperationsService.compile(body), 180_000L));
-  }
-
-  /**
-   * Ejecuta codigo Java dentro de Studio.
-   *
-   * El codigo ve las mismas APIs que ve el IDE. Solo corre si las acciones
-   * inseguras estan habilitadas: ejecutar codigo arbitrario puede tocar el
+   * Ejecuta codigo Java dentro de Studio. El codigo ve las mismas APIs que ve el
+   * IDE, asi que solo corre con las acciones inseguras habilitadas: puede tocar el
    * workspace de forma irreversible.
    */
   private void handleRunCode(HttpExchange exchange) throws IOException {
     JsonObject body = readJsonBody(exchange);
     BridgeConfig current = config();
-    if (current.readOnly) {
-      throw new BadRequestException("READ_ONLY", "El bridge esta en modo readOnly");
-    }
+    requireWritable(current);
     if (!current.unsafeActions) {
       throw new BadRequestException("UNSAFE_ACTIONS_DISABLED",
           "La ejecucion de codigo requiere unsafeActions=true");
@@ -516,40 +535,44 @@ final class BridgeServer {
     respond(exchange, 200, CodeRunnerService.run(body));
   }
 
-  private void handleLaunchRunStatus(HttpExchange exchange) throws IOException {    JsonObject body = readJsonBody(exchange);
-    String launchId = optString(body, "launchId");
-    if (launchId == null || launchId.trim().isEmpty()) {
-      launchId = queryParam(exchange, "launchId");
-    }
-    if (launchId == null || launchId.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'launchId'");
-    }
-    respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
+  /** Ultimas lineas del Error Log de Studio: GET /logs/tail?lines=200. */
+  private void handleLogTail(HttpExchange exchange) throws IOException {
+    int lines = queryInt(exchange, "lines", LogTailService.DEFAULT_LINES);
+    respond(exchange, 200, LogTailService.tail(lines));
   }
 
-  private void handleLaunchWait(HttpExchange exchange) throws IOException {
-    JsonObject body = readJsonBody(exchange);
-    String launchId = optString(body, "launchId");
-    if (launchId == null || launchId.trim().isEmpty()) {
-      launchId = queryParam(exchange, "launchId");
+  private static void requireWritable(BridgeConfig config) {
+    if (config.readOnly) {
+      throw new BadRequestException("READ_ONLY", "El bridge esta en modo readOnly");
     }
-    if (launchId == null || launchId.trim().isEmpty()) {
-      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro 'launchId'");
+  }
+
+  /** Parametro obligatorio: del cuerpo JSON o, si no viene, de la query string. */
+  private String requiredParam(HttpExchange exchange, JsonObject body, String key) {
+    String value = optString(body, key);
+    if (isBlank(value)) {
+      value = queryParam(exchange, key);
     }
-    int timeoutMs = optInt(body, "timeoutMs", 60000);
-    LaunchTrackerService.LaunchRunInfo info = LaunchTrackerService.waitForLaunch(launchId, timeoutMs);
-    if (info != null && info.terminatedAt != null) {
-      respond(exchange, 200, LaunchTrackerService.runStatus(launchId));
-      return;
+    if (isBlank(value)) {
+      throw new BadRequestException("MISSING_PARAMETER", "Falta el parametro '" + key + "'");
     }
-    Map<String, Object> payload = new LinkedHashMap<>();
-    payload.put("ok", true);
-    payload.put("source", "studio-bridge");
-    payload.put("confidence", "high");
-    payload.put("endpoint", "/launch/wait");
-    payload.put("timedOut", true);
-    payload.put("launchId", launchId);
-    respond(exchange, 200, payload);
+    return value;
+  }
+
+  private static boolean isBlank(String value) {
+    return value == null || value.trim().isEmpty();
+  }
+
+  private int queryInt(HttpExchange exchange, String key, int fallback) {
+    String value = queryParam(exchange, key);
+    if (isBlank(value)) {
+      return fallback;
+    }
+    try {
+      return Integer.parseInt(value.trim());
+    } catch (NumberFormatException e) {
+      return fallback;
+    }
   }
 
   private String queryParam(HttpExchange exchange, String key) {
@@ -588,7 +611,7 @@ final class BridgeServer {
         throw new BadRequestException("INVALID_BODY", "El cuerpo de la peticion debe ser un objeto JSON");
       }
       return parsed.getAsJsonObject();
-    } catch (com.google.gson.JsonParseException e) {
+    } catch (JsonParseException e) {
       throw new BadRequestException("INVALID_JSON", "JSON invalido: " + e.getMessage());
     }
   }

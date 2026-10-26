@@ -92,6 +92,10 @@ public final class UiThread {
   private static <T> T call(Callable<T> action) {
     try {
       return action.call();
+    } catch (RuntimeException e) {
+      // Sin envolver: asi el servidor ve la excepcion original (por ejemplo una
+      // validacion que debe responder 400, no 500).
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

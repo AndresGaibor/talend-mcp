@@ -147,6 +147,10 @@ public final class JobContexts {
       parameter.getClass().getMethod("setType", String.class).invoke(parameter, type.trim());
     }
     parameter.getClass().getMethod("setValue", String.class).invoke(parameter, value);
+    String comment = JsonSpec.string(spec, "comment");
+    if (comment != null) {
+      parameter.getClass().getMethod("setComment", String.class).invoke(parameter, comment);
+    }
 
     save(manager, process);
 

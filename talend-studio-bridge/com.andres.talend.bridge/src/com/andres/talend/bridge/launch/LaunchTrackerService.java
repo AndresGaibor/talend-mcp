@@ -8,12 +8,14 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 public final class LaunchTrackerService {
 
@@ -31,6 +33,24 @@ public final class LaunchTrackerService {
 
   private static final Map<String, LaunchRunInfo> launches = new ConcurrentHashMap<>();
   private static final Map<String, String> launchNameToLatestId = new ConcurrentHashMap<>();
+
+  /**
+   * Cada cuanto se busca el proceso del job de un lanzamiento vigilado. En
+   * Windows cada busqueda lanza PowerShell (~1 s), asi que no conviene mas rapido.
+   */
+  private static final long OBSERVE_POLL_MS = 3000L;
+
+  /** Margen entre el instante de arranque del proceso y el del lanzamiento. */
+  private static final long START_TOLERANCE_MS = 2000L;
+
+  /** Tiempo maximo para que aparezca el proceso del job (compilacion incluida). */
+  private static final long PROCESS_APPEAR_TIMEOUT_MS = 15L * 60L * 1000L;
+
+  /** Vigilantes activos, por launchId. */
+  private static final Map<String, Thread> observers = new ConcurrentHashMap<>();
+
+  /** Procesos ya asignados a un lanzamiento, para no contarlos dos veces. */
+  private static final Set<Long> claimedPids = ConcurrentHashMap.newKeySet();
 
   private LaunchTrackerService() {}
 
@@ -76,12 +96,17 @@ public final class LaunchTrackerService {
     launches.put(launchId, info);
     launchNameToLatestId.put(launchConfigName, launchId);
     persist(info);
+    observe(launchId, launchConfigName, info.startedAt);
     return launchId;
   }
 
-  public static void markTerminated(String launchId, Integer exitCode, Map<String, Object> extra) {
+  /**
+   * Marca el lanzamiento como terminado. Es idempotente: el vigilante y
+   * `waitForLaunch` pueden llegar a la vez y solo el primero escribe.
+   */
+  public static synchronized void markTerminated(String launchId, Integer exitCode, Map<String, Object> extra) {
     LaunchRunInfo info = launches.get(launchId);
-    if (info != null) {
+    if (info != null && info.terminatedAt == null) {
       info.terminatedAt = System.currentTimeMillis();
       info.durationMs = info.terminatedAt - info.startedAt;
       info.exitCode = exitCode;
@@ -115,41 +140,30 @@ public final class LaunchTrackerService {
     markTerminated(launchId, exitCode, null);
   }
 
+  /**
+   * Espera a que el launch termine, como mucho `timeoutMs`.
+   *
+   * No sondea procesos: el fin lo marca el vigilante (`observe`). Si nadie
+   * vigila el launch, no va a cambiar de estado y se devuelve enseguida en vez
+   * de consumir todo el timeout.
+   */
   public static LaunchRunInfo waitForLaunch(String launchId, int timeoutMs) {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (true) {
       LaunchRunInfo info = getLaunch(launchId);
-      if (info != null && info.terminatedAt != null) {
+      if (info == null || info.terminatedAt != null || !observers.containsKey(launchId)) {
         return info;
       }
-      long remaining = deadline - System.currentTimeMillis();
-      if (remaining <= 0) {
-        return getLaunch(launchId);
-      }
-      if (info != null) {
-        // Talend ejecuta cada job en una JVM aparte. El fin del proceso es
-        // la senal de que el job termino: el evento de depuracion de
-        // Eclipse no se emite para estos lanzamientos.
-        for (ProcessHandle handle : processesOfJob(info.launchConfigName)) {
-          try {
-            handle.onExit().get(Math.min(remaining, 1000), TimeUnit.MILLISECONDS);
-            markTerminated(launchId, exitCodeOf(handle), null);
-            return getLaunch(launchId);
-          } catch (TimeoutException e) {
-            // Todavia no ha terminado: se sigue esperando.
-          } catch (Exception e) {
-            // El proceso ya no esta: se comprueba en la siguiente vuelta.
-          }
-        }
+      if (System.currentTimeMillis() >= deadline) {
+        return info;
       }
       try {
         Thread.sleep(50);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        break;
+        return getLaunch(launchId);
       }
     }
-    return getLaunch(launchId);
   }
 
   /**
@@ -187,7 +201,7 @@ public final class LaunchTrackerService {
     if (space > 0) {
       jobName = jobName.substring(0, space);
     }
-    if (jobName.isEmpty()) {
+    if (!jobName.matches("[A-Za-z0-9_.\\-]+")) {
       return found;
     }
     for (ProcessHandle handle : ProcessHandle.allProcesses().toArray(ProcessHandle[]::new)) {
@@ -200,7 +214,125 @@ public final class LaunchTrackerService {
         // Hay procesos que no dejan leer su linea de comandos.
       }
     }
+    if (found.isEmpty() && System.getProperty("os.name", "").toLowerCase().startsWith("windows")) {
+      found.addAll(processesByCommandLineOnWindows(jobName));
+    }
     return found;
+  }
+
+  /**
+   * Procesos de Windows cuya linea de comandos contiene el nombre del job.
+   *
+   * Desde la JVM de Studio, `ProcessHandle` no da la linea de comandos de los
+   * procesos ajenos (viene vacia), pero WMI si. Se usa PowerShell, que hay en
+   * cualquier Windows. El nombre ya viene validado, asi que no puede colar nada
+   * en el comando.
+   */
+  private static List<ProcessHandle> processesByCommandLineOnWindows(String jobName) {
+    List<ProcessHandle> found = new ArrayList<>();
+    String script = "Get-CimInstance Win32_Process -Filter \"CommandLine LIKE '%" + jobName
+        + "%'\" | ForEach-Object { $_.ProcessId }";
+    String encoded = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_16LE));
+    try {
+      Process powershell = new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded)
+          .redirectError(ProcessBuilder.Redirect.DISCARD)
+          .start();
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(powershell.getInputStream(), StandardCharsets.UTF_8))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          String pid = line.trim();
+          if (pid.matches("\\d+")) {
+            ProcessHandle.of(Long.parseLong(pid)).ifPresent(found::add);
+          }
+        }
+      }
+      powershell.waitFor(10, TimeUnit.SECONDS);
+    } catch (Exception e) {
+      System.err.println("No se pudo consultar WMI por los procesos de " + jobName + ": " + e.getMessage());
+    }
+    return found;
+  }
+
+  /**
+   * Vigila el proceso del job de un lanzamiento hasta que termina.
+   *
+   * Talend no emite evento de depuracion para estos lanzamientos, asi que el
+   * fin se detecta por el proceso del sistema. La vigilancia arranca con el
+   * lanzamiento y no solo cuando alguien llama a `waitForLaunch`: un job que
+   * acaba antes de esa llamada no dejaria rastro para encontrarlo despues.
+   */
+  private static void observe(String launchId, String launchConfigName, long startedAt) {
+    Thread observer = new Thread(() -> {
+      ProcessHandle job = null;
+      try {
+        job = waitForJobProcess(launchConfigName, startedAt);
+        if (job != null) {
+          job.onExit().get();
+          markTerminated(launchId, exitCodeOf(job), null);
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
+        System.err.println("Fallo la vigilancia del launch " + launchId + ": " + e.getMessage());
+      } finally {
+        if (job != null) {
+          claimedPids.remove(job.pid());
+        }
+        observers.remove(launchId);
+      }
+    }, "talend-bridge-launch-" + launchId);
+    observer.setDaemon(true);
+    observers.put(launchId, observer);
+    observer.start();
+  }
+
+  /**
+   * Espera a que aparezca el proceso del job que arranco despues del lanzamiento.
+   *
+   * Ignora los procesos ya asignados a otro lanzamiento y los que arrancaron
+   * antes, para no confundir una ejecucion anterior del mismo job. Devuelve
+   * null si el proceso no aparece dentro de PROCESS_APPEAR_TIMEOUT_MS.
+   */
+  private static ProcessHandle waitForJobProcess(String launchConfigName, long startedAt) throws InterruptedException {
+    long deadline = System.currentTimeMillis() + PROCESS_APPEAR_TIMEOUT_MS;
+    while (System.currentTimeMillis() < deadline) {
+      for (ProcessHandle handle : processesOfJob(launchConfigName)) {
+        if (startedAfter(handle, startedAt) && claimedPids.add(handle.pid())) {
+          return handle;
+        }
+      }
+      Thread.sleep(OBSERVE_POLL_MS);
+    }
+    return null;
+  }
+
+  private static boolean startedAfter(ProcessHandle handle, long startedAt) {
+    return handle.info().startInstant()
+        .map(instant -> instant.toEpochMilli() >= startedAt - START_TOLERANCE_MS)
+        .orElse(false);
+  }
+
+  /**
+   * Para los vigilantes. Se llama al detener el plugin, que tambien ocurre al
+   * recargarlo en caliente: asi no quedan hilos del classloader anterior.
+   */
+  public static void stopObservers() {
+    for (Thread observer : observers.values()) {
+      observer.interrupt();
+    }
+    observers.clear();
+    claimedPids.clear();
+  }
+
+  /**
+   * Estado que ve quien consulta. Un launch sin fin y sin vigilante no se puede
+   * confirmar: se devuelve `unobserved` en vez de un `started` que nadie actualiza.
+   */
+  private static String displayStatus(LaunchRunInfo info) {
+    if (info.terminatedAt == null && !observers.containsKey(info.launchId)) {
+      return "unobserved";
+    }
+    return info.status;
   }
 
   private static void persist(LaunchRunInfo info) {
@@ -300,7 +432,7 @@ public final class LaunchTrackerService {
       payload.put("startedAt", info.startedAt);
       payload.put("terminatedAt", info.terminatedAt);
       payload.put("durationMs", info.durationMs);
-      payload.put("status", info.status);
+      payload.put("status", displayStatus(info));
       payload.put("exitCode", info.exitCode);
       payload.put("terminated", info.terminatedAt != null);
     } else {

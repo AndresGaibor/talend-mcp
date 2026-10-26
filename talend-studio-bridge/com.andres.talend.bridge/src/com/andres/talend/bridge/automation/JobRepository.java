@@ -396,7 +396,7 @@ public final class JobRepository {
   }
 
   /** Job del proyecto por su etiqueta. */
-  private static Object findByLabel(Object repositoryFactory, String name) throws Exception {
+  static Object findByLabel(Object repositoryFactory, String name) throws Exception {
     Class<?> enumClass = repositoryFactory.getClass().getClassLoader()
         .loadClass("org.talend.core.model.repository.ERepositoryObjectType");
     Object processType = enumClass.getField("PROCESS").get(null);

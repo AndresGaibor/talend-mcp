@@ -71,11 +71,12 @@ public final class RepositoryConnections {
           connectionType = connection == null ? null : connection.getClass().getSimpleName();
         }
 
+        final String connectionTypeName = connectionType;
         Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         collectTables(invoke(connection, "getDataPackage"), 0, visited, table -> {
           Map<String, Object> schema = new LinkedHashMap<>();
           schema.put("connectionName", connectionName);
-          schema.put("connectionType", connectionType);
+          schema.put("connectionType", connectionTypeName);
           schema.put("name", firstString(invoke(table, "getLabel"), invoke(table, "getName")));
           schema.put("columns", describeColumns(invoke(table, "getColumns")));
           schemas.add(schema);
