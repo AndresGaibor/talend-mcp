@@ -1,8 +1,65 @@
 import * as z from "zod/v4";
-import { bridgeOk, bridgeFail } from "./tools-base";
+import { join } from "node:path";
+import { bridgeOk, bridgeFail, bridgeResultToEnvelope, loadBridge } from "./tools-base";
 import { buildChecklist, createPackage, collectJobFiles } from "../deliverables/deliverable-packager";
+import { createPlatformContext } from "../../platform";
+import { toTalendHostPath } from "../../platform/path-bridge";
+
+const BUILD_JOB_ENDPOINT = "/automation/build-job";
+
+/**
+ * Carpeta de builds por defecto: `TALEND_BUILDS_DIR/<job>`. La variable va en la forma de Studio
+ * (la misma que lee `talend_find_exported_jobs`), asi que no hace falta convertirla.
+ */
+function defaultBuildDir(jobName: string): string | undefined {
+  const raw = process.env.TALEND_BUILDS_DIR;
+  return raw ? join(raw, jobName) : undefined;
+}
 
 export const deliverableTools = [
+  {
+    name: "talend_deliverables_build_job",
+    description:
+      "Construye un job como Build Job: zip autonomo con launcher (_run.bat/_run.sh), jar, lib/ y contexto, extraido en la carpeta de builds. Ejecutalo sin Studio con talend_runs_start_exported. Guarda el job en Studio antes de construirlo.",
+    annotations: { readOnly: false, requiresConfirmation: true },
+    inputSchema: z.object({
+      jobName: z.string().describe("Nombre del job, ya compilado en Studio"),
+      contextName: z.string().optional().default("Default").describe("Contexto que usa el launcher por defecto"),
+      version: z.string().optional().default("0.1").describe("Version del job"),
+      destinationDir: z
+        .string()
+        .optional()
+        .describe("Carpeta del build. Por defecto, TALEND_BUILDS_DIR/<jobName>"),
+    }),
+    handler: async (input: { jobName: string; contextName?: string; version?: string; destinationDir?: string }) => {
+      const ctx = createPlatformContext();
+      const destination = input.destinationDir
+        ? toTalendHostPath(input.destinationDir, ctx)
+        : defaultBuildDir(input.jobName);
+      if (!destination) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint: BUILD_JOB_ENDPOINT,
+          error: {
+            code: "NO_BUILDS_DIR",
+            message: "No hay carpeta de build: define TALEND_BUILDS_DIR o pasa destinationDir.",
+          },
+        });
+      }
+
+      const bridge = await loadBridge();
+      const result = await bridge.buildJob({
+        job: input.jobName,
+        destination,
+        version: input.version,
+        context: input.contextName,
+      });
+      const envelope = bridgeResultToEnvelope(result, BUILD_JOB_ENDPOINT);
+      return envelope.ok ? bridgeOk(envelope) : bridgeFail(envelope);
+    },
+  },
   {
     name: "talend_deliverables_export_job",
     description: "Prepara un paquete de entregable para un job.",

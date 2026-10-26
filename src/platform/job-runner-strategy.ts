@@ -47,16 +47,27 @@ export function getScriptPathForCmd(scriptPath: string, ctx: PlatformContext): s
   return scriptPath;
 }
 
+/**
+ * Argumentos para lanzar un script. `extraArgs` llega al script como argumentos (el launcher de Talend
+ * los reenvia a Java con `%*` o `"$@"`): asi es como se pasan `--context=` y `--context_param`.
+ */
 export function buildScriptExecutionArgs(
   scriptPath: string,
   strategy: JobRunnerStrategy,
   ctx: PlatformContext,
+  extraArgs: string[] = [],
 ): string[] {
   if (strategy.shell === "cmd.exe") {
     const windowsPath = getScriptPathForCmd(scriptPath, ctx);
-    return ["/C", windowsPath];
+    return ["/C", windowsPath, ...extraArgs];
   }
-  return ["-c", `chmod +x "${scriptPath}" && "${scriptPath}"`];
+  const quoted = extraArgs.map(shellQuote).join(" ");
+  return ["-c", `chmod +x "${scriptPath}" && "${scriptPath}"${quoted ? ` ${quoted}` : ""}`];
+}
+
+/** Entrecomilla un argumento para sh: sin expansion y con las comillas simples escapadas. */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 export function selectScriptByPlatform(

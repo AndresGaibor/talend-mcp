@@ -128,8 +128,8 @@ export const allTools = [
   createUpsertRepositoryContextParameterTool(),
 
   createFindExportedJobsTool(),
-  createJobInfoTool(),
-  createTailRunOutputTool(),
+  createJobInfoTool(),
+  createTailRunOutputTool(),
 
   createLatestChangesTool(),
   createLiveStartTool(),

@@ -20,7 +20,7 @@ export function createRunExportedJobTool() {
         timeoutMs: { type: "number", description: "Timeout en ms (default: 300000)" },
         params: {
           type: "object",
-          description: "Parámetros como TALEND_PARAM_<key>",
+          description: "Parámetros de contexto del job, pasados al launcher como --context_param <clave>=<valor>",
           additionalProperties: { type: "string" },
         },
       },

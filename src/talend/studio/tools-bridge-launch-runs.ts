@@ -24,17 +24,4 @@ export const bridgeLaunchRunTools = [
       return bridgeOk(bridgeResultToEnvelope(result, "/launch/run-status"));
     },
   },
-  {
-    name: "talend_bridge_launch_wait",
-    description: "Espera a que una ejecución termine.",
-    inputSchema: z.object({
-      launchId: z.string().describe("ID de la launch"),
-      timeoutMs: z.number().optional().default(60000).describe("Timeout en ms"),
-    }),
-    handler: async ({ launchId, timeoutMs }: { launchId: string; timeoutMs?: number }) => {
-      const bridge = await loadBridge();
-      const result = await bridge.launchWait(launchId, timeoutMs);
-      return bridgeOk(bridgeResultToEnvelope(result, "/launch/wait"));
-    },
-  },
 ];

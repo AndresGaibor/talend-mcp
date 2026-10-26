@@ -12,7 +12,11 @@ function checked(result: { ok: boolean; data?: unknown; error?: { message: strin
   if (!result.ok) throw new Error(result.error?.message ?? "Studio rechazo la operacion");
   const data = result.data as { ok?: boolean; result?: unknown; error?: string } | undefined;
   if (data?.ok === false) throw new Error(data.error ?? "Studio rechazo la operacion");
-  return data?.result ?? data;
+  const payload = data?.result ?? data;
+  if (payload && typeof payload === "object" && "ok" in payload && payload.ok === false) {
+    throw new Error("error" in payload ? String(payload.error) : "Studio rechazo la operacion");
+  }
+  return payload;
 }
 
 function folderOf(spec: CustomJobSpec): string {
@@ -145,7 +149,12 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
       if (!Array.isArray(contexts?.contexts)) throw new Error("Studio no devolvio los contextos del Job");
       const environment = job.defaultContext ?? "Default";
       let context = contexts.contexts.find((item) => item.name === environment);
-      if (!context) { checked(await bridge.createJobContext({ job: job.jobName, name: environment })); context = { name: environment, parameters: [] }; }
+      if (!context) {
+        checked(await bridge.createJobContext({ job: job.jobName, name: environment }));
+        const refreshed = checked(await bridge.jobContexts({ job: job.jobName })) as typeof contexts;
+        context = refreshed.contexts?.find((item) => item.name === environment);
+        if (!context) throw new Error(`Studio no confirmo el contexto ${environment}`);
+      }
       const names = new Set((job.contexts ?? []).map((item) => item.name));
       for (const variable of job.contexts ?? []) {
         const current = context.parameters.find((item) => item.name === variable.name);
