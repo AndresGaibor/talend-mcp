@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **232**.
+Tools registradas en el preset actual: **233**.
 
 ## Empezar
 
@@ -980,7 +980,7 @@ Lanzar jobs y leer su salida, log e historial.
 
 #### `talend_job_run_by_name`
 
-Ejecuta un job por nombre de launch config.
+Ejecuta un job por nombre de launch config. Antes de lanzar comprueba si Studio tiene un dialogo modal abierto (STUDIO_DIALOG_OPEN). Con installMissing:true, si lo que bloquea son los modulos de terceros, pulsa la descarga y espera a que termine antes de lanzar (autoInstalledModules lo indica).
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -991,6 +991,8 @@ Argumentos principales:
 - `saveBefore` (boolean, opcional): Guardar antes de ejecutar
 - `waitForTermination` (boolean, opcional): Esperar a que termine
 - `timeoutMs` (number, opcional): Timeout en ms
+- `ignoreDialogs` (boolean, opcional): Lanzar aunque haya dialogos abiertos que bloquean Studio (no recomendado)
+- `installMissing` (boolean, opcional): Si Studio pide los modulos de terceros, pulsar la descarga y esperar a que termine antes de lanzar
 
 #### `talend_job_wait_run`
 
@@ -1924,6 +1926,12 @@ Argumentos principales:
 - `code` (string, obligatorio): Codigo fuente Java con un metodo estatico 'public static Object run()'
 - `className` (string, opcional): Nombre de la clase. Si se omite, se deduce del codigo
 
+#### `talend_studio_ui_dialogs`
+
+Lista los dialogos abiertos en Talend Studio (titulo, si son modales, botones y textos) y marca cuales bloquean el IDE, con la accion sugerida. Solo lectura: no pulsa ni cierra nada, y responde al momento. Es la misma comprobacion que hacen talend_job_run_by_name y talend_job_compile antes de actuar.
+
+**Uso:** solo lectura; requiere Studio + bridge.
+
 #### `talend_studio_ui_inventory`
 
 Inventario de solo lectura de la interfaz de Talend Studio: menus, pestanas de editor y paneles, barras de herramientas, perspectivas, vistas registradas y clases de dialogos y asistentes por bundle. No pulsa, no cierra ni guarda nada. Requiere unsafeActions=true en el bridge.
@@ -2273,13 +2281,15 @@ Argumentos principales:
 
 #### `talend_job_compile`
 
-Genera el codigo Java del job y comprueba que compila, sin ejecutarlo. Devuelve 'compiles' y, si falla, la linea y el mensaje del error (por ejemplo 'no_comillas cannot be resolved to a variable'). Es la forma de saber si una configuracion genera codigo valido antes de correr el job. Tarda unos segundos y ocupa el hilo de la interfaz de Studio mientras genera, igual que un Run.
+Genera el codigo Java del job y comprueba que compila, sin ejecutarlo. Devuelve 'compiles' y, si falla, la linea y el mensaje del error (por ejemplo 'no_comillas cannot be resolved to a variable'). Es la forma de saber si una configuracion genera codigo valido antes de correr el job. Si faltan dependencias Maven las lista en 'missingArtifacts'; con installMissing:true las descarga de Maven Central y vuelve a compilar. Se bloquea con STUDIO_DIALOG_OPEN si hay un dialogo modal abierto en Studio. Tarda unos segundos y ocupa el hilo de la interfaz de Studio mientras genera, igual que un Run.
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
 Argumentos principales:
 
 - `job` (string, opcional): Job a compilar. Si se omite, el job activo
+- `installMissing` (boolean, opcional): Descargar lo que falte (modulos de terceros de Studio y dependencias Maven de Maven Central) y volver a compilar
+- `ignoreDialogs` (boolean, opcional): Compilar aunque haya dialogos abiertos que bloquean Studio (no recomendado)
 
 #### `talend_job_configure_node`
 

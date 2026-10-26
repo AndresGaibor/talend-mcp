@@ -129,6 +129,64 @@ similares. Si anades una sonda, mantenla con ese criterio.
 - El contenido de cualquier dialogo de la seccion 73.
 - La paleta GEF de la pestana Designer (es un lienzo, no widgets SWT).
 
+## 77. Control de dialogos desde el flujo
+
+**Verificado en vivo** en Studio 8.0.1, con un dialogo de prueba que no hace nada al pulsarse.
+
+Antes de actuar, el flujo comprueba si Studio tiene un dialogo abierto:
+
+| Tool | Que hace antes de actuar |
+|---|---|
+| `talend_job_run_by_name` (sin `dryRun`) | Si hay un dialogo modal que no es progreso, para con `STUDIO_DIALOG_OPEN` antes de lanzar |
+| `talend_job_compile` | Lo mismo, antes de generar el codigo |
+| `talend_studio_install_modules` | Lee que modulos lista el dialogo antes de pulsar. Si no hay ninguno, `NO_MODULES_DIALOG` |
+| `talend_studio_ui_dialogs` | Lista los dialogos y marca cuales bloquean. Solo lectura |
+
+La comprobacion usa `GET /workbench/dialogs/list` (`DialogListService`). Lee widgets en el hilo de la
+UI y no compila nada: responde en 20 a 70 ms. Antes se hacia con `run-code`, que tardaba unos 7 s
+por llamada aunque el codigo no hiciera nada: cada `run-code` compila el codigo y arma el classpath.
+Con un plugin anterior que no tiene el endpoint, la comprobacion vuelve a `run-code` sola.
+
+### Automatico con `installMissing:true`
+
+Si lo unico que bloquea es el dialogo de modulos de terceros, `talend_job_run_by_name` (y
+`talend_job_compile`) pulsa "Download and install all modules available", espera a que Studio quede
+libre (hasta 120 s) y continua. Cualquier otro dialogo se devuelve tal cual, sin tocarlo. La respuesta
+indica `autoInstalledModules`.
+
+Verificado con un dialogo imitado: titulo "Third party modules", un boton de descarga sin efecto y un
+"Cerrar" que cierra la ventana. `run_by_name` espero 30,4 s, a que el guardian cerrara el dialogo, y
+continuo hasta el lanzamiento. Ese lanzamiento fallo con `LAUNCH_NOT_FOUND` porque la configuracion no
+existia, asi que no se ejecuto ningun job. No se descargo nada.
+
+### Lo que no se resuelve sin preguntar
+
+- **Fallo cerrado.** Si la comprobacion no puede hacerse, `run_by_name` y `compile` no actuan: devuelven
+  `STUDIO_DIALOG_CHECK_FAILED`. Solo `ignoreDialogs: true` lo salta, a sabiendas. Antes seguian en
+  silencio: en una prueba, `run_by_name` lanzo con la comprobacion caida, porque el bridge no respondio.
+- **Dependencias Maven.** `compile` con `installMissing` descarga las coordenadas `Missing artifact g:a:v`
+  de Maven Central y vuelve a compilar. El `tMap` no se resuelve asi: `talend-tmap-dataset` no esta en
+  Maven Central (seccion 25 de INTERNALS 05). Para ese caso sirve el dialogo de modulos de Studio.
+- **Ventana del guardian.** El dialogo de modulos se cierra a los 30 s si nadie lo atiende. Por eso el
+  flujo responde `STUDIO_DIALOG_OPEN` con la accion a tomar, y con `installMissing` lo atiende en el
+  mismo paso.
+
+### Trampas
+
+- Un dialogo de prueba tiene que cerrarse de verdad al pulsar un boton. Si su boton no tiene listener,
+  el guardian lo "pulsa" sin efecto y el dialogo se queda abierto: la prueba parece un fallo del flujo.
+- `run-code` no sirve para comprobaciones frecuentes: el coste base son ~7 s aunque el codigo sea trivial.
+
+## 78. Dependencias que faltan: deteccion
+
+`findMissingArtifacts` (`missing-artifacts.ts`) lee el texto de la compilacion. Reconoce dos formas:
+`Missing artifact g:a:jar:v` (con coordenada) y `...jar inexistente` (solo el nombre del jar). Un jar sin
+groupId se senala, pero no se descarga: no hay coordenada que pedir a Maven Central.
+
+Cubierto por tests del parser y de la orquestacion (`compileWithDependencies`) con un bridge falso. No
+se probo en vivo con un job que tenga una dependencia faltante, porque no hay un job de prueba sin efectos
+externos que la necesite.
+
 ## Relacionado
 
 - Guardian de modales y el riesgo de `Save Resource`: [seccion 13](02-operar-el-job.md#13-el-guardian-de-modales).

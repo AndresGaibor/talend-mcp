@@ -258,7 +258,7 @@ public final class ModalGuard {
    *
    * Las ventanas del workbench no se cierran: no son dialogos.
    */
-  private static boolean isWorkbenchShell(Shell shell) {
+  static boolean isWorkbenchShell(Shell shell) {
     for (IWorkbenchWindow window : PlatformUI.getWorkbench().getWorkbenchWindows()) {
       Shell workbenchShell = window.getShell();
       if (workbenchShell != null && workbenchShell.equals(shell)) {

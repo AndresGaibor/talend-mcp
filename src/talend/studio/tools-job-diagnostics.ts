@@ -1,5 +1,7 @@
 import * as z from "zod/v4";
-import { bridgeOk, loadBridge } from "./tools-base";
+import { bridgeFail, bridgeOk, loadBridge } from "./tools-base";
+import { compileWithDependencies } from "./compile-with-dependencies";
+import { prepareStudioForJob } from "./studio-dialogs";
 
 export const jobDiagnosticsTools = [
   {
@@ -31,20 +33,67 @@ export const jobDiagnosticsTools = [
   },
   {
     name: "talend_job_compile",
-    description: "Genera el codigo Java del job y comprueba que compila, sin ejecutarlo. Devuelve 'compiles' y, si falla, la linea y el mensaje del error (por ejemplo 'no_comillas cannot be resolved to a variable'). Es la forma de saber si una configuracion genera codigo valido antes de correr el job. Tarda unos segundos y ocupa el hilo de la interfaz de Studio mientras genera, igual que un Run.",
+    description: "Genera el codigo Java del job y comprueba que compila, sin ejecutarlo. Devuelve 'compiles' y, si falla, la linea y el mensaje del error (por ejemplo 'no_comillas cannot be resolved to a variable'). Es la forma de saber si una configuracion genera codigo valido antes de correr el job. Si faltan dependencias Maven las lista en 'missingArtifacts'; con installMissing:true las descarga de Maven Central y vuelve a compilar. Se bloquea con STUDIO_DIALOG_OPEN si hay un dialogo modal abierto en Studio. Tarda unos segundos y ocupa el hilo de la interfaz de Studio mientras genera, igual que un Run.",
     inputSchema: z.object({
       job: z.string().optional().describe("Job a compilar. Si se omite, el job activo"),
+      installMissing: z.boolean().optional().default(false).describe("Descargar lo que falte (modulos de terceros de Studio y dependencias Maven de Maven Central) y volver a compilar"),
+      ignoreDialogs: z.boolean().optional().default(false).describe("Compilar aunque haya dialogos abiertos que bloquean Studio (no recomendado)"),
     }),
-    handler: async ({ job }: { job?: string }) => {
+    handler: async ({ job, installMissing, ignoreDialogs }: { job?: string; installMissing?: boolean; ignoreDialogs?: boolean }) => {
       const bridge = await loadBridge();
-      const result = await bridge.jobCompile({ job });
+
+      // Un dialogo modal abierto (por ejemplo los modulos de terceros) bloquea la generacion.
+      const prepared = await prepareStudioForJob(bridge, {
+        ignoreDialogs: ignoreDialogs ?? false,
+        installMissing: installMissing ?? false,
+      });
+      const dialogCheck = prepared.check;
+      const autoInstalledModules = prepared.autoInstalledModules;
+      if (dialogCheck.status === "unavailable" && !ignoreDialogs) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "medium",
+          endpoint: "/automation/job/compile",
+          error: {
+            code: "STUDIO_DIALOG_CHECK_FAILED",
+            message: `No se pudo comprobar si Studio tiene dialogos abiertos (${dialogCheck.reason}). No se compila sin esa comprobacion: revisa Studio o usa ignoreDialogs:true.`,
+          },
+        });
+      }
+      if (dialogCheck.status === "blocked") {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "high",
+          endpoint: "/automation/job/compile",
+          data: { blocking: dialogCheck.blocking, autoInstalledModules },
+          error: {
+            code: "STUDIO_DIALOG_OPEN",
+            message: `Studio tiene ${dialogCheck.blocking.length} dialogo(s) que bloquean el IDE: ${dialogCheck.blocking.map((dialog) => `"${dialog.title}"`).join(", ")}. Resuelvelos antes de compilar (talend_studio_ui_dialogs muestra la accion sugerida).`,
+          },
+        });
+      }
+
+      const outcome = await compileWithDependencies(bridge, job, installMissing ?? false);
+      const dialogWarning = dialogCheck.status === "unavailable"
+        ? `No se pudo comprobar si Studio tiene dialogos abiertos: ${dialogCheck.reason}`
+        : undefined;
+
       return bridgeOk({
-        ok: result.ok,
-        source: result.source,
-        confidence: result.confidence,
+        ok: outcome.ok,
+        source: outcome.source,
+        confidence: outcome.confidence,
         endpoint: "/automation/job/compile",
-        data: result.data,
-        error: result.error,
+        warning: dialogWarning,
+        data: {
+          ...outcome.data,
+          autoInstalledModules,
+          missingArtifacts: outcome.missingArtifacts,
+          ...(outcome.autoInstalled.length > 0 ? { autoInstalled: outcome.autoInstalled } : {}),
+          ...(outcome.hint ? { hint: outcome.hint } : {}),
+        },
+        error: outcome.error,
       });
     },
   },

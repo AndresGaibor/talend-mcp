@@ -3,6 +3,7 @@ import * as z from "zod/v4";
 
 import { bridgeOk, bridgeFail, loadBridge } from "../tools-base";
 import { interpretLaunchWait, type LaunchWaitOutcome } from "../launch-wait-outcome";
+import { prepareStudioForJob } from "../studio-dialogs";
 
 import type { TalendStudioBridgeClient } from "../bridge-client";
 
@@ -31,15 +32,17 @@ async function resolveLaunchConfigName(bridge: TalendStudioBridgeClient, jobName
 export const launch = [
 {
     name: "talend_job_run_by_name",
-    description: "Ejecuta un job por nombre de launch config.",
+    description: "Ejecuta un job por nombre de launch config. Antes de lanzar comprueba si Studio tiene un dialogo modal abierto (STUDIO_DIALOG_OPEN). Con installMissing:true, si lo que bloquea son los modulos de terceros, pulsa la descarga y espera a que termine antes de lanzar (autoInstalledModules lo indica).",
     inputSchema: z.object({
       jobName: z.string().describe("Nombre del job o launch config"),
       dryRun: z.boolean().optional().default(false).describe("Si es dry run"),
       saveBefore: z.boolean().optional().default(true).describe("Guardar antes de ejecutar"),
       waitForTermination: z.boolean().optional().default(true).describe("Esperar a que termine"),
       timeoutMs: z.number().optional().default(120000).describe("Timeout en ms"),
+      ignoreDialogs: z.boolean().optional().default(false).describe("Lanzar aunque haya dialogos abiertos que bloquean Studio (no recomendado)"),
+      installMissing: z.boolean().optional().default(false).describe("Si Studio pide los modulos de terceros, pulsar la descarga y esperar a que termine antes de lanzar"),
     }),
-    handler: async (input: { jobName: string; dryRun?: boolean; saveBefore?: boolean; waitForTermination?: boolean; timeoutMs?: number }) => {
+    handler: async (input: { jobName: string; dryRun?: boolean; saveBefore?: boolean; waitForTermination?: boolean; timeoutMs?: number; ignoreDialogs?: boolean; installMissing?: boolean }) => {
       try {
         const bridge = await loadBridge();
 
@@ -52,6 +55,49 @@ export const launch = [
             endpoint: "/job/run-by-name",
             error: { code: "AMBIGUOUS_LAUNCH_CONFIG", message: resolved.error },
           });
+        }
+
+        // Un dialogo modal abierto dejaria el lanzamiento colgado: se comprueba antes de lanzar.
+        // Si la sonda no puede correr, se lanza igual y el aviso lo dice.
+        let dialogWarning: string | undefined;
+        let autoInstalledModules = false;
+        if (!input.dryRun) {
+          const prepared = await prepareStudioForJob(bridge, {
+            ignoreDialogs: input.ignoreDialogs ?? false,
+            installMissing: input.installMissing ?? false,
+          });
+          const dialogCheck = prepared.check;
+          autoInstalledModules = prepared.autoInstalledModules;
+          if (dialogCheck.status === "blocked") {
+            const titles = dialogCheck.blocking.map((dialog) => `"${dialog.title}"`).join(", ");
+            return bridgeFail({
+              ok: false,
+              source: "studio-bridge",
+              confidence: "high",
+              endpoint: "/job/run-by-name",
+              data: { blocking: dialogCheck.blocking, autoInstalledModules },
+              error: {
+                code: "STUDIO_DIALOG_OPEN",
+                message: `Studio tiene ${dialogCheck.blocking.length} dialogo(s) que bloquean el IDE: ${titles}. Resuelvelos antes de lanzar el job (talend_studio_ui_dialogs muestra la accion sugerida).`,
+              },
+            });
+          }
+          if (dialogCheck.status === "unavailable") {
+            // Sin la comprobacion no se sabe si Studio esta bloqueado: no se lanza el job a ciegas.
+            if (!input.ignoreDialogs) {
+              return bridgeFail({
+                ok: false,
+                source: "studio-bridge",
+                confidence: "medium",
+                endpoint: "/job/run-by-name",
+                error: {
+                  code: "STUDIO_DIALOG_CHECK_FAILED",
+                  message: `No se pudo comprobar si Studio tiene dialogos abiertos (${dialogCheck.reason}). No se lanza el job sin esa comprobacion: revisa Studio o usa ignoreDialogs:true.`,
+                },
+              });
+            }
+            dialogWarning = `No se pudo comprobar si Studio tiene dialogos abiertos: ${dialogCheck.reason}`;
+          }
         }
 
         const launchResult = await bridge.runLaunchConfig(resolved.resolved, input.dryRun ?? false);
@@ -94,11 +140,18 @@ export const launch = [
           source: "studio-bridge",
           confidence: "high",
           endpoint: "/job/run-by-name",
-          warning: outcome?.timedOut
-            ? `El job sigue en ejecucion tras ${input.timeoutMs ?? 120000} ms: usa talend_job_wait_run con launchId para seguir esperando.`
-            : undefined,
+          warning:
+            [
+              dialogWarning,
+              outcome?.timedOut
+                ? `El job sigue en ejecucion tras ${input.timeoutMs ?? 120000} ms: usa talend_job_wait_run con launchId para seguir esperando.`
+                : undefined,
+            ]
+              .filter((text): text is string => text !== undefined)
+              .join(" ") || undefined,
           data: {
             launched: true,
+            autoInstalledModules,
             launchId,
             launchResult: launchResult.data,
             waitResult: waitData,

@@ -20,6 +20,7 @@ type ToolSafetyAnnotation = {
 const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_bridge_ping: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_studio_ui_inventory: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_studio_ui_dialogs: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_bridge_commands: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_bridge_launch_configs: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_bridge_events_recent: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },

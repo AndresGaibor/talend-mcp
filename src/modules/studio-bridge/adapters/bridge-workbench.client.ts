@@ -156,4 +156,9 @@ export class BridgeWorkbenchClient extends BridgeTransportClient {
       body: {},
     });
   }
+
+  /** Dialogos abiertos en Studio. Solo lectura: no pulsa ni cierra nada. */
+  async listDialogs(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/dialogs/list");
+  }
 }

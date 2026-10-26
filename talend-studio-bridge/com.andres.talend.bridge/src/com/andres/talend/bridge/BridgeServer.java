@@ -28,6 +28,7 @@ import com.andres.talend.bridge.problems.ProblemMarkerService;
 import com.andres.talend.bridge.resources.WorkspaceService;
 import com.andres.talend.bridge.talend.TalendClassProbeService;
 import com.andres.talend.bridge.talend.TalendIntrospectionService;
+import com.andres.talend.bridge.workbench.DialogListService;
 import com.andres.talend.bridge.workbench.ModalGuard;
 import com.andres.talend.bridge.workbench.WorkbenchService;
 
@@ -229,6 +230,7 @@ final class BridgeServer {
     ui("/workbench/save-all", WorkbenchService::saveAllEditors);
     ui("/workbench/dialogs", ModalGuard::dismissBlockingDialogs);
     ui("/workbench/modules/install", ModalGuard::installMissingModules);
+    ui("/workbench/dialogs/list", DialogListService::list);
     route("/workbench/open-resource", this::handleOpenResource);
     route("/workbench/close-editor", this::handleCloseEditor);
     route("/workbench/activate-editor", this::handleActivateEditor);

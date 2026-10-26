@@ -47,6 +47,13 @@ hace desde Maven Central.
 **no esta en Maven Central** (es de Talend Exchange y pide credenciales). Con el
 instalador se comprueba enseguida: devuelve 404 para todos los group id
 habituales (`org.talend.components`, `org.talend.libraries`, ...).
+
+**Automatizado.** `talend_job_compile` con `installMissing: true` lee la coordenada del error
+(`Missing artifact g:a:jar:v`), la descarga con `installArtifact` y vuelve a compilar. Si la descarga
+falla, no se recompila y la respuesta lo dice por componente. `talend_job_run_by_name` con
+`installMissing: true` pulsa, ademas, la descarga de modulos de terceros de Studio cuando su dialogo
+bloquea el lanzamiento (seccion 77 de INTERNALS 08). Para el `tMap`, la via prevista es ese dialogo de
+modulos: no se verifico con un job que use `tMap`.
 ## 26. Que no puede entrar al hilo de la UI
 
 Todo lo que corre en `UiThread.sync` ocupa el hilo de la interfaz de Studio: mientras dura, Studio

@@ -254,3 +254,91 @@ public class TalendUiRegistryProbe {
   }
 }
 `;
+
+/**
+ * Lista los dialogos visibles que no son la ventana principal. Rapida: solo
+ * lee widgets, asi que puede correr en cada lanzamiento. No lee campos de texto
+ * (`Text`), porque pueden contener contrasenas. Debe correr en el hilo de la UI.
+ */
+export const UI_DIALOG_PROBE_CLASS = "TalendUiDialogProbe";
+
+export const UI_DIALOG_PROBE_SOURCE = `import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.CLabel;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.ui.IWorkbenchWindow;
+import org.eclipse.ui.PlatformUI;
+
+// Solo lectura: no pulsa, no cierra y no cambia nada.
+public class TalendUiDialogProbe {
+
+  static final int CAP = 60;
+
+  static String clean(String text) {
+    return text == null ? "" : text.replace("&", "").trim();
+  }
+
+  static boolean isWorkbench(Shell shell) {
+    for (IWorkbenchWindow window : PlatformUI.getWorkbench().getWorkbenchWindows()) {
+      if (window.getShell() == shell) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static void collect(Control control, List<String> texts, List<String> buttons) {
+    if (control instanceof Button) {
+      String text = clean(((Button) control).getText());
+      if (!text.isEmpty() && buttons.size() < CAP) {
+        buttons.add(text);
+      }
+    } else if (control instanceof Label) {
+      String text = clean(((Label) control).getText());
+      if (!text.isEmpty() && texts.size() < CAP) {
+        texts.add(text);
+      }
+    } else if (control instanceof CLabel) {
+      String text = clean(((CLabel) control).getText());
+      if (!text.isEmpty() && texts.size() < CAP) {
+        texts.add(text);
+      }
+    }
+    if (control instanceof Composite) {
+      for (Control child : ((Composite) control).getChildren()) {
+        collect(child, texts, buttons);
+      }
+    }
+  }
+
+  public static Object run() {
+    List<Object> dialogs = new ArrayList<>();
+    for (Shell shell : Display.getDefault().getShells()) {
+      if (shell.isDisposed() || !shell.isVisible() || isWorkbench(shell)) {
+        continue;
+      }
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("title", clean(shell.getText()));
+      entry.put("modal", (shell.getStyle() & (SWT.APPLICATION_MODAL | SWT.PRIMARY_MODAL | SWT.SYSTEM_MODAL)) != 0);
+      List<String> texts = new ArrayList<>();
+      List<String> buttons = new ArrayList<>();
+      collect(shell, texts, buttons);
+      entry.put("texts", texts);
+      entry.put("buttons", buttons);
+      dialogs.add(entry);
+    }
+    Map<String, Object> out = new LinkedHashMap<>();
+    out.put("dialogs", dialogs);
+    return out;
+  }
+}
+`;

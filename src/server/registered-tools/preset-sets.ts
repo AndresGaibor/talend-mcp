@@ -68,6 +68,7 @@ export const PRESET_AGENT = new Set([
   "talend_studio_list_components",
   "talend_studio_component_parameters",
   "talend_studio_ui_inventory",
+  "talend_studio_ui_dialogs",
   "talend_components_definition",
   "talend_components_search",
   "talend_components_parameters",

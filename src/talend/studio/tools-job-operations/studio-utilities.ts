@@ -1,7 +1,8 @@
 ﻿/** Tools de jobOperationsTools: studio-utilities. */
 import * as z from "zod/v4";
 
-import { bridgeOk, loadBridge } from "../tools-base";
+import { bridgeFail, bridgeOk, loadBridge } from "../tools-base";
+import { checkStudioDialogs } from "../studio-dialogs";
 
 import { columnSchema, componentSpecShape, parameterSchema } from "../tools-job-operation-schemas";
 
@@ -21,13 +22,37 @@ export const studioUtilities = [
     inputSchema: z.object({}),
     handler: async () => {
       const bridge = await loadBridge();
+
+      // Antes de pulsar: que modulos lista el dialogo, para que la respuesta diga que se descarga.
+      const before = await checkStudioDialogs(bridge, true);
+      const pending = before.status === "unavailable"
+        ? []
+        : before.dialogs.filter((dialog) => dialog.kind === "missing_modules");
+
       const result = await bridge.installModules();
+      const installed: unknown[] = Array.isArray(result.data?.installed) ? result.data.installed : [];
+      if (result.ok && installed.length === 0) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "high",
+          endpoint: "/workbench/modules/install",
+          error: {
+            code: "NO_MODULES_DIALOG",
+            message: "No hay ningun dialogo de modulos de terceros abierto. El guardian lo cierra a los 30 s: vuelve a lanzar el job para que Studio lo muestre otra vez.",
+          },
+        });
+      }
+
       return bridgeOk({
         ok: result.ok,
         source: result.source,
         confidence: result.confidence,
         endpoint: "/workbench/modules/install",
-        data: result.data,
+        data: {
+          ...(result.data ?? {}),
+          dialogTexts: pending.flatMap((dialog) => dialog.texts),
+        },
         error: result.error,
       });
     },

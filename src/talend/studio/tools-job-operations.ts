@@ -7,4 +7,5 @@ import { maintenanceDiagnostics } from "./tools-job-operations/maintenance-diagn
 import { catalog } from "./tools-job-operations/catalog";
 import { studioUtilities } from "./tools-job-operations/studio-utilities";
 import { studioUiInventory } from "./tools-job-operations/studio-ui-inventory";
-export const jobOperationsTools = [...jobLifecycle, ...nodesCreateConfigure, ...connectionsContexts, ...nodeEditing, ...maintenanceDiagnostics, ...catalog, ...studioUtilities, ...studioUiInventory];
+import { studioUiDialogs } from "./tools-job-operations/studio-ui-dialogs";
+export const jobOperationsTools = [...jobLifecycle, ...nodesCreateConfigure, ...connectionsContexts, ...nodeEditing, ...maintenanceDiagnostics, ...catalog, ...studioUtilities, ...studioUiInventory, ...studioUiDialogs];

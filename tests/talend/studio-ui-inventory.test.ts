@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { buildUiInventory } from "../../src/talend/studio/tools-job-operations/studio-ui-inventory";
 import {
+  UI_DIALOG_PROBE_CLASS,
+  UI_DIALOG_PROBE_SOURCE,
   UI_REGISTRY_PROBE_CLASS,
   UI_REGISTRY_PROBE_SOURCE,
   UI_WIDGET_PROBE_CLASS,
@@ -13,11 +15,12 @@ import {
  */
 describe("talend_studio_ui_inventory", () => {
   describe("sondas", () => {
-    const sources = [UI_WIDGET_PROBE_SOURCE, UI_REGISTRY_PROBE_SOURCE];
+    const sources = [UI_WIDGET_PROBE_SOURCE, UI_REGISTRY_PROBE_SOURCE, UI_DIALOG_PROBE_SOURCE];
 
     test("cada sonda declara su clase y el punto de entrada que espera run-code", () => {
       expect(UI_WIDGET_PROBE_SOURCE).toContain(`public class ${UI_WIDGET_PROBE_CLASS}`);
       expect(UI_REGISTRY_PROBE_SOURCE).toContain(`public class ${UI_REGISTRY_PROBE_CLASS}`);
+      expect(UI_DIALOG_PROBE_SOURCE).toContain(`public class ${UI_DIALOG_PROBE_CLASS}`);
       for (const source of sources) {
         expect(source).toContain("public static Object run()");
       }
