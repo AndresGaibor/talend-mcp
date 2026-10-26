@@ -1,0 +1,203 @@
+{
+  "nombre": "conciliacion: el destino pierde filas y la conciliacion falla",
+  "job": "MCP_L5_ConciliaFalla",
+  "nodos": [
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "origen",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tFilterRow",
+      "nombre": "filtra",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_String"
+        }
+      ],
+      "tablas": {
+        "CONDITIONS": {
+          "columns": [
+            "INPUT_COLUMN",
+            "FUNCTION",
+            "OPERATOR",
+            "RVALUE"
+          ],
+          "rows": [
+            {
+              "INPUT_COLUMN": "id",
+              "FUNCTION": "",
+              "OPERATOR": ">",
+              "RVALUE": "2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFileOutputDelimited",
+      "nombre": "destino",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_concilia_destino.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        },
+        "INCLUDEHEADER": {
+          "value": "true"
+        },
+        "FILE_EXIST_EXCEPTION": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "relee",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_concilia_destino.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tFileCompare",
+      "nombre": "compara",
+      "columnas": [
+        {
+          "name": "linea",
+          "type": "id_String"
+        }
+      ],
+      "parameters": {
+        "FILE": {
+          "value": "@TESTDATA@/l5_clientes.csv"
+        },
+        "FILE_REF": {
+          "value": "@TESTDATA@/l5_concilia_destino.csv"
+        },
+        "PRINT": {
+          "value": "true"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "concilia",
+      "parameters": {
+        "CODE": {
+          "value": "long filasOrigen = ((Number) globalMap.get(\"@uniqueName:origen\" + \"_NB_LINE\")).longValue();\nlong filasDestino = ((Number) globalMap.get(\"@uniqueName:relee\" + \"_NB_LINE\")).longValue();\nif (filasOrigen != filasDestino) {\n  throw new RuntimeException(\"no concilia: origen=\" + filasOrigen + \" destino=\" + filasDestino);\n}\nSystem.out.println(\"concilia: \" + filasOrigen + \" filas\");"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "origen",
+      "destino": "filtra"
+    },
+    {
+      "origen": "filtra",
+      "destino": "destino"
+    },
+    {
+      "origen": "origen",
+      "destino": "relee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "relee",
+      "destino": "compara",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "relee",
+      "destino": "concilia",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "error_esperado": true,
+    "contiene": [
+      "no concilia: origen=4 destino=1"
+    ]
+  }
+}

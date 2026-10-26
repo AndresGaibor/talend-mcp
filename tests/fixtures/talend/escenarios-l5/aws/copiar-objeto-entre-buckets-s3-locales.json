@@ -1,0 +1,52 @@
+{
+  "nombre": "aws: copiar objeto entre buckets S3 locales",
+  "job": "MCP_L5_S3Copy",
+  "nodos": [
+    {
+      "type": "S3Copy",
+      "nombre": "copiaObjeto",
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.datastore.enablePathStyleAccess": {
+          "value": "true"
+        },
+        "configuration.bucket": {
+          "value": "talend-l5-bank-test"
+        },
+        "configuration.sourceKey": {
+          "value": "l5/ancho_fijo.txt"
+        },
+        "configuration.destinationBucket": {
+          "value": "talend-l5-bank-test"
+        },
+        "configuration.destinationKey": {
+          "value": "l5/ancho_fijo-copia.txt"
+        },
+        "configuration.enableServerSideEncryption": {
+          "value": "false"
+        },
+        "configuration.dieOnError": {
+          "value": "true"
+        }
+      }
+    }
+  ],
+  "conexiones": []
+}

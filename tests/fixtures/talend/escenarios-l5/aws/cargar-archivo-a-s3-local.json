@@ -1,0 +1,46 @@
+{
+  "nombre": "aws: cargar archivo a S3 local",
+  "job": "MCP_L5_S3Put",
+  "nodos": [
+    {
+      "type": "S3Put",
+      "nombre": "carga",
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.datastore.enablePathStyleAccess": {
+          "value": "true"
+        },
+        "configuration.bucket": {
+          "value": "talend-l5-bank-test"
+        },
+        "configuration.key": {
+          "value": "l5/ancho_fijo.txt"
+        },
+        "configuration.file": {
+          "value": "@TESTDATA@/ancho_fijo.txt"
+        },
+        "configuration.dieOnError": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": []
+}

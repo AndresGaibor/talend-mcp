@@ -1,0 +1,121 @@
+{
+  "nombre": "transformaciones: un tUnite junta dos flujos",
+  "job": "MCP_L5_Unite",
+  "nodos": [
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lector1",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lector2",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tUnite",
+      "nombre": "une",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector1",
+      "destino": "une"
+    },
+    {
+      "origen": "lector2",
+      "destino": "une"
+    },
+    {
+      "origen": "une",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 8
+  }
+}

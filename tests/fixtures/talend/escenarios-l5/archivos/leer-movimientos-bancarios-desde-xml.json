@@ -1,0 +1,80 @@
+{
+  "nombre": "archivos: leer movimientos bancarios desde XML",
+  "job": "MCP_L5_FileInputXML",
+  "nodos": [
+    {
+      "type": "tFileInputXML",
+      "nombre": "leeMovimientosXML",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_movimientos.xml"
+        },
+        "LOOP_QUERY": {
+          "value": "\"/movimientos/movimiento\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "cuenta",
+          "type": "id_String"
+        },
+        {
+          "name": "fecha",
+          "type": "id_String"
+        },
+        {
+          "name": "saldo",
+          "type": "id_String"
+        }
+      ],
+      "tablas": {
+        "MAPPING": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "QUERY",
+            "NODECHECK"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "cuenta",
+              "QUERY": "cuenta",
+              "NODECHECK": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "fecha",
+              "QUERY": "fecha",
+              "NODECHECK": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "saldo",
+              "QUERY": "saldo",
+              "NODECHECK": "false"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "leeMovimientosXML",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "CTA-001|2026-01-10|150.25",
+      "CTA-002|2026-01-11|0.00"
+    ]
+  }
+}

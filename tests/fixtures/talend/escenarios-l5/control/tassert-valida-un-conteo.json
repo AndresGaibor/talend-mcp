@@ -1,0 +1,116 @@
+{
+  "nombre": "control de flujo: tAssert valida el conteo de filas y tAssertCatcher lo informa",
+  "job": "MCP_L5_Assert",
+  "nodos": [
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lee",
+      "parameters": {
+        "FILENAME": {
+          "value": "\"@TESTDATA@/l5_clientes.csv\""
+        },
+        "FIELDSEPARATOR": {
+          "value": "\";\""
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "\"UTF-8\""
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tAssert",
+      "nombre": "verifica",
+      "parameters": {
+        "DESCRIPTION": {
+          "value": "\"conteo origen\""
+        },
+        "EXPRESSION": {
+          "value": "((Integer) globalMap.get(\"@uniqueName:lee\" + \"_NB_LINE\")) == 4"
+        }
+      }
+    },
+    {
+      "type": "tAssertCatcher",
+      "nombre": "captura",
+      "columnas": [
+        {
+          "name": "moment",
+          "type": "id_Date"
+        },
+        {
+          "name": "pid",
+          "type": "id_String"
+        },
+        {
+          "name": "project",
+          "type": "id_String"
+        },
+        {
+          "name": "job",
+          "type": "id_String"
+        },
+        {
+          "name": "language",
+          "type": "id_String"
+        },
+        {
+          "name": "origin",
+          "type": "id_String"
+        },
+        {
+          "name": "status",
+          "type": "id_String"
+        },
+        {
+          "name": "substatus",
+          "type": "id_String"
+        },
+        {
+          "name": "description",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "verifica",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "captura",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "Ok"
+    ]
+  }
+}

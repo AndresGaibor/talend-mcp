@@ -1,0 +1,173 @@
+{
+  "nombre": "control de flujo: un correo de error si el job falla",
+  "job": "MCP_L5_CorreoError",
+  "nodos": [
+    {
+      "type": "tSendMail",
+      "nombre": "avisa_inicio",
+      "parameters": {
+        "TO": {
+          "value": "\"l5@example.com\""
+        },
+        "FROM": {
+          "value": "\"talend-mcp@example.com\""
+        },
+        "NEED_PERSONAL_NAME": {
+          "value": "false"
+        },
+        "SUBJECT": {
+          "value": "\"[L5] inicio\""
+        },
+        "MESSAGE": {
+          "value": "\"El proceso arranca\""
+        },
+        "CHECK_ATTACHMENT": {
+          "value": "false"
+        },
+        "SMTP_HOST": {
+          "value": "\"127.0.0.1\""
+        },
+        "SMTP_PORT": {
+          "value": "2525"
+        },
+        "SSL": {
+          "value": "false"
+        },
+        "STARTTLS": {
+          "value": "false"
+        },
+        "AUTH_MODE": {
+          "value": "NO_AUTH"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        },
+        "TEXT_SUBTYPE": {
+          "value": "plain"
+        },
+        "ENCODING": {
+          "value": "\"UTF-8\""
+        },
+        "SET_LOCALHOST": {
+          "value": "false"
+        },
+        "CC": {
+          "value": "\"\""
+        },
+        "BCC": {
+          "value": "\"\""
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "trabajo",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "1"
+        ]
+      ]
+    },
+    {
+      "type": "tDie",
+      "nombre": "falla",
+      "parameters": {
+        "MESSAGE": {
+          "value": "el trabajo fallo a proposito"
+        },
+        "EXIT_JVM": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tSendMail",
+      "nombre": "avisa_error",
+      "parameters": {
+        "TO": {
+          "value": "\"l5@example.com\""
+        },
+        "FROM": {
+          "value": "\"talend-mcp@example.com\""
+        },
+        "NEED_PERSONAL_NAME": {
+          "value": "false"
+        },
+        "SUBJECT": {
+          "value": "\"[L5] fin con error\""
+        },
+        "MESSAGE": {
+          "value": "\"El proceso fallo\""
+        },
+        "CHECK_ATTACHMENT": {
+          "value": "false"
+        },
+        "SMTP_HOST": {
+          "value": "\"127.0.0.1\""
+        },
+        "SMTP_PORT": {
+          "value": "2525"
+        },
+        "SSL": {
+          "value": "false"
+        },
+        "STARTTLS": {
+          "value": "false"
+        },
+        "AUTH_MODE": {
+          "value": "NO_AUTH"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        },
+        "TEXT_SUBTYPE": {
+          "value": "plain"
+        },
+        "ENCODING": {
+          "value": "\"UTF-8\""
+        },
+        "SET_LOCALHOST": {
+          "value": "false"
+        },
+        "CC": {
+          "value": "\"\""
+        },
+        "BCC": {
+          "value": "\"\""
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "avisa_inicio",
+      "destino": "trabajo",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "trabajo",
+      "destino": "falla"
+    },
+    {
+      "origen": "trabajo",
+      "destino": "avisa_error",
+      "tipo": "SUBJOB_ERROR"
+    }
+  ],
+  "espera": {
+    "error_esperado": true,
+    "fichero": {
+      "ruta": "@TESTDATA@/l5-correos.log",
+      "contiene": [
+        "Subject: [L5] inicio",
+        "Subject: [L5] fin con error"
+      ]
+    }
+  }
+}

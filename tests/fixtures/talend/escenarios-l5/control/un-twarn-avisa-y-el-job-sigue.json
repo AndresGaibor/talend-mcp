@@ -1,0 +1,63 @@
+{
+  "nombre": "control de flujo: un tWarn avisa y el job sigue",
+  "job": "MCP_L5_Aviso",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ]
+      ]
+    },
+    {
+      "type": "tWarn",
+      "nombre": "aviso",
+      "parameters": {
+        "MESSAGE": {
+          "value": "cuidado con el dato"
+        },
+        "CODE": {
+          "value": "W001"
+        },
+        "PRIORITY": {
+          "value": "4"
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "salida"
+    },
+    {
+      "origen": "entrada",
+      "destino": "aviso",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana",
+      "cuidado con el dato",
+      "Code: W001"
+    ]
+  }
+}

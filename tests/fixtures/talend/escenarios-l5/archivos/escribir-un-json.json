@@ -1,0 +1,67 @@
+{
+  "nombre": "archivos: escribir un JSON",
+  "job": "MCP_L5_JsonSalida",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Jose"
+        ]
+      ]
+    },
+    {
+      "type": "tFileOutputJSON",
+      "nombre": "escribe",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_salida.json"
+        },
+        "GENERATE_JSON_ARRAY": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_salida.json",
+      "contiene": [
+        "Ana",
+        "Jose"
+      ]
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "nombre": "archivos: listar los ficheros de una carpeta",
+  "job": "MCP_L5_Lista",
+  "nodos": [
+    {
+      "type": "tFileList",
+      "nombre": "lista",
+      "parameters": {
+        "DIRECTORY": {
+          "value": "@TESTDATA@/l5_lista"
+        },
+        "GLOBEXPRESSIONS": {
+          "value": "false"
+        },
+        "LIST_MODE": {
+          "value": "FILES"
+        },
+        "ORDER_BY_FILENAME": {
+          "value": "true"
+        },
+        "ORDER_ACTION_ASC": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "schemaDespuesDeConectar": true,
+      "columnas": [
+        {
+          "name": "marca",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "x"
+        ]
+      ]
+    },
+    {
+      "type": "tJavaRow",
+      "nombre": "lee",
+      "parameters": {
+        "CODE": {
+          "value": "output_row.fichero = (String) globalMap.get(\"@uniqueName:lista\" + \"_CURRENT_FILE\");"
+        }
+      },
+      "columnas": [
+        {
+          "name": "fichero",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "lee"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "b.txt"
+    ]
+  }
+}

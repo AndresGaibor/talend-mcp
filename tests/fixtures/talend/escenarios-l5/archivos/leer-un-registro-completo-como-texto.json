@@ -1,0 +1,51 @@
+{
+  "nombre": "archivos: leer un registro completo como texto",
+  "job": "MCP_L5_FileInputRaw",
+  "nodos": [
+    {
+      "type": "tFileInputRaw",
+      "nombre": "leeRegistro",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_raw_record.txt"
+        },
+        "AS_STRING": {
+          "value": "true"
+        },
+        "AS_BYTEARRAY": {
+          "value": "false"
+        },
+        "AS_INPUTSTREAM": {
+          "value": "false"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "contenido",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "leeRegistro",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "cuenta=CTA-001;saldo=150.25;estado=ACTIVA"
+    ]
+  }
+}

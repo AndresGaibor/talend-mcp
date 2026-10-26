@@ -56,6 +56,32 @@ test("rechaza una conexion incompatible antes de modificar Studio", async () => 
   expect(writes).toEqual([]);
 });
 
+test("no reemplaza un Job ajeno aunque coincidan nombre y carpeta", async () => {
+  const fake = studio();
+  fake.jobs.push({ label: "job_existing", version: "0.1", folderPath: "test", description: "Creado por una persona", itemPath: "existing.item", propertiesPath: "existing.properties" });
+  await expect(applyCustomJobSpec({ jobName: "job_existing", folderPath: "Process/test", components: [] }, fake.dependencies)).rejects.toThrow("CONFLICT");
+  expect(fake.events).toEqual([]);
+});
+
+test("valida los hijos antes del primer cambio y los crea antes del padre", async () => {
+  const fake = studio();
+  const spec: CustomJobSpec = { jobName: "job_parent", folderPath: "Process/test", components: [], childJobs: [{ jobName: "job_child", folderPath: "Process/test", components: [] }] };
+  const result = await applyCustomJobSpec(spec, fake.dependencies) as { childJobs: unknown[] };
+  expect(fake.events.filter((event) => event.startsWith("create:"))).toEqual(["create:job_child", "create:job_parent"]);
+  expect(result.childJobs).toHaveLength(1);
+
+  const invalid = studio();
+  spec.childJobs![0]!.components.push({ uniqueName: "bad", componentName: "tLogRow", parameters: { INVENTADO: "x" } });
+  await expect(applyCustomJobSpec(spec, invalid.dependencies)).rejects.toThrow("INVENTADO");
+  expect(invalid.events).toEqual([]);
+});
+
+test("una respuesta con fallo interno no confirma una creacion", async () => {
+  const fake = studio();
+  fake.dependencies.bridge.createJob = async () => ({ ok: true, source: "studio-bridge", confidence: "high", endpoint: "create", data: { result: { ok: false, error: "No se pudo guardar" } } });
+  await expect(applyCustomJobSpec({ jobName: "job_failed", components: [] }, fake.dependencies)).rejects.toThrow("No se pudo guardar");
+});
+
 test("crea por Studio, conecta antes de terminar la configuracion y reintenta sin pisar valores", async () => {
   const fake = studio();
   const spec: CustomJobSpec = { jobName: "job_test", folderPath: "Process/test", components: [

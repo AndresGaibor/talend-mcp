@@ -1,0 +1,129 @@
+{
+  "nombre": "privacidad: quitar un dato sensible con tDataMasking",
+  "job": "MCP_L5_DataMasking",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "cuenta",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "123456789"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tDataMasking",
+      "nombre": "mascara",
+      "parameters": {
+        "OUTPUT_ORIGINAL": {
+          "value": "false"
+        }
+      },
+      "esquemas": [
+        {
+          "conector": "FLOW",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "cuenta",
+              "type": "id_String"
+            }
+          ]
+        },
+        {
+          "conector": "FLOW_OUTPUT",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "cuenta",
+              "type": "id_String"
+            },
+            {
+              "name": "ORIGINAL_MARK",
+              "type": "id_Boolean"
+            }
+          ]
+        }
+      ],
+      "schemaDespuesDeConectar": true,
+      "tablas": {
+        "MODIF_TABLE": {
+          "columns": [
+            "INPUT_COLUMN",
+            "CATEGORY",
+            "FUNCTION",
+            "METHOD",
+            "ALPHABET",
+            "EXTRA_PARAMETER",
+            "KEEP_FORMAT"
+          ],
+          "rows": [
+            {
+              "INPUT_COLUMN": "cuenta",
+              "CATEGORY": "SET_TO_NULL",
+              "FUNCTION": "SET_TO_NULL",
+              "METHOD": "EMPTY",
+              "ALPHABET": "BEST_GUESS",
+              "EXTRA_PARAMETER": "",
+              "KEEP_FORMAT": "false"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "cuenta",
+          "type": "id_String"
+        },
+        {
+          "name": "ORIGINAL_MARK",
+          "type": "id_Boolean"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "mascara"
+    },
+    {
+      "origen": "mascara",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "1||false"
+    ]
+  }
+}

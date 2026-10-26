@@ -1,0 +1,83 @@
+{
+  "nombre": "aws: enviar un mensaje bancario a SQS local",
+  "job": "MCP_L5_SQSOutput",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "cuenta",
+          "type": "id_String"
+        },
+        {
+          "name": "evento",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "9001",
+          "CTA-9001",
+          "ALERTA_FRAUDE"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "SQSOutput",
+      "nombre": "envia",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "cuenta",
+          "type": "id_String"
+        },
+        {
+          "name": "evento",
+          "type": "id_String"
+        }
+      ],
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.queueName": {
+          "value": "talend-l5-bank-alerts"
+        },
+        "configuration.dieOnError": {
+          "value": "true"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "envia"
+    }
+  ]
+}

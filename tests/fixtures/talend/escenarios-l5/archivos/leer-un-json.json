@@ -1,0 +1,73 @@
+{
+  "nombre": "archivos: leer un JSON",
+  "job": "MCP_L5_Json",
+  "nodos": [
+    {
+      "type": "tFileInputJSON",
+      "nombre": "lector",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.json"
+        },
+        "READ_BY": {
+          "value": "JSONPATH"
+        },
+        "JSON_LOOP_QUERY": {
+          "value": "$.clientes[*]"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ],
+      "tablas": {
+        "MAPPING_JSONPATH": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "QUERY"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "QUERY": "$.id"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "QUERY": "$.nombre"
+            },
+            {
+              "SCHEMA_COLUMN": "ciudad",
+              "QUERY": "$.ciudad"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "1|Ana|Bogota",
+      "2|Jose|Medellin"
+    ]
+  }
+}

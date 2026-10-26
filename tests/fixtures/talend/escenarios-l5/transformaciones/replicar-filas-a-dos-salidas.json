@@ -1,0 +1,64 @@
+{
+  "nombre": "transformaciones: replicar filas a dos salidas",
+  "job": "MCP_L5_Replicate",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "valor",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "uno"
+        ],
+        [
+          "2",
+          "dos"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tReplicate",
+      "nombre": "replica",
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salidaA"
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salidaB"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "replica"
+    },
+    {
+      "origen": "replica",
+      "destino": "salidaA"
+    },
+    {
+      "origen": "replica",
+      "destino": "salidaB"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|uno",
+      "2|dos"
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "nombre": "control de flujo: tLoop repite un subjob tres veces",
+  "job": "MCP_L5_Loop",
+  "nodos": [
+    {
+      "type": "tLoop",
+      "nombre": "bucle",
+      "parameters": {
+        "FORLOOP": {
+          "value": "true"
+        },
+        "WHILELOOP": {
+          "value": "false"
+        },
+        "FROM": {
+          "value": "1"
+        },
+        "TO": {
+          "value": "3"
+        },
+        "STEP": {
+          "value": "1"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"vuelta\");"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "bucle",
+      "destino": "imprime",
+      "tipo": "ITERATE"
+    }
+  ],
+  "espera": {
+    "lineas": 3,
+    "contiene": [
+      "vuelta"
+    ]
+  }
+}

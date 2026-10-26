@@ -1,0 +1,82 @@
+{
+  "nombre": "control de flujo: reintento tras un fallo con espera",
+  "job": "MCP_L5_Reintento",
+  "nodos": [
+    {
+      "type": "tJava",
+      "nombre": "limpia",
+      "parameters": {
+        "CODE": {
+          "value": "new java.io.File(\"@TESTDATA@/l5_reintento_marca.txt\").delete();"
+        }
+      }
+    },
+    {
+      "type": "tRunJob",
+      "nombre": "intento1",
+      "parameters": {
+        "PROCESS": {
+          "value": "MCP_L5_Reintento_Hijo"
+        }
+      }
+    },
+    {
+      "type": "tSleep",
+      "nombre": "espera",
+      "parameters": {
+        "PAUSE": {
+          "value": "2"
+        }
+      }
+    },
+    {
+      "type": "tRunJob",
+      "nombre": "intento2",
+      "parameters": {
+        "PROCESS": {
+          "value": "MCP_L5_Reintento_Hijo"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "limpia",
+      "destino": "intento1",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "intento1",
+      "destino": "espera",
+      "tipo": "SUBJOB_ERROR"
+    },
+    {
+      "origen": "espera",
+      "destino": "intento2",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "jobs": [
+    {
+      "job": "MCP_L5_Reintento_Hijo",
+      "nodos": [
+        {
+          "type": "tJava",
+          "nombre": "intenta",
+          "parameters": {
+            "CODE": {
+              "value": "java.io.File marca = new java.io.File(\"@TESTDATA@/l5_reintento_marca.txt\");\ntry {\n  if (!marca.exists()) {\n    marca.createNewFile();\n    throw new RuntimeException(\"archivo en uso, se reintenta\");\n  }\n} catch (java.io.IOException e) {\n  throw new RuntimeException(e);\n}\nSystem.out.println(\"intento correcto\");"
+            }
+          }
+        }
+      ],
+      "conexiones": []
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "archivo en uso, se reintenta",
+      "intento correcto"
+    ]
+  }
+}

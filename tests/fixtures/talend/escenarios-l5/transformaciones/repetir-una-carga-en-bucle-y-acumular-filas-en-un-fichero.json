@@ -1,0 +1,144 @@
+{
+  "nombre": "transformaciones: repetir una carga en bucle y acumular filas en un fichero",
+  "job": "MCP_L5_Duplica",
+  "nodos": [
+    {
+      "type": "tJava",
+      "nombre": "limpia",
+      "parameters": {
+        "CODE": {
+          "value": "new java.io.File(\"@TESTDATA@/l5_duplica_salida.csv\").delete();"
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "vueltas",
+      "columnas": [
+        {
+          "name": "vuelta",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "1"
+        ],
+        [
+          "2"
+        ],
+        [
+          "3"
+        ]
+      ]
+    },
+    {
+      "type": "tFlowToIterate",
+      "nombre": "itera"
+    },
+    {
+      "type": "tRunJob",
+      "nombre": "carga",
+      "parameters": {
+        "PROCESS": {
+          "value": "MCP_L5_Duplica_Hijo"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "limpia",
+      "destino": "vueltas",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "vueltas",
+      "destino": "itera"
+    },
+    {
+      "origen": "itera",
+      "destino": "carga",
+      "tipo": "ITERATE"
+    }
+  ],
+  "jobs": [
+    {
+      "job": "MCP_L5_Duplica_Hijo",
+      "nodos": [
+        {
+          "type": "tFileInputDelimited",
+          "nombre": "lee",
+          "parameters": {
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_clientes.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "HEADER": {
+              "value": "1"
+            },
+            "ENCODING": {
+              "value": "UTF-8"
+            }
+          },
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_String"
+            }
+          ]
+        },
+        {
+          "type": "tFileOutputDelimited",
+          "nombre": "escribe",
+          "parameters": {
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_duplica_salida.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "ENCODING": {
+              "value": "UTF-8"
+            },
+            "APPEND": {
+              "value": "true"
+            },
+            "INCLUDEHEADER": {
+              "value": "false"
+            },
+            "FILE_EXIST_EXCEPTION": {
+              "value": "false"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "lee",
+          "destino": "escribe"
+        }
+      ]
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_duplica_salida.csv",
+      "lineas": 12
+    }
+  }
+}

@@ -1,0 +1,251 @@
+{
+  "nombre": "aws: listar los objetos de un prefijo en S3 local",
+  "job": "MCP_L5_S3Lista",
+  "nodos": [
+    {
+      "type": "S3BucketCreate",
+      "nombre": "crea",
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.datastore.enablePathStyleAccess": {
+          "value": "true"
+        },
+        "configuration.bucket": {
+          "value": "talend-l5-listado"
+        },
+        "configuration.dieOnError": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "S3Put",
+      "nombre": "sube1",
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.datastore.enablePathStyleAccess": {
+          "value": "true"
+        },
+        "configuration.bucket": {
+          "value": "talend-l5-listado"
+        },
+        "configuration.key": {
+          "value": "l5/listado/a.txt"
+        },
+        "configuration.file": {
+          "value": "@TESTDATA@/ancho_fijo.txt"
+        },
+        "configuration.dieOnError": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "S3Put",
+      "nombre": "sube2",
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.datastore.enablePathStyleAccess": {
+          "value": "true"
+        },
+        "configuration.bucket": {
+          "value": "talend-l5-listado"
+        },
+        "configuration.key": {
+          "value": "l5/listado/b.txt"
+        },
+        "configuration.file": {
+          "value": "@TESTDATA@/ancho_fijo.txt"
+        },
+        "configuration.dieOnError": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "S3Put",
+      "nombre": "sube3",
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.datastore.enablePathStyleAccess": {
+          "value": "true"
+        },
+        "configuration.bucket": {
+          "value": "talend-l5-listado"
+        },
+        "configuration.key": {
+          "value": "otra/c.txt"
+        },
+        "configuration.file": {
+          "value": "@TESTDATA@/ancho_fijo.txt"
+        },
+        "configuration.dieOnError": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "S3List",
+      "nombre": "lista",
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.datastore.enablePathStyleAccess": {
+          "value": "true"
+        },
+        "configuration.listAll": {
+          "value": "false"
+        },
+        "configuration.dieOnError": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "configuration.buckets": {
+          "columns": [
+            "configuration.buckets[].bucketName",
+            "configuration.buckets[].keyPrefix"
+          ],
+          "rows": [
+            {
+              "configuration.buckets[].bucketName": "talend-l5-listado",
+              "configuration.buckets[].keyPrefix": "l5/listado/"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "key",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "String clave = (String) globalMap.get(\"@uniqueName:lista\" + \"_CURRENT_KEY\");\nif (!clave.startsWith(\"l5/listado/\")) { throw new RuntimeException(\"fuera del prefijo: \" + clave); }\nSystem.out.println(\"clave: \" + clave);"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "crea",
+      "destino": "sube1",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "sube1",
+      "destino": "sube2",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "sube2",
+      "destino": "sube3",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "sube3",
+      "destino": "lista",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lista",
+      "destino": "imprime",
+      "tipo": "ITERATE"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "clave: l5/listado/a.txt",
+      "clave: l5/listado/b.txt"
+    ]
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "nombre": "control de flujo: tParallelize lanza una espera y una escritura a la vez",
+  "job": "MCP_L5_Paralelo",
+  "nodos": [
+    {
+      "type": "tJava",
+      "nombre": "limpia",
+      "parameters": {
+        "CODE": {
+          "value": "new java.io.File(\"@TESTDATA@/l5_marca_paralelo.txt\").delete();"
+        }
+      }
+    },
+    {
+      "type": "tParallelize",
+      "nombre": "paralelo",
+      "parameters": {
+        "WAIT_FOR": {
+          "value": "All"
+        },
+        "SLEEPTIME": {
+          "value": "100"
+        },
+        "DIE_ON_ERROR": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "escribe",
+      "parameters": {
+        "CODE": {
+          "value": "try {\n  Thread.sleep(2000);\n  new java.io.File(\"@TESTDATA@/l5_marca_paralelo.txt\").createNewFile();\n} catch (Exception e) {\n  throw new RuntimeException(e);\n}"
+        }
+      }
+    },
+    {
+      "type": "tWaitForFile",
+      "nombre": "espera",
+      "parameters": {
+        "DIRECTORY": {
+          "value": "\"@TESTDATA@\""
+        },
+        "FILEMASK": {
+          "value": "\"l5_marca_paralelo.txt\""
+        },
+        "ACTION_ON": {
+          "value": "filecreated"
+        },
+        "THEN": {
+          "value": "continue"
+        },
+        "WAIT": {
+          "value": "1"
+        },
+        "MAX_ITERATIONS": {
+          "value": "20"
+        },
+        "INTERVAL_CHECK": {
+          "value": "500"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "fin",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"archivo recibido\");"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "limpia",
+      "destino": "paralelo",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "paralelo",
+      "destino": "escribe",
+      "tipo": "PARALLELIZE"
+    },
+    {
+      "origen": "paralelo",
+      "destino": "espera",
+      "tipo": "PARALLELIZE"
+    },
+    {
+      "origen": "espera",
+      "destino": "fin",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "archivo recibido"
+    ]
+  }
+}

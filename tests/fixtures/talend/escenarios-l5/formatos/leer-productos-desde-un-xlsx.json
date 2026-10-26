@@ -1,0 +1,74 @@
+{
+  "nombre": "formatos: leer productos desde un XLSX",
+  "job": "MCP_L5_ExcelInput",
+  "nodos": [
+    {
+      "type": "tFileInputExcel",
+      "nombre": "lector",
+      "columnas": [
+        {
+          "name": "codigo",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "parameters": {
+        "VERSION_2007": {
+          "value": "true"
+        },
+        "FILENAME": {
+          "value": "@TESTDATA@/productos.xlsx"
+        },
+        "ALL_SHEETS": {
+          "value": "false"
+        },
+        "HEADER": {
+          "value": "3"
+        },
+        "FIRST_COLUMN": {
+          "value": "1"
+        },
+        "LAST_COLUMN": {
+          "value": "2"
+        },
+        "TRIMALL": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "SHEETLIST": {
+          "columns": [
+            "SHEETNAME",
+            "USE_REGEX"
+          ],
+          "rows": [
+            {
+              "SHEETNAME": "Productos",
+              "USE_REGEX": "false"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "P001|Widget basico",
+      "P002|Widget premium",
+      "P003|Servicio anual"
+    ]
+  }
+}

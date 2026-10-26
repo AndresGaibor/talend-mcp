@@ -1,0 +1,79 @@
+{
+  "nombre": "archivos: leer un CSV y escribir otro",
+  "job": "MCP_L5_Escribir",
+  "nodos": [
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lector",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tFileOutputDelimited",
+      "nombre": "escritor",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_salida.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        },
+        "CREATE_HEADER": {
+          "value": "false"
+        },
+        "FILE_EXIST_EXCEPTION": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector",
+      "destino": "escritor"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_salida.csv",
+      "lineas": 4,
+      "contiene": [
+        "1;Ana;Bogota;100.5",
+        "2;Jose;Medellin;200.25"
+      ]
+    }
+  }
+}

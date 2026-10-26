@@ -1,0 +1,119 @@
+{
+  "nombre": "privacidad: cifrar y descifrar una columna con clave AES",
+  "job": "MCP_L5_EncryptDecrypt",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "secreto",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "dato_l5_confidencial"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tDataEncrypt",
+      "nombre": "cifra",
+      "columnas": [
+        {
+          "name": "secreto",
+          "type": "id_String"
+        }
+      ],
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "SECRET_TYPE": {
+          "value": "CRYPTO_KEY"
+        },
+        "CRYPTO_METHOD": {
+          "value": "AES"
+        },
+        "SECRET_KEY": {
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "literal": true
+        }
+      },
+      "tablas": {
+        "TABLE_CONFIG": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "COLUMNS_ENCRYPT"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "secreto",
+              "COLUMNS_ENCRYPT": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tDataDecrypt",
+      "nombre": "descifra",
+      "columnas": [
+        {
+          "name": "secreto",
+          "type": "id_String"
+        }
+      ],
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "SECRET_TYPE": {
+          "value": "CRYPTO_KEY"
+        },
+        "CRYPTO_METHOD": {
+          "value": "AES"
+        },
+        "SECRET_KEY": {
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "literal": true
+        }
+      },
+      "tablas": {
+        "TABLE_CONFIG": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "COLUMNS_DECRYPT"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "secreto",
+              "COLUMNS_DECRYPT": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "cifra"
+    },
+    {
+      "origen": "cifra",
+      "destino": "descifra"
+    },
+    {
+      "origen": "descifra",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "dato_l5_confidencial"
+    ]
+  }
+}

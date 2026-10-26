@@ -1,0 +1,84 @@
+{
+  "nombre": "control de flujo: un trigger de error se dispara",
+  "job": "MCP_L5_Trigger",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "lector",
+      "columnas": [
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "Ana"
+        ]
+      ]
+    },
+    {
+      "type": "tDie",
+      "nombre": "corta",
+      "parameters": {
+        "MESSAGE": {
+          "value": "el job se corta a proposito"
+        },
+        "EXIT_JVM": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "manejador",
+      "columnas": [
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "fallo al procesar"
+        ]
+      ]
+    },
+    {
+      "type": "tFileOutputDelimited",
+      "nombre": "escribe",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_trigger.txt"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector",
+      "destino": "corta"
+    },
+    {
+      "origen": "manejador",
+      "destino": "escribe"
+    },
+    {
+      "origen": "lector",
+      "destino": "manejador",
+      "tipo": "SUBJOB_ERROR"
+    }
+  ],
+  "espera": {
+    "error_esperado": true,
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_trigger.txt",
+      "contiene": [
+        "fallo al procesar"
+      ]
+    }
+  }
+}

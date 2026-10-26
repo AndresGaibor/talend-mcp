@@ -1,0 +1,71 @@
+{
+  "nombre": "transformaciones: quedarse con unas columnas",
+  "job": "MCP_L5_Filtra",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "schemaDespuesDeConectar": true,
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana",
+          "Bogota"
+        ],
+        [
+          "2",
+          "Jose",
+          "Medellin"
+        ]
+      ]
+    },
+    {
+      "type": "tFilterColumns",
+      "nombre": "filtra",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "filtra"
+    },
+    {
+      "origen": "filtra",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "1|Bogota",
+      "2|Medellin"
+    ]
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "nombre": "control de flujo: cronometro mide una espera",
+  "job": "MCP_L5_Cronometro",
+  "nodos": [
+    {
+      "type": "tChronometerStart",
+      "nombre": "inicio",
+      "parameters": {
+        "CAPTION": {
+          "value": "medicion l5"
+        }
+      }
+    },
+    {
+      "type": "tSleep",
+      "nombre": "espera",
+      "parameters": {
+        "PAUSE": {
+          "value": "1"
+        }
+      }
+    },
+    {
+      "type": "tChronometerStop",
+      "nombre": "fin",
+      "parameters": {
+        "SINCE_BEGINNING": {
+          "value": "false"
+        },
+        "SINCE_STARTER": {
+          "value": "true"
+        },
+        "STARTER": {
+          "value": "@uniqueName:inicio",
+          "literal": false
+        },
+        "DISPLAY": {
+          "value": "true"
+        },
+        "DISPLAY_COMPONENT_NAME": {
+          "value": "true"
+        },
+        "CAPTION": {
+          "value": "medicion l5"
+        },
+        "DISPLAY_READABLE_DURATION": {
+          "value": "true"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "inicio",
+      "destino": "espera",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "espera",
+      "destino": "fin",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "medicion l5",
+      "milliseconds"
+    ]
+  }
+}

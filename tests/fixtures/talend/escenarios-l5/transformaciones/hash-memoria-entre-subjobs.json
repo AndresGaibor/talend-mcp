@@ -1,0 +1,116 @@
+{
+  "nombre": "transformaciones: un tHashOutput guarda filas en memoria y otro subjob las lee con tHashInput",
+  "job": "MCP_L5_Hash",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Jose"
+        ],
+        [
+          "3",
+          "Lucia"
+        ]
+      ]
+    },
+    {
+      "type": "tHashOutput",
+      "nombre": "guarda",
+      "parameters": {
+        "LIST": {
+          "value": "\"\""
+        },
+        "DATA_WRITE_MODEL": {
+          "value": "MEMORY"
+        },
+        "KEYS_MANAGEMENT": {
+          "value": "KEEP_ALL"
+        },
+        "APPEND": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tHashInput",
+      "nombre": "lee",
+      "parameters": {
+        "LIST": {
+          "value": "@uniqueName:guarda",
+          "literal": false
+        },
+        "LINK_WITH": {
+          "value": "true"
+        },
+        "RELEASE_CACHE": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "guarda"
+    },
+    {
+      "origen": "guarda",
+      "destino": "lee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 3,
+    "contiene": [
+      "1|Ana",
+      "2|Jose",
+      "3|Lucia"
+    ]
+  },
+  "pendiente": "tHashInput recorre el hash de tHashOutput y no recibe filas en esta topologia (la clave coincide y la lectura existe en el codigo generado). Causa sin identificar."
+}

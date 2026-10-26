@@ -1,0 +1,66 @@
+{
+  "nombre": "formatos: leer registros de ancho fijo",
+  "job": "MCP_L5_PositionalInput",
+  "nodos": [
+    {
+      "type": "tFileInputPositional",
+      "nombre": "lector",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "fecha",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        },
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ],
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/ancho_fijo.txt"
+        },
+        "PATTERN": {
+          "value": "8,30,10,12,10",
+          "literal": true
+        },
+        "HEADER": {
+          "value": "0"
+        },
+        "TRIMALL": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 5,
+    "contiene": [
+      "Ana Maria Nunez",
+      "2023-01-15",
+      "1500.5",
+      "SUSPENDIDO"
+    ]
+  }
+}

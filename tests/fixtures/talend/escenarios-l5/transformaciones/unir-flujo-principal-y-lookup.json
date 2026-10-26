@@ -1,0 +1,136 @@
+{
+  "nombre": "transformaciones: unir flujo principal y lookup",
+  "job": "MCP_L5_Join",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "principal",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Beto"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "lookup",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Bogota"
+        ],
+        [
+          "2",
+          "Cali"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tJoin",
+      "nombre": "union",
+      "parameters": {
+        "USE_LOOKUP_COLS": {
+          "value": "true"
+        }
+      },
+      "esquemas": [
+        {
+          "conector": "FLOW",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_Integer"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad_lookup",
+              "type": "id_String"
+            }
+          ]
+        }
+      ],
+      "schemaDespuesDeConectar": true,
+      "tablas": {
+        "JOIN_KEY": {
+          "columns": [
+            "INPUT_COLUMN",
+            "LOOKUP_COLUMN"
+          ],
+          "rows": [
+            {
+              "INPUT_COLUMN": "id",
+              "LOOKUP_COLUMN": "id"
+            }
+          ]
+        },
+        "LOOKUP_COLS": {
+          "columns": [
+            "OUTPUT_COLUMN",
+            "LOOKUP_COLUMN"
+          ],
+          "rows": [
+            {
+              "OUTPUT_COLUMN": "ciudad_lookup",
+              "LOOKUP_COLUMN": "ciudad"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "principal",
+      "destino": "union"
+    },
+    {
+      "origen": "lookup",
+      "destino": "union"
+    },
+    {
+      "origen": "union",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "1|Ana|Bogota",
+      "2|Beto|Cali"
+    ]
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "nombre": "contextos: cada entorno tiene su valor",
+  "job": "MCP_L5_Contextos",
+  "contexto": "produccion",
+  "contextos": [
+    {
+      "nombre": "Default",
+      "variables": [
+        {
+          "nombre": "L5_VALOR",
+          "valor": "hola",
+          "tipo": "id_String"
+        }
+      ]
+    },
+    {
+      "nombre": "produccion",
+      "variables": [
+        {
+          "nombre": "L5_VALOR",
+          "valor": "adios",
+          "tipo": "id_String"
+        }
+      ]
+    }
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "variables",
+      "columnas": [
+        {
+          "name": "key",
+          "type": "id_String"
+        },
+        {
+          "name": "value",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "L5_VALOR",
+          "recargado"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tContextLoad",
+      "nombre": "contexto",
+      "parameters": {
+        "PRINT_OPERATIONS": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "key",
+          "type": "id_String"
+        },
+        {
+          "name": "value",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "variables",
+      "destino": "contexto"
+    },
+    {
+      "origen": "contexto",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "set key \"L5_VALOR\" with value \"recargado\"",
+      "L5_VALOR",
+      "recargado"
+    ],
+    "contextos": [
+      {
+        "nombre": "Default",
+        "variables": [
+          {
+            "nombre": "L5_VALOR",
+            "valor": "hola"
+          }
+        ]
+      },
+      {
+        "nombre": "produccion",
+        "variables": [
+          {
+            "nombre": "L5_VALOR",
+            "valor": "adios"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "nombre": "formatos: escribir y releer un libro Excel 97-2003",
+  "job": "MCP_L5_ExcelRoundtrip",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "codigo",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "P001",
+          "Ana"
+        ],
+        [
+          "P002",
+          "Beto"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tFileOutputExcel",
+      "nombre": "escribe",
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "VERSION_2007": {
+          "value": "false"
+        },
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_excel_roundtrip.xls"
+        },
+        "SHEETNAME": {
+          "value": "Sheet1"
+        },
+        "INCLUDEHEADER": {
+          "value": "true"
+        },
+        "IS_ALL_AUTO_SZIE": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tFileInputExcel",
+      "nombre": "lector",
+      "columnas": [
+        {
+          "name": "codigo",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "parameters": {
+        "VERSION_2007": {
+          "value": "false"
+        },
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_excel_roundtrip.xls"
+        },
+        "ALL_SHEETS": {
+          "value": "false"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "FIRST_COLUMN": {
+          "value": "1"
+        },
+        "LAST_COLUMN": {
+          "value": "2"
+        },
+        "TRIMALL": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "SHEETLIST": {
+          "columns": [
+            "SHEETNAME",
+            "USE_REGEX"
+          ],
+          "rows": [
+            {
+              "SHEETNAME": "Sheet1",
+              "USE_REGEX": "false"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    },
+    {
+      "origen": "entrada",
+      "destino": "lector",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lector",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 2,
+    "contiene": [
+      "P001",
+      "Ana",
+      "P002",
+      "Beto"
+    ]
+  }
+}

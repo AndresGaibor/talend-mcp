@@ -1,0 +1,144 @@
+{
+  "nombre": "calidad: buscar una entrada en el indice de sinonimos",
+  "job": "MCP_L5_SynonymSearch",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "word",
+          "type": "id_String"
+        },
+        {
+          "name": "suggestion",
+          "type": "id_String"
+        },
+        {
+          "name": "GID",
+          "type": "id_String"
+        },
+        {
+          "name": "GRP_SIZE",
+          "type": "id_Integer"
+        },
+        {
+          "name": "SCORE",
+          "type": "id_Double"
+        },
+        {
+          "name": "SCORES",
+          "type": "id_String"
+        },
+        {
+          "name": "NB_MATCHED_FIELDS",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "NY",
+          "",
+          "",
+          "0",
+          "0.0",
+          "",
+          "0"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tSynonymSearch",
+      "nombre": "busca",
+      "esquemas": [
+        {
+          "conector": "FLOW",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "word",
+              "type": "id_String"
+            },
+            {
+              "name": "suggestion",
+              "type": "id_String"
+            },
+            {
+              "name": "GID",
+              "type": "id_String"
+            },
+            {
+              "name": "GRP_SIZE",
+              "type": "id_Integer"
+            },
+            {
+              "name": "SCORE",
+              "type": "id_Double"
+            },
+            {
+              "name": "SCORES",
+              "type": "id_String"
+            },
+            {
+              "name": "NB_MATCHED_FIELDS",
+              "type": "id_Integer"
+            }
+          ]
+        }
+      ],
+      "parameters": {
+        "LIMIT": {
+          "value": "1"
+        }
+      },
+      "schemaDespuesDeConectar": true,
+      "tablas": {
+        "SEARCH_INDEXS": {
+          "columns": [
+            "PRE_COLUMN",
+            "COLUMN",
+            "INDEX_PATH",
+            "SEARCH_MODE",
+            "SCORE_THRESHOLD",
+            "MAX_EDITS_FOR_FUZZY_MATCH",
+            "SLOP_FOR_PARTIAL_MATCH",
+            "NUM_TOPS"
+          ],
+          "rows": [
+            {
+              "PRE_COLUMN": "word",
+              "COLUMN": "suggestion",
+              "INDEX_PATH": "testdata/l5_synonym_index",
+              "SEARCH_MODE": "MATCH_ANY",
+              "SCORE_THRESHOLD": "0.0",
+              "MAX_EDITS_FOR_FUZZY_MATCH": "1",
+              "SLOP_FOR_PARTIAL_MATCH": "1",
+              "NUM_TOPS": "5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "busca"
+    },
+    {
+      "origen": "busca",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 1,
+    "contiene": [
+      "NY"
+    ]
+  }
+}

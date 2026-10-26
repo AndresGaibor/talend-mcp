@@ -1,0 +1,81 @@
+{
+  "nombre": "sistema: establecer una propiedad y leerla en el job",
+  "job": "MCP_L5_SetEnv",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "1"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tSetEnv",
+      "nombre": "configura",
+      "schemaDespuesDeConectar": true,
+      "tablas": {
+        "PARAMS": {
+          "columns": [
+            "NAME",
+            "VALUE",
+            "APPEND"
+          ],
+          "rows": [
+            {
+              "NAME": "\"MCP_L5_PROPERTY\"",
+              "VALUE": "\"valor_l5\"",
+              "APPEND": "false"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tJavaRow",
+      "nombre": "lee",
+      "columnas": [
+        {
+          "name": "propiedad",
+          "type": "id_String"
+        }
+      ],
+      "parameters": {
+        "CODE": {
+          "value": "output_row.propiedad = System.getProperty(\"MCP_L5_PROPERTY\");"
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "configura"
+    },
+    {
+      "origen": "configura",
+      "destino": "lee"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "valor_l5"
+    ]
+  }
+}

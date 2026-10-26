@@ -1,0 +1,96 @@
+{
+  "nombre": "aws: escribir una fila en DynamoDB local",
+  "job": "MCP_L5_DynamoDBOutput",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "cuenta",
+          "type": "id_String"
+        },
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "9001",
+          "CTA-9001",
+          "ACTIVA"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "dynamoDBOutput",
+      "nombre": "escribe",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "key": true
+        },
+        {
+          "name": "cuenta",
+          "type": "id_String"
+        },
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ],
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "configuration.dataset.datastore.awsAuthConfig.basicAuthConfig.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.awsAuthConfig.basicAuthConfig.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useServerUrl": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.url": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.tableName": {
+          "value": "l5_bank_accounts"
+        },
+        "configuration.createTableIfNotExist": {
+          "value": "true"
+        },
+        "configuration.primaryKeyType": {
+          "value": "SIMPLE_PRIMARY_KEY"
+        },
+        "configuration.partitionKey": {
+          "value": "id"
+        },
+        "configuration.partitionKeyType": {
+          "value": "NUMBER"
+        },
+        "configuration.readCapacityUnits": {
+          "value": "5"
+        },
+        "configuration.writeCapacityUnits": {
+          "value": "5"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ]
+}

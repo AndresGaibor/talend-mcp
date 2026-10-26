@@ -1,0 +1,87 @@
+{
+  "nombre": "privacidad: barajar valores de una columna",
+  "job": "MCP_L5_DataShuffling",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "cliente",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "ALFA"
+        ],
+        [
+          "BRAVO"
+        ],
+        [
+          "CHARLIE"
+        ],
+        [
+          "DELTA"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tDataShuffling",
+      "nombre": "baraja",
+      "columnas": [
+        {
+          "name": "cliente",
+          "type": "id_String"
+        }
+      ],
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "RANDOM_SEED": {
+          "value": "17"
+        },
+        "SEPERATION_SIZE": {
+          "value": "1000"
+        }
+      },
+      "tablas": {
+        "SHUFFLING_COLUMNS": {
+          "columns": [
+            "COLUMN",
+            "GROUP_ID"
+          ],
+          "rows": [
+            {
+              "COLUMN": "cliente",
+              "GROUP_ID": "1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "baraja"
+    },
+    {
+      "origen": "baraja",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 4,
+    "contiene": [
+      "ALFA",
+      "BRAVO",
+      "CHARLIE",
+      "DELTA"
+    ]
+  }
+}

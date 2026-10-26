@@ -1,0 +1,78 @@
+{
+  "nombre": "transformaciones: un tNormalize parte una columna en filas",
+  "job": "MCP_L5_Normaliza",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "etiquetas",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "Ana",
+          "rojo;verde"
+        ],
+        [
+          "Jose",
+          "azul"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tNormalize",
+      "nombre": "normaliza",
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "NORMALIZE_COLUMN": {
+          "value": "etiquetas"
+        },
+        "ITEMSEPARATOR": {
+          "value": ";"
+        },
+        "CSV_OPTION": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "etiquetas",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "normaliza"
+    },
+    {
+      "origen": "normaliza",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "Ana|rojo",
+      "Ana|verde",
+      "Jose|azul"
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "nombre": "control de flujo: capturar aviso con tLogCatcher",
+  "job": "MCP_L5_LogCatcher",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "1"
+        ]
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salidaPrincipal"
+    },
+    {
+      "type": "tWarn",
+      "nombre": "aviso",
+      "parameters": {
+        "MESSAGE": {
+          "value": "capturable_l5"
+        },
+        "CODE": {
+          "value": "1001"
+        },
+        "PRIORITY": {
+          "value": "4"
+        }
+      }
+    },
+    {
+      "type": "tLogCatcher",
+      "nombre": "capturador"
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salidaAvisos"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "salidaPrincipal"
+    },
+    {
+      "origen": "entrada",
+      "destino": "aviso",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "capturador",
+      "destino": "salidaAvisos"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "capturable_l5"
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "nombre": "archivos: subir un fichero con tHDFSPut a un HDFS real (Apache Hadoop en Docker)",
+  "job": "MCP_L5_HdfsPut",
+  "nodos": [
+    {
+      "type": "tHDFSPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "LOCALDIR": {
+          "value": "\"@TESTDATA@\""
+        },
+        "REMOTEDIR": {
+          "value": "\"/l5/destino\""
+        },
+        "FILE_ACTION": {
+          "value": "OVERWRITE"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_hdfs_subido.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "cuenta",
+      "parameters": {
+        "CODE": {
+          "value": "try {\n  org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();\n  conf.set(\"fs.defaultFS\", \"hdfs://localhost:9000\");\n  conf.set(\"dfs.client.use.datanode.hostname\", \"true\");\n  org.apache.hadoop.fs.FileSystem hdfs = org.apache.hadoop.fs.FileSystem.get(conf);\n  java.io.BufferedReader lector = new java.io.BufferedReader(new java.io.InputStreamReader(hdfs.open(new org.apache.hadoop.fs.Path(\"/l5/destino/l5_hdfs_subido.csv\")), \"UTF-8\"));\n  int filas = 0;\n  while (lector.readLine() != null) filas++;\n  lector.close();\n  System.out.println(\"subido: \" + filas);\n} catch (java.io.IOException e) {\n  throw new RuntimeException(e);\n}"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "sube",
+      "destino": "cuenta",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "subido: 5"
+    ]
+  }
+}

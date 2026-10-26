@@ -1,0 +1,34 @@
+{
+  "nombre": "aws: crear una cola SQS local",
+  "job": "MCP_L5_SQSQueueCreate",
+  "nodos": [
+    {
+      "type": "SQSQueueCreate",
+      "nombre": "creaCola",
+      "parameters": {
+        "configuration.dataset.datastore.credentialProvider": {
+          "value": "STATIC_CREDENTIALS"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.accessKey": {
+          "value": "talend-test"
+        },
+        "configuration.dataset.datastore.staticCredentialConfiguration.secretKey": {
+          "value": "talend-test-secret"
+        },
+        "configuration.dataset.datastore.region": {
+          "value": "us-east-1"
+        },
+        "configuration.dataset.datastore.useRegionEndpoint": {
+          "value": "true"
+        },
+        "configuration.dataset.datastore.regionEndpoint": {
+          "value": "http://127.0.0.1:4566"
+        },
+        "configuration.dataset.queueName": {
+          "value": "talend-l5-bank-alerts"
+        }
+      }
+    }
+  ],
+  "conexiones": []
+}

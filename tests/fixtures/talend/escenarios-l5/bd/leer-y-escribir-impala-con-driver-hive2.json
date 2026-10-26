@@ -1,0 +1,142 @@
+{
+  "nombre": "bases de datos: escribir y leer Impala con el driver HIVE2 (HiveServer2 emulado)",
+  "job": "MCP_L5_ImpalaHS2",
+  "nodos": [
+    {
+      "type": "tImpalaConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "IMPALA_DRIVER": {
+          "value": "HIVE2"
+        },
+        "HOST": {
+          "value": "\"localhost\""
+        },
+        "PORT": {
+          "value": "\"21050\""
+        },
+        "DBNAME": {
+          "value": "\"default\""
+        },
+        "USER": {
+          "value": "\"hive\""
+        },
+        "PASS": {
+          "value": "\"\""
+        },
+        "USE_KRB": {
+          "value": "false"
+        },
+        "USE_SSL": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tImpalaRow",
+      "nombre": "borra",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"DROP TABLE IF EXISTS l5_impala_ventas\""
+        },
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tImpalaRow",
+      "nombre": "crea",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"CREATE TABLE l5_impala_ventas (ciudad STRING, monto DOUBLE)\""
+        },
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tImpalaRow",
+      "nombre": "inserta",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"INSERT INTO l5_impala_ventas VALUES ('Bogota', 100.5), ('Cali', 300.0)\""
+        },
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tImpalaInput",
+      "nombre": "lee",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"SELECT DISTINCT ciudad, monto FROM l5_impala_ventas ORDER BY ciudad\""
+        },
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "borra",
+      "destino": "crea",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "crea",
+      "destino": "inserta",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "inserta",
+      "destino": "lee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 2,
+    "contiene": [
+      "Bogota|100.5",
+      "Cali|300.0"
+    ]
+  }
+}

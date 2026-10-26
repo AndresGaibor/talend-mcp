@@ -1,0 +1,65 @@
+{
+  "nombre": "archivos: leer propiedades y tamaño de un fichero",
+  "job": "MCP_L5_FileProperties",
+  "nodos": [
+    {
+      "type": "tFileProperties",
+      "nombre": "propiedades",
+      "columnas": [
+        {
+          "name": "abs_path",
+          "type": "id_String"
+        },
+        {
+          "name": "dirname",
+          "type": "id_String"
+        },
+        {
+          "name": "basename",
+          "type": "id_String"
+        },
+        {
+          "name": "mode_string",
+          "type": "id_String"
+        },
+        {
+          "name": "size",
+          "type": "id_Long"
+        },
+        {
+          "name": "mtime",
+          "type": "id_Long"
+        },
+        {
+          "name": "mtime_string",
+          "type": "id_String"
+        }
+      ],
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/ancho_fijo.txt"
+        },
+        "MD5": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "propiedades",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 1,
+    "contiene": [
+      "ancho_fijo.txt",
+      "355"
+    ]
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "nombre": "privacidad: duplicar una fila y modificar la copia",
+  "job": "MCP_L5_DuplicateRow",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Beto"
+        ],
+        [
+          "3",
+          "Caro"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tDuplicateRow",
+      "nombre": "duplica",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ORIGINAL_MARK",
+          "type": "id_Boolean"
+        }
+      ],
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "PERCENTAGE_DUPLICATES": {
+          "value": "100"
+        },
+        "DISTRIBUTION_NAME": {
+          "value": "BERNOULLI"
+        },
+        "AVERAGE_GROUP_SIZE": {
+          "value": "2"
+        },
+        "RANDOM_SEED": {
+          "value": "12345678"
+        }
+      },
+      "tablas": {
+        "MODIF_TABLE": {
+          "columns": [
+            "INPUT_COLUMN",
+            "MODIF_RATE",
+            "FUNCTION",
+            "MAX_MODIF_COUNT",
+            "SYNONYM_INDEX_PATH"
+          ],
+          "rows": [
+            {
+              "INPUT_COLUMN": "nombre",
+              "MODIF_RATE": "1.0",
+              "FUNCTION": "SET_TO_BLANK",
+              "MAX_MODIF_COUNT": "1",
+              "SYNONYM_INDEX_PATH": "\"\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "duplica"
+    },
+    {
+      "origen": "duplica",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "false",
+      "||false",
+      "true"
+    ]
+  }
+}

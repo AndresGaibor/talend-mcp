@@ -1,0 +1,178 @@
+{
+  "nombre": "transformaciones: quitar duplicados",
+  "job": "MCP_L5_Transformaciones",
+  "nodos": [
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lector",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tUniqRow",
+      "nombre": "unicos",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "columnasPorConector": {
+        "UNIQUE": [
+          {
+            "name": "id",
+            "type": "id_Integer"
+          },
+          {
+            "name": "nombre",
+            "type": "id_String"
+          },
+          {
+            "name": "ciudad",
+            "type": "id_String"
+          },
+          {
+            "name": "monto",
+            "type": "id_Double"
+          }
+        ]
+      },
+      "tablas": {
+        "UNIQUE_KEY": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "KEY_ATTRIBUTE",
+            "CASE_SENSITIVE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "KEY_ATTRIBUTE": "true",
+              "CASE_SENSITIVE": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "row1.nombre",
+              "KEY_ATTRIBUTE": "false",
+              "CASE_SENSITIVE": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "ciudad",
+              "KEY_ATTRIBUTE": "false",
+              "CASE_SENSITIVE": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "monto",
+              "KEY_ATTRIBUTE": "false",
+              "CASE_SENSITIVE": "false"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tSortRow",
+      "nombre": "ordena",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "tablas": {
+        "CRITERIA": {
+          "columns": [
+            "COLNAME",
+            "SORT",
+            "ORDER"
+          ],
+          "rows": [
+            {
+              "COLNAME": "monto",
+              "SORT": "num",
+              "ORDER": "desc"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector",
+      "destino": "unicos"
+    },
+    {
+      "origen": "unicos",
+      "destino": "ordena"
+    },
+    {
+      "origen": "ordena",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "3|Lucia|Cali|300.0",
+      "2|Jose|Medellin|200.25",
+      "1|Ana|Bogota|100.5"
+    ]
+  }
+}

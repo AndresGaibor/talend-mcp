@@ -1,0 +1,73 @@
+{
+  "nombre": "archivos: extraer campos de registros con expresion regular",
+  "job": "MCP_L5_FileInputRegex",
+  "nodos": [
+    {
+      "type": "tFileInputRegex",
+      "nombre": "leeMovimientos",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_regex_records.txt"
+        },
+        "REGEX": {
+          "value": "\"^([^;]+);([^;]+);([^;]+);([^;]+)$\""
+        },
+        "HEADER": {
+          "value": "0"
+        },
+        "FOOTER": {
+          "value": "0"
+        },
+        "IGNORE_ERROR_MESSAGE": {
+          "value": "false"
+        },
+        "REMOVE_EMPTY_ROW": {
+          "value": "true"
+        },
+        "FAIL_ON_UNMATCHED_REGEX": {
+          "value": "true"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "cuenta",
+          "type": "id_String"
+        },
+        {
+          "name": "fecha",
+          "type": "id_String"
+        },
+        {
+          "name": "saldo",
+          "type": "id_String"
+        },
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "leeMovimientos",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "CTA-001|2026-01-10|150.25|ACTIVA",
+      "CTA-002|2026-01-11|0.00|BLOQUEADA"
+    ]
+  }
+}

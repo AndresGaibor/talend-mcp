@@ -1,0 +1,56 @@
+{
+  "nombre": "control de flujo: tFileDelete borra un fichero temporal",
+  "job": "MCP_L5_Limpieza",
+  "nodos": [
+    {
+      "type": "tJava",
+      "nombre": "crea",
+      "parameters": {
+        "CODE": {
+          "value": "try { new java.io.File(\"@TESTDATA@/l5_borrar.txt\").createNewFile(); } catch (Exception e) { throw new RuntimeException(e); }"
+        }
+      }
+    },
+    {
+      "type": "tFileDelete",
+      "nombre": "borra",
+      "parameters": {
+        "FILENAME": {
+          "value": "\"@TESTDATA@/l5_borrar.txt\""
+        },
+        "FAILON": {
+          "value": "true"
+        },
+        "FOLDER": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "confirma",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"existe: \" + new java.io.File(\"@TESTDATA@/l5_borrar.txt\").exists());"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "crea",
+      "destino": "borra",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "borra",
+      "destino": "confirma",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "existe: false"
+    ]
+  }
+}

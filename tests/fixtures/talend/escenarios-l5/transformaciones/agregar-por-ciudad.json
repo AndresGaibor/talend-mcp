@@ -1,0 +1,126 @@
+{
+  "nombre": "transformaciones: agregar por ciudad",
+  "job": "MCP_L5_Agrega",
+  "nodos": [
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lector",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_ventas.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "schemaDespuesDeConectar": true,
+      "esquemas": [
+        {
+          "conector": "FLOW",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_Double"
+            },
+            {
+              "name": "cliente",
+              "type": "id_Integer"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "tAggregateRow",
+      "nombre": "agrega",
+      "esquemas": [
+        {
+          "conector": "FLOW",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            },
+            {
+              "name": "total_monto",
+              "type": "id_Double"
+            },
+            {
+              "name": "num_clientes",
+              "type": "id_Integer"
+            }
+          ]
+        }
+      ],
+      "tablas": {
+        "GROUPBYS": {
+          "columns": [
+            "OUTPUT_COLUMN",
+            "INPUT_COLUMN"
+          ],
+          "rows": [
+            {
+              "OUTPUT_COLUMN": "ciudad",
+              "INPUT_COLUMN": "ciudad"
+            }
+          ]
+        },
+        "OPERATIONS": {
+          "columns": [
+            "OUTPUT_COLUMN",
+            "FUNCTION",
+            "INPUT_COLUMN",
+            "IGNORE_NULL"
+          ],
+          "rows": [
+            {
+              "OUTPUT_COLUMN": "total_monto",
+              "FUNCTION": "sum",
+              "INPUT_COLUMN": "monto",
+              "IGNORE_NULL": "true"
+            },
+            {
+              "OUTPUT_COLUMN": "num_clientes",
+              "FUNCTION": "count",
+              "INPUT_COLUMN": "cliente",
+              "IGNORE_NULL": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector",
+      "destino": "agrega"
+    },
+    {
+      "origen": "agrega",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "Bogota|201.0|2",
+      "Medellin|200.25|1",
+      "Cali|300.0|1"
+    ]
+  }
+}

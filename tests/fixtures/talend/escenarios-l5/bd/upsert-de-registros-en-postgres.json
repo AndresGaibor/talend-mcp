@@ -1,0 +1,162 @@
+{
+  "nombre": "bases de datos: upsert de registros en Postgres",
+  "job": "MCP_L5_PostgresUpsert",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_upsert",
+    "CREATE TABLE l5_upsert (id integer PRIMARY KEY, nombre varchar(80), estado varchar(20))",
+    "INSERT INTO l5_upsert VALUES (1, 'Nombre anterior', 'ACTIVO')"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "key": true
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Nombre actualizado",
+          "INACTIVO"
+        ],
+        [
+          "2",
+          "Nuevo cliente",
+          "ACTIVO"
+        ]
+      ]
+    },
+    {
+      "type": "tPostgresqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "5433"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "DBNAME": {
+          "value": "talend_test"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tPostgresqlOutput",
+      "nombre": "upsert",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_upsert"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "DATA_ACTION": {
+          "value": "INSERT_OR_UPDATE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "MAPPING": {
+          "value": "postgres_id"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "true",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "false",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "estado",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4",
+          "key": true
+        },
+        {
+          "name": "nombre",
+          "type": "id_String",
+          "sourceType": "VARCHAR"
+        },
+        {
+          "name": "estado",
+          "type": "id_String",
+          "sourceType": "VARCHAR"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "upsert"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*)::text || ':' || max(CASE WHEN id = 1 THEN nombre END) || ':' || max(CASE WHEN id = 2 THEN nombre END) FROM l5_upsert",
+      "valor": "2:Nombre actualizado:Nuevo cliente"
+    }
+  }
+}

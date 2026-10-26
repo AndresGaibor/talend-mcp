@@ -1,0 +1,24 @@
+{
+  "nombre": "archivos: crear un archivo vacio con tFileTouch",
+  "job": "MCP_L5_FileTouch",
+  "nodos": [
+    {
+      "type": "tFileTouch",
+      "nombre": "crea",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_touch_marker.txt"
+        },
+        "CREATEDIR": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_touch_marker.txt"
+    }
+  }
+}

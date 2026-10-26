@@ -1,0 +1,36 @@
+{
+  "nombre": "archivos: comprobar la existencia de un fichero local",
+  "job": "MCP_L5_FileExist",
+  "nodos": [
+    {
+      "type": "tFileExist",
+      "nombre": "existe",
+      "parameters": {
+        "FILE_NAME": {
+          "value": "@TESTDATA@/ancho_fijo.txt"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "valida",
+      "parameters": {
+        "CODE": {
+          "value": "if (Boolean.TRUE.equals(globalMap.get(\"tFileExist_2_EXISTS\"))) { System.out.println(\"L5_FILE_EXISTS\"); } else { throw new RuntimeException(\"El fichero de prueba deberia existir\"); }"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "existe",
+      "destino": "valida",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "L5_FILE_EXISTS"
+    ]
+  }
+}

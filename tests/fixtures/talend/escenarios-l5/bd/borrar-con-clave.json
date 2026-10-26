@@ -1,0 +1,121 @@
+{
+  "nombre": "bases de datos: borrar con clave",
+  "job": "MCP_L5_Borra",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_borra",
+    "CREATE TABLE l5_borra (id integer, nombre varchar(50))",
+    "INSERT INTO l5_borra VALUES (1, 'Ana'), (2, 'Jose'), (3, 'Lucia')"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "2"
+        ]
+      ]
+    },
+    {
+      "type": "tPostgresqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "5433"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "DBNAME": {
+          "value": "talend_test"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tPostgresqlOutput",
+      "nombre": "borra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_borra"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "DATA_ACTION": {
+          "value": "DELETE"
+        },
+        "MAPPING": {
+          "value": "postgres_id"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "true",
+              "UPDATABLE": "false",
+              "INSERTABLE": "false"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "borra"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*)::int FROM l5_borra",
+      "valor": 2
+    }
+  }
+}

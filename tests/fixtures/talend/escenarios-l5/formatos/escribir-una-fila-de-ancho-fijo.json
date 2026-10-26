@@ -1,0 +1,78 @@
+{
+  "nombre": "formatos: escribir una fila de ancho fijo",
+  "job": "MCP_L5_PositionalOutput",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "codigo",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "AB"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tFileOutputPositional",
+      "nombre": "escribe",
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_salida_posicional.txt"
+        },
+        "INCLUDEHEADER": {
+          "value": "false"
+        },
+        "APPEND": {
+          "value": "false"
+        },
+        "CREATE": {
+          "value": "true"
+        },
+        "USE_BYTE": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FORMATS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "SIZE",
+            "PADDING_CHAR",
+            "ALIGN",
+            "KEEP"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "codigo",
+              "SIZE": "5",
+              "PADDING_CHAR": "' '",
+              "ALIGN": "'L'",
+              "KEEP": "'A'"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_salida_posicional.txt",
+      "lineas": [
+        "AB   "
+      ]
+    }
+  }
+}

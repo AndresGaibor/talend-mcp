@@ -1,0 +1,42 @@
+{
+  "nombre": "archivos: extraer entradas de un libro XLSX",
+  "job": "MCP_L5_FileUnarchive",
+  "nodos": [
+    {
+      "type": "tFileUnarchive",
+      "nombre": "extrae",
+      "parameters": {
+        "ZIPFILE": {
+          "value": "@TESTDATA@/productos.xlsx"
+        },
+        "DIRECTORY": {
+          "value": "@TESTDATA@/l5_unarchive"
+        },
+        "ROOTNAME": {
+          "value": "false"
+        },
+        "INTEGRITY": {
+          "value": "false"
+        },
+        "EXTRACTPATH": {
+          "value": "true"
+        },
+        "CHECKPASSWORD": {
+          "value": "false"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_unarchive/xl/workbook.xml",
+      "contiene": [
+        "Productos"
+      ]
+    }
+  }
+}

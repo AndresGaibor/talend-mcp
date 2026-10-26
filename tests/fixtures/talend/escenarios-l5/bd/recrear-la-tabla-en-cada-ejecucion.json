@@ -1,0 +1,151 @@
+{
+  "nombre": "bases de datos: recrear la tabla en cada ejecucion",
+  "job": "MCP_L5_Recrea",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String",
+          "length": 255
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String",
+          "length": 255
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana",
+          "Bogota",
+          "100.5"
+        ],
+        [
+          "2",
+          "Jose",
+          "Medellin",
+          "200.25"
+        ]
+      ]
+    },
+    {
+      "type": "tPostgresqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "5433"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "DBNAME": {
+          "value": "talend_test"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tPostgresqlOutput",
+      "nombre": "escribe",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_recrea"
+        },
+        "TABLE_ACTION": {
+          "value": "DROP_IF_EXISTS_AND_CREATE"
+        },
+        "MAPPING": {
+          "value": "postgres_id"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "ciudad",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "monto",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*) FROM information_schema.columns WHERE table_name = 'l5_recrea' AND column_name = 'viejo'",
+      "valor": 0
+    }
+  },
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_recrea",
+    "CREATE TABLE l5_recrea (id integer, viejo text)",
+    "INSERT INTO l5_recrea (id, viejo) VALUES (99, 'antiguo')"
+  ]
+}

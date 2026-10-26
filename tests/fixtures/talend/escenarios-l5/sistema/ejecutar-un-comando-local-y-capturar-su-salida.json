@@ -1,0 +1,43 @@
+{
+  "nombre": "sistema: ejecutar un comando local y capturar su salida",
+  "job": "MCP_L5_System",
+  "nodos": [
+    {
+      "type": "tSystem",
+      "nombre": "comando",
+      "columnas": [
+        {
+          "name": "outputline",
+          "type": "id_String"
+        }
+      ],
+      "parameters": {
+        "COMMAND": {
+          "value": "cmd /c echo MCP_L5_SYSTEM_OK",
+          "literal": true
+        },
+        "OUTPUT": {
+          "value": "NORMAL_OUTPUT"
+        },
+        "ERROROUTPUT": {
+          "value": "OUTPUT_TO_CONSOLE"
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "comando",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "MCP_L5_SYSTEM_OK"
+    ]
+  }
+}

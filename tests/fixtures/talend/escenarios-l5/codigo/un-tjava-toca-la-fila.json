@@ -1,0 +1,67 @@
+{
+  "nombre": "codigo: un tJava toca la fila",
+  "job": "MCP_L5_Java",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Jose"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tJavaRow",
+      "nombre": "codigo",
+      "schemaDespuesDeConectar": true,
+      "parameters": {
+        "CODE": {
+          "value": "output_row.nombre_mayus = input_row.nombre.toUpperCase();"
+        }
+      },
+      "columnas": [
+        {
+          "name": "nombre_mayus",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "codigo"
+    },
+    {
+      "origen": "codigo",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "ANA",
+      "JOSE"
+    ]
+  }
+}

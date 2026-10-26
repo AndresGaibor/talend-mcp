@@ -26,6 +26,7 @@ describe("Tools de operaciones sobre el job de Studio", () => {
         "talend_job_compile",
         "talend_studio_run_code",
         "talend_studio_dismiss_dialogs",
+        "talend_studio_ui_inventory",
         "talend_studio_list_components",
         "talend_studio_component_parameters",
       ];

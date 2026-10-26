@@ -1,8 +1,26 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { runNewHttpServer } from "../../src/presentation/server/new-server";
+import { buildServerInstructions } from "../../src/modules/guide/domain/server-instructions";
 
-describe("Instrucciones para agentes en el handshake MCP", () => {
-  test("initialize incluye el punto de entrada y las reglas de Talend", async () => {
+const previousFilter = process.env.TALEND_MCP_FILTER;
+
+afterAll(() => {
+  if (previousFilter === undefined) delete process.env.TALEND_MCP_FILTER;
+  else process.env.TALEND_MCP_FILTER = previousFilter;
+});
+
+describe("instrucciones del servidor", () => {
+  test("son cortas y explican por donde empezar", () => {
+    const instructions = buildServerInstructions();
+    expect(instructions).toContain('talend_guide { mode: "overview" }');
+    expect(instructions).toContain("nunca escribiendo el .item");
+    expect(instructions.length).toBeLessThan(4000);
+  });
+
+  test("el handshake de initialize las incluye", async () => {
+    // Con el preset corto el servidor registra 46 tools en vez de 230: la
+    // prueba comprueba el cableado, no el tamano del catalogo.
+    process.env.TALEND_MCP_FILTER = "agent";
     const server = await runNewHttpServer({ port: 0 });
     try {
       const response = await fetch(`${server.localUrl}/mcp`, {
@@ -15,8 +33,7 @@ describe("Instrucciones para agentes en el handshake MCP", () => {
       };
 
       expect(response.ok).toBe(true);
-      expect(payload.result?.instructions).toContain("talend_guide { mode: \"overview\" }");
-      expect(payload.result?.instructions).toContain("nunca escribiendo el .item");
+      expect(payload.result?.instructions).toBe(buildServerInstructions());
       expect(payload.result?.capabilities).toBeDefined();
     } finally {
       await server.close();

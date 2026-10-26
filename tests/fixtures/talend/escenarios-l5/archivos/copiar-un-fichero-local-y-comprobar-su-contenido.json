@@ -1,0 +1,50 @@
+{
+  "nombre": "archivos: copiar un fichero local y comprobar su contenido",
+  "job": "MCP_L5_FileCopy",
+  "nodos": [
+    {
+      "type": "tFileCopy",
+      "nombre": "copia",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/ancho_fijo.txt"
+        },
+        "ENABLE_COPY_DIRECTORY": {
+          "value": "false"
+        },
+        "DESTINATION": {
+          "value": "@TESTDATA@"
+        },
+        "RENAME": {
+          "value": "true"
+        },
+        "DESTINATION_RENAME": {
+          "value": "l5_copia_ancho_fijo.txt"
+        },
+        "REMOVE_FILE": {
+          "value": "false"
+        },
+        "REPLACE_FILE": {
+          "value": "true"
+        },
+        "CREATE_DIRECTORY": {
+          "value": "true"
+        },
+        "FAILON": {
+          "value": "true"
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_copia_ancho_fijo.txt",
+      "contiene": [
+        "Ana Maria Nunez",
+        "2023-01-15",
+        "SUSPENDIDO"
+      ]
+    }
+  }
+}

@@ -1,0 +1,264 @@
+{
+  "nombre": "transformaciones: 15 vueltas de 500 mil filas acumuladas en un fichero",
+  "job": "MCP_L5_Rendimiento",
+  "nodos": [
+    {
+      "type": "tJava",
+      "nombre": "limpia",
+      "parameters": {
+        "CODE": {
+          "value": "new java.io.File(\"@TESTDATA@/l5_rendimiento_salida.csv\").delete();"
+        }
+      }
+    },
+    {
+      "type": "tChronometerStart",
+      "nombre": "inicio",
+      "parameters": {
+        "CAPTION": {
+          "value": "duplicacion l5"
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "vueltas",
+      "columnas": [
+        {
+          "name": "vuelta",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "1"
+        ],
+        [
+          "2"
+        ],
+        [
+          "3"
+        ],
+        [
+          "4"
+        ],
+        [
+          "5"
+        ],
+        [
+          "6"
+        ],
+        [
+          "7"
+        ],
+        [
+          "8"
+        ],
+        [
+          "9"
+        ],
+        [
+          "10"
+        ],
+        [
+          "11"
+        ],
+        [
+          "12"
+        ],
+        [
+          "13"
+        ],
+        [
+          "14"
+        ],
+        [
+          "15"
+        ]
+      ]
+    },
+    {
+      "type": "tFlowToIterate",
+      "nombre": "itera"
+    },
+    {
+      "type": "tRunJob",
+      "nombre": "carga",
+      "parameters": {
+        "PROCESS": {
+          "value": "MCP_L5_Rendimiento_Hijo"
+        }
+      }
+    },
+    {
+      "type": "tChronometerStop",
+      "nombre": "fin",
+      "parameters": {
+        "SINCE_BEGINNING": {
+          "value": "false"
+        },
+        "SINCE_STARTER": {
+          "value": "true"
+        },
+        "STARTER": {
+          "value": "@uniqueName:inicio",
+          "literal": false
+        },
+        "DISPLAY": {
+          "value": "true"
+        },
+        "DISPLAY_COMPONENT_NAME": {
+          "value": "true"
+        },
+        "CAPTION": {
+          "value": "duplicacion l5"
+        },
+        "DISPLAY_READABLE_DURATION": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "borra",
+      "parameters": {
+        "CODE": {
+          "value": "new java.io.File(\"@TESTDATA@/l5_rendimiento_salida.csv\").delete();"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "limpia",
+      "destino": "inicio",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "inicio",
+      "destino": "vueltas",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "vueltas",
+      "destino": "itera"
+    },
+    {
+      "origen": "itera",
+      "destino": "carga",
+      "tipo": "ITERATE"
+    },
+    {
+      "origen": "vueltas",
+      "destino": "fin",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "fin",
+      "destino": "borra",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "jobs": [
+    {
+      "job": "MCP_L5_Rendimiento_Hijo",
+      "nodos": [
+        {
+          "type": "tFileInputDelimited",
+          "nombre": "lee",
+          "parameters": {
+            "FILENAME": {
+              "value": "@TESTDATA@/clientes_grande.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "HEADER": {
+              "value": "1"
+            },
+            "ENCODING": {
+              "value": "UTF-8"
+            }
+          },
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_String"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "fecha_alta",
+              "type": "id_String"
+            },
+            {
+              "name": "monto",
+              "type": "id_String"
+            },
+            {
+              "name": "estado",
+              "type": "id_String"
+            },
+            {
+              "name": "ciudad",
+              "type": "id_String"
+            }
+          ]
+        },
+        {
+          "type": "tFileOutputDelimited",
+          "nombre": "escribe",
+          "parameters": {
+            "FILENAME": {
+              "value": "@TESTDATA@/l5_rendimiento_salida.csv"
+            },
+            "FIELDSEPARATOR": {
+              "value": ";"
+            },
+            "ENCODING": {
+              "value": "UTF-8"
+            },
+            "APPEND": {
+              "value": "true"
+            },
+            "INCLUDEHEADER": {
+              "value": "false"
+            },
+            "FILE_EXIST_EXCEPTION": {
+              "value": "false"
+            }
+          }
+        },
+        {
+          "type": "tJava",
+          "nombre": "cuenta",
+          "parameters": {
+            "CODE": {
+              "value": "System.out.println(\"filas escritas: \" + globalMap.get(\"@uniqueName:escribe\" + \"_NB_LINE\"));"
+            }
+          }
+        }
+      ],
+      "conexiones": [
+        {
+          "origen": "lee",
+          "destino": "escribe"
+        },
+        {
+          "origen": "lee",
+          "destino": "cuenta",
+          "tipo": "SUBJOB_OK"
+        }
+      ]
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "duplicacion l5",
+      "milliseconds",
+      "filas escritas: 500000"
+    ]
+  }
+}

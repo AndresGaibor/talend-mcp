@@ -1,0 +1,50 @@
+{
+  "nombre": "control de flujo: un tDie corta el job",
+  "job": "MCP_L5_Die",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ]
+      ]
+    },
+    {
+      "type": "tDie",
+      "nombre": "corta",
+      "parameters": {
+        "MESSAGE": {
+          "value": "el job se corta a proposito"
+        },
+        "EXIT_JVM": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "corta"
+    }
+  ],
+  "espera": {
+    "error_esperado": true,
+    "contiene": [
+      "el job se corta a proposito"
+    ]
+  }
+}

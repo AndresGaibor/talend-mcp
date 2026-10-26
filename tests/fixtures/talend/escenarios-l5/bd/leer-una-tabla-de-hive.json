@@ -1,0 +1,160 @@
+{
+  "nombre": "bases de datos: cargar un CSV en Hive y leerlo con tHiveInput",
+  "job": "MCP_L5_HiveLee",
+  "nodos": [
+    {
+      "type": "tHiveConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "CONNECTION_MODE": {
+          "value": "STANDALONE"
+        },
+        "HIVE_SERVER": {
+          "value": "HIVE2"
+        },
+        "HOST": {
+          "value": "\"localhost\""
+        },
+        "PORT": {
+          "value": "\"10000\""
+        },
+        "DBNAME": {
+          "value": "\"default\""
+        },
+        "USER": {
+          "value": "\"hive\""
+        },
+        "PASS": {
+          "value": "\"\""
+        }
+      }
+    },
+    {
+      "type": "tHiveRow",
+      "nombre": "borra",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"DROP TABLE IF EXISTS l5_hive_clientes\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tHiveRow",
+      "nombre": "crea",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"CREATE TABLE l5_hive_clientes (id INT, nombre STRING, ciudad STRING, monto DOUBLE) ROW FORMAT DELIMITED FIELDS TERMINATED BY ';' STORED AS TEXTFILE TBLPROPERTIES ('skip.header.line.count'='1')\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tHiveLoad",
+      "nombre": "carga",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "LOAD_ACTION": {
+          "value": "LOAD"
+        },
+        "FILEPATH": {
+          "value": "\"/data/l5_clientes.csv\""
+        },
+        "TABLE": {
+          "value": "\"l5_hive_clientes\""
+        },
+        "FILE_ACTION": {
+          "value": "OVERWRITE"
+        },
+        "LOCAL": {
+          "value": "true"
+        },
+        "CREATE_IF_NOT_EXIST": {
+          "value": "false"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tHiveInput",
+      "nombre": "lee",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"SELECT id, nombre, ciudad, monto FROM l5_hive_clientes ORDER BY id, nombre\""
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "borra",
+      "destino": "crea",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "crea",
+      "destino": "carga",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "carga",
+      "destino": "lee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 4,
+    "contiene": [
+      "1|Ana|Bogota|100.5",
+      "2|Jose|Medellin|200.25",
+      "3|Lucia|Cali|300.0"
+    ]
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "nombre": "control de flujo: un correo al empezar y otro al terminar bien",
+  "job": "MCP_L5_Correo",
+  "nodos": [
+    {
+      "type": "tSendMail",
+      "nombre": "avisa_inicio",
+      "parameters": {
+        "TO": {
+          "value": "\"l5@example.com\""
+        },
+        "FROM": {
+          "value": "\"talend-mcp@example.com\""
+        },
+        "NEED_PERSONAL_NAME": {
+          "value": "false"
+        },
+        "SUBJECT": {
+          "value": "\"[L5] inicio\""
+        },
+        "MESSAGE": {
+          "value": "\"El proceso arranca\""
+        },
+        "CHECK_ATTACHMENT": {
+          "value": "false"
+        },
+        "SMTP_HOST": {
+          "value": "\"127.0.0.1\""
+        },
+        "SMTP_PORT": {
+          "value": "2525"
+        },
+        "SSL": {
+          "value": "false"
+        },
+        "STARTTLS": {
+          "value": "false"
+        },
+        "AUTH_MODE": {
+          "value": "NO_AUTH"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        },
+        "TEXT_SUBTYPE": {
+          "value": "plain"
+        },
+        "ENCODING": {
+          "value": "\"UTF-8\""
+        },
+        "SET_LOCALHOST": {
+          "value": "false"
+        },
+        "CC": {
+          "value": "\"\""
+        },
+        "BCC": {
+          "value": "\"\""
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "trabajo",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "1"
+        ],
+        [
+          "2"
+        ]
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    },
+    {
+      "type": "tSendMail",
+      "nombre": "avisa_fin",
+      "parameters": {
+        "TO": {
+          "value": "\"l5@example.com\""
+        },
+        "FROM": {
+          "value": "\"talend-mcp@example.com\""
+        },
+        "NEED_PERSONAL_NAME": {
+          "value": "false"
+        },
+        "SUBJECT": {
+          "value": "\"[L5] fin OK\""
+        },
+        "MESSAGE": {
+          "value": "\"El proceso termino bien\""
+        },
+        "CHECK_ATTACHMENT": {
+          "value": "false"
+        },
+        "SMTP_HOST": {
+          "value": "\"127.0.0.1\""
+        },
+        "SMTP_PORT": {
+          "value": "2525"
+        },
+        "SSL": {
+          "value": "false"
+        },
+        "STARTTLS": {
+          "value": "false"
+        },
+        "AUTH_MODE": {
+          "value": "NO_AUTH"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        },
+        "TEXT_SUBTYPE": {
+          "value": "plain"
+        },
+        "ENCODING": {
+          "value": "\"UTF-8\""
+        },
+        "SET_LOCALHOST": {
+          "value": "false"
+        },
+        "CC": {
+          "value": "\"\""
+        },
+        "BCC": {
+          "value": "\"\""
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "avisa_inicio",
+      "destino": "trabajo",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "trabajo",
+      "destino": "salida"
+    },
+    {
+      "origen": "trabajo",
+      "destino": "avisa_fin",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5-correos.log",
+      "contiene": [
+        "Subject: [L5] inicio",
+        "Subject: [L5] fin OK"
+      ]
+    }
+  }
+}

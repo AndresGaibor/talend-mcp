@@ -1,0 +1,102 @@
+{
+  "nombre": "transformaciones: un tFilterRow filtra por una condicion",
+  "job": "MCP_L5_Filtro",
+  "nodos": [
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lector",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tFilterRow",
+      "nombre": "filtra",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "tablas": {
+        "CONDITIONS": {
+          "columns": [
+            "INPUT_COLUMN",
+            "FUNCTION",
+            "OPERATOR",
+            "RVALUE"
+          ],
+          "rows": [
+            {
+              "INPUT_COLUMN": "monto",
+              "FUNCTION": "",
+              "OPERATOR": ">",
+              "RVALUE": "150"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lector",
+      "destino": "filtra"
+    },
+    {
+      "origen": "filtra",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "2|Jose|Medellin|200.25",
+      "3|Lucia|Cali|300.0"
+    ]
+  }
+}

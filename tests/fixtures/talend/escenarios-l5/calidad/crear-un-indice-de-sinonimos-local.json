@@ -1,0 +1,121 @@
+{
+  "nombre": "calidad: crear un indice de sinonimos local",
+  "job": "MCP_L5_SynonymOutput",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "word",
+          "type": "id_String"
+        },
+        {
+          "name": "synonyms",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "NY",
+          "New York|Big Apple"
+        ],
+        [
+          "SF",
+          "San Francisco|City by the Bay"
+        ]
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tSynonymOutput",
+      "nombre": "indice",
+      "esquemas": [
+        {
+          "conector": "FLOW",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "word",
+              "type": "id_String"
+            },
+            {
+              "name": "synonyms",
+              "type": "id_String"
+            }
+          ]
+        },
+        {
+          "conector": "MAIN",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "word",
+              "type": "id_String"
+            },
+            {
+              "name": "synonyms",
+              "type": "id_String"
+            },
+            {
+              "name": "status",
+              "type": "id_String"
+            }
+          ]
+        }
+      ],
+      "parameters": {
+        "FILE_PATH": {
+          "value": "@TESTDATA@/l5_synonym_index"
+        },
+        "OPERATION": {
+          "value": "INIT"
+        },
+        "ENTRY": {
+          "value": "word"
+        },
+        "SYNONYMS": {
+          "value": "synonyms"
+        }
+      },
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida",
+      "columnas": [
+        {
+          "name": "word",
+          "type": "id_String"
+        },
+        {
+          "name": "synonyms",
+          "type": "id_String"
+        },
+        {
+          "name": "status",
+          "type": "id_String"
+        }
+      ]
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "indice"
+    },
+    {
+      "origen": "indice",
+      "destino": "salida",
+      "tipo": "MAIN"
+    }
+  ],
+  "espera": {
+    "lineas": 2,
+    "contiene": [
+      "NY",
+      "SF",
+      "inserted"
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "nombre": "contextos: un parametro de contexto se lee en el job",
+  "job": "MCP_L5_Parametro",
+  "contextos": [
+    {
+      "nombre": "Default",
+      "variables": [
+        {
+          "nombre": "L5_PARAM",
+          "valor": "por-defecto",
+          "tipo": "id_String"
+        }
+      ]
+    }
+  ],
+  "nodos": [
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"parametro: \" + context.L5_PARAM);"
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "contiene": [
+      "parametro: por-defecto"
+    ]
+  }
+}
