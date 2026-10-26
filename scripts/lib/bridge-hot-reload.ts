@@ -1,5 +1,5 @@
 import { execSync, spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, utimesSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, renameSync, rmSync, utimesSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { homedir, platform } from "node:os";
 
@@ -18,18 +18,56 @@ const IS_WIN = platform() === "win32";
 const ui = createUi();
 const { ok, warn } = ui;
 
-const BRIDGE_PING_URL = "http://127.0.0.1:3930/ping";
+const DEFAULT_BRIDGE_PORT = 3930;
+const PLUGIN_ID = "com.andres.talend.bridge";
 
-/** Version del bundle que esta sirviendo el bridge ahora, o null si no responde. */
-export async function runningBridgeVersion(): Promise<string | null> {
+/** Campos del ping que el instalador y el estado usan. El resto del payload se ignora. */
+export type BridgePing = {
+  plugin: string;
+  version: string;
+  mode?: string;
+  pid?: number;
+  javaVersion?: string;
+  uptimeMs?: number;
+};
+
+/**
+ * Puerto del bridge: TALEND_BRIDGE_PORT, luego el de ~/.talend-bridge/config.json y
+ * por ultimo el 3930. Debe coincidir con lo que lee el plugin en Java.
+ */
+export function bridgePort(): number {
+  const fromEnv = Number(process.env.TALEND_BRIDGE_PORT);
+  if (Number.isInteger(fromEnv) && fromEnv > 0) return fromEnv;
   try {
-    const response = await fetch(BRIDGE_PING_URL, { signal: AbortSignal.timeout(1000) });
+    const config = JSON.parse(readFileSync(join(bridgeHome(), "config.json"), "utf8")) as { port?: unknown };
+    if (typeof config.port === "number" && Number.isInteger(config.port)) return config.port;
+  } catch {
+    // Sin archivo (o corrupto) el plugin usa el puerto por defecto.
+  }
+  return DEFAULT_BRIDGE_PORT;
+}
+
+/** Carpeta ~/.talend-bridge, donde viven la configuracion, el token y la carga en caliente. */
+export function bridgeHome(): string {
+  return join(homedir(), ".talend-bridge");
+}
+
+/** Respuesta de /ping del bridge, o null si no responde o no es el plugin. */
+export async function runningBridgePing(): Promise<BridgePing | null> {
+  try {
+    const response = await fetch(`http://127.0.0.1:${bridgePort()}/ping`, { signal: AbortSignal.timeout(1000) });
     if (!response.ok) return null;
-    const payload = (await response.json()) as { plugin?: string; version?: string };
-    return payload.plugin === "com.andres.talend.bridge" ? (payload.version ?? "desconocida") : null;
+    const payload = (await response.json()) as Partial<BridgePing>;
+    if (payload.plugin !== PLUGIN_ID) return null;
+    return { ...payload, plugin: PLUGIN_ID, version: payload.version ?? "desconocida" } as BridgePing;
   } catch {
     return null;
   }
+}
+
+/** Version del bundle que esta sirviendo el bridge ahora, o null si no responde. */
+export async function runningBridgeVersion(): Promise<string | null> {
+  return (await runningBridgePing())?.version ?? null;
 }
 
 export async function isStudioRunning(studio: StudioInstall): Promise<boolean> {
@@ -52,29 +90,76 @@ export async function isStudioRunning(studio: StudioInstall): Promise<boolean> {
 
 /**
  * Carpeta donde el plugin vigila el jar para recargarse en caliente.
- * Debe coincidir con `HotReloadService.hotJarPath()` del lado Java.
+ * Debe coincidir con `HotReloadService.hotJarPath()` del lado Java: si la variable
+ * esta vacia, el plugin usa la carpeta por defecto, y aqui tambien.
  */
-function hotJarPath(): string {
-  const dir = process.env.TALEND_BRIDGE_HOT_DIR
-    ?? join(homedir(), ".talend-bridge", "hot");
+export function hotJarPath(): string {
+  const dir = process.env.TALEND_BRIDGE_HOT_DIR?.trim() || join(bridgeHome(), "hot");
   return join(dir, "bridge.jar");
 }
 
-/** Copia el jar compilado a la carpeta de carga en caliente. */
-export function publishHotJar(jarPath: string): string | undefined {
+/** Un jar es un zip: empieza por "PK" y tiene al menos la cola del directorio central. */
+export function isJarFile(path: string): boolean {
   try {
-    const target = hotJarPath();
+    const content = readFileSync(path);
+    return content.length >= 22 && content[0] === 0x50 && content[1] === 0x4b;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Copia el jar compilado a la carpeta de carga en caliente.
+ *
+ * Se escribe primero junto al destino y luego se renombra: el watcher del plugin
+ * nunca ve un jar a medias (si lo viera, la recarga fallaria o cargaria basura).
+ */
+export function publishHotJar(jarPath: string): string | undefined {
+  if (!isJarFile(jarPath)) {
+    warn(`No se publica ${jarPath}: no es un jar valido.`);
+    return undefined;
+  }
+
+  const target = hotJarPath();
+  const staging = `${target}.${process.pid}.tmp`;
+  try {
     mkdirSync(dirname(target), { recursive: true });
-    cpSync(jarPath, target, { force: true });
-    // `cpSync` conserva el mtime del jar de origen. Si el bundle se compiló
-    // antes de iniciar Studio, el watcher puede haber memorizado esa misma
-    // firma y no detectar la copia aunque haya que cargar una versión nueva.
+    copyFileSync(jarPath, staging);
+    // Fecha nueva: la firma del watcher es tamanio y fecha de modificacion.
     const now = new Date();
-    utimesSync(target, now, now);
+    utimesSync(staging, now, now);
+    renameWithRetry(staging, target);
     return target;
   } catch (error) {
+    removeQuietly(staging);
     warn(`No se pudo publicar el jar para carga en caliente: ${error instanceof Error ? error.message : String(error)}`);
     return undefined;
+  }
+}
+
+/**
+ * En Windows el renombrado sobre un archivo puede fallar un instante si otro proceso
+ * (un antivirus, el propio watcher) lo tiene abierto. Se reintenta con una pausa corta.
+ */
+function renameWithRetry(from: string, to: string, attempts = 5): void {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const retryable = code === "EPERM" || code === "EBUSY";
+      if (!retryable || attempt >= attempts) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100 * attempt);
+    }
+  }
+}
+
+function removeQuietly(path: string): void {
+  try {
+    rmSync(path, { force: true });
+  } catch {
+    // Un temporal que no se puede borrar no afecta a la instalacion.
   }
 }
 

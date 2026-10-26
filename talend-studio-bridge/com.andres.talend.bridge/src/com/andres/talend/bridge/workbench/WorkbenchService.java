@@ -189,34 +189,6 @@ public final class WorkbenchService {
     return payload;
   }
 
-  public static Map<String, Object> closeActiveEditor() {
-    Map<String, Object> payload = new LinkedHashMap<>();
-    payload.put("ok", true);
-    payload.put("source", "studio-bridge");
-    payload.put("confidence", "medium");
-    payload.put("endpoint", "/workbench/close-editor");
-
-    IWorkbenchPage page = activePage();
-    if (page == null || page.getActiveEditor() == null) {
-      payload.put("ok", false);
-      payload.put("closed", false);
-      payload.put("error", error("NO_ACTIVE_EDITOR", "No hay editor activo"));
-      return payload;
-    }
-
-    IEditorPart editor = page.getActiveEditor();
-    try {
-      page.closeEditor(editor, true);
-      payload.put("closed", true);
-      payload.put("editorTitle", editor.getTitle());
-    } catch (Exception e) {
-      payload.put("ok", false);
-      payload.put("closed", false);
-      payload.put("error", error("CLOSE_FAILED", e.getMessage()));
-    }
-    return payload;
-  }
-
   public static Map<String, Object> activateEditor(String title) {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ok", true);

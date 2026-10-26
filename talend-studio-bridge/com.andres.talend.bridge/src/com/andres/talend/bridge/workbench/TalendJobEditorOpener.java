@@ -386,14 +386,6 @@ final class TalendJobEditorOpener {
     return method.invoke(target);
   }
 
-  private static Class<?> loadClassFromBundle(String bundleSymbolicName, String className) throws ClassNotFoundException {
-    Bundle bundle = Platform.getBundle(bundleSymbolicName);
-    if (bundle == null) {
-      throw new ClassNotFoundException("No se encontró el bundle " + bundleSymbolicName);
-    }
-    return bundle.loadClass(className);
-  }
-
   private static final class RepositoryCoordinates {
     private final String label;
     private final String version;

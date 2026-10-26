@@ -88,8 +88,11 @@ responde. Si no quieres que toque el plugin, usa `bun run start --skip-bridge` o
 `bun run start:server`.
 
 El servidor estará disponible localmente en `http://127.0.0.1:3927/mcp`. Configura esa dirección
-en tu cliente MCP y comienza con `talend_guide`. Por defecto expone el preset `agent` (46
-herramientas); para ver el catálogo completo, define `TALEND_MCP_FILTER=canonical`.
+en tu cliente MCP y comienza con `talend_guide`.
+
+Qué herramientas expone depende del arranque: `bun run start` usa el preset `agent` (el más
+práctico para empezar); `bun run start:server` y cualquier arranque sin `TALEND_MCP_FILTER` exponen
+todas. `bun run mapa` muestra el número de herramientas de cada preset.
 
 ### 4. Habilitar el trabajo en vivo con Talend Studio
 

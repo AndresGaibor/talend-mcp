@@ -35,15 +35,23 @@ const tableSpecSchema = z.object({
     .describe("Filas de la tabla: una por registro, como array o como objeto con las claves de columna"),
 });
 
-const mapperEntrySchema = z.object({
+// Estrictos a proposito: con `z.object` una clave desconocida (un `expression`
+// puesto a nivel de tabla, por ejemplo) se descarta en silencio y el tMap sale
+// sin esa expresion. Con `strictObject` el error nombra la clave.
+const mapperEntrySchema = z.strictObject({
   name: z.string().describe("Nombre de la columna"),
   type: z.string().optional().describe("Tipo Java de la columna"),
   expression: z.string().optional().describe("Expresion de la columna"),
   nullable: z.boolean().optional().describe("Admite nulos"),
+  operator: z.string().optional().describe("Operador de la columna, si el tMap lo usa"),
 });
 
-const mapperTableSchema = z.object({
-  name: z.string().describe("Nombre de la tabla: row1, out1, Var..."),
+const mapperTableSchema = z.strictObject({
+  name: z
+    .string()
+    .describe(
+      "Nombre de la tabla: el de la conexion a la que va, tal como lo pone Studio al conectar (row1, row2...). No se inventa: out1 o Var no existen como conexiones",
+    ),
   columns: z.array(mapperEntrySchema).optional().describe("Columnas de la tabla"),
   filter: z.string().optional().describe("Filtro de la tabla"),
   matchingMode: z.string().optional().describe("Modo de emparejado del lookup: UNIQUE_MATCH, MULTI_MATCH..."),
@@ -54,10 +62,24 @@ const mapperTableSchema = z.object({
   isJoinTableOf: z.string().optional().describe("Tabla principal del join"),
 });
 
+// Una variable de la seccion Var: nombre, tipo y expresion, sin columnas.
+const mapperVarSchema = z.strictObject({
+  name: z.string().describe("Nombre de la variable"),
+  type: z.string().optional().describe("Tipo Java de la variable: id_String, id_Integer..."),
+  expression: z.string().optional().describe("Expresion de la variable"),
+  nullable: z.boolean().optional().describe("Admite nulos"),
+});
+
 const mapperSchema = z.object({
-  inputs: z.array(mapperTableSchema).optional().describe("Tablas de entrada"),
-  outputs: z.array(mapperTableSchema).optional().describe("Tablas de salida"),
-  vars: z.array(mapperTableSchema).optional().describe("Variables de la seccion Var"),
+  inputs: z
+    .array(mapperTableSchema)
+    .optional()
+    .describe("Tablas de entrada: una por conexion de entrada, con el nombre de esa conexion"),
+  outputs: z
+    .array(mapperTableSchema)
+    .optional()
+    .describe("Tablas de salida: una por conexion de salida, con el nombre de esa conexion y la expresion de cada columna"),
+  vars: z.array(mapperVarSchema).optional().describe("Variables de la seccion Var"),
 });
 
 /** Configuracion declarativa compartida por las operaciones de nodos. */

@@ -63,7 +63,7 @@ Un agente puede hablar con Studio sin el servidor MCP, por dos niveles:
 
 | Grupo | Rutas |
 |---|---|
-| Estado | `/ping`, `/capabilities`, `/audit/environment`, `/workspace/state`, `/workspace/refresh`, `/problems/markers`, `/events/recent`, `/events/clear` |
+| Estado | `/ping`, `/capabilities`, `/audit/environment`, `/workspace/state`, `/workspace/refresh`, `/problems/markers`, `/events/recent`, `/events/clear`, `/logs/tail?lines=200` (ultimas lineas del Error Log de Studio), `/talend/probe/classes`, `POST /talend/api/check` (existencia de clases y metodos de la API de Talend en el Studio abierto) |
 | Jobs | `/automation/job/create`, `/automation/job/open`, `/automation/job/delete`, `/automation/job/execute` |
 | Nodos | `/automation/nodes/add`, `/connect`, `/update`, `/configure`, `/schema`, `/copy`, `/delete`, `/list` (todas bajo `/automation/nodes/`) |
 | Catalogo | `/automation/components`, `/automation/components/parameters`, `/automation/coverage` |

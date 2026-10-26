@@ -2,48 +2,76 @@
 
 Instrucciones para agentes de IA que trabajan en **talend-mcp**.
 
-Este archivo es la fuente de verdad. Si una regla aqui contradice una costumbre mia, gana este
-archivo. `CLAUDE.md` solo guarda el detalle de Bun y apunta aqui.
+Este archivo es la fuente de verdad. Si una regla aqui contradice una costumbre tuya, gana este
+archivo. `CLAUDE.md` solo guarda el detalle de Bun y apunta aqui. El indice de toda la
+documentacion esta en [docs/README.md](docs/README.md).
+
+## 0. Empieza aqui
+
+**talend-mcp** es un servidor MCP local que analiza y edita proyectos de **Qlik Talend Studio**.
+Trabaja sobre los archivos del workspace y, cuando Talend Studio esta abierto, con el plugin Java
+(`talend-studio-bridge/`) que expone la API del IDE. No tiene interfaz grafica: lo consume un
+cliente MCP.
+
+Primeros comandos, en este orden:
+
+```bash
+bun install      # una vez
+bun run mapa     # mapa vivo: carpetas, tools por preset, comandos y estado del bridge
+bun run doctor   # Studio, bridge, MCP y configuracion en una pantalla
+bun test         # debe estar en verde antes de tocar nada
+```
+
+**Elige tu camino:**
+
+| Quieres... | Empieza por | Verifica con |
+|---|---|---|
+| **Usar** el MCP para crear, editar o ejecutar jobs en Studio | [docs/GUIA-AGENTE.md](docs/GUIA-AGENTE.md). En el cliente MCP, la primera llamada es `talend_guide` con `mode: "overview"` | la guia y `talend_guide` |
+| **Cambiar** codigo TypeScript (tools, servicios, scripts) | Seccion 5 y [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | `bun run typecheck` y `bun test tests/<area>` |
+| **Agregar una tool** MCP | Seccion 6 y [docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md) | `bun test tests/tools` |
+| **Cambiar el plugin Java** (bridge) | [talend-studio-bridge/README.md](talend-studio-bridge/README.md) y seccion 3 | `bun test tests/talend/bridge-java.test.ts` |
+| **Escribir o revisar** un escenario L5 | [docs/plan-de-pruebas/03-ejecucion-l5.md](docs/plan-de-pruebas/03-ejecucion-l5.md) | `bun run l5:validar` |
+| **Entender** una API interna de Talend Studio | [docs/TALEND-STUDIO-INTERNALS.md](docs/TALEND-STUDIO-INTERNALS.md) y `bun run talend:api find <nombre>` | `bun run talend:api live <clase>` |
+| Saber **que esta probado** | [docs/COBERTURA-POR-FAMILIA.md](docs/COBERTURA-POR-FAMILIA.md) | `bun run mapa` |
+| **No sabes donde esta algo** | [docs/README.md](docs/README.md) | `bun run mapa` |
+
+**Tres reglas que mas dano hacen:**
+
+1. **Los jobs se crean y modifican con las tools que usan la API de Studio** (`talend_job_*_in_studio`,
+   `talend_job_add_node`...), nunca escribiendo el `.item` a mano. Studio mantiene el modelo en
+   memoria: un XML escrito por fuera deja el job inconsistente.
+2. **Studio es un entorno vivo.** `bun run bridge:install` recarga el plugin en el Studio abierto:
+   no lo ejecutes mientras hay jobs o dialogos en curso. Las acciones con `unsafeActions`
+   (ejecutar codigo Java, borrar, escribir en el workspace) pueden ser irreversibles.
+3. **Antes de commitear:** `bun run verify`. No commitees carpetas generadas (seccion 10).
 
 ## 1. Que es el repo
 
-Servidor MCP (Model Context Protocol) que analiza y edita proyectos de **Qlik Talend Studio**
-sobre los archivos `.item` y `.properties` de un workspace de Talend.
+El servidor expone decenas de herramientas MCP, agrupadas por area (`talend_<area>_<verbo>`).
+`bun run mapa` da el numero exacto por preset: un cliente externo nuevo usa
+`TALEND_MCP_FILTER=agent`; `all` expone todo.
 
-El servidor expone ~230 herramientas MCP. No tiene interfaz grafica propia: la consumes desde
-un cliente MCP.
-
-**Dos formas de trabajar aqui, dos puntos de entrada:**
-
-| Vas a... | Lee primero |
-|---|---|
-| **Usar** el MCP para crear, editar, ejecutar y verificar jobs en un Talend Studio abierto | [docs/GUIA-AGENTE.md](docs/GUIA-AGENTE.md) (flujo, reglas de configuracion, errores, limites) y [docs/PLAN-DE-PRUEBAS.md](docs/PLAN-DE-PRUEBAS.md) |
-| **Cambiar** el codigo del repo o el plugin Java | Este archivo, [docs/PLAN-DE-TRABAJO.md](docs/PLAN-DE-TRABAJO.md) y [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) |
-
-Para un agente conectado al servidor MCP, la primera llamada es `talend_guide` en modo
-`overview`. Para clientes externos nuevos usa `TALEND_MCP_FILTER=agent`; la guia descubre las
-tools activas, enseña tareas paso a paso y avisa cuando el preset no expone una capacidad.
-El inventario completo se genera con `bun run docs:tools` y se publica en
-[docs/CATALOGO-DE-TOOLS.md](docs/CATALOGO-DE-TOOLS.md).
-
-Regla de fondo para quien usa el MCP: los jobs se crean y modifican **con las tools que usan la
-API de Studio** (`talend_job_*_in_studio`, `talend_job_add_node`...), nunca escribiendo el
-`.item` a mano.
+Regla de fondo para quien usa el MCP: los jobs se crean y modifican **con la API de Studio**, nunca
+escribiendo el `.item` a mano (ver regla 1 arriba).
 
 ## 2. Stack y comandos
 
 | Comando | Que hace |
 |---|---|
 | `bun install` | Instala dependencias. **Nunca** uses npm, yarn o pnpm. |
-| `bun test` | Suite completa (300+ tests, ~1,5 s). Solo corre `tests/`. |
+| `bun test` | Suite completa, en segundos. Solo corre `tests/` (lo fija `bunfig.toml`). |
 | `bun run typecheck` | `tsc --noEmit`. Debe terminar sin errores. |
 | `bun run verify` | `typecheck` + `bun test` + `l5:validar`. Es el comando antes de commitear. |
 | `bun run test:ci` | `bun test --bail`: corta en el primer fallo. |
-| `bun run l5:validar` | Valida los fixtures L5 (79 escenarios, 14 suites) sin abrir Studio ni cargar el bridge (~65 ms). Acepta `--suite <nombre>`. |
-| `bun run doctor` | Estado de Studio, bridge, MCP y configuracion en una pantalla (~0,2 s). |
-| `bun run start:server` | Levanta el servidor MCP en `http://127.0.0.1:3927/mcp`. |
-| `bun run start` | Igual que `start:server`, ademas actualiza el plugin si Studio esta abierto y el bridge no responde. |
-| `bun run bridge:install` | Compila y publica el plugin Java. Si Talend Studio esta corriendo, se compila con `javac` (~8 s, 0 s sin cambios) y se recarga en caliente; espera a que el bridge sirva la version nueva, sin `Start-Sleep`. `--maven` fuerza Maven/Tycho (lento, ~25-40 s); `--force` recompila y recarga aunque no haya cambios. |
+| `bun run l5:validar` | Valida los escenarios L5 sin abrir Studio ni cargar el bridge. Acepta `--suite <nombre>`. |
+| `bun run mapa` | Mapa del repo: carpetas, tools por preset, comandos y estado del bridge. `--json` para scripts. |
+| `bun run doctor` | Estado de Studio, bridge, MCP y configuracion en una pantalla. |
+| `bun run start:server` | Levanta el servidor MCP en `http://127.0.0.1:3927/mcp`, con todas las tools. |
+| `bun run start` | Igual, con preset `agent` por defecto, y actualiza el plugin si Studio esta abierto y el bridge no responde. |
+| `bun run bridge:install` | Compila y publica el plugin Java. Con Studio abierto compila con `javac` y recarga en caliente. `--maven` fuerza Maven/Tycho (lento); `--force` recompila aunque no haya cambios. |
+| `bun run bridge:status` | Estado del bridge: Studio, version en vivo, build local y jar publicado. Solo lee. |
+| `bun run bridge:watch` | Desarrollo del plugin: recompila y recarga al guardar un fuente, con Studio abierto. |
+| `bun run talend:api <drift\|find\|live>` | Examina la API de Talend: nombres que la instalacion no tiene, clases que declaran un nombre, y consultas al Studio abierto. |
 | `bun run jobs ...` / `bun run contexts ...` | CLI local para jobs y contextos. |
 
 Reglas de Bun (proyecto, no Node):
@@ -57,25 +85,20 @@ Reglas de Bun (proyecto, no Node):
 
 ## 3. Estado del repositorio
 
-- **No hay apps ni UI.** No existe `apps-ui/` ni la capa `src/presentation/apps/`. El servidor
-  expone solo tools.
-- **No hay tunnel ni Tailscale Funnel.** El servidor es local (`127.0.0.1`) o stdio.
-  No reintroduzcas `CONTROL_PLANE_API_KEY`, `TALEND_MCP_FUNNEL` ni `src/tailscale/`.
-- **No hay exposicion publica.** Si necesitas acceso remoto, resuelvelo con el cliente MCP,
-  no con un proxy dentro del repo.
-- **No hay ChatGPT Web.** El unico host es un cliente MCP local.
+- **No hay apps ni UI.** La capa de interfaz grafica ya no existe: el servidor expone solo tools.
+- **No hay tunel ni exposicion publica.** El servidor es local (`127.0.0.1`) o stdio. No
+  reintroduzcas claves de control plane, tuneles ni la capa de Tailscale.
 - **No hay aliases de tools.** Toda tool se llama `talend_<area>_<verbo>` y hay una sola tool
   por capacidad. No reintentes el mecanismo de aliases legacy.
 - **El registro de tools vive en un solo lugar:** `getModuleTools()` en
   `src/server/registered-tools.ts`, que consume `src/presentation/server/tool-registry.ts`.
 - **No hay codigo muerto.** Si agregas un archivo, conectalo: los barridos de referencias
   orfas son parte de la revision.
-- **`entregables/` y `evidencias/`** son salidas generadas y no se versionan.
 - **El plugin Java se recarga en caliente.** `bun run bridge:install` publica el bundle en
-  `~/.talend-bridge/hot/bridge.jar` y el plugin lo detecta y se
-  recarga solo (`Bundle.update`). No reinicies Talend Studio para aplicar cambios. Ojo: al
-  reiniciar Studio se carga el bundle **instalado**, no el de la carga en caliente; despues de un
-  reinicio hay que volver a lanzar `bun run bridge:install` y mirar la `version` del ping.
+  `~/.talend-bridge/hot/bridge.jar` y el plugin lo detecta y se recarga solo (`Bundle.update`).
+  No reinicies Talend Studio para aplicar cambios. Ojo: al reiniciar Studio se carga el bundle
+  **instalado**, no el de la carga en caliente; despues de un reinicio hay que volver a lanzar
+  `bun run bridge:install` y mirar la `version` del ping.
 - **Nada lento ni bloqueante en el hilo de UI del bridge.** `UiThread.sync` es solo para tocar
   widgets o el modelo del job, y en trozos cortos. Ejecutar jobs, descargar artefactos, recorrer
   el catalogo entero o esperar procesos va en el hilo de trabajo HTTP; si no, Talend Studio se
@@ -84,7 +107,7 @@ Reglas de Bun (proyecto, no Node):
   (requiere `unsafeActions`). Usalo para explorar APIs; lo que funcione se lleva al bridge como
   operacion con su tool, para que quien clone el repo la tenga.
 - **Documenta lo que aprendas.** Cada trampa de Studio descubierta va a
-  `docs/TALEND-STUDIO-INTERNALS.md`; cada limite o estado de fase, a `docs/PLAN-DE-PRUEBAS.md`.
+  `docs/TALEND-STUDIO-INTERNALS.md`; cada limite o estado de fase, a `docs/plan-de-pruebas/`.
 
 ## 4. Reglas de oro
 
@@ -109,15 +132,19 @@ Reglas de Bun (proyecto, no Node):
    `tests/fixtures/talend/escenarios-l5/<suite>/<escenario>.json`: un archivo por escenario,
    agrupados en la carpeta de su suite. Se cargan y validan con `scripts/l5/scenario-files.ts`
    (`loadScenarioTree`), y `bun run l5:validar` los revisa sin abrir Studio. No vuelvas a un
-   unico JSON gigante ni a un archivo por suite. Cualquier fixture nuevo que se pueda agrupar por
-   caso o suite se separa igual.
+   unico JSON gigante ni a un archivo por suite.
 10. **Documentacion por tema.** `docs/TALEND-STUDIO-INTERNALS.md`, `docs/GUIA-AGENTE.md` y
-    `docs/PLAN-DE-PRUEBAS.md` son indices; el contenido vive en `docs/studio-internals/`,
+    `docs/plan-de-pruebas/` son indices; el contenido vive en `docs/studio-internals/`,
     `docs/guia-agente/` y `docs/plan-de-pruebas/`. No agregues secciones nuevas al indice: crea o
     amplia el archivo del tema y conserva el numero de seccion cuando exista.
 11. **Variables de entorno nuevas** se declaran en `src/config/env.ts` y se documentan en el
     README. Las del CLI instalador son `TALEND_STUDIO_HOME`, `TALEND_BRIDGE_AUTO_INSTALL` y
     `TALEND_MCP_LOG`.
+12. **Rutas de datos de los escenarios.** En un escenario L5, `@TESTDATA@` se sustituye solo a
+    traves del arnes (`scripts/l5/testdata-paths.ts`). Si llamas al bridge a mano, usa la ruta
+    absoluta: un placeholder sin sustituir hace que Studio escriba en una carpeta literal.
+13. **Documentacion que se puede romper, se comprueba.** `tests/docs/entry-docs.test.ts` verifica
+    enlaces, comandos `bun run` y rutas de los mapas. Si mueves algo, el test te dice que arreglar.
 
 ## 5. Estructura del repositorio
 
@@ -130,25 +157,26 @@ src/
 ├── domain/                  entidades y puertos del nucleo (jobs, workspace, analysis)
 ├── application/             casos de uso del nucleo
 ├── infrastructure/          implementaciones (filesystem, git, xml, workspace)
-├── talend/                  logica de Talend: XML, jobs, contextos, DQ, mastery, tools
-├── modules/                 modulos con casos de uso y adapters propios
+├── talend/                  logica de Talend: XML, jobs, contextos, DQ, mastery, tools de Studio
+├── modules/                 modulos con casos de uso y adapters propios (jobs, runs, guide, studio-bridge...)
 ├── presentation/
 │   ├── tools/               tools por area (analysis, components, contexts, execution, jobs)
 │   └── server/              servidor HTTP/stdio, registro y anotaciones de tools
-└── server/                  registro de tools, adaptadores MCP, esquemas
-scripts/                     scripts de operacion (start, install-bridge, doctor, jobs, ...)
-├── lib/                     deteccion de Studio, compilacion, hot reload e instalacion p2
-├── l5/                      arnes L5: validacion, seleccion, montaje, ejecucion, expectativas e informe
+└── server/                  registro de tools, adaptadores MCP, presets y esquemas
+scripts/                     scripts de operacion (start, install-bridge, doctor, mapa, jobs, ...)
+├── lib/                     deteccion de Studio, compilacion, hot reload, estado e instalacion p2
+├── l5/                      arnes L5: validacion, seleccion, montaje, ejecucion y expectativas
+├── talend-api/              detector de deriva de la API de Talend (ApiDrift.java)
 ├── studio-job/              una fase por archivo para el CLI de operaciones sobre Studio
 └── testdata/                generadores de CSV, XLSX (ZIP) y datos de Postgres
-tests/                       suite de tests (bun test)
+tests/                       suite de bun test (un area por carpeta, ver seccion 8)
 talend-studio-bridge/        plugin Java (Eclipse/Tycho) que expone Studio por HTTP
-docs/                        documentacion tecnica
-└── studio-internals/        referencia de APIs internas, un archivo por tema
+docs/                        documentacion tecnica; indice en docs/README.md
 ```
 
-Detalle completo en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). Las APIs internas de Talend
-Studio que usa el plugin Java estan en
+`bun run mapa` muestra la misma estructura con una descripcion de cada carpeta y el estado real del
+bridge. Detalle completo en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). Las APIs internas de
+Talend Studio que usa el plugin estan en
 [docs/TALEND-STUDIO-INTERNALS.md](docs/TALEND-STUDIO-INTERNALS.md).
 
 ## 6. Como agregar una tool
@@ -177,12 +205,13 @@ Studio que usa el plugin Java estan en
    ```
 
    Ubicacion: `src/modules/<modulo>/tools/` si el modulo existe, `src/talend/studio/tools-<area>.ts`
-   si es una tool de estudio.
+   si es una tool de Studio.
 3. **Registrala**:
    - Tools de modulo: en `getModuleTools()` de `src/server/registered-tools.ts`.
-   - Tools de estudio: en el array `allTools` de `src/talend/studio/bridge-tools.ts`.
+   - Tools de Studio: en el array `allTools` de `src/talend/studio/bridge-tools.ts`.
 4. **Escribe el test** en `tests/tools/` o `tests/<area>/`.
-5. **Verificacion**: `bun run typecheck` y `bun test`.
+5. **Verificacion**: `bun run typecheck` y `bun test`. Luego `bun run docs:tools` regenera el
+   catalogo y `bun run mapa` debe contar la tool nueva.
 
 Convenciones:
 
@@ -217,22 +246,26 @@ El schema Zod esta en `src/shared/contracts/result.contract.ts`.
 
 - Ubicacion: `tests/<area>/<tema>.test.ts`, con `import { describe, expect, test } from "bun:test"`.
 - Un solo archivo se corre con `bun test tests/<area>/<tema>.test.ts`; una carpeta, con
-  `bun test tests/<area>`. No hace falta tocar `bun test` completo mientras se itera.
+  `bun test tests/<area>`. No hace falta correr la suite completa mientras se itera.
 - Fixtures: `tests/fixtures/talend/`. No dependas de archivos que existan solo en una maquina.
 - Para rutas, crea temporales con `mkdtempSync(join(tmpdir(), "talend-<area>-"))` y borralos en
   `afterAll`.
 - `bunfig.toml` limita `bun test` a `tests/` a proposito: no agregues tests fuera de esa carpeta.
 
-Cobertura existente por area:
+Cobertura por area:
 
 | Carpeta | Que cubre |
 |---|---|
 | `tests/tools/` | registro, contratos, schemas, seguridad, convencion de nombres |
 | `tests/presentation/` | envelope de resultado |
-| `tests/talend/` | jobs, contextos, DQ, logs, workspace, ejecuciones, diagnostico |
+| `tests/talend/` | jobs, contextos, DQ, logs, workspace, ejecuciones, diagnostico, y el bridge |
+| `tests/talend/bridge-java.test.ts` | tests Java del plugin (compila `talend-studio-bridge/.../test/` con el JDK de Studio; se salta sin Studio) |
+| `tests/l5/` | arnes L5: rutas de datos, seleccion y montaje de escenarios |
+| `tests/scripts/` | scripts de operacion: instalador, estado del bridge, mapa, CLI de la API de Talend |
+| `tests/docs/` | documentacion de entrada: enlaces, comandos y rutas de los mapas |
 | `tests/platform/` | deteccion de SO, portabilidad de rutas |
 
-## 9. Before de tocar codigo
+## 9. Antes de tocar codigo
 
 ```bash
 bun install
@@ -241,3 +274,20 @@ bun test            # debe estar verde antes de empezar
 ```
 
 Si alguno de los dos falla antes de tu cambio, el problema es preexistente: reportalo y sigue.
+
+## 10. Carpetas que no se versionan, y de quien son
+
+| Carpeta | De quien es | Que hacer |
+|---|---|---|
+| `workspace/` | Talend Studio (Eclipse), local | No la edites ni la versiones. Ignorada. |
+| `node_modules/`, `talend-studio-bridge/**/target/` | bun y el build del plugin | Se regeneran. Ignoradas. |
+| `.talend-mcp/` | runtime del servidor (catalogos, logs de runs) | Ignorada. Se regenera. |
+| `entregables/`, `evidencias/` | salidas generadas | Ignoradas. |
+| `testdata/*.csv`, `testdata/*.xlsx`, ... | datos de prueba generados por `scripts/make-testdata.ts` | Se regeneran; los pequenos si estan versionados. |
+| `.freebuff/` | otra herramienta, con su `project-id` | Ignorada. No la edites. |
+| `addons/` | datos de sinonimos, **sin uso confirmado** en el codigo | Versionada. No la borres sin decidirlo con el equipo. |
+| `examples/` | ejemplos de entrada | Versionada. Solo referencia. |
+
+Una carpeta nueva que aparezca sola en la raiz, con un nombre raro, es un error de alguna
+ejecucion: busca quien la creo antes de commitearla. Si aparece `@TESTDATA@`, un escenario L5 no
+sustituyo su placeholder (regla 12).

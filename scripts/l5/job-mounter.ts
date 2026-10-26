@@ -56,6 +56,16 @@ export async function crearContextos(
 }
 
 /**
+ * Si un fallo al borrar el job es esperable: el job todavia no existe.
+ *
+ * Solo eso. Un fallo cualquiera (Studio sin responder, un job abierto) no se
+ * tolera: si se ignora, el job anterior se queda y el montaje sigue sobre el.
+ */
+export function borradoTolerable(mensaje: string): boolean {
+  return /no existe|not found|no se encontr/i.test(mensaje);
+}
+
+/**
  * Monta un job: lo borra, lo crea, anade los nodos con su configuracion y
  * los conecta.
  */
@@ -74,7 +84,7 @@ export async function montarJob(
     () => bridge.deleteJob({ name: spec.job }),
     transitorioDeStudio,
   );
-  if (!borrado.ok && !/no existe|not found|no se/i.test(errorDe(borrado))) {
+  if (!borrado.ok && !borradoTolerable(errorDe(borrado))) {
     return { ok: false, mensaje: `no se pudo borrar: ${errorDe(borrado)}` };
   }
 

@@ -1,8 +1,11 @@
 package com.andres.talend.bridge.automation;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.andres.talend.bridge.BridgeLog;
 import com.andres.talend.bridge.workbench.WorkbenchService;
@@ -232,20 +235,6 @@ public final class TalendApi {
   // El modelo
   // ---------------------------------------------------------------------
 
-  /** Nodo del proceso por su unique name. */
-  public static Object nodeByUniqueNameLegacy(Object process, String uniqueName) throws Exception {
-    Object nodes = process.getClass().getMethod("getGraphicalNodes").invoke(process);
-    if (nodes instanceof Iterable) {
-      for (Object node : (Iterable<?>) nodes) {
-        Object name = node.getClass().getMethod("getUniqueName").invoke(node);
-        if (uniqueName.equals(name)) {
-          return node;
-        }
-      }
-    }
-    return null;
-  }
-
   /**
    * Componente del catalogo por su nombre.
    *
@@ -361,12 +350,48 @@ public final class TalendApi {
     return nodes;
   }
 
-  /** Invoca un metodo y devuelve su resultado, o null si falla. */
+  /** Metodos ya buscados por clase: buscar un metodo por nombre es lo caro de la reflexion. */
+  private static final ClassValue<Map<String, Method>> METHODS = new ClassValue<>() {
+    @Override
+    protected Map<String, Method> computeValue(Class<?> type) {
+      return new ConcurrentHashMap<>();
+    }
+  };
+
+  /** Avisos ya emitidos, para no repetir en cada peticion el mismo fallo de la API. */
+  private static final Set<String> REPORTED = ConcurrentHashMap.newKeySet();
+
+  /**
+   * Invoca un metodo publico y devuelve su resultado, o null si no se puede.
+   *
+   * Un metodo que no existe casi siempre quiere decir que la version de Studio
+   * cambio su API. Se avisa en el Error Log una vez por clase y metodo, en lugar
+   * de devolver null en silencio y que parezca que el dato no existe.
+   */
   public static Object invokeOrNull(Object target, String method) {
+    Class<?> type = target.getClass();
+    Map<String, Method> cache = METHODS.get(type);
+    Method resolved = cache.get(method);
+    if (resolved == null) {
+      try {
+        resolved = type.getMethod(method);
+        cache.put(method, resolved);
+      } catch (NoSuchMethodException e) {
+        reportOnce("No existe " + type.getName() + "." + method + "() en esta version de Studio", e);
+        return null;
+      }
+    }
     try {
-      return target.getClass().getMethod(method).invoke(target);
+      return resolved.invoke(target);
     } catch (Exception e) {
+      reportOnce("Falla al invocar " + type.getName() + "." + method + "()", e);
       return null;
+    }
+  }
+
+  private static void reportOnce(String message, Throwable cause) {
+    if (REPORTED.add(message)) {
+      BridgeLog.warn(message, cause);
     }
   }
 

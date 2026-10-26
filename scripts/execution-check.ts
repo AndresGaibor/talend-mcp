@@ -6,6 +6,7 @@
  *   bun run scripts/execution-check.ts archivos             # filtro por nombre
  *   bun run scripts/execution-check.ts --suite transformaciones
  *   bun run scripts/execution-check.ts --solo-fallidos       # reintenta los fallos del CSV anterior
+ *   bun run scripts/execution-check.ts --todas               # repite tambien los que ya pasaron
  *   bun run scripts/execution-check.ts --validar             # solo valida los fixtures (sin Studio)
  *
  * Cada escenario declara el job que hay que montar, como montarlo y **que se
@@ -34,14 +35,25 @@ import {
   leerResultados,
   nombresFallidos,
 } from "./l5/scenario-report";
+import { errorDe } from "./l5/studio-retry";
+import {
+  escribirCache,
+  estaProbado,
+  huellaDe,
+  huellaDeEscenario,
+  huellaDelArnes,
+  leerCache,
+} from "./l5/scenario-cache";
 import type { Escenario, Resultado } from "./l5/scenario-types";
 
 const args = process.argv.slice(2);
 const salidaCsv = "testdata/resultados-l5.csv";
+const cachePath = "testdata/cache-l5.json";
 
 const suite = argumento(args, "suite")?.toLowerCase();
 const soloFallidos = args.includes("--solo-fallidos");
 const soloValidar = args.includes("--validar");
+const todas = args.includes("--todas");
 const referenciaGit = argumento(args, "desde");
 const filtro = posicional(args, ["--suite", "--desde"]);
 
@@ -102,15 +114,39 @@ async function main(): Promise<void> {
   ]);
 
   const bridge = await createBridgeClient({ config: { timeoutMs: 180_000 } });
+  // Sin bridge, cada escenario falla con el mismo error. Se corta antes de
+  // montar nada, y el informe anterior no se sobrescribe con esos fallos.
+  const latido = await bridge.ping();
+  if (!latido.ok) {
+    console.error(`No se ejecuta ningun escenario: ${errorDe(latido)}`);
+    process.exitCode = 1;
+    return;
+  }
   const indice = await new DefinitionIndexRepository().load();
   const definiciones = new Map(indice.components.map((componente) => [componente.name, componente]));
+
+  // Lo que ya paso, con la misma huella (escenario, arnes y contexto), no se vuelve a
+  // ejecutar; `--todas` lo repite. La cache se guarda al terminar cada escenario.
+  const cache = leerCache(cachePath);
+  const huellaArnes = huellaDelArnes();
+  const huellaContexto = huellaDe([latido.data?.version ?? "", JSON.stringify(indice.components)]);
+  const huellaDeCada = (escenario: Escenario) => huellaDeEscenario(escenario, huellaArnes, huellaContexto);
+  const pendientes = seleccionados.filter(
+    (escenario) => todas || !estaProbado(cache, escenario.nombre, huellaDeCada(escenario)),
+  );
+  const omitidos = seleccionados.length - pendientes.length;
+  if (pendientes.length === 0) {
+    console.log(`Los ${omitidos} escenarios seleccionados ya estan probados sin cambios. Con --todas se repiten.`);
+    return;
+  }
+  if (omitidos > 0) console.log(`${omitidos} ya probados sin cambios: se omiten (con --todas se repiten).`);
 
   const resultadosPrevios = leerResultados(salidaCsv);
   const resultadosActuales = new Map<string, string>();
   let bien = 0;
   let total = 0;
 
-  for (const escenario of seleccionados) {
+  for (const escenario of pendientes) {
     total++;
     // Un escenario que revienta no puede abortar la corrida: se registra el
     // error y siguen los demas, para no perder el resto del informe.
@@ -126,6 +162,12 @@ async function main(): Promise<void> {
     }
     const correcto = detalle.ejecutaOk && detalle.salidaCorrecta;
     if (correcto) bien++;
+    if (correcto) {
+      cache[escenario.nombre] = { huella: huellaDeCada(escenario), fecha: new Date().toISOString() };
+    } else {
+      delete cache[escenario.nombre];
+    }
+    escribirCache(cachePath, cache);
     console.log(
       `${correcto ? "OK   " : "FALLA"} ${escenario.nombre}` +
         (detalle.mensaje ? `: ${detalle.mensaje}` : ""),

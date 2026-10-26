@@ -15,6 +15,10 @@
     "start:server": "bun run index.ts",
     "doctor": "bun run scripts/doctor.ts",
     "bridge:install": "bun run scripts/start.ts --install-bridge",
+    "bridge:status": "bun run scripts/start.ts --bridge-status",
+    "bridge:watch": "bun run scripts/start.ts --watch-bridge",
+    "talend:api": "bun run scripts/talend-api.ts",
+    "talend:drift": "bun run scripts/talend-api.ts drift",
     "verify": "bun run typecheck && bun test && bun run l5:validar",
     "test:ci": "bun test --bail",
     "l5:validar": "bun run scripts/execution-check.ts --validar",
@@ -23,6 +27,7 @@
     "jobs": "bun run scripts/jobs.ts",
     "contexts": "bun run scripts/contexts.ts",
     "docs:tools": "bun run scripts/generate-tool-catalog.ts",
+    "mapa": "bun run scripts/mapa.ts",
     "benchmark:performance": "bun run scripts/performance-benchmark.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"

@@ -136,9 +136,10 @@ bun run scripts/coverage.ts --family File/Input --compile --solo-pendientes --ou
 
 ## Verificacion
 
-`bun run typecheck` limpio y `bun test`: **440 tests en 79 archivos, 0 fallos**. El archivo más
+`bun run typecheck` limpio y `bun test` en verde (la cifra exacta cambia con cada cambio: `bun test`
+la muestra). El archivo más
 lento es `server-smoke.test.ts`, porque valida la conversión de schemas de las tools; se conserva a
-propósito como prueba de contrato. `l5:validar` recorre 88 escenarios de las 14 suites en ~65 ms y
+propósito como prueba de contrato. `l5:validar` recorre todos los escenarios de las suites en menos de un segundo y
 sale con código 1 ante una suite desconocida o un fixture roto, comprobado con un archivo temporal
 que se elimina después.
 La validacion real contra Studio sigue incompleta: en la suite `bd` pasaron 5 de 8 escenarios;

@@ -77,7 +77,7 @@ solo funcionan si todos los scripts pasan por ese logger.
 
    El instalador detecta Talend Studio y elige la via segun el estado del IDE:
 
-   - **Studio corriendo**: compila con `javac` (~8 s, 0 s si no cambiaron las fuentes) y copia el
+   - **Studio corriendo**: compila con `javac` (segundos; si no cambiaron las fuentes, casi instantaneo) y copia el
      jar en `~/.talend-bridge/hot/bridge.jar`. El plugin lo detecta y se recarga solo
      (`Bundle.update`), asi que **no hay que reiniciar Studio**. Espera a que el ping confirme la
      version nueva; si no llega, avisa en vez de dar exito.
@@ -138,16 +138,18 @@ docs: documenta el flujo de instalacion del plugin
 
 ## 7. Pendientes conocidos
 
-Cosas que se detectaron al preparar el repo y siguen abiertas:
+Pendientes comprobados contra el codigo en la ultima revision. Si alguno ya no es cierto, quitalo
+y dilo en el mismo cambio.
 
-- `src/modules/jobs/adapters/talend-xml-job.repository.ts` sigue siendo un stub: las tools de
-  job usan la implementacion real de `src/infrastructure/repositories/job-xml.repository.ts`.
-  Conviene unificar en una sola capa.
-- `talend_jobs_detect_antipatterns` devuelve siempre la lista vacia: falta el detector real.
-- `talend_components_extract_schema` devuelve las columnas vacias: el catalogo no guarda el
-  detalle de columnas de cada componente.
-- `talend_components_catalog_status` usa un cache de componentes en memoria; deberia persistir.
-- Las tools de `src/modules/` y las de `src/talend/studio/` se registran en dos listas
-  distintas; unificarlas reduciria la chance de duplicar capacidades.
-- El build del plugin descarga metadata p2 de Eclipse, por lo que el job de CI del plugin es
-  lento. Se puede cachear.
+- **Dos capas de lectura de jobs.** `src/modules/jobs/adapters/talend-job.repository.ts` delega en
+  `talend-job/job-reader.ts`, y existe ademas `src/infrastructure/repositories/job-xml.repository.ts`.
+  Antes de tocar la lectura de jobs, confirma cual usa cada tool y unifica.
+- **`talend_jobs_detect_antipatterns` devuelve siempre `[]`**: `src/modules/jobs/tools/jobs-detect-antipatterns.tool.ts`
+  tiene la lista fija. Falta el detector real.
+- **`talend_components_extract_schema`** promete columnas en su descripcion. No se comprobo en esta
+  revision si las devuelve; verificalo antes de citarla como fuente de columnas.
+- **Cache de catalogo.** `talend_components_catalog_status` pasa por `ComponentCacheRepository`; revisa
+  si el catalogo sobrevive a un reinicio del servidor.
+- **Dos listas de tools.** `getModuleTools()` (en `src/server/registered-tools.ts`) y `allTools` (en
+  `src/talend/studio/bridge-tools.ts`) se registran por separado. Unificarlas reduce el riesgo de
+  duplicar una capacidad.

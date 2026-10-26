@@ -13,7 +13,7 @@ Mapa del repositorio `talend-mcp`. Para las reglas de trabajo mira [AGENTS.md](.
             │ HTTP / SSE / stdio
 ┌───────────▼──────────────┐
 │      Servidor MCP        │   index.ts
-│  new-server.ts           │   ├─ registro de tools (~230)
+│  new-server.ts           │   ├─ registro de tools (todas, ver bun run mapa)
 │  registered-tools.ts     │   └─ dispatch JSON-RPC
 └───────────┬──────────────┘
             │

@@ -16,6 +16,7 @@ el fichero que escribe). El informe queda en `testdata/resultados-l5.csv`.
 | `bun run l5:validar [--suite <nombre>]` | Valida los fixtures sin abrir Studio: nombre, job, nodos, conexiones y suite. Sale con código 1 y la ruta exacta si algo está mal |
 | `bun run scripts/execution-check.ts --solo-fallidos` | Reintenta solo los escenarios fallidos segun `testdata/resultados-l5.csv` |
 | `bun run scripts/execution-check.ts --desde HEAD` | Ejecuta los escenarios cuyo fixture cambio respecto al commit indicado |
+| `bun run scripts/execution-check.ts --todas` | Repite también los escenarios que ya pasaron. Por defecto se omiten los que pasaron con la misma huella (escenario, código del arnés y versión del plugin), guardada en `testdata/cache-l5.json`. No cubre el estado externo (Postgres, S3, HDFS, SMTP): si cambian, usa `--todas` |
 | `L5_KEEP_JOBS=1 bun run scripts/execution-check.ts` | Deja los jobs montados en Studio (por defecto se borran). En PowerShell: `$env:L5_KEEP_JOBS="1"; bun run scripts/execution-check.ts` |
 
 En cada archivo de escenario, `@TESTDATA@` es la carpeta `testdata/` (los datos que usan: `l5_clientes.csv`,

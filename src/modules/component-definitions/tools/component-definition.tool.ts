@@ -2,6 +2,8 @@ import { z } from "zod/v4";
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { DefinitionIndexRepository } from "../infrastructure/definition-index.repository";
 import { GetComponentDefinitionsUseCase } from "../application/get-component-definitions.use-case";
+import { mensajeNoEncontrado, resumenParaAgente, textoResumen } from "../application/resumen-para-agente";
+import { COMPONENT_REGISTRY } from "../../../talend/component-registry";
 
 export const ComponentDefinitionSchema = z.object({
   name: z.string().optional().describe("Nombre del componente (por ejemplo tFileOutputDelimited)"),
@@ -46,30 +48,22 @@ export function createComponentDefinitionTool() {
           const definition = await useCase.get(input.name, input.palette);
           if (!definition) {
             return {
-              content: [
-                {
-                  type: "text",
-                  text:
-                    `No se encontro la definicion de '${input.name}' en la instalacion de Studio. ` +
-                    `Los componentes de la generacion nueva (AWS, JDBC, Snowflake...) no tienen XML: ` +
-                    `para esos, usa talend_studio_component_parameters.`,
-                },
-              ],
+              content: [{ type: "text", text: mensajeNoEncontrado(input.name) }],
               isError: true,
             };
           }
-          const obligatorios = definition.plan.parameters
-            .filter((item) => item.kind === "value")
-            .map((item) => `${item.name} = ${item.value}`)
-            .join(", ");
           return {
             content: [
               {
                 type: "text",
-                text:
-                  `${definition.name} (${definition.family}, ${definition.palette}). ` +
-                  `Parametros obligatorios: ${definition.requiredParameters.length}. ` +
-                  (obligatorios ? `Valores sugeridos: ${obligatorios}.` : "Sin valores que se puedan sugerir."),
+                text: textoResumen(
+                  definition,
+                  resumenParaAgente({
+                    ...definition,
+                    esenciales: COMPONENT_REGISTRY[definition.name]?.requiredParameters,
+                    valoresDelRegistro: COMPONENT_REGISTRY[definition.name]?.defaultParameters,
+                  }),
+                ),
               },
             ],
             structuredContent: { definition } as any,

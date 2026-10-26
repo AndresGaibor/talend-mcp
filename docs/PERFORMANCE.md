@@ -54,7 +54,7 @@ no compares una tool de filesystem con compilación o ejecución.
 | `bun run typecheck` | `tsc --noEmit` completo | ~4-5 s |
 | `bun run verify` | typecheck + tests + fixtures L5 | ~7 s |
 | `bun run doctor` | Studio, bridge, MCP y configuración | ~0,2 s |
-| `bun run l5:validar` | 79 fixtures de 14 suites, sin Studio | ~65 ms |
+| `bun run l5:validar` | todos los escenarios L5 (88 en 14 suites al 26/10/2026), sin Studio | menos de 1 s |
 
 Los escenarios L5 viven en `tests/fixtures/talend/escenarios-l5/<suite>/<escenario>.json`: un
 archivo por escenario dentro de la carpeta de su suite (79 archivos, el mayor de 7 KB). Así cada

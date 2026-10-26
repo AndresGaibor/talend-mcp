@@ -50,7 +50,12 @@ export function compararFichero(
   contenido: string[] | null,
   ruta: string,
 ): string[] {
-  if (contenido === null) return [`no se escribio el fichero ${ruta}`];
+  if (contenido === null) {
+    return [
+      `no se escribio el fichero ${ruta}: el job no lo ha creado. ` +
+        `Revisa FILENAME del tFileOutputDelimited y que exista su carpeta de destino`,
+    ];
+  }
 
   const fallos: string[] = [];
   if (Array.isArray(espera.lineas)) {

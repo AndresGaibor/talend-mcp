@@ -37,7 +37,8 @@ export type FastBuildResult =
 type BuildState = { fingerprint: string; version: string };
 
 /** Jars del target platform que Tycho dejo resueltos en el repositorio local. */
-function targetPlatformJars(): string[] {
+/** Jars del target platform (los que Tycho dejo en ~/.m2): el classpath con el que se compila el bundle. */
+export function targetPlatformJars(): string[] {
   const root = join(homedir(), ".m2", "repository", "p2", "osgi", "bundle");
   if (!existsSync(root)) return [];
 
@@ -102,10 +103,44 @@ function formatJavacOutput(output: string): string {
     .trim();
 }
 
-export function buildBridgeFast(projectRoot: string, jdk: string, force = false): FastBuildResult {
+/** Rutas del bundle y de la salida de la compilacion rapida. */
+function bundlePaths(projectRoot: string) {
   const bundleDir = join(projectRoot, "talend-studio-bridge", "com.andres.talend.bridge");
-  const manifestPath = join(bundleDir, "META-INF", "MANIFEST.MF");
-  const pluginXml = join(bundleDir, "plugin.xml");
+  const workDir = join(bundleDir, "target", "fast");
+  return {
+    bundleDir,
+    manifestPath: join(bundleDir, "META-INF", "MANIFEST.MF"),
+    pluginXml: join(bundleDir, "plugin.xml"),
+    workDir,
+    statePath: join(workDir, "build.json"),
+    jarPath: join(workDir, "com.andres.talend.bridge.jar"),
+  };
+}
+
+/** Huella de lo que entra en el jar ahora mismo: fuentes, MANIFEST, plugin.xml y jars del target platform. */
+function currentFingerprint(projectRoot: string, jarCount: number): string {
+  const paths = bundlePaths(projectRoot);
+  const sources = javaSources(join(paths.bundleDir, "src"));
+  return fingerprintOf([...sources, paths.manifestPath, paths.pluginXml], jarCount);
+}
+
+/**
+ * Dice si el ultimo build rapido sigue valiendo para las fuentes actuales, sin compilar.
+ * Lo usa el estado del bridge para avisar de cambios que todavia no estan publicados.
+ */
+export function bridgeBuildStatus(projectRoot: string): { upToDate: boolean; version?: string; jar: string } {
+  const paths = bundlePaths(projectRoot);
+  const jars = targetPlatformJars();
+  const previous = readState(paths.statePath);
+  if (!previous || jars.length === 0 || !existsSync(paths.jarPath)) {
+    return { upToDate: false, jar: paths.jarPath };
+  }
+  const upToDate = previous.fingerprint === currentFingerprint(projectRoot, jars.length);
+  return { upToDate, version: previous.version, jar: paths.jarPath };
+}
+
+export function buildBridgeFast(projectRoot: string, jdk: string, force = false): FastBuildResult {
+  const { bundleDir, manifestPath, workDir, statePath, jarPath } = bundlePaths(projectRoot);
   const javac = join(jdk, "bin", `javac${EXE}`);
   const jarTool = join(jdk, "bin", `jar${EXE}`);
 
@@ -119,11 +154,7 @@ export function buildBridgeFast(projectRoot: string, jdk: string, force = false)
   }
 
   const sources = javaSources(join(bundleDir, "src"));
-  const fingerprint = fingerprintOf([...sources, manifestPath, pluginXml], jars.length);
-
-  const workDir = join(bundleDir, "target", "fast");
-  const statePath = join(workDir, "build.json");
-  const jarPath = join(workDir, "com.andres.talend.bridge.jar");
+  const fingerprint = currentFingerprint(projectRoot, jars.length);
 
   const previous = readState(statePath);
   if (!force && previous && previous.fingerprint === fingerprint && existsSync(jarPath)) {

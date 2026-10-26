@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 import { homedir, platform } from "node:os";
 
 import { buildBridgeFast } from "../fast-bridge-build";
@@ -21,6 +21,13 @@ const c = createStyler(shouldUseColor(process.env, Boolean(process.stderr.isTTY)
 const { ok, info, warn, fail, step } = ui;
 
 function resolveMaven(): string | null {
+  // MAVEN_HOME (o M2_HOME) es la forma explicita de elegir la instalacion.
+  for (const home of [process.env.MAVEN_HOME, process.env.M2_HOME]) {
+    if (!home) continue;
+    const bin = join(home, "bin", IS_WIN ? "mvn.cmd" : "mvn");
+    if (existsSync(bin)) return bin;
+  }
+
   const which = spawnSync(IS_WIN ? "where" : "which", ["mvn"], { encoding: "utf8" });
   if (which.status === 0) {
     const first = which.stdout.split(/\r?\n/).map((l) => l.trim()).find(Boolean);
@@ -40,12 +47,12 @@ function resolveMaven(): string | null {
 function buildBridge(projectRoot: string, jdk: string): boolean {
   const mvn = resolveMaven();
   if (!mvn) {
-    fail("No se encontro Maven. Instala Maven 3.9+ o agregalo al PATH.");
+    fail("No se encontro Maven. Instala Maven 3.9+, agregalo al PATH o define MAVEN_HOME.");
     return false;
   }
 
   const bridgeDir = join(projectRoot, "talend-studio-bridge");
-  const env = { ...process.env, JAVA_HOME: jdk, PATH: `${join(jdk, "bin")};${process.env.PATH ?? ""}` };
+  const env = { ...process.env, JAVA_HOME: jdk, PATH: [join(jdk, "bin"), process.env.PATH ?? ""].join(delimiter) };
 
   info(`Maven: ${c(basename(dirname(dirname(mvn))), "cyan")}`);
   info(`JDK: ${c(jdk, "cyan")} (Java ${runJavaVersion(jdk)})`);

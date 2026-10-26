@@ -602,7 +602,7 @@ Verificado con `bases de datos: cargar un CSV en Hive y leerlo con tHiveInput` c
 
 Para probar la ruta HIVE2 hace falta un jar con esa coordenada. En pruebas se usó un marcador vacío con el mismo nombre; el modo `IMPALA` sigue necesitando el driver real.
 
-El driver HIVE2 habla `noSasl`. Un HiveServer2 con SASL (el de Hive) lo rechaza con `Socket is closed by peer`. Un impalad lo acepta. Se emula con HiveServer2 con `hive.server2.authentication=NOSASL` en el puerto 21050.
+El driver HIVE2 habla `noSasl`. Un HiveServer2 con SASL (el de Hive) lo rechaza con `Socket is closed by peer`. Un impalad lo acepta. Las pruebas usan el impalad real del quickstart oficial de Apache Impala 4.5.3 (`testdata/impala/quickstart.yml`), en el puerto 21050. El HiveServer2 con `NOSASL` que se usó antes queda como perfil `emu` en `testdata/docker-compose.yml`, sin uso por defecto.
 
 Los componentes Impala (`tImpalaRow`, `tImpalaInput`) necesitan `USE_EXISTING_CONNECTION=true` para tomar el host de `tImpalaConnection`. Sin eso usan su `HOST` vacío y fallan con `Bad URL format`.
 

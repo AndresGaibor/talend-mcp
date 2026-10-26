@@ -1,5 +1,8 @@
 # Handoff: automatizar Talend Studio con el MCP
 
+> **Historico.** Es el traspaso de una sesion de octubre de 2026. Sus cifras (tests, estado de la
+> rama) ya no estan al dia. Para empezar, lee [AGENTS.md](../AGENTS.md) y [README.md](README.md).
+
 > Documento de traspaso entre sesiones. La fuente de verdad son el roadmap
 > ([ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md)), el estado de las pruebas
 > ([PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md)) y los descubrimiento sobre Studio

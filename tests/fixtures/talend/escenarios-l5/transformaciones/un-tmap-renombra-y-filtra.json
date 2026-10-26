@@ -79,7 +79,7 @@
         ],
         "outputs": [
           {
-            "name": "out1",
+            "name": "row2",
             "reject": false,
             "columns": [
               {

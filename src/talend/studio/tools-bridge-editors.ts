@@ -1,4 +1,5 @@
 import * as z from "zod/v4";
+import { planificarCierre, type EditorAbierto } from "./editores-guardados";
 import { bridgeOk, bridgeResultToEnvelope, loadBridge } from "./tools-base";
 
 export const bridgeEditorTools = [
@@ -37,6 +38,43 @@ export const bridgeEditorTools = [
       const bridge = await loadBridge();
       const result = await bridge.closeEditor(title, save ?? true);
       return bridgeOk(bridgeResultToEnvelope(result, "/workbench/close-editor"));
+    },
+  },
+  {
+    name: "talend_bridge_close_saved_editors",
+    description:
+      "Cierra los editores de jobs que no tienen cambios sin guardar, para liberar memoria del heap de Studio. Con `prefix` solo cierra los jobs cuyo nombre empieza por ese texto (por ejemplo MCP_L5_, los del arnes). Por defecto solo lista lo que cerraria: con `dryRun: false` lo cierra. No guarda ni descarta nada: un editor con cambios sin guardar se deja abierto.",
+    inputSchema: z.object({
+      prefix: z.string().optional().describe("Solo jobs cuyo nombre empieza por este texto"),
+      dryRun: z.boolean().optional().default(true).describe("Por defecto solo lista lo que cerraria; false cierra los editores"),
+    }),
+    handler: async ({ prefix, dryRun }: { prefix?: string; dryRun?: boolean }) => {
+      const bridge = await loadBridge();
+      const estado = await bridge.workbenchState();
+      if (!estado.ok) {
+        return bridgeOk(bridgeResultToEnvelope(estado, "/workbench/state"));
+      }
+      const editores = (estado.data?.windows ?? []).flatMap(
+        (ventana) => (ventana.openEditors ?? []) as EditorAbierto[],
+      );
+      const plan = planificarCierre(editores, prefix);
+      const simular = dryRun ?? true;
+      const cerrados: string[] = [];
+      const fallidos: string[] = [];
+      if (!simular) {
+        for (const title of plan.cerrar) {
+          const cierre = await bridge.closeEditor(title, false);
+          if (cierre.ok && cierre.data?.closed === true) cerrados.push(title);
+          else fallidos.push(title);
+        }
+      }
+      return bridgeOk({
+        ok: fallidos.length === 0,
+        source: estado.source,
+        confidence: estado.confidence,
+        endpoint: "/workbench/close-editor",
+        data: { dryRun: simular, cerrar: plan.cerrar, cerrados, fallidos, conservar: plan.conservar },
+      });
     },
   },
   {

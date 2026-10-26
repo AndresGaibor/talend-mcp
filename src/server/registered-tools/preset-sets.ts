@@ -4,7 +4,7 @@
 //   all          → todas las tools talend_*
 //   canonical    → idem, sin los duplicados legacy conocidos
 //   agent        → flujo habitual de inspeccion, creacion, edicion y ejecucion
-//   core         → 21 tools esenciales (las mas seguras para clientes limitados)
+//   core         → tools esenciales (las mas seguras para clientes limitados)
 //   jobs         → talend_jobs_* + tools de job relacionadas
 //   snapshots    → talend_snapshots_*
 //   runs         → tools de ejecucion
@@ -22,7 +22,7 @@
 // Presets are additive: TALEND_MCP_FILTER="core,jobs"
 // Wildcards work too:  TALEND_MCP_FILTER="talend_bridge_*"
 
-// 21-tool curated safe set
+// Curated safe set: the tools a limited client needs to start (see `core` above)
 export const PRESET_CORE = new Set([
   "talend_jobs_list",
   "talend_jobs_read",

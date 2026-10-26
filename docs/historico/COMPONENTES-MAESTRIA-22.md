@@ -1,3 +1,5 @@
+> **Historico.** Catalogo de una prueba anterior ("22 componentes"). No es la cobertura vigente: esa esta en [COBERTURA-POR-FAMILIA.md](../COBERTURA-POR-FAMILIA.md).
+
 # Catálogo de Componentes Talend (Maestría 100% — 22 Componentes)
 
 Este servidor MCP está capacitado para generar, parsear y validar Jobs de Talend utilizando **22 componentes únicos** del catálogo oficial.

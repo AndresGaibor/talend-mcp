@@ -26,6 +26,20 @@ export type BridgePingPayload = {
   plugin: string;
   version: string;
   mode: string;
+  unsafeActions?: boolean;
+  /** Proceso de Studio que sirve el bridge, y cuanto lleva arriba la version actual. */
+  pid?: number;
+  javaVersion?: string;
+  startedAt?: number;
+  uptimeMs?: number;
+};
+
+/** Ultimas lineas del Error Log de Talend Studio (`/logs/tail`). */
+export type BridgeLogTail = {
+  available: boolean;
+  file?: string;
+  truncated?: boolean;
+  lines: string[];
 };
 
 export type BridgeCommand = {

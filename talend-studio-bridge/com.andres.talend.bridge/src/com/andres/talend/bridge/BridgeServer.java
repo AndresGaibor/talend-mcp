@@ -223,14 +223,14 @@ final class BridgeServer {
     route("/logs/tail", this::handleLogTail);
 
     // Workbench: editores, vistas y dialogos.
-    ui("/workbench/state", WorkbenchService::state);
-    ui("/workbench/selection", WorkbenchService::selection);
-    ui("/workbench/views", WorkbenchService::views);
-    ui("/workbench/save-active", WorkbenchService::saveActiveEditor);
-    ui("/workbench/save-all", WorkbenchService::saveAllEditors);
-    ui("/workbench/dialogs", ModalGuard::dismissBlockingDialogs);
-    ui("/workbench/modules/install", ModalGuard::installMissingModules);
-    ui("/workbench/dialogs/list", DialogListService::list);
+    ui("/workbench/state", () -> WorkbenchService.state());
+    ui("/workbench/selection", () -> WorkbenchService.selection());
+    ui("/workbench/views", () -> WorkbenchService.views());
+    ui("/workbench/save-active", () -> WorkbenchService.saveActiveEditor());
+    ui("/workbench/save-all", () -> WorkbenchService.saveAllEditors());
+    ui("/workbench/dialogs", () -> ModalGuard.dismissBlockingDialogs());
+    ui("/workbench/modules/install", () -> ModalGuard.installMissingModules());
+    ui("/workbench/dialogs/list", () -> DialogListService.list());
     route("/workbench/open-resource", this::handleOpenResource);
     route("/workbench/close-editor", this::handleCloseEditor);
     route("/workbench/activate-editor", this::handleActivateEditor);
@@ -238,77 +238,78 @@ final class BridgeServer {
     route("/workbench/show-view", this::handleShowView);
 
     // Workspace y problemas. Solo leen disco; el refresh toca la vista del workspace.
-    worker("/workspace/state", WorkspaceService::state);
-    ui("/workspace/refresh", WorkspaceService::refresh);
-    worker("/problems/markers", ProblemMarkerService::markers);
-    worker("/talend/probe/classes", () -> TalendClassProbeService.probe(bundleContext));
+    worker("/workspace/state", () -> WorkspaceService.state());
+    ui("/workspace/refresh", () -> WorkspaceService.refresh());
+    worker("/problems/markers", () -> ProblemMarkerService.markers());
+    worker("/talend/probe/classes", () -> TalendClassProbeService.probe());
+    workerBody("/talend/api/check", body -> TalendClassProbeService.check(body));
 
     // Comandos de Studio, ejecuciones (launch configs) y eventos.
-    ui("/commands/list", CommandAuditService::listCommands);
+    ui("/commands/list", () -> CommandAuditService.listCommands());
     route("/commands/execute", this::handleExecuteCommand);
-    worker("/launch/configs", LaunchConfigService::listConfigs);
+    worker("/launch/configs", () -> LaunchConfigService.listConfigs());
     route("/launch/run", this::handleLaunchRun);
-    worker("/launch/runs", LaunchTrackerService::runs);
+    worker("/launch/runs", () -> LaunchTrackerService.runs());
     route("/launch/run-status", this::handleLaunchRunStatus);
     route("/launch/wait", this::handleLaunchWait);
-    worker("/events/recent", EventsService::recent);
-    worker("/events/clear", EventsService::clear);
+    worker("/events/recent", () -> EventsService.recent());
+    worker("/events/clear", () -> EventsService.clear());
 
     // Introspeccion del editor y del job activo.
-    ui("/talend/active-editor/introspect", TalendIntrospectionService::activeEditorIntrospect);
-    ui("/talend/active-job/model", TalendIntrospectionService::activeJobModel);
-    ui("/talend/active-job/details", TalendIntrospectionService::activeJobDetails);
-    ui("/talend/active-job/dependencies", TalendIntrospectionService::activeJobDependencies);
+    ui("/talend/active-editor/introspect", () -> TalendIntrospectionService.activeEditorIntrospect());
+    ui("/talend/active-job/model", () -> TalendIntrospectionService.activeJobModel());
+    ui("/talend/active-job/details", () -> TalendIntrospectionService.activeJobDetails());
+    ui("/talend/active-job/dependencies", () -> TalendIntrospectionService.activeJobDependencies());
     route("/talend/active-component/details", this::handleActiveComponentDetails);
     route("/talend/active-job/select-component", this::handleSelectComponent);
 
     // Automatizacion fuera de la UI: descargas, ejecuciones, build y cobertura.
     // La cobertura recorre el catalogo entero y cede a la UI componente a componente
     // (ver CoverageChecker), asi que no puede correr entera dentro de ella.
-    workerBody("/automation/artifacts/install", JobOperationsService::installArtifact);
+    workerBody("/automation/artifacts/install", body -> JobOperationsService.installArtifact(body));
     workerBody("/automation/build-job", body -> {
       requireWritable(config());
       return BuildJobService.build(body);
     });
-    workerBody("/automation/coverage", JobOperationsService::coverage);
-    workerBody("/automation/coverage/status", JobOperationsService::coverageStatus);
-    workerBody("/automation/memory", JobOperationsService::memory);
-    workerBody("/automation/job/execute", JobOperationsService::executeJob);
+    workerBody("/automation/coverage", body -> JobOperationsService.coverage(body));
+    workerBody("/automation/coverage/status", body -> JobOperationsService.coverageStatus(body));
+    workerBody("/automation/memory", body -> JobOperationsService.memory(body));
+    workerBody("/automation/job/execute", body -> JobOperationsService.executeJob(body));
     route("/automation/run-active-job", this::handleAutomationRunActiveJob);
     route("/automation/run-code", this::handleRunCode);
 
     // Operaciones sobre el job abierto. Usan la API del IDE (cada nodo nace con sus
     // parametros y el XML lo escribe Studio), asi que van en el hilo de la UI.
-    uiBody("/automation/components", JobOperationsService::listComponents);
-    uiBody("/automation/components/parameters", JobOperationsService::componentParameters);
-    uiBody("/automation/job/create", JobOperationsService::createJob);
-    uiBody("/automation/job/delete", JobOperationsService::deleteJob);
-    uiBody("/automation/job/open", JobOperationsService::openJob);
+    uiBody("/automation/components", body -> JobOperationsService.listComponents(body));
+    uiBody("/automation/components/parameters", body -> JobOperationsService.componentParameters(body));
+    uiBody("/automation/job/create", body -> JobOperationsService.createJob(body));
+    uiBody("/automation/job/delete", body -> JobOperationsService.deleteJob(body));
+    uiBody("/automation/job/open", body -> JobOperationsService.openJob(body));
     // Generar el codigo valida la sintaxis en la UI y tarda varios segundos.
-    uiBody("/automation/job/compile", 180_000L, JobOperationsService::compile);
-    uiBody("/automation/job/problems", JobOperationsService::problems);
-    uiBody("/automation/job/contexts", JobOperationsService::contexts);
-    uiBody("/automation/job/contexts/create", JobOperationsService::createContext);
-    uiBody("/automation/job/contexts/parameter", JobOperationsService::setContextParameter);
-    uiBody("/automation/job/contexts/parameter/delete", JobOperationsService::deleteContextParameter);
-    uiBody("/automation/job/contexts/delete", JobOperationsService::deleteContext);
-    uiBody("/automation/nodes/list", JobOperationsService::listNodes);
-    uiBody("/automation/nodes/add", JobOperationsService::addNode);
-    uiBody("/automation/nodes/connect", JobOperationsService::connect);
-    uiBody("/automation/nodes/update", JobOperationsService::updateNode);
-    uiBody("/automation/nodes/delete", JobOperationsService::deleteNodes);
-    uiBody("/automation/nodes/copy", JobOperationsService::copyNode);
-    uiBody("/automation/nodes/schema", JobOperationsService::setSchema);
-    uiBody("/automation/nodes/configure", JobOperationsService::configureNode);
+    uiBody("/automation/job/compile", 180_000L, body -> JobOperationsService.compile(body));
+    uiBody("/automation/job/problems", body -> JobOperationsService.problems(body));
+    uiBody("/automation/job/contexts", body -> JobOperationsService.contexts(body));
+    uiBody("/automation/job/contexts/create", body -> JobOperationsService.createContext(body));
+    uiBody("/automation/job/contexts/parameter", body -> JobOperationsService.setContextParameter(body));
+    uiBody("/automation/job/contexts/parameter/delete", body -> JobOperationsService.deleteContextParameter(body));
+    uiBody("/automation/job/contexts/delete", body -> JobOperationsService.deleteContext(body));
+    uiBody("/automation/nodes/list", body -> JobOperationsService.listNodes(body));
+    uiBody("/automation/nodes/add", body -> JobOperationsService.addNode(body));
+    uiBody("/automation/nodes/connect", body -> JobOperationsService.connect(body));
+    uiBody("/automation/nodes/update", body -> JobOperationsService.updateNode(body));
+    uiBody("/automation/nodes/delete", body -> JobOperationsService.deleteNodes(body));
+    uiBody("/automation/nodes/copy", body -> JobOperationsService.copyNode(body));
+    uiBody("/automation/nodes/schema", body -> JobOperationsService.setSchema(body));
+    uiBody("/automation/nodes/configure", body -> JobOperationsService.configureNode(body));
 
     // Contextos y conexiones del repositorio del proyecto.
-    uiBody("/automation/repository/contexts", JobOperationsService::repositoryContexts);
-    uiBody("/automation/repository/connections", JobOperationsService::repositoryConnections);
-    uiBody("/automation/repository/schemas", JobOperationsService::repositorySchemas);
-    uiBody("/automation/repository/contexts/create", JobOperationsService::createRepositoryContext);
-    uiBody("/automation/repository/contexts/parameter", JobOperationsService::setRepositoryContextParameter);
-    uiBody("/automation/repository/contexts/parameter/delete", JobOperationsService::deleteRepositoryContextParameter);
-    uiBody("/automation/repository/contexts/delete", JobOperationsService::deleteRepositoryContext);
+    uiBody("/automation/repository/contexts", body -> JobOperationsService.repositoryContexts(body));
+    uiBody("/automation/repository/connections", body -> JobOperationsService.repositoryConnections(body));
+    uiBody("/automation/repository/schemas", body -> JobOperationsService.repositorySchemas(body));
+    uiBody("/automation/repository/contexts/create", body -> JobOperationsService.createRepositoryContext(body));
+    uiBody("/automation/repository/contexts/parameter", body -> JobOperationsService.setRepositoryContextParameter(body));
+    uiBody("/automation/repository/contexts/parameter/delete", body -> JobOperationsService.deleteRepositoryContextParameter(body));
+    uiBody("/automation/repository/contexts/delete", body -> JobOperationsService.deleteRepositoryContext(body));
   }
 
   /** Ruta sin cuerpo que responde con el resultado de la accion, en el hilo de trabajo. */
@@ -401,8 +402,9 @@ final class BridgeServer {
       BridgeLog.warn("Conexion interrumpida atendiendo " + path, e);
     } catch (Exception e) {
       BridgeLog.error("Fallo atendiendo " + path, e);
-      String message = e.getMessage() == null ? e.toString() : e.getMessage();
-      respond(exchange, 500, errorPayload(path, "INTERNAL_ERROR", message));
+      // toString() conserva el nombre de la excepcion (java.lang.NullPointerException: ...),
+      // que es lo que usa el diagnostico para reconocer el fallo.
+      respond(exchange, 500, errorPayload(path, "INTERNAL_ERROR", e.toString()));
     } finally {
       logIfSlow(path, started);
     }

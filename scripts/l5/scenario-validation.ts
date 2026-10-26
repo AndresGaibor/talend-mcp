@@ -101,6 +101,8 @@ export function validateScenario(value: unknown, options: ValidateOptions = {}):
     }
   }
 
+  validarComponentes(value, path, problems);
+
   if (value.pendiente !== undefined && !isNonEmptyString(value.pendiente)) {
     problems.push(`${path}: "pendiente" tiene que explicar que falta`);
   }
@@ -114,6 +116,181 @@ export function validateScenario(value: unknown, options: ValidateOptions = {}):
   }
 
   return problems;
+}
+
+/** Componentes de fichero delimitado: el FILENAME y el esquema son lo que mas falla. */
+const COMPONENTES_DE_FICHERO = new Set(["tFileInputDelimited", "tFileOutputDelimited"]);
+
+/**
+ * Reglas por componente: lo que Studio necesita para generar un codigo que compile.
+ *
+ * Las fallas que encuentra el agente al probar (un fichero sin FILENAME, un
+ * lector sin esquema, un tMap cuyo modelo no encaja con sus conexiones) se
+ * detectan aqui, antes de montar nada, con el nombre del nodo y el arreglo.
+ */
+function validarComponentes(value: Record<string, unknown>, path: string, problems: string[]): void {
+  const nodos = Array.isArray(value.nodos) ? value.nodos.filter(isRecord) : [];
+  const conexiones = Array.isArray(value.conexiones) ? value.conexiones.filter(isRecord) : undefined;
+
+  for (const nodo of nodos) {
+    const tipo = nodo.type;
+    const nombre = nodo.nombre;
+    if (!isNonEmptyString(tipo) || !isNonEmptyString(nombre)) continue;
+
+    const entradas = conexiones?.filter((conexion) => conexion.destino === nombre).length;
+    const salidas = conexiones?.filter((conexion) => conexion.origen === nombre).length;
+
+    if (COMPONENTES_DE_FICHERO.has(tipo)) {
+      validarFichero({ nodo, tipo, nombre, path, problems, entradas });
+    }
+    if (tipo === "tMap") {
+      validarTMap({ nodo, nombre, path, problems, entradas, salidas });
+    }
+  }
+}
+
+function validarFichero(opciones: {
+  nodo: Record<string, unknown>;
+  tipo: string;
+  nombre: string;
+  path: string;
+  problems: string[];
+  entradas?: number;
+}): void {
+  const { nodo, tipo, nombre, path, problems, entradas } = opciones;
+
+  if (!tieneParametro(nodo, "FILENAME")) {
+    problems.push(
+      `${path}: "${nombre}" (${tipo}) no tiene FILENAME, la ruta del fichero. Sin ella el job no compila ` +
+        `("The constructor File() is undefined"). Agrega parameters.FILENAME con la ruta.`,
+    );
+  }
+  if (tipo === "tFileInputDelimited" && !tieneEsquema(nodo)) {
+    problems.push(
+      `${path}: "${nombre}" (tFileInputDelimited) no tiene columnas: sin esquema no sabe que campos leer. ` +
+        `Declara "columnas" con name y type de cada campo.`,
+    );
+  }
+  if (tipo === "tFileOutputDelimited" && entradas === 0) {
+    problems.push(
+      `${path}: "${nombre}" (tFileOutputDelimited) no tiene entrada: no le llega ninguna fila. ` +
+        `Conectale el origen en "conexiones".`,
+    );
+  }
+}
+
+/**
+ * Si el nodo declara columnas: en `columnas` (conector principal) o en alguna
+ * tabla de `esquemas`. Son las dos formas que admite el escenario.
+ */
+function tieneEsquema(nodo: Record<string, unknown>): boolean {
+  if (Array.isArray(nodo.columnas) && nodo.columnas.length > 0) return true;
+  return Array.isArray(nodo.esquemas) && nodo.esquemas.some(
+    (tabla) => isRecord(tabla) && Array.isArray(tabla.columnas) && tabla.columnas.length > 0,
+  );
+}
+
+/** Si el nodo tiene el parametro con un valor de texto no vacio. */
+function tieneParametro(nodo: Record<string, unknown>, clave: string): boolean {
+  const parametros = nodo.parameters;
+  if (!isRecord(parametros) || !isRecord(parametros[clave])) return false;
+  return isNonEmptyString((parametros[clave] as Record<string, unknown>).value);
+}
+
+/**
+ * Modelo del tMap contra sus conexiones.
+ *
+ * Cada conexion de entrada necesita una tabla en `inputs`, y cada conexion de
+ * salida una en `outputs`, con el mismo nombre que la conexion. Las conexiones
+ * las pone Studio (`row1`, `row2`...); el nombre que no coincide con ninguna
+ * deja las expresiones sin destino.
+ */
+function validarTMap(opciones: {
+  nodo: Record<string, unknown>;
+  nombre: string;
+  path: string;
+  problems: string[];
+  entradas?: number;
+  salidas?: number;
+}): void {
+  const { nodo, nombre, path, problems, entradas, salidas } = opciones;
+
+  if (!isRecord(nodo.mapper)) {
+    problems.push(
+      `${path}: "${nombre}" (tMap) no tiene "mapper": sin modelo el tMap no tiene entradas, salidas ni expresiones.`,
+    );
+    return;
+  }
+  const mapper = nodo.mapper;
+
+  validarTablasDeTMap({ tablas: mapper.inputs, clave: "inputs", tipo: "entrada", nombre, path, problems, conexiones: entradas });
+  validarTablasDeTMap({ tablas: mapper.outputs, clave: "outputs", tipo: "salida", nombre, path, problems, conexiones: salidas });
+  validarVariablesDeTMap(mapper.vars, nombre, path, problems);
+}
+
+function validarTablasDeTMap(opciones: {
+  tablas: unknown;
+  clave: "inputs" | "outputs";
+  tipo: "entrada" | "salida";
+  nombre: string;
+  path: string;
+  problems: string[];
+  conexiones?: number;
+}): void {
+  const { tablas, clave, tipo, nombre, path, problems, conexiones } = opciones;
+
+  if (tablas !== undefined && !Array.isArray(tablas)) {
+    problems.push(`${path}: mapper.${clave} de "${nombre}" tiene que ser una lista de tablas.`);
+    return;
+  }
+  const lista = Array.isArray(tablas) ? tablas : [];
+
+  if (conexiones !== undefined && lista.length !== conexiones) {
+    problems.push(
+      `${path}: "${nombre}" (tMap) declara ${lista.length} ${tipo}(s) en mapper.${clave} pero tiene ` +
+        `${conexiones} conexion(es) de ${tipo}. Hay una tabla por conexion, con el mismo nombre que la conexion.`,
+    );
+  }
+
+  const vistas = new Set<string>();
+  lista.forEach((tabla, indice) => {
+    if (!isRecord(tabla) || !isNonEmptyString(tabla.name)) {
+      problems.push(`${path}: mapper.${clave}[${indice}] de "${nombre}" no tiene "name" (el nombre de la conexion).`);
+      return;
+    }
+    if (vistas.has(tabla.name)) {
+      problems.push(`${path}: mapper.${clave} de "${nombre}" repite la tabla "${tabla.name}".`);
+    }
+    vistas.add(tabla.name);
+
+    if (!Array.isArray(tabla.columns) || tabla.columns.length === 0) {
+      const consejo = tipo === "salida" ? "con name, type y expression" : "con name y type";
+      problems.push(
+        `${path}: la ${tipo} "${tabla.name}" del tMap "${nombre}" no tiene columns: sin esquema no hay nada que mapear. ` +
+          `Declara sus columnas ${consejo}.`,
+      );
+    }
+  });
+}
+
+function validarVariablesDeTMap(vars: unknown, nombre: string, path: string, problems: string[]): void {
+  if (vars === undefined) return;
+  if (!Array.isArray(vars)) {
+    problems.push(`${path}: mapper.vars de "${nombre}" tiene que ser una lista de variables.`);
+    return;
+  }
+  vars.forEach((variable, indice) => {
+    if (!isRecord(variable) || !isNonEmptyString(variable.name)) {
+      problems.push(`${path}: mapper.vars[${indice}] de "${nombre}" no tiene "name".`);
+      return;
+    }
+    if (variable.columns !== undefined) {
+      problems.push(
+        `${path}: la variable "${variable.name}" del tMap "${nombre}" usa "columns". ` +
+          `En vars cada entrada es una variable con name, type y expression.`,
+      );
+    }
+  });
 }
 
 function esListaDeTexto(value: unknown): boolean {

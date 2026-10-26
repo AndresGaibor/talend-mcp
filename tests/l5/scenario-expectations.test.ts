@@ -28,7 +28,7 @@ describe("comparacion con la salida esperada", () => {
 
   test("fichero ausente, lineas exactas, cantidad y contenido", () => {
     expect(compararFichero({ ruta: "x.csv" }, null, "x.csv")).toEqual([
-      "no se escribio el fichero x.csv",
+      "no se escribio el fichero x.csv: el job no lo ha creado. Revisa FILENAME del tFileOutputDelimited y que exista su carpeta de destino",
     ]);
     expect(compararFichero({ ruta: "x.csv", lineas: ["a"] }, ["a"], "x.csv")).toEqual([]);
     expect(compararFichero({ ruta: "x.csv", lineas: 1 }, ["a", "b"], "x.csv")).toEqual([

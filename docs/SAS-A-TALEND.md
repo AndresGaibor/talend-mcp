@@ -53,23 +53,23 @@ configurar, L3 conectar, L4 compilar, L5 ejecutar con salida verificada.
 
 | # | Capacidad en SAS (transcripción) | Equivalente Talend | Estado en talend-mcp | Brecha |
 |---|---|---|---|---|
-| 1 | Leer y escribir datasets de librerías permanentes (`.sas7bdat`, gobernadas en metadata) | Tablas Hive o Impala en la LZ; base relacional; archivos; repositorio | Postgres a L5. Hive: `tHiveInput` y `tHiveLoad` compilan (L4), `tHiveRow` compila en una medición y falla en otra. Impala: solo L1/L2 | Sin cluster para L5. Conexiones compartidas no creables |
-| 2 | Dataset temporal en `WORK` (intermedio que no se guarda) | `tHashOutput` / `tHashInput`, o flujo entre subjobs | `tHashOutput` compila (L4). `tHashInput` dio error de compilación en una medición. Sin L5 | Escenario L5 |
+| 1 | Leer y escribir datasets de librerías permanentes (`.sas7bdat`, gobernadas en metadata) | Tablas Hive o Impala en la LZ; base relacional; archivos; repositorio | **L5 contra HiveServer2** (`apache/hive:4.0.1`): `tHiveConnection`, `tHiveRow`, `tHiveLoad` y `tHiveInput` cargan un CSV y lo leen. **L5 para Impala por HS2** (`tImpalaConnection` con `IMPALA_DRIVER=HIVE2` contra un HiveServer2 sin SASL en el 21050). Postgres a L5 | Hive y Impala reales, sin cluster. El modo `IMPALA` necesita el driver JDBC de Cloudera |
+| 2 | Dataset temporal en `WORK` (intermedio que no se guarda) | `tHashOutput` / `tHashInput`, o flujo entre subjobs | `tHashOutput` escribe y se ejecuta. `tHashInput` no devuelve filas en la topología probada: **pendiente** (INTERNALS 70) | Resolver la lectura de `tHashInput` |
 | 3 | Borrar la tabla si existe y regenerarla desde cero | `TABLE_ACTION` `DROP_IF_EXISTS_AND_CREATE` del componente de salida | **L5** (`bd/recrear-la-tabla-en-cada-ejecucion`). `DROP_CREATE` emite un `DROP TABLE` sin `IF EXISTS` y falla si la tabla no existe (sección 7) | Ninguna para Postgres |
 | 4 | Filtros, conteos y agregados (`PROC SQL`, `SELECT COUNT`) | `tFilterRow`, `tAggregateRow`, `tDBInput` con SQL | L5 | Dialecto Hive o Impala sin probar |
 | 5 | Cruces y homologación de tablas | `tMap`, `tJoin` | L5 | Ninguna para el caso local |
 | 6 | Generar un dataset grande duplicándolo 15 veces con `append` (478 filas a 14 M, 2 GB) | `tFlowToIterate` + `tRunJob` por vuelta, con salida delimitada en modo append | **L5** con 15 vueltas de 500 mil filas (7,5 M filas, 417 MB): **9,6 s** por run, medido con `tChronometerStop`. Con 3 vueltas, 1,5 M filas en 1,8 s | El volumen SAS (14 M, 2 GB) no se ha probado. Un `tRowGenerator` dentro de un job hijo no genera (sección 7) |
-| 7 | Verificar que lo escrito en la LZ coincide con el origen (campos y registros); fallar si no | `NB_LINE` de la entrada y la salida, `tFileCompare`, y un `tJava` que falla si no coincide | **L5**, dos escenarios: conciliación que pasa (4 filas, ficheros idénticos) y una que falla a propósito (el destino pierde filas) | Hoy se prueba con ficheros; falta con tablas de Postgres o Hive |
+| 7 | Verificar que lo escrito en la LZ coincide con el origen (campos y registros); fallar si no | `NB_LINE` de la entrada y la salida, `tFileCompare`, `tAssert` con `tAssertCatcher` | **L5**: conciliación que pasa y una que falla a propósito, con `tFileCompare` y con `tAssert` (`Ok` / `Fail`) | Hoy se prueba con ficheros; falta con tablas de Hive o Impala |
 | 8 | Medir duración (`sys timer`, "el nodo calcula la diferencia") | `tChronometerStart` / `tChronometerStop` | **L5** (`control/cronometro-mide-una-espera`): imprime `1006 milliseconds` para una espera de 1 s | Ninguna |
-| 9 | Paralelismo: dividir el dataset en partes y escribirlas en paralelo ("split 3") | `tParallelize` + `tFlowToIterate` / `tRunJob` | `tParallelize` compila (L4). Sin L5 | Escenario L5 y control de concurrencia |
-| 10 | Carga masiva a la LZ ("wait for bulkload") | `tHiveLoad`, `tImpalaLoad`, o `tHDFSPut` + `LOAD DATA` | `tHiveLoad` y `tHDFSPut` compilan (L4). `tImpalaLoad` solo L1/L2 | Cluster Cloudera para L5 |
+| 9 | Paralelismo: dividir el dataset en partes y escribirlas en paralelo ("split 3") | `tParallelize` + `tFlowToIterate` / `tRunJob` | **L5**: `tParallelize` lanza en paralelo una escritura con retardo y un `tWaitForFile` que espera el fichero (`control/tparallelize-y-twaitforfile`) | Medir paralelismo con volumen |
+| 10 | Carga masiva a la LZ ("wait for bulkload") | `tHiveLoad`, `tImpalaLoad`, o `tHDFSPut` + `LOAD DATA` | **L5**: `tHiveLoad` (LOAD DATA LOCAL) y `tHDFSPut` a un HDFS real (`apache/hadoop:3.3.6` en Docker) | Cluster Cloudera (Impala y HDFS reales) |
 | 11 | Exportar un dataset a S3 en CSV | `tFileOutputDelimited` + `tS3Put` | `tS3Put` a L5, contra Moto, no contra S3 real | Validar con S3 real (credenciales y permisos de ustedes) |
 | 12 | Importar desde S3 y listar los directorios del bucket | `S3List` (sin `t`, así aparece en el catálogo de Studio) con tabla de buckets y `ITERATE` | **L5** (`aws/listar-los-objetos-de-un-prefijo-en-s3-local`): lista solo el prefijo `l5/listado/` y no el objeto de otro prefijo | Contra S3 real, sin validar (IAM) |
-| 13 | Reintentar si el archivo está "en uso" o hay un bloqueo | `tRunJob` + trigger `SUBJOB_ERROR` + `tSleep` + segundo `tRunJob` | **L5** (`control/reintento-tras-un-fallo-con-espera`): el primer intento falla con "archivo en uso" y el segundo sale bien | Esperar a un archivo que aparece (`tWaitForFile`) sin probar |
+| 13 | Reintentar si el archivo está "en uso" o hay un bloqueo | `tWaitForFile` + trigger `SUBJOB_ERROR` + `tRunJob` o `tLoop` | **L5**: reintento tras un fallo (`tRunJob` y `SUBJOB_ERROR`), y espera a un archivo con `tWaitForFile` (`control/tparallelize-y-twaitforfile`) | Reintento con backoff y con varios archivos sin probar |
 | 14 | Elegir el nodo activo entre dos de la LZ (el otro está en standby) | Contexto por entorno + `tJava` que prueba la conexión | `tContextLoad` tiene escenario **L5** (`contextos/cada-entorno-tiene-su-valor`) y pasa. La medición L4 que lo daba por roto es antigua | Elegir entre dos conexiones reales (activa y standby) |
 | 15 | Correo al terminar: tres correos (inicio, OK, error) | `tSendMail` en `SUBJOB_OK` / `SUBJOB_ERROR` | **L5** contra un sumidero SMTP local (`scripts/l5/smtp-sink.ts`): `control/correo-de-inicio-y-fin` y `control/correo-de-error`. Hay que fijar `CC` y `BCC` (sección 7) | Un SMTP real de ustedes, sin probar |
 | 16 | Calendarizar (cinco veces al día, semanal, mensual, trimestral) | Scheduler de TMC, o el programador del sistema con un Build Job | **Build Job** construido y ejecutado fuera de Studio: `talend_deliverables_build_job` + `talend_runs_start_exported` con `--context_param`. No hay programador ni API de TMC | Programador decidido: TMC. Falta publicar el artefacto y programar por API (Fase B, punto 10) |
-| 17 | Limpieza trimestral de datos permanentes | Job con `tFileDelete`, `tS3Delete` o `DELETE`, programado | `tS3Delete` a L5. `tFileDelete` compila (L4) | Depende de la fila 16 |
+| 17 | Limpieza trimestral de datos permanentes | Job con `tFileDelete`, `tS3Delete` o `DELETE`, programado | **L5**: `tFileDelete` borra un fichero y se comprueba que ya no existe (`control/tfiledelete-borra-un-fichero`). `tS3Delete` a L5 | Depende de la fila 16 |
 | 18 | Macros reutilizables con parámetros (`%MACRO`, `%DO`, nombres generados) | Joblets con parámetros + contextos + `tRunJob` con parámetros | Contextos y padre-hijo a L5. Joblets sin crear (ROADMAP P1) | Crear y usar joblets |
 | 19 | Importar Excel, validar y homologar (proyecto "Información exógena") | `tFileInputExcel` + `tSchemaComplianceCheck` | XLS 97-2003 a L5. **XLSX a L5** (`formatos/leer-productos-desde-un-xlsx`) tras instalar las dependencias de POI en el repositorio de Studio (sección 7) | `tSchemaComplianceCheck` sin probar |
 | 20 | Errores de ejecución y su diagnóstico ("Error 1, filen…" de Cloudera) | `tDie`, `tWarn`, `tLogCatcher`, `OnComponentError`, logs | `tDie`, `tWarn`, `tLogCatcher` a L5. Herramientas `talend_errors_explain` y `talend_runs_collect_logs` | El mensaje exacto de Cloudera no se puede reproducir sin el cluster |
@@ -219,3 +219,35 @@ Fase B, con su detalle en INTERNALS 64 a 66:
   en el runner.
 - **`tSendMail` envía copias a `carbon@example.com` y `blindcarbon@example.com`** si no se fijan `CC` y
   `BCC`. Los escenarios `control/correo-*` los dejan vacíos.
+
+## 8. Emuladores y pruebas de componentes (2026-10-26)
+
+Todo lo de esta sección corre en la máquina local con contenedores o emuladores. Cada componente probado
+tiene un escenario L5 (`tests/fixtures/talend/escenarios-l5/<suite>/`). Último run de los escenarios que
+tocan esta fase: 83 de 87 ejecutables pasan. Los 4 que fallan son de SQS y DynamoDB sobre Moto con Java 21,
+ya conocidos. Queda 1 pendiente (`tHashInput`, INTERNALS 70).
+
+| Servicio | Cómo se levanta | Puerto | Qué prueba | Qué NO prueba |
+|---|---|---|---|---|
+| PostgreSQL 16 | `docker compose -f testdata/docker-compose.yml up -d postgres` | 5433 | `tPostgresql*` y `tDB*` | Otros motores |
+| HiveServer2 4.0.1 | `... up -d hive` (`apache/hive:4.0.1`, `testdata/` montado en `/data`) | 10000 | `tHiveConnection`, `tHiveRow`, `tHiveLoad` (LOAD DATA LOCAL), `tHiveInput` | Cluster Hive, Kerberos |
+| Impala 4.5.3 (quickstart oficial de Apache) | `docker compose -f testdata/impala/quickstart.yml --env-file testdata/impala/.env up -d` | 21050 | `tImpalaConnection`, `tImpalaRow`, `tImpalaInput` con `IMPALA_DRIVER=HIVE2` contra un impalad real | Cluster Cloudera, HDFS real, y el modo `IMPALA` (necesita el driver de Cloudera) |
+| HDFS (Apache Hadoop 3.3.6) | `... up -d hdfs-namenode hdfs-datanode` | 9000, 9866 | `tHDFSPut` a `hdfs://localhost:9000/` | Cluster de Cloudera, Kerberos |
+| S3 (Moto en Docker, `motoserver/moto:latest`) | `docker compose -f testdata/docker-compose.yml up -d moto` | 4566 | `S3BucketCreate`, `S3Put`, `S3Get`, `S3List`, `S3Copy`, `S3Delete` | S3 real, IAM |
+| Sumidero SMTP | `bun run scripts/l5/smtp-sink.ts` | 2525 | `tSendMail` (inicio, fin OK y error), escrito en `testdata/l5-correos.log` | Un servidor de correo real |
+| Studio y bridge | Studio abierto con el plugin instalado (`--install-bridge`) | 3930 | Todo lo que corre un job | Nada: es la base |
+
+Dependencias que hay que instalar en el `.m2` de Studio para estos componentes (ver INTERNALS 63 y 67 a 68):
+Hive y Hadoop (16 artefactos), `commons-logging`, `micrometer-registry-prometheus`, `io.prometheus.jmx:collector`,
+y para Impala los jars de `io.airlift`, `org.apache.ivy`, `joda-time`, `libfb303`, `orc-*` y `oro`, más el
+marcador `Impala:ImpalaJDBC42:2.6.30.1036`, que no es el driver real.
+
+### Bloqueos de acceso (Fase C)
+
+- **Impala de Cloudera**: el impalad local es el quickstart de Apache, no el de Cloudera. El driver
+  `ImpalaJDBC42` de Cloudera no está en Maven Central; el modo `IMPALA` necesita el jar, el host y las
+  credenciales del endpoint de Impala de ustedes.
+- **HDFS y Hive reales de Cloudera**: mismo caso, requieren acceso al cluster.
+- **TMC**: no tiene emulador. Programar y ejecutar por API requiere región, environment, space, Remote Engine y
+  una cuenta de servicio (sección 4, punto 10).
+- **SMTP real**: el sumidero valida el protocolo del componente, no la entrega.

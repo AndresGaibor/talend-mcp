@@ -625,15 +625,6 @@ public final class RepositoryContexts {
     return parameters;
   }
 
-  /** La referencia del item del repositorio a un entorno. */
-  private static Object contextReference(Object itemResource, Object environment) throws Exception {
-    Class<?> referenceClass = TalendClasses
-        .load("org.talend.core.model.properties.ContextReference");
-    Object reference = referenceClass.getConstructor().newInstance();
-    reference.getClass().getMethod("setContext", Object.class).invoke(reference, environment);
-    return reference;
-  }
-
   /** Guarda el item del repositorio. */
   private static void save(Object factory, Object item) {
     try {

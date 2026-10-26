@@ -10,6 +10,7 @@ import com.andres.talend.bridge.BridgeConfig;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchManager;
@@ -148,7 +149,8 @@ public final class LaunchConfigService {
       String launchMode = mode != null && !mode.trim().isEmpty() ? mode : ILaunchManager.RUN_MODE;
       String launchId = LaunchTrackerService.registerLaunch(launchConfiguration.getName(), launchMode);
       payload.put("launchId", launchId);
-      launchConfiguration.launch(launchMode, new NullProgressMonitor(), true);
+      ILaunch launch = launchConfiguration.launch(launchMode, new NullProgressMonitor(), true);
+      LaunchTrackerService.attachLaunch(launchId, launch);
       payload.put("executed", true);
       payload.put("launchMode", launchMode);
       return payload;

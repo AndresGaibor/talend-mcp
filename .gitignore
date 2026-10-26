@@ -42,6 +42,8 @@ testdata/*.xls
 testdata/*.txt
 testdata/*.log
 testdata/resultados.csv
+# Escenarios L5 ya probados (huellas locales de esta maquina).
+testdata/cache-l5.json
 
 # Indice Lucene generado por tSynonymOutput al ejecutar los escenarios L5.
 testdata/l5_synonym_index/
@@ -73,3 +75,11 @@ workspace/
 target/
 talend-studio-bridge/**/target
 scratch/
+
+# Carpetas que aparecen por error o son de otras herramientas (no son del repo)
+# Escenario L5 que no sustituyo @TESTDATA@ (ver tests/l5/datos-con-rutas.test.ts).
+/@TESTDATA@/
+# Estado local de otra herramienta: su propio .gitignore dice que no se versione.
+/.freebuff/
+# Manifiesto de un job de Studio que se habia commiteado en la raiz por error.
+/META-INF/

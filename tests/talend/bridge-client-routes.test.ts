@@ -69,6 +69,15 @@ describe("cliente HTTP del bridge", () => {
     expect(llamadas[0]?.headers?.Authorization).toBe("Bearer secreto");
   });
 
+  test("pide las ultimas lineas del Error Log con el token", async () => {
+    interceptar();
+
+    await cliente("secreto").logTail(50.7);
+
+    expect(llamadas[0]?.url).toBe("http://127.0.0.1:3930/logs/tail?lines=50");
+    expect(llamadas[0]?.headers?.Authorization).toBe("Bearer secreto");
+  });
+
   test("codifica el titulo al buscar un editor", async () => {
     interceptar();
 

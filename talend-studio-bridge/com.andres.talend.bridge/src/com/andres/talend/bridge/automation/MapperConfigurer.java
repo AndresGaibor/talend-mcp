@@ -1,8 +1,10 @@
 package com.andres.talend.bridge.automation;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.andres.talend.bridge.BridgeLog;
 
@@ -24,7 +26,7 @@ import com.google.gson.JsonObject;
  *
  * ```xml
  * <nodeData xsi:type="TalendMapper:MapperData">
- *   <outputTables name="out1">
+ *   <outputTables name="row2">
  *     <mapperTableEntries name="id" expression="row1.id " type="id_Integer"/>
  *   </outputTables>
  *   <inputTables name="row1" matchingMode="UNIQUE_MATCH" lookupMode="LOAD_ONCE">
@@ -43,13 +45,17 @@ import com.google.gson.JsonObject;
  *       "filter": "row1.estado == 'A'" }
  *   ],
  *   "outputs": [
- *     { "name": "out1", "reject": false,
+ *     { "name": "row2", "reject": false,
  *       "columns": [ { "name": "id", "type": "id_Integer", "expression": "row1.id" } ],
  *       "filter": "row1.monto > 100" }
  *   ],
  *   "vars": [ { "name": "v", "type": "id_String", "expression": "'x'" } ]
  * }
  * ```
+ *
+ * El `name` de cada entrada y de cada salida es el de su conexion (`row1`,
+ * `row2`...), que pone Studio al conectar. Las variables van en la seccion Var:
+ * una entrada por variable, con su nombre, tipo y expresion.
  */
 public final class MapperConfigurer {
 
@@ -63,25 +69,26 @@ public final class MapperConfigurer {
    * Aplica el modelo del tMap al nodo.
    */
   public static void configure(Object node, JsonObject spec) throws Exception {
+    String nodeName = nombreDelNodo(node);
     Object externalNode = externalNodeOf(node);
     if (externalNode == null) {
-      throw new IllegalStateException(
-          "El componente no admite modelo propio: no se puede configurar como tMap");
+      throw new IllegalStateException("El componente '" + nodeName
+          + "' no admite modelo propio: 'mapper' solo se aplica a tMap. Quita 'mapper' de su configuracion");
     }
     Object data = externalNode.getClass().getMethod("getExternalData").invoke(externalNode);
     if (data == null) {
       data = ComponentConfigurator.talendClass(MAPPER_DATA).getConstructor().newInstance();
     }
 
-    // El nombre de una tabla del tMap es el de la conexion a la que pertenece.
-    // El conversor empareja por nombre, asi que si el modelo declara "out1" y
-    // la conexion se llama "conn_1", las expresiones se pierden.
+    // Las tablas se emparejan con las conexiones por nombre. Antes se
+    // emparejaban por posicion y el nombre declarado se descartaba: una salida
+    // "out1" acababa con la expresion de otra conexion, o con ninguna.
     List<String> entradas = connectionNames(node, "getIncomingConnections");
     List<String> salidas = connectionNames(node, "getOutgoingConnections");
 
-    setTables(data, "setInputTables", spec.get("inputs"), true, entradas);
-    setTables(data, "setOutputTables", spec.get("outputs"), false, salidas);
-    setTables(data, "setVarsTables", spec.get("vars"), false, null);
+    setTables(data, "setInputTables", spec.get("inputs"), true, entradas, nodeName);
+    setTables(data, "setOutputTables", spec.get("outputs"), false, salidas, nodeName);
+    setVars(data, spec.get("vars"), nodeName);
 
     // El nodo y su external node tienen que apuntar al mismo modelo: el
     // external node es el que se serializa en el `<nodeData>`.
@@ -134,48 +141,111 @@ public final class MapperConfigurer {
     return node.getClass().getMethod("getExternalNode").invoke(node);
   }
 
-  /** Rellena una de las listas de tablas del modelo. */
+  /** Rellena una de las listas de tablas del modelo (entradas o salidas). */
   private static void setTables(Object data, String setter, JsonElement raw, boolean isInput,
-      List<String> connectionNames) throws Exception {
+      List<String> connectionNames, String nodeName) throws Exception {
     if (raw == null || !raw.isJsonArray()) {
       return;
     }
+    String tipo = isInput ? "entrada" : "salida";
     List<Object> tables = new ArrayList<>();
-    int index = 0;
+    Set<String> usadas = new HashSet<>();
     for (JsonElement entry : raw.getAsJsonArray()) {
       if (!entry.isJsonObject()) {
         continue;
       }
-      String name = null;
-      if (connectionNames != null && index < connectionNames.size()) {
-        name = connectionNames.get(index);
+      JsonObject spec = entry.getAsJsonObject();
+      String name = nombreDeConexion(JsonSpec.string(spec, "name"), connectionNames, tipo, nodeName);
+      if (!usadas.add(name)) {
+        throw new IllegalStateException("El tMap '" + nodeName + "' repite la " + tipo + " '" + name + "'");
       }
-      tables.add(createTable(entry.getAsJsonObject(), isInput, name));
-      index++;
+      tables.add(createTable(spec, isInput, name, nodeName));
     }
     data.getClass().getMethod(setter, List.class).invoke(data, tables);
   }
 
   /**
-   * Crea una tabla del tMap (de entrada, de salida o de variables).
+   * Nombre real de una tabla del tMap: el de la conexion a la que pertenece.
+   *
+   * El nombre declarado tiene que ser el de una conexion. Si no lo es, las
+   * expresiones no llegan a ninguna conexion y el job no compila, asi que se
+   * rechaza y se dicen cuales son los nombres reales.
+   *
+   * Sin conexiones (el tMap todavia no esta conectado) se usa el declarado.
+   */
+  private static String nombreDeConexion(String declared, List<String> connectionNames, String tipo,
+      String nodeName) {
+    if (connectionNames.isEmpty()) {
+      return declared == null ? "" : declared;
+    }
+    if (declared != null && connectionNames.contains(declared)) {
+      return declared;
+    }
+    String campo = tipo.equals("entrada") ? "inputs" : "outputs";
+    throw new IllegalStateException("El tMap '" + nodeName + "' declara la " + tipo + " '"
+        + (declared == null ? "(sin name)" : declared) + "' y no hay ninguna conexion de " + tipo
+        + " con ese nombre. Las conexiones de " + tipo + " son: " + String.join(", ", connectionNames)
+        + ". Usa esos nombres en mapper." + campo + "[].name");
+  }
+
+  /**
+   * Las variables del tMap: su seccion Var es una sola tabla con una entrada
+   * por variable (nombre, tipo y expresion).
+   */
+  private static void setVars(Object data, JsonElement raw, String nodeName) throws Exception {
+    if (raw == null || !raw.isJsonArray()) {
+      return;
+    }
+    List<Object> entries = new ArrayList<>();
+    for (JsonElement variable : raw.getAsJsonArray()) {
+      if (!variable.isJsonObject()) {
+        continue;
+      }
+      JsonObject spec = variable.getAsJsonObject();
+      if (JsonSpec.string(spec, "name") == null) {
+        throw new IllegalStateException("Una variable del tMap '" + nodeName + "' no tiene name");
+      }
+      entries.add(createEntry(spec));
+    }
+    Object table = ComponentConfigurator.talendClass(MAPPER_TABLE).getConstructor().newInstance();
+    table.getClass().getMethod("setName", String.class).invoke(table, "Var");
+    table.getClass().getMethod("setMetadataTableEntries", List.class).invoke(table, entries);
+    List<Object> tables = new ArrayList<>();
+    tables.add(table);
+    data.getClass().getMethod("setVarsTables", List.class).invoke(data, tables);
+  }
+
+  /** El unique name del nodo, para los mensajes. */
+  private static String nombreDelNodo(Object node) {
+    Object name = TalendApi.invokeOrNull(node, "getUniqueName");
+    return name == null ? "?" : String.valueOf(name);
+  }
+
+  /**
+   * Crea una tabla de entrada o de salida del tMap.
    *
    * @param name nombre real de la tabla: el de la conexion a la que pertenece.
    */
-  private static Object createTable(JsonObject spec, boolean isInput, String name) throws Exception {
+  private static Object createTable(JsonObject spec, boolean isInput, String name, String nodeName)
+      throws Exception {
     Object table = ComponentConfigurator.talendClass(MAPPER_TABLE).getConstructor().newInstance();
-    String declared = JsonSpec.string(spec, "name");
-    table.getClass().getMethod("setName", String.class)
-        .invoke(table, name != null ? name : (declared == null ? "" : declared));
+    table.getClass().getMethod("setName", String.class).invoke(table, name);
+
+    // Sin columnas no hay nada que mapear: Studio genera un struct vacio y el
+    // job no compila. Se dice aqui, con el nombre de la tabla.
+    JsonElement columns = spec.get("columns");
+    if (columns == null || !columns.isJsonArray() || columns.getAsJsonArray().size() == 0) {
+      throw new IllegalStateException("La " + (isInput ? "entrada" : "salida") + " '" + name
+          + "' del tMap '" + nodeName + "' no tiene columnas: sin esquema no hay nada que mapear."
+          + " Declara sus columns con name y type");
+    }
 
     List<Object> entries = new ArrayList<>();
-    JsonElement columns = spec.get("columns");
-    if (columns != null && columns.isJsonArray()) {
-      for (JsonElement column : columns.getAsJsonArray()) {
-        if (!column.isJsonObject()) {
-          continue;
-        }
-        entries.add(createEntry(column.getAsJsonObject()));
+    for (JsonElement column : columns.getAsJsonArray()) {
+      if (!column.isJsonObject()) {
+        continue;
       }
+      entries.add(createEntry(column.getAsJsonObject()));
     }
     table.getClass().getMethod("setMetadataTableEntries", List.class).invoke(table, entries);
 

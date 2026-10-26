@@ -63,8 +63,13 @@ public final class LogTailService {
 
   /** Archivo de log de la plataforma, o null si no se conoce. */
   static File logFile() {
-    IPath location = Platform.getLogFileLocation();
-    return location == null ? null : location.toFile();
+    try {
+      IPath location = Platform.getLogFileLocation();
+      return location == null ? null : location.toFile();
+    } catch (RuntimeException e) {
+      // Fuera de Eclipse (pruebas, ejecucion sin Studio) la plataforma no tiene log.
+      return null;
+    }
   }
 
   /** Ultimas {@code lines} lineas del archivo, leyendo como mucho {@link #MAX_BYTES} del final. */

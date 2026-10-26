@@ -25,16 +25,24 @@ services:
     volumes:
       - ./:/data
 
-  # Emulacion de un impalad para tImpala* con IMPALA_DRIVER=HIVE2: HiveServer2 sin SASL (auth=noSasl) en el
-  # puerto 21050. Es lo que usa el driver HIVE2 de Talend; no emula el comportamiento propio de Impala.
+  # S3 (emulador Moto). Los escenarios aws: usan http://127.0.0.1:4566.
+  moto:
+    image: motoserver/moto:latest
+    container_name: talend_mcp_moto
+    ports:
+      - "4566:5000"
+
+  # Emulacion anterior de Impala: HiveServer2 sin SASL en el 21050. Ya no hace falta porque el Impala real
+  # (testdata/impala/quickstart.yml) escucha en ese puerto. Se deja como perfil opcional.
   impala-emu:
+    profiles: ["emu"]
     image: apache/hive:4.0.1
     container_name: talend_mcp_impala_emu
     environment:
       SERVICE_NAME: hiveserver2
       SERVICE_OPTS: "-Dhive.server2.thrift.port=21050 -Dhive.server2.authentication=NOSASL"
     ports:
-      - "21050:21050"
+      - "21051:21050"
 
   # HDFS para tHDFSPut / tHDFSGet / tHDFSInput. Un namenode y un datanode de Apache Hadoop 3.3.6 (el cliente
   # de Talend usa Hadoop 3.3.4). El datanode anuncia localhost para que el cliente del host lo alcance.
@@ -63,6 +71,41 @@ services:
     ports:
       - "9866:9866"
       - "9864:9864"
+
+  # MySQL 8.4 para las pruebas de tMysql*. Misma base y usuario que Postgres (talend_test / talend).
+  mysql:
+    image: mysql:8.4
+    container_name: talend_mcp_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: talend_test
+      MYSQL_USER: talend
+      MYSQL_PASSWORD: talend
+    ports:
+      - "3307:3306"
+
+  # MongoDB 7 para las pruebas de tMongoDB*. Usuario talend con autenticacion en la base admin.
+  mongo:
+    image: mongo:7
+    container_name: talend_mcp_mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: talend
+      MONGO_INITDB_ROOT_PASSWORD: talend
+    ports:
+      - "27018:27017"
+
+  # Servidor FTP para tFTP*. En modo pasivo el cliente recibe PUBLICHOST, asi que el rango 30000-30009 va publicado.
+  ftp:
+    image: stilliard/pure-ftpd:latest
+    container_name: talend_mcp_ftp
+    environment:
+      PUBLICHOST: localhost
+      FTP_USER_NAME: talend
+      FTP_USER_PASS: talend
+      FTP_USER_HOME: /home/talend
+    ports:
+      - "2121:21"
+      - "30000-30009:30000-30009"
 
 volumes:
   pgdata:

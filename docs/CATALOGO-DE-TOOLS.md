@@ -733,6 +733,17 @@ Argumentos principales:
 - `title` (string, obligatorio): Título del editor
 - `save` (boolean, opcional): Si debe guardar antes de cerrar
 
+#### `talend_bridge_close_saved_editors`
+
+Cierra los editores de jobs sin cambios sin guardar, para liberar memoria del heap de Studio. Los editores con cambios sin guardar se dejan abiertos: nunca se guarda ni se descarta nada.
+
+**Uso:** escribe/ejecuta; requiere Studio + bridge. Por defecto solo lista (`dryRun` true).
+
+Argumentos principales:
+
+- `prefix` (string, opcional): Solo jobs cuyo nombre empieza por este texto (por ejemplo `MCP_L5_`)
+- `dryRun` (boolean, opcional, por defecto `true`): Con `false` cierra los editores
+
 #### `talend_bridge_commands`
 
 Lista los comandos disponibles en el bridge.

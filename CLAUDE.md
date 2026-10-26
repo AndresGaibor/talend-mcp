@@ -1,7 +1,8 @@
 # CLAUDE.md
 
 Las instrucciones de este repositorio viven en **[AGENTS.md](AGENTS.md)**. Lelas primero: son
-la fuente de verdad para cualquier agente de IA.
+la fuente de verdad para cualquier agente de IA. Para ubicarte en el repo, ejecuta `bun run mapa`;
+el indice de la documentacion esta en [docs/README.md](docs/README.md).
 
 Resumen de lo imprescindible:
 

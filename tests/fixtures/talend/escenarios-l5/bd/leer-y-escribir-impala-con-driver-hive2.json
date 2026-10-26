@@ -1,5 +1,5 @@
 {
-  "nombre": "bases de datos: escribir y leer Impala con el driver HIVE2 (HiveServer2 emulado)",
+  "nombre": "bases de datos: escribir y leer Impala 4.5.3 (driver HIVE2 contra un impalad real)",
   "job": "MCP_L5_ImpalaHS2",
   "nodos": [
     {

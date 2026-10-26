@@ -8,18 +8,35 @@ export const componentParameterTools = [
     name: "talend_components_parameters",
     description: "Lista los parámetros de un componente.",
     inputSchema: z.object({
-      componentName: z.string().describe("Nombre del componente"),
+      componentName: z.string().optional().describe("Nombre del componente, por ejemplo tFileInputDelimited"),
+      name: z.string().optional().describe("Igual que componentName (el nombre que usan talend_components_definition y talend_studio_component_parameters)"),
     }),
-    handler: async ({ componentName }: { componentName: string }) => {
+    handler: async ({ componentName, name }: { componentName?: string; name?: string }) => {
+      const nombre = componentName ?? name;
+      if (!nombre) {
+        return bridgeFail({
+          ok: false,
+          source: "workspace-files",
+          confidence: "low",
+          endpoint: "/components/parameters",
+          error: {
+            code: "MISSING_PARAMETER",
+            message: "Falta componentName: el nombre del componente, por ejemplo tFileInputDelimited.",
+          },
+        });
+      }
       const { inspectCatalogComponent } = await import("../../components/component-catalog-store");
-      const component = await inspectCatalogComponent(componentName);
+      const component = await inspectCatalogComponent(nombre);
       if (!component) {
         return bridgeFail({
           ok: false,
           source: "workspace-files",
           confidence: "low",
           endpoint: "/components/parameters",
-          error: { code: "NOT_FOUND", message: "Componente no encontrado: " + componentName },
+          error: {
+            code: "NOT_FOUND",
+            message: `No hay ningún componente llamado '${nombre}'. Busca el nombre exacto con talend_components_search.`,
+          },
         });
       }
       return bridgeOk({

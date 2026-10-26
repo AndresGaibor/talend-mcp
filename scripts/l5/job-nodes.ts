@@ -3,6 +3,15 @@ import { conRutas } from "./testdata-paths";
 import { errorDe, esperar, transitorioDeStudio } from "./studio-retry";
 
 /**
+ * Filas de datos de un componente con las rutas resueltas. Las celdas son datos del
+ * escenario: si un `@TESTDATA@` no se sustituye aqui, Studio escribe o lee en una ruta
+ * relativa al cwd y aparece una carpeta literal `@TESTDATA@` en el repo.
+ */
+export function datosConRutas(filas: string[][]): string[][] {
+  return filas.map((fila) => fila.map((celda) => conRutas(celda)));
+}
+
+/**
  * Nodos del job: alta en Studio y primer schema.
  *
  * El schema de los componentes que lo piden despues de conectar no se aplica
@@ -156,7 +165,7 @@ export async function ponerSchemaInicial(
       job,
       uniqueName,
       columns: nodo.columnas ?? [],
-      values: nodo.values,
+      values: datosConRutas(nodo.values),
     });
     if (!conDatos.ok) {
       return { ok: false, mensaje: `no se pudieron poner los datos a ${nodo.type}: ${errorDe(conDatos)}` };
@@ -170,7 +179,7 @@ export async function ponerSchemaInicial(
         nombre: nombrePlan,
         schema: [],
         columns: nodo.columnas ?? [],
-        values: nodo.values,
+        values: datosConRutas(nodo.values),
       });
     }
     return { ok: true };

@@ -14,6 +14,25 @@ import type { Bridge, Escenario } from "./scenario-types";
 
 export type SalidaJob = { ok: true; lineas: string[] } | { ok: false; mensaje: string };
 
+/**
+ * La linea que explica por que termino el job con error.
+ *
+ * Un job que falla llena la salida de avisos (`[WARN]`) antes del error real,
+ * asi que tomar las primeras lineas enseña el ruido. Se elige, por orden: la
+ * ultima causa (`Caused by`), la primera linea `[FATAL]`, la primera `[ERROR]`
+ * y, si no hay ninguna, la ultima linea.
+ */
+export function causaDeFallo(lineas: string[]): string {
+  const ultimaCausa = lineas.filter((linea) => linea.includes("Caused by")).pop();
+  const elegida =
+    ultimaCausa ??
+    lineas.find((linea) => linea.includes("[FATAL]")) ??
+    lineas.find((linea) => linea.includes("[ERROR]")) ??
+    lineas[lineas.length - 1] ??
+    "sin salida";
+  return elegida.trim().slice(0, 300);
+}
+
 export async function ejecutarJob(bridge: Bridge, escenario: Escenario): Promise<SalidaJob> {
   const compilado = await compilarEnStudio(bridge, escenario.job);
   if (!compilado.ok) {
@@ -72,7 +91,7 @@ export async function ejecutarJob(bridge: Bridge, escenario: Escenario): Promise
     if (!escenario.espera?.error_esperado) {
       return {
         ok: false,
-        mensaje: `salida con codigo ${cuerpo.exitCode}: ${lineas.slice(0, 3).join(" | ")}`,
+        mensaje: `salida con codigo ${cuerpo.exitCode}. Causa: ${causaDeFallo(lineas)}`,
       };
     }
   }

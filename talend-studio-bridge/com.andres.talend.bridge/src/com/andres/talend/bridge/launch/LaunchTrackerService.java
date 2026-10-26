@@ -4,11 +4,16 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +21,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+
+import org.eclipse.debug.core.DebugException;
+import org.eclipse.debug.core.ILaunch;
+import org.eclipse.debug.core.model.IProcess;
 
 public final class LaunchTrackerService {
 
@@ -35,10 +44,25 @@ public final class LaunchTrackerService {
   private static final Map<String, String> launchNameToLatestId = new ConcurrentHashMap<>();
 
   /**
+   * Lanzamientos que se conservan en el store. Los mas antiguos se descartan al cargar.
+   * Es un tope de crecimiento, no de historial: el store del equipo tenia ~1.700 y no
+   * debe perder ninguno al compactarse.
+   */
+  static final int MAX_STORED_RUNS = 5000;
+
+  /**
    * Cada cuanto se busca el proceso del job de un lanzamiento vigilado. En
    * Windows cada busqueda lanza PowerShell (~1 s), asi que no conviene mas rapido.
    */
   private static final long OBSERVE_POLL_MS = 3000L;
+
+  /** Sondeo lento, tras la ventana de arranque. Detectar el inicio con 10 s de retraso es aceptable. */
+  private static final long OBSERVE_SLOW_POLL_MS = 10_000L;
+
+  /** Durante cuanto tiempo se sondea rapido, desde que se registra el lanzamiento. */
+  private static final long OBSERVE_FAST_WINDOW_MS = 60_000L;
+
+  private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase().startsWith("windows");
 
   /** Margen entre el instante de arranque del proceso y el del lanzamiento. */
   private static final long START_TOLERANCE_MS = 2000L;
@@ -46,22 +70,50 @@ public final class LaunchTrackerService {
   /** Tiempo maximo para que aparezca el proceso del job (compilacion incluida). */
   private static final long PROCESS_APPEAR_TIMEOUT_MS = 15L * 60L * 1000L;
 
+  /** Cuanto se espera a que Eclipse marque como terminado el proceso del launch. */
+  private static final long EXIT_CODE_WAIT_MS = 10_000L;
+
+  private static final long EXIT_CODE_POLL_MS = 200L;
+
   /** Vigilantes activos, por launchId. */
   private static final Map<String, Thread> observers = new ConcurrentHashMap<>();
+
+  /** Launch de Eclipse de cada ejecucion, para leer el codigo de salida de su proceso. */
+  private static final Map<String, ILaunch> launchOf = new ConcurrentHashMap<>();
 
   /** Procesos ya asignados a un lanzamiento, para no contarlos dos veces. */
   private static final Set<Long> claimedPids = ConcurrentHashMap.newKeySet();
 
   private LaunchTrackerService() {}
 
+  /**
+   * Un lanzamiento que seguia "started" al cargar el plugin ya no tiene vigilante: los
+   * vigilantes viven en memoria y se pierden al recargar o reiniciar. Sin esto quedaba
+   * "started" para siempre, como si el job siguiera corriendo. Se marca como interrumpido,
+   * sin codigo de salida, que es lo que se sabe.
+   */
+  private static void markOrphanedRuns() {
+    long now = System.currentTimeMillis();
+    for (LaunchRunInfo info : launches.values()) {
+      if (info.terminatedAt == null && "started".equals(info.status)) {
+        info.status = "interrupted";
+        info.terminatedAt = now;
+        info.durationMs = now - info.startedAt;
+        persist(info);
+      }
+    }
+  }
+
   public static void loadPersistedRuns() {
     File file = getStoreFile();
     if (!file.exists()) return;
 
+    int linesRead = 0;
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
       String line;
       while ((line = reader.readLine()) != null) {
         if (line.trim().isEmpty()) continue;
+        linesRead++;
         try {
           LaunchRunInfo info = deserialize(line);
           if (info != null && info.launchId != null) {
@@ -79,8 +131,57 @@ public final class LaunchTrackerService {
           }
         } catch (Exception ignored) {}
       }
+      markOrphanedRuns();
     } catch (Exception e) {
       System.err.println("Failed to load persisted runs: " + e.getMessage());
+      return;
+    }
+    // Fuera del try del lector: en Windows el archivo sigue bloqueado mientras esta abierto.
+    try {
+      compactStore(linesRead);
+    } catch (IOException e) {
+      System.err.println("Failed to compact persisted runs: " + e.getMessage());
+    }
+  }
+
+  /**
+   * El store es solo de anadir: cada cambio de estado es una linea nueva. Al cargar se
+   * conserva el ultimo estado de cada lanzamiento (los MAX_STORED_RUNS mas recientes) y,
+   * si el archivo tenia lineas de mas, se reescribe. Sin esto crecia sin limite y cada
+   * arranque lo leia entero.
+   */
+  private static void compactStore(int linesRead) throws IOException {
+    if (linesRead <= launches.size() && launches.size() <= MAX_STORED_RUNS) {
+      return;
+    }
+    List<LaunchRunInfo> kept = new ArrayList<>(launches.values());
+    kept.sort(Comparator.comparingLong((LaunchRunInfo info) -> info.startedAt));
+    if (kept.size() > MAX_STORED_RUNS) {
+      kept = new ArrayList<>(kept.subList(kept.size() - MAX_STORED_RUNS, kept.size()));
+    }
+
+    Set<String> keptIds = new HashSet<>();
+    for (LaunchRunInfo info : kept) {
+      keptIds.add(info.launchId);
+    }
+    launches.keySet().retainAll(keptIds);
+    launchNameToLatestId.clear();
+    for (LaunchRunInfo info : kept) {
+      // Orden ascendente: el ultimo que se pone es el mas reciente de cada nombre.
+      launchNameToLatestId.put(info.launchConfigName, info.launchId);
+    }
+
+    File store = getStoreFile();
+    File temp = new File(store.getParentFile(), store.getName() + ".tmp");
+    try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(temp), StandardCharsets.UTF_8)) {
+      for (LaunchRunInfo info : kept) {
+        writer.write(serialize(info) + "\n");
+      }
+    }
+    try {
+      Files.move(temp.toPath(), store.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    } finally {
+      temp.delete(); // Si el movimiento funciono, ya no existe: no hace nada.
     }
   }
 
@@ -98,6 +199,16 @@ public final class LaunchTrackerService {
     persist(info);
     observe(launchId, launchConfigName, info.startedAt);
     return launchId;
+  }
+
+  /**
+   * Asocia el launch de Eclipse que devolvio `launch(...)` con su ejecucion.
+   * Sin esto no hay forma de leer el codigo de salida del job.
+   */
+  public static void attachLaunch(String launchId, ILaunch launch) {
+    if (launchId != null && launch != null) {
+      launchOf.put(launchId, launch);
+    }
   }
 
   /**
@@ -120,24 +231,6 @@ public final class LaunchTrackerService {
       }
       persist(info);
     }
-  }
-
-  /**
-   * Marca como terminada la ultima ejecucion de una configuracion de arranque.
-   *
-   * Es la via que usa el listener de Eclipse: al terminar el proceso del job
-   * solo se sabe el nombre de la configuracion, no el identificador que se
-   * dio al registrar el arranque.
-   */
-  public static void markTerminatedByLaunchName(String launchConfigName, Integer exitCode) {
-    if (launchConfigName == null) {
-      return;
-    }
-    String launchId = launchNameToLatestId.get(launchConfigName);
-    if (launchId == null) {
-      return;
-    }
-    markTerminated(launchId, exitCode, null);
   }
 
   /**
@@ -167,21 +260,39 @@ public final class LaunchTrackerService {
   }
 
   /**
-   * Codigo de salida de un proceso ya terminado.
+   * Codigo de salida del job de un lanzamiento, leido de su proceso en Eclipse Debug.
    *
-   * Se pide por reflexion porque la version de Java con la que compila el
-   * plugin no siempre expone `ProcessHandle.Info.exitCode`.
+   * ProcessHandle no expone el codigo de salida en la API publica de Java (solo
+   * el padre de un proceso lo tiene), asi que se mira por el lado de Eclipse: el
+   * IProcess del lanzamiento tiene getExitValue(). Eclipse puede marcarlo como
+   * terminado un instante despues de que el proceso del sistema acabe, por eso se
+   * espera un poco. Si no aparece, el codigo queda desconocido (null): no se inventa.
    */
-  private static Integer exitCodeOf(ProcessHandle handle) {
-    try {
-      Object info = handle.getClass().getMethod("info").invoke(handle);
-      Object value = info.getClass().getMethod("exitCode").invoke(info);
-      if (value instanceof java.util.Optional) {
-        value = ((java.util.Optional<?>) value).orElse(null);
-      }
-      return value instanceof Integer ? (Integer) value : null;
-    } catch (Exception e) {
+  private static Integer exitCodeOf(String launchId) {
+    ILaunch launch = launchOf.remove(launchId);
+    if (launch == null) {
       return null;
+    }
+    long deadline = System.currentTimeMillis() + EXIT_CODE_WAIT_MS;
+    while (true) {
+      for (IProcess process : launch.getProcesses()) {
+        try {
+          if (process.isTerminated()) {
+            return process.getExitValue();
+          }
+        } catch (DebugException e) {
+          return null;
+        }
+      }
+      if (System.currentTimeMillis() >= deadline) {
+        return null;
+      }
+      try {
+        Thread.sleep(EXIT_CODE_POLL_MS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return null;
+      }
     }
   }
 
@@ -204,17 +315,21 @@ public final class LaunchTrackerService {
     if (!jobName.matches("[A-Za-z0-9_.\\-]+")) {
       return found;
     }
-    for (ProcessHandle handle : ProcessHandle.allProcesses().toArray(ProcessHandle[]::new)) {
-      try {
-        String command = handle.info().commandLine().orElse("");
-        if (command.contains(jobName)) {
-          found.add(handle);
+    // En Windows ProcessHandle no devuelve la linea de comandos de ningun proceso
+    // (medido), asi que ahi solo sirve WMI: recorrer todos los procesos seria trabajo perdido.
+    if (!WINDOWS) {
+      for (ProcessHandle handle : ProcessHandle.allProcesses().toArray(ProcessHandle[]::new)) {
+        try {
+          String command = handle.info().commandLine().orElse("");
+          if (command.contains(jobName)) {
+            found.add(handle);
+          }
+        } catch (Exception e) {
+          // Hay procesos que no dejan leer su linea de comandos.
         }
-      } catch (Exception e) {
-        // Hay procesos que no dejan leer su linea de comandos.
       }
     }
-    if (found.isEmpty() && System.getProperty("os.name", "").toLowerCase().startsWith("windows")) {
+    if (found.isEmpty() && WINDOWS) {
       found.addAll(processesByCommandLineOnWindows(jobName));
     }
     return found;
@@ -261,6 +376,20 @@ public final class LaunchTrackerService {
    * lanzamiento y no solo cuando alguien llama a `waitForLaunch`: un job que
    * acaba antes de esa llamada no dejaria rastro para encontrarlo despues.
    */
+  /**
+   * Cierra un lanzamiento cuyo proceso nunca se encontro. Sin esto quedaba "started" para
+   * siempre, igual que los huerfanos al reiniciar.
+   */
+  private static void markUnobserved(String launchId) {
+    LaunchRunInfo info = launches.get(launchId);
+    if (info != null && info.terminatedAt == null) {
+      info.status = "not_observed";
+      info.terminatedAt = System.currentTimeMillis();
+      info.durationMs = info.terminatedAt - info.startedAt;
+      persist(info);
+    }
+  }
+
   private static void observe(String launchId, String launchConfigName, long startedAt) {
     Thread observer = new Thread(() -> {
       ProcessHandle job = null;
@@ -268,7 +397,10 @@ public final class LaunchTrackerService {
         job = waitForJobProcess(launchConfigName, startedAt);
         if (job != null) {
           job.onExit().get();
-          markTerminated(launchId, exitCodeOf(job), null);
+          markTerminated(launchId, exitCodeOf(launchId), null);
+        } else {
+          // El proceso no aparecio en el plazo: no se sabe cuando ni como termino.
+          markUnobserved(launchId);
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -278,6 +410,7 @@ public final class LaunchTrackerService {
         if (job != null) {
           claimedPids.remove(job.pid());
         }
+        launchOf.remove(launchId);
         observers.remove(launchId);
       }
     }, "talend-bridge-launch-" + launchId);
@@ -294,14 +427,18 @@ public final class LaunchTrackerService {
    * null si el proceso no aparece dentro de PROCESS_APPEAR_TIMEOUT_MS.
    */
   private static ProcessHandle waitForJobProcess(String launchConfigName, long startedAt) throws InterruptedException {
-    long deadline = System.currentTimeMillis() + PROCESS_APPEAR_TIMEOUT_MS;
+    long begin = System.currentTimeMillis();
+    long deadline = begin + PROCESS_APPEAR_TIMEOUT_MS;
     while (System.currentTimeMillis() < deadline) {
       for (ProcessHandle handle : processesOfJob(launchConfigName)) {
         if (startedAfter(handle, startedAt) && claimedPids.add(handle.pid())) {
           return handle;
         }
       }
-      Thread.sleep(OBSERVE_POLL_MS);
+      // Rapido al principio, para no perder el arranque; despues, lento: una compilacion
+      // puede tardar minutos y cada sondeo en Windows lanza PowerShell (~0,8 s).
+      long elapsed = System.currentTimeMillis() - begin;
+      Thread.sleep(elapsed < OBSERVE_FAST_WINDOW_MS ? OBSERVE_POLL_MS : OBSERVE_SLOW_POLL_MS);
     }
     return null;
   }
@@ -396,10 +533,6 @@ public final class LaunchTrackerService {
   public static LaunchRunInfo getLaunch(String launchId) {
     if (launchId == null) return null;
     return launches.get(launchId);
-  }
-
-  public static List<LaunchRunInfo> getAllLaunches() {
-    return new ArrayList<>(launches.values());
   }
 
   public static List<LaunchRunInfo> getRecentRuns(int limit) {

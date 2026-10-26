@@ -1,5 +1,9 @@
 # Convencion de nombres de tools
 
+> **Historico.** Documenta una migracion ya terminada. Los nombres vigentes son los de
+> `bun run docs:tools` ([CATALOGO-DE-TOOLS.md](CATALOGO-DE-TOOLS.md)); las referencias a tests
+> de la migracion ya no existen.
+
 La migracion de nombres legacy ya termino: **no quedan aliases**. Cada capacidad tiene una
 sola tool y su nombre es canonico.
 

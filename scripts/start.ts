@@ -5,14 +5,20 @@ import { platform } from "node:os";
 
 import { installBridge } from "./install-bridge";
 import { runningBridgeVersion } from "./lib/bridge-hot-reload";
+import { runBridgeStatus } from "./lib/bridge-status";
+import { runBridgeWatch } from "./lib/bridge-watch";
 import { detectStudio } from "./lib/studio-detect";
 import { createUi } from "../src/shared/cli/ui";
+
+const PROJECT_ROOT = join(import.meta.dir, "..");
 
 /**
  * Arranque del servidor MCP de Talend.
  *
  *   bun run start                      -> actualiza el plugin si hace falta y levanta el MCP
  *   bun run start --install-bridge     -> compila e instala el plugin Java
+ *   bun run start --bridge-status      -> estado del bridge: Studio, version en vivo, build y jar publicado
+ *   bun run start --watch-bridge       -> recompila y recarga el plugin en cada cambio (Studio abierto)
  *   bun run start --skip-bridge        -> no toca el plugin (arranque minimo)
  *
  * La actualizacion automatica solo actua cuando el bridge no responde y Talend
@@ -155,6 +161,16 @@ async function main() {
 
   if (args.includes("--install-bridge") || args.includes("-i")) {
     await installBridge();
+    return;
+  }
+
+  if (args.includes("--bridge-status")) {
+    await runBridgeStatus(PROJECT_ROOT);
+    return;
+  }
+
+  if (args.includes("--watch-bridge")) {
+    process.exitCode = await runBridgeWatch(PROJECT_ROOT, detectStudio());
     return;
   }
 

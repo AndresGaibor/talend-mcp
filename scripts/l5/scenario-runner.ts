@@ -13,8 +13,31 @@ import type { Bridge, Definiciones, Escenario, Resultado } from "./scenario-type
  * y comprobacion de lo esperado.
  */
 
-/** Ejecuta un escenario completo y devuelve el resultado de la comprobacion. */
+/**
+ * Ejecuta un escenario completo y devuelve el resultado de la comprobacion.
+ *
+ * Al terminar, pase lo que pase, borra sus jobs: un job que se queda abierto en
+ * el IDE ocupa memoria del heap de Studio, y antes los de los escenarios que
+ * fallaban (y los auxiliares de todos) no se borraban nunca.
+ */
 export async function ejecutar(
+  bridge: Bridge,
+  escenario: Escenario,
+  definiciones: Definiciones,
+): Promise<Resultado> {
+  try {
+    return await ejecutarEscenario(bridge, escenario, definiciones);
+  } finally {
+    await borrarJobs(bridge, jobsDelEscenario(escenario));
+  }
+}
+
+/** Los jobs que monta un escenario: los auxiliares y, al final, el principal. */
+export function jobsDelEscenario(escenario: Escenario): string[] {
+  return [...(escenario.jobs ?? []).map((auxiliar) => auxiliar.job), escenario.job];
+}
+
+async function ejecutarEscenario(
   bridge: Bridge,
   escenario: Escenario,
   definiciones: Definiciones,
@@ -65,7 +88,6 @@ export async function ejecutar(
   }
 
   const fallos = await comprobarEspera(bridge, escenario, salida.lineas);
-  await borrarJob(bridge, escenario.job);
 
   return {
     ejecutaOk: true,
@@ -113,9 +135,17 @@ async function comprobarEspera(bridge: Bridge, escenario: Escenario, lineas: str
   return fallos;
 }
 
-/** Borra el job montado, salvo que `L5_KEEP_JOBS=1`. */
-async function borrarJob(bridge: Bridge, job: string): Promise<void> {
-  if (process.env.L5_KEEP_JOBS !== "1") {
-    await bridge.deleteJob({ name: job });
+/**
+ * Borra los jobs del escenario, salvo que `L5_KEEP_JOBS=1`. Un fallo al borrar
+ * no tapa el resultado: el job puede no existir si el montaje fallo antes.
+ */
+async function borrarJobs(bridge: Bridge, jobs: string[]): Promise<void> {
+  if (process.env.L5_KEEP_JOBS === "1") return;
+  for (const job of jobs) {
+    try {
+      await bridge.deleteJob({ name: job });
+    } catch {
+      // Se ignora: el borrado es de limpieza, no parte de la comprobacion.
+    }
   }
 }

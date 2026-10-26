@@ -10,10 +10,33 @@ import type { BridgeConfig } from "./bridge-config";
 import type {
   BridgeCapabilities,
   BridgeEnvironment,
+  BridgeLogTail,
   BridgePingPayload,
   BridgeRequestInit,
   BridgeResult,
 } from "./bridge-types";
+
+/**
+ * Frase para quien llama cuando el bridge no contesta.
+ *
+ * El error crudo de `fetch` (`ECONNREFUSED: Unable to connect...`) no dice que
+ * falla el bridge de Studio ni que hacer. La frase lo dice y deja el detalle
+ * original al final, por si hace falta para depurar.
+ */
+export function mensajeDeConexion(error: unknown, baseUrl: string, timeoutMs: number): string {
+  const detalle = error instanceof Error ? error.message : String(error);
+  const nombre = error instanceof Error ? error.name : "";
+  if (nombre === "AbortError" || /abort/i.test(detalle)) {
+    return `El bridge de Talend Studio en ${baseUrl} no contesto en ${timeoutMs} ms: Studio puede estar ocupado (compilando o con un dialogo abierto). Se puede reintentar. (detalle: ${detalle})`;
+  }
+  if (/ECONNREFUSED|Unable to connect|fetch failed|Failed to fetch/i.test(detalle)) {
+    return `No hay bridge de Talend Studio en ${baseUrl}: Studio no esta abierto con el plugin, o el puerto no es el del bridge. Revisa con "bun run bridge:status". (detalle: ${detalle})`;
+  }
+  if (/ECONNRESET|socket connection was closed/i.test(detalle)) {
+    return `El bridge en ${baseUrl} cerro la conexion a mitad de la respuesta: Studio puede estar reiniciando. Se puede reintentar. (detalle: ${detalle})`;
+  }
+  return detalle;
+}
 
 export class BridgeTransportClient {
   private readonly baseUrl: string;
@@ -44,9 +67,15 @@ export class BridgeTransportClient {
     return await this.request<BridgeEnvironment>("/audit/environment");
   }
 
+  /** Ultimas `lines` lineas del Error Log de Studio (el servidor acota el maximo). */
+  async logTail(lines = 200): Promise<BridgeResult<BridgeLogTail>> {
+    return await this.request<BridgeLogTail>(`/logs/tail?lines=${Math.trunc(lines)}`);
+  }
+
   protected async request<T>(endpoint: string, init: BridgeRequestInit = {}): Promise<BridgeResult<T>> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? this.timeoutMs);
+    const timeoutMs = init.timeoutMs ?? this.timeoutMs;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const headers: Record<string, string> = { Accept: "application/json" };
@@ -92,13 +121,15 @@ export class BridgeTransportClient {
         rawText,
       };
     } catch (error) {
-      const mensaje = error instanceof Error ? error.message : String(error);
       return {
         ok: false,
         source: "unavailable",
         confidence: "low",
         endpoint,
-        error: { code: "BRIDGE_UNAVAILABLE", message: mensaje },
+        error: {
+          code: "BRIDGE_UNAVAILABLE",
+          message: mensajeDeConexion(error, this.baseUrl, timeoutMs),
+        },
       };
     } finally {
       clearTimeout(timer);
