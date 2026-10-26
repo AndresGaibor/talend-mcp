@@ -40,7 +40,7 @@ L4 compila, L5 ejecuta con la salida esperada).
 |---|---|
 | Ejecutar los escenarios L5 | `bun run scripts/execution-check.ts [filtro]` (el informe sale en `testdata/resultados-l5.csv`) |
 | Medir componentes a L4 | `bun run scripts/coverage.ts --components <lista> --compile --out <csv>` (tambien `--family`, `--max`, `--cancel`) |
-| Recompilar el plugin Java | `bun run scripts/start.ts --install-bridge` (**no** con una medicion en marcha) |
+| Recompilar el plugin Java | `bun run bridge:install` (**no** con una medicion en marcha) |
 | Llamar al bridge a pelo | `bun run scripts/bridge-call.ts /ruta @fichero.json` |
 | Llamar a una tool del MCP | `bun run scripts/mcp-call.ts <tool> @fichero.json` |
 | Comprobar el repo | `bun run typecheck` y `bun test` |
@@ -53,7 +53,7 @@ L4 compila, L5 ejecuta con la salida esperada).
   `~/.talend-bridge/config.json` tiene `unsafeActions: true`.
 - Compilar y recargar el plugin Java en caliente, sin reiniciar Studio (~5 s):
   ```bash
-  bun run scripts/start.ts --install-bridge
+  bun run bridge:install
   ```
 - Llamar al bridge directo: `bun run scripts/bridge-call.ts /ruta @archivo.json`. En PowerShell hay que pasar el
   JSON por archivo, porque las comillas en linea se pierden.
@@ -100,7 +100,7 @@ exist`, aunque esten bien; la primera corrida asi dio 32 de 77, y con una **reco
 
 ### El bridge: cuatro arreglos con efecto practico
 
-Los cuatro son del plugin Java (se publican con `bun run scripts/start.ts --install-bridge`) y estan explicados
+Los cuatro son del plugin Java (se publican con `bun run bridge:install`) y estan explicados
 en INTERNALS 42, 43, 44 y 46:
 
 1. **El nombre de la columna en la base de datos** (`setOriginalDbColumnName`): sin el, el `tDBOutput` genera el
@@ -126,7 +126,7 @@ codigo. Ademas, el **conector** no siempre es `FLOW`: el `tUniqRow` saca sus fil
 ### Arnes de ejecucion (L5): 28 de 28 en verde
 
 `scripts/execution-check.ts` monta un job, lo ejecuta y **compara la salida con la esperada** (declarada antes de
-ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5.json`; el informe sale en
+ejecutar). Los escenarios estan en `tests/fixtures/talend/escenarios-l5/<suite>/<escenario>.json`; el informe sale en
 `testdata/resultados-l5.csv`. **Veintiocho escenarios en verde**: el de humo, el de leer un
 CSV, el de leer y escribir un CSV, el de transformaciones (`tUniqRow` + `tSortRow` sobre el CSV, quitando el
 duplicado y ordenando por importe), el `tFilterRow` con condicion, el `tUnite`, el `tMap` que renombra y filtra,

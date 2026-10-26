@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **231**.
+Tools registradas en el preset actual: **232**.
 
 ## Empezar
 
@@ -804,17 +804,6 @@ Argumentos principales:
 
 - `launchId` (string, obligatorio): ID de la launch
 
-#### `talend_bridge_launch_wait`
-
-Espera a que una ejecución termine.
-
-**Uso:** escribe/ejecuta; requiere Studio + bridge.
-
-Argumentos principales:
-
-- `launchId` (string, obligatorio): ID de la launch
-- `timeoutMs` (number, opcional): Timeout en ms
-
 #### `talend_bridge_open_component_settings`
 
 Abre la configuración de un componente en Talend Studio.
@@ -837,7 +826,7 @@ Argumentos principales:
 
 #### `talend_bridge_ping`
 
-Verifica si el bridge de Talend Studio está disponible.
+Verifica si el bridge de Talend Studio estÃ¡ disponible.
 
 **Uso:** solo lectura; requiere Studio + bridge.
 
@@ -861,14 +850,14 @@ Refresca el workspace.
 
 #### `talend_bridge_run_launch_config`
 
-Ejecuta una configuración de launch.
+Ejecuta una configuraciÃ³n de launch.
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
 Argumentos principales:
 
 - `name` (string, obligatorio): Nombre de la launch config
-- `mode` (string, opcional): Modo de ejecución
+- `mode` (string, opcional): Modo de ejecuciÃ³n
 - `dryRun` (boolean, opcional): Si es dry run
 
 #### `talend_bridge_save_active_editor`
@@ -895,7 +884,7 @@ Argumentos principales:
 
 #### `talend_bridge_selection`
 
-Obtiene la selección actual en el workbench.
+Obtiene la selecciÃ³n actual en el workbench.
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -1005,7 +994,7 @@ Argumentos principales:
 
 #### `talend_job_wait_run`
 
-Espera a que un launch existente termine.
+Espera a que un launch termine. `terminated: true` solo si Studio lo confirma; `WAIT_TIMEOUT` si sigue en marcha y `WAIT_UNOBSERVED` si el bridge no lo vigila (no se puede confirmar el fin).
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -1091,7 +1080,7 @@ Argumentos principales:
 - `scriptPath` (string, opcional): Ruta explícita al script (opcional)
 - `contextName` (string, opcional): Nombre del contexto (default: Default)
 - `timeoutMs` (number, opcional): Timeout en ms (default: 300000)
-- `params` (object, opcional): Parámetros como TALEND_PARAM_<key>
+- `params` (object, opcional): Parámetros de contexto del job, pasados al launcher como --context_param <clave>=<valor>
 
 #### `talend_tail_run_output`
 
@@ -1254,6 +1243,19 @@ Argumentos principales:
 ### Entregables
 
 Reunir archivos, validar y empaquetar un job para entrega.
+
+#### `talend_deliverables_build_job`
+
+Construye un job como Build Job: zip autonomo con launcher (_run.bat/_run.sh), jar, lib/ y contexto, extraido en la carpeta de builds. Ejecutalo sin Studio con talend_runs_start_exported. Guarda el job en Studio antes de construirlo.
+
+**Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
+
+Argumentos principales:
+
+- `jobName` (string, obligatorio): Nombre del job, ya compilado en Studio
+- `contextName` (string, opcional): Contexto que usa el launcher por defecto
+- `version` (string, opcional): Version del job
+- `destinationDir` (string, opcional): Carpeta del build. Por defecto, TALEND_BUILDS_DIR/<jobName>
 
 #### `talend_deliverables_collect`
 
@@ -1867,7 +1869,7 @@ Argumentos principales:
 
 #### `talend_studio_dismiss_dialogs`
 
-Cierra los dialogos modales que bloquean Talend Studio (por ejemplo el 'Jobname Error' al reusar la etiqueta de un job). El plugin ya lo hace solo; esta tool lo fuerza bajo demanda.
+Cierra los dialogos modales que bloquean Talend Studio PULSANDO su boton: 'Jobname Error' y 'Save Resource' responden Yes (reemplaza el job o guarda los cambios pendientes). NO es de solo lectura. Para ver que dialogos hay sin tocarlos usa talend_studio_ui_inventory. El plugin ya lo hace solo; esta tool lo fuerza bajo demanda.
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -1921,6 +1923,12 @@ Argumentos principales:
 
 - `code` (string, obligatorio): Codigo fuente Java con un metodo estatico 'public static Object run()'
 - `className` (string, opcional): Nombre de la clase. Si se omite, se deduce del codigo
+
+#### `talend_studio_ui_inventory`
+
+Inventario de solo lectura de la interfaz de Talend Studio: menus, pestanas de editor y paneles, barras de herramientas, perspectivas, vistas registradas y clases de dialogos y asistentes por bundle. No pulsa, no cierra ni guarda nada. Requiere unsafeActions=true en el bridge.
+
+**Uso:** solo lectura; requiere Studio + bridge.
 
 ### Watcher
 
@@ -2379,7 +2387,7 @@ Argumentos principales:
 
 #### `talend_job_measure_runtime`
 
-Mide el tiempo de ejecución de un job consultando runs anteriores.
+Mide el tiempo de ejecuciÃ³n de un job consultando runs anteriores.
 
 **Uso:** escribe/ejecuta; funciona sin Studio.
 
@@ -2387,7 +2395,7 @@ Argumentos principales:
 
 - `jobName` (string, obligatorio): Nombre del job o launch config
 - `targetMs` (number, opcional): Tiempo objetivo en ms para comparar
-- `latestOnly` (boolean, opcional): Solo devolver el último run
+- `latestOnly` (boolean, opcional): Solo devolver el Ãºltimo run
 
 #### `talend_job_open_in_studio`
 

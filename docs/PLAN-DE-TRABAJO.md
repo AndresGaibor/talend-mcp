@@ -6,8 +6,9 @@ Checklist para trabajar en `talend-mcp`. Complementa [AGENTS.md](../AGENTS.md).
 
 ```bash
 bun install
-bun run typecheck    # debe terminar sin errores
-bun test             # debe estar verde
+bun run verify       # typecheck + tests + fixtures; debe terminar sin errores
+bun run l5:validar   # fixtures L5 bien formados (no abre Studio)
+bun run doctor       # estado de Studio, bridge, MCP y configuracion
 ```
 
 Si algo falla antes de tu cambio, es un problema preexistente: anotalo y sigue. No lo
@@ -54,10 +55,16 @@ Si algo falla antes de tu cambio, es un problema preexistente: anotalo y sigue. 
    - Tools de modulo: `getModuleTools()` en `src/server/registered-tools.ts`.
    - Tools de estudio: el array `allTools` de `src/talend/studio/bridge-tools.ts`.
 4. **Test** en `tests/<area>/`.
-5. **Verificacion**: `bun run typecheck` y `bun test`.
+5. **Verificacion**: `bun run verify` (typecheck + tests + fixtures). Si el cambio es solo de tests,
+   `bun run test:ci` corta en el primer fallo.
 
 Reglas de naming: `talend_<area>_<verbo>`. Marca `readOnly: true` en toda tool que no escriba.
 Si la capacidad ya existe, renombra la tool vieja en vez de crear una segunda.
+
+Los mensajes de los CLI salen por `src/shared/cli/ui.ts`: `ui.ok` para lo que salio bien, `ui.warn`
+para una degradacion que no impide seguir, `ui.fail` para un error, `ui.step` para el progreso y
+`ui.debug` para trazas. No uses `console.log` ni colores propios: `TALEND_MCP_LOG` y `NO_COLOR`
+solo funcionan si todos los scripts pasan por ese logger.
 
 ## 4. Receta: cambiar el plugin Java
 
@@ -65,20 +72,30 @@ Si la capacidad ya existe, renombra la tool vieja en vez de crear una segunda.
 2. Compila y publica con el CLI:
 
    ```bash
-   bun run scripts/start.ts --install-bridge
+   bun run bridge:install
    ```
 
-   El instalador detecta Talend Studio, compila con Maven + Tycho y publica el bundle:
+   El instalador detecta Talend Studio y elige la via segun el estado del IDE:
 
-   - **Studio corriendo**: copia el jar en `~/.talend-bridge/hot/bridge.jar`. El plugin lo
-     detecta y se recarga solo (`Bundle.update`), asi que **no hay que reiniciar Studio**.
-   - **Studio cerrado**: desinstala la versión anterior y instala la nueva con el p2
-     director.
+   - **Studio corriendo**: compila con `javac` (~8 s, 0 s si no cambiaron las fuentes) y copia el
+     jar en `~/.talend-bridge/hot/bridge.jar`. El plugin lo detecta y se recarga solo
+     (`Bundle.update`), asi que **no hay que reiniciar Studio**. Espera a que el ping confirme la
+     version nueva; si no llega, avisa en vez de dar exito.
+   - **Studio cerrado**: usa Maven + Tycho, desinstala la version anterior y instala la nueva con el
+     p2 director.
+
+   Opciones: `--maven` fuerza Maven/Tycho aunque Studio este abierto; `--force` recompila y
+   recarga aunque las fuentes no hayan cambiado.
+
+   `bun run start` hace esta misma actualizacion solo cuando el bridge no responde y Studio esta
+   abierto: nunca lanza Maven ni p2 en el arranque. Desactivala con
+   `TALEND_BRIDGE_AUTO_INSTALL=0` o `bun run start --skip-bridge`.
 
 3. Verifica:
 
    ```bash
    curl http://127.0.0.1:3930/ping
+   bun run doctor
    ```
 
 Errores frecuentes del plugin:
@@ -88,14 +105,13 @@ Errores frecuentes del plugin:
 | `ClassNotFoundException: ...Startup` | `plugin.xml` no entro en el jar | Revisar `bin.includes` en `build.properties` (una sola linea por clave) |
 | El bridge no escucha en 3930 | El bundle es lazy y no hay extension `org.eclipse.ui.startup` | Verificar que `plugin.xml` este en el jar |
 | `ProvisionException ... ubicacion de extension invalida` | Cache de p2 con una URI malformada | El instalador lo limpia; si persiste, borrar `configuration/org.eclipse.osgi/*/data/*` |
-| `No se encontro Talend Studio` | Rutas no contempladas | Agregar la ruta en `studioCandidates()` de `scripts/install-bridge.ts` |
+| `No se encontro Talend Studio` | Rutas no contempladas | Define `TALEND_STUDIO_HOME` con la carpeta que tiene `plugins/` y `features/`, o agrega la ruta en `studioHomeCandidates()` de `scripts/lib/studio-detect.ts` |
 | El plugin no se recarga | Studio abierto con una versión vieja sin `HotReloadService` | Cerrar Studio, instalar con p2 y volver a abrir |
 
 ## 5. Verificacion antes de commitear
 
 ```bash
-bun run typecheck
-bun test
+bun run verify
 git status
 ```
 

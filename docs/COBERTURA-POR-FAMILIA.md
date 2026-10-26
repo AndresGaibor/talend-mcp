@@ -307,7 +307,7 @@ Para L4 no hace falta el driver; para L5 si, y hay que instalarlo en el `.m2` de
 
 - **L4**: el componente se crea, se configura, se monta, compila y se borra; `compila=si` y el job
   no deja problemas de diseno.
-- **L5**: hay un escenario en `tests/fixtures/talend/escenarios-l5.json` con la salida declarada
+- **L5**: hay un escenario en `tests/fixtures/talend/escenarios-l5/<suite>/<escenario>.json` con la salida declarada
   **antes** de ejecutar, y `scripts/execution-check.ts` lo deja en verde.
 - Un fallo se documenta con su causa y su plan de accion. Si es del arnes, se repite antes de
   abrir un bug.

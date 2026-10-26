@@ -80,23 +80,31 @@ La ruta debe señalar la carpeta que contiene `talend.project`.
 ### 3. Iniciar
 
 ```bash
-bun run start:server
+bun run start
 ```
 
+`start` actualiza el plugin automáticamente si Talend Studio está abierto y el bridge no
+responde. Si no quieres que toque el plugin, usa `bun run start --skip-bridge` o
+`bun run start:server`.
+
 El servidor estará disponible localmente en `http://127.0.0.1:3927/mcp`. Configura esa dirección
-en tu cliente MCP y comienza con `talend_guide`.
+en tu cliente MCP y comienza con `talend_guide`. Por defecto expone el preset `agent` (46
+herramientas); para ver el catálogo completo, define `TALEND_MCP_FILTER=canonical`.
 
 ### 4. Habilitar el trabajo en vivo con Talend Studio
 
 Con Talend Studio instalado, ejecuta:
 
 ```bash
-bun run scripts/start.ts --install-bridge
+bun run bridge:install
 ```
 
 El plugin conecta el servidor con Studio. Si Studio está abierto, normalmente se actualiza sin
 reiniciarlo. El bridge funciona en modo de solo lectura por defecto; las acciones que modifican el
 proyecto requieren la autorización correspondiente en el entorno.
+
+Si la instalación no detecta Studio, define `TALEND_STUDIO_HOME` con la carpeta que contiene
+`plugins/` y `features/`. Para revisar el estado completo: `bun run doctor`.
 
 ## Conectar otro cliente MCP
 
@@ -131,8 +139,10 @@ en el [catálogo de herramientas](docs/CATALOGO-DE-TOOLS.md).
 ## Desarrollo
 
 ```bash
-bun run typecheck
-bun test
+bun run verify       # typecheck + tests + validacion de fixtures
+bun test tests/talend/l5-scenario-files.test.ts   # un solo archivo
+bun run l5:validar   # valida los fixtures L5 sin abrir Studio
+bun run doctor       # estado de Studio, bridge, MCP y configuracion
 ```
 
 ## Configuración adicional
@@ -146,7 +156,12 @@ visibles, puedes configurar estas variables:
 | `TALEND_MCP_PORT` | Puerto HTTP (por defecto `3927`). |
 | `TALEND_MCP_HOST` | Dirección de escucha (por defecto `127.0.0.1`). |
 | `TALEND_WORKSPACE` | Ubicación del workspace, si no defines `TALEND_PROJECT`. |
-| `TALEND_MCP_FILTER` | Herramientas visibles: `agent`, `core` o `all`. |
+| `TALEND_MCP_FILTER` | Herramientas visibles: `agent` (por defecto en `start`), `core`, `canonical` o `all`. |
+| `TALEND_STUDIO_HOME` | Instalación de Studio (carpeta con `plugins/` y `features/`). |
+| `TALEND_BRIDGE_AUTO_INSTALL` | `0` desactiva la actualización automática del plugin al arrancar. |
+| `TALEND_MCP_LOG` | `quiet`, `normal` o `verbose` para los mensajes de los CLI. |
+| `TALEND_LOG_DIR` | Carpeta donde buscar los logs de Studio para `talend_read_run_log`. |
+| `TALEND_DISABLE_AUTODETECT` | `1` impide inferir el proyecto desde el workspace. |
 
 ## Solución rápida de problemas
 

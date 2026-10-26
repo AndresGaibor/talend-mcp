@@ -88,8 +88,10 @@ talend-studio-bridge/
 ```
 
 - Se compila con Maven + Tycho contra un release de Eclipse y Gson desde Orbit.
-- Se instala (y actualiza) con el p2 director de Talend Studio. Todo el flujo vive en
-  `scripts/install-bridge.ts`, se ejecuta con `bun run scripts/start.ts --install-bridge`.
+- Se instala (y actualiza) con el p2 director de Talend Studio. El flujo se orquesta en
+  `scripts/install-bridge.ts` y sus etapas viven en `scripts/lib/` (`studio-detect`,
+  `bridge-compile`, `bridge-hot-reload`, `p2-install`). Se ejecuta con `bun run bridge:install`;
+  `bun run start` solo actualiza en caliente cuando el bridge no responde y Studio esta abierto.
 - El token de autenticacion vive en `~/.talend-bridge/token` y la configuracion en
   `~/.talend-bridge/config.json` (modo lectura por defecto).
 
