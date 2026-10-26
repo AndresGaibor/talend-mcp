@@ -84,9 +84,9 @@ errores, orquestacion). El orden dentro de cada grupo es aproximado.
 | 1 | tMap | Transformar, filtrar y cruzar entradas y salidas |
 | 2 | tFileInputDelimited | Leer CSV/TXT |
 | 3 | tFileOutputDelimited | Escribir CSV/TXT |
-| 4 | tDBInput | Leer de cualquier base JDBC |
-| 5 | tDBOutput | Escribir en cualquier base JDBC |
-| 6 | tDBConnection | Conexion compartida a la base |
+| 4 | tJDBCInput | Leer de una base por JDBC |
+| 5 | tJDBCOutput | Escribir en una base por JDBC |
+| 6 | tJDBCConnection | Conexion compartida a la base |
 | 7 | tFilterRow | Filtrar filas |
 | 8 | tAggregateRow | Agrupar y agregar |
 | 9 | tSortRow | Ordenar |
@@ -122,7 +122,7 @@ errores, orquestacion). El orden dentro de cada grupo es aproximado.
 | 29 | tFileCopy | Copiar ficheros |
 | 30 | tFileDelete | Borrar ficheros |
 | 31 | tFileExist | Comprobar que existe un fichero |
-| 32 | tRESTClient | Llamadas REST |
+| 32 | tHttpRequest | Llamadas HTTP/REST |
 | 33 | tSendMail | Enviar correo |
 
 ### Grupo D: transformacion avanzada
@@ -144,10 +144,10 @@ errores, orquestacion). El orden dentro de cada grupo es aproximado.
 
 | # | Componente | Para que |
 |---|---|---|
-| 44 | tDBRow | SQL libre |
-| 45 | tDBClose | Cerrar conexion |
-| 46 | tDBCommit | Confirmar transaccion |
-| 47 | tDBRollback | Deshacer transaccion |
+| 44 | tJDBCRow | SQL libre |
+| 45 | tJDBCClose | Cerrar conexion |
+| 46 | tJDBCCommit | Confirmar transaccion |
+| 47 | tJDBCRollback | Deshacer transaccion |
 | 48 | tFixedFlowInput | Datos fijos de prueba |
 | 49 | tRowGenerator | Generar filas |
 | 50 | tPostgresqlInput | Leer PostgreSQL |
@@ -157,8 +157,12 @@ errores, orquestacion). El orden dentro de cada grupo es aproximado.
 Vienen de los informes `testdata/cobertura-l4-*.csv` y de la revision de tMap. Cada uno se confirma o se descarta
 al revisar su componente.
 
-- **Sin medicion de compilacion:** tDBInput, tDBOutput, tDBConnection, tDBRow, tDBClose, tDBCommit, tDBRollback,
-  tRESTClient. tSendMail tiene creacion y guardado, pero no compilacion.
+- **Correccion de la lista (verificada con Studio):** tDBInput, tDBOutput, tDBConnection, tDBRow, tDBClose,
+  tDBCommit y tDBRollback no existen en la paleta Standard de Talend 8.0.1; el genérico es la familia `tJDBC*`. Y
+  tRESTClient tampoco existe: el REST de la paleta es `tREST`, marcado como *deprecated*, así que se sustituye por
+  `tHttpRequest`. La posición en la lista no cambia.
+- **Sin medicion de compilacion:** tSendMail tiene creacion y guardado, pero no compilacion. Los componentes JDBC
+  de generacion nueva no tienen XML: su definicion sale solo de Studio (`talend_studio_component_parameters`).
 - **Fallos de compilacion en los informes:** tSortRow (`defaultRow cannot be resolved`), tUniqRow
   (`IllegalArgumentException`), tRunJob (`Syntax error on token "new"`), tContextLoad (`Duplicate local variable`),
   tFileInputExcel (`Syntax error on token ""`), tFileInputXML (`NameSpaceTool_... cannot be resolved`), tNormalize

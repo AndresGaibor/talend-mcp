@@ -21,9 +21,9 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 1 | tMap | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en informes L4 (antes de los cambios de mapper). Bridge con los cambios compila; falta publicarlo. Fixture usa `row2`. |
 | 2 | tFileInputDelimited | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4. Varios escenarios L5. El validador exige FILENAME y esquema. |
 | 3 | tFileOutputDelimited | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (3 informes). |
-| 4 | tDBInput | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sin medicion en ningun informe. |
-| 5 | tDBOutput | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sin medicion en ningun informe. |
-| 6 | tDBConnection | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sin medicion en ningun informe. |
+| 4 | tJDBCInput | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBInput, que no existe en esta Studio. Presente en el catalogo DI. Sin medicion de compilacion. |
+| 5 | tJDBCOutput | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBOutput. Sin medicion de compilacion. |
+| 6 | tJDBCConnection | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBConnection. Sin medicion de compilacion. |
 | 7 | tFilterRow | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (4 informes). Escenario L5 existente. |
 | 8 | tAggregateRow | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (3 informes). Reglas en 04-reglas-de-componentes.md. |
 | 9 | tSortRow | A | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 2 informes (`defaultRow cannot be resolved`) y pasa en 1. |
@@ -49,7 +49,7 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 29 | tFileCopy | C | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 1 informe (`IllegalArgumentException`). |
 | 30 | tFileDelete | C | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Un fallo del arnes: volver a medir. |
 | 31 | tFileExist | C | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Un fallo del arnes: volver a medir. |
-| 32 | tRESTClient | C | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sin medicion en ningun informe. |
+| 32 | tHttpRequest | C | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tRESTClient, que no existe en esta Studio (el REST de la paleta, tREST, esta deprecated). Sin medicion. |
 | 33 | tSendMail | C | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Creado y guardado; sin compilacion medida en L4. |
 | 34 | tJavaRow | D | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
 | 35 | tJavaFlex | D | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (3 informes). Escenario de tJavaFlex existe. |
@@ -61,10 +61,10 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 41 | tConvertType | D | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
 | 42 | tFlowToIterate | D | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
 | 43 | tIterateToFlow | D | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 44 | tDBRow | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sin medicion en ningun informe. |
-| 45 | tDBClose | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sin medicion en ningun informe. |
-| 46 | tDBCommit | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sin medicion en ningun informe. |
-| 47 | tDBRollback | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sin medicion en ningun informe. |
+| 44 | tJDBCRow | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBRow. Sin medicion de compilacion. |
+| 45 | tJDBCClose | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBClose. Sin medicion de compilacion. |
+| 46 | tJDBCCommit | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBCommit. Sin medicion de compilacion. |
+| 47 | tJDBCRollback | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBRollback. Sin medicion de compilacion. |
 | 48 | tFixedFlowInput | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (1 informe). Escenario L5 existe. |
 | 49 | tRowGenerator | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Escenario L5 existe. |
 | 50 | tPostgresqlInput | E | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (1 informe). |
