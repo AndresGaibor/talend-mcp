@@ -18,7 +18,8 @@
         [
           "2;Jose;Medellin"
         ]
-      ]
+      ],
+      "schemaDespuesDeConectar": true
     },
     {
       "type": "tExtractDelimitedFields",
@@ -77,5 +78,5 @@
       "2|Jose|Medellin"
     ]
   },
-  "pendiente": "tExtractDelimitedFields compila y corre, pero la entrada se queda con id, nombre y ciudad (la propagacion del esquema de salida hacia el origen) en vez de linea: el codigo generado divide row1.id. Sin resolver: mismo problema de propagacion que el REJECT."
+  "pendiente": "tExtractDelimitedFields: la entrada se conserva con linea al marcarla schemaDespuesDeConectar (diagnostico de propagacion confirmado). Queda un generador con try/catch desbalanceado (catch sin try, linea 1393), el mismo patron que tWriteXMLField. Sin resolver."
 }
