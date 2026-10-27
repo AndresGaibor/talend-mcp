@@ -1,0 +1,42 @@
+{
+  "nombre": "calidad: transformar un XML con una hoja XSLT con tXSLT",
+  "job": "MCP_L5_XSLT",
+  "nodos": [
+    {
+      "type": "tXSLT",
+      "nombre": "transforma",
+      "parameters": {
+        "XML_FILE": {
+          "value": "@TESTDATA@/l5_xslt_entrada.xml",
+          "literal": true
+        },
+        "XSLT_FILE": {
+          "value": "@TESTDATA@/l5_xslt_hoja.xsl",
+          "literal": true
+        },
+        "OUTPUT_FILE": {
+          "value": "@TESTDATA@/l5_xslt_salida.txt",
+          "literal": true
+        },
+        "OVERRIDE_INPUT_XML_FILE": {
+          "value": "false"
+        },
+        "OVERRIDE_INPUT_XSL_FILE": {
+          "value": "false"
+        },
+        "OVERRIDE_OUTPUT": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_xslt_salida.txt",
+      "contiene": [
+        "Ana;Jose;"
+      ]
+    }
+  }
+}
