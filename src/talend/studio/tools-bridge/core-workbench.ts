@@ -79,12 +79,24 @@ export const coreWorkbench = [
   },
 {
     name: "talend_bridge_problems_markers",
-    description: "Obtiene los markers de problemas.",
+    description: "Obtiene los markers de problemas del IDE (Eclipse). Para los avisos de un job concreto usa talend_job_problems.",
     inputSchema: z.object({}),
     handler: async () => {
       const bridge = await loadBridge();
       const result = await bridge.problemsMarkers();
       return bridgeOk(bridgeResultToEnvelope(result, "/problems/markers"));
+    },
+  },
+{
+    name: "talend_bridge_log_tail",
+    description: "Ultimas lineas del Error Log de Talend Studio: errores y avisos de componentes y plugins que no salen en la salida del job. Revisalo despues de ejecutar o compilar, aunque todo haya ido bien.",
+    inputSchema: z.object({
+      lines: z.number().int().positive().optional().default(200).describe("Cuantas lineas finales leer (el servidor acota el maximo)"),
+    }),
+    handler: async ({ lines }: { lines?: number }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.logTail(lines ?? 200);
+      return bridgeOk(bridgeResultToEnvelope(result, "/logs/tail"));
     },
   },
 {

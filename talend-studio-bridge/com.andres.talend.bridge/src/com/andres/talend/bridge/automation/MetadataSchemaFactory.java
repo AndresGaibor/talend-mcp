@@ -77,7 +77,12 @@ final class MetadataSchemaFactory {
       column.getClass().getMethod("setPrecision", Integer.class).invoke(column,
           definition.has("precision") ? Integer.valueOf(definition.get("precision").getAsInt()) : Integer.valueOf(-1));
       column.getClass().getMethod("setOriginalLength", Integer.class).invoke(column, Integer.valueOf(-1));
-      column.getClass().getMethod("setPattern", String.class).invoke(column, JsonSpec.stringOrEmpty(definition, "pattern"));
+      // Una columna de fecha sin patron da el aviso "A value must be set for Date Pattern": se pone el de Talend.
+      String pattern = JsonSpec.stringOrEmpty(definition, "pattern");
+      if (pattern.isEmpty() && "id_Date".equals(type)) {
+        pattern = "yyyy-MM-dd HH:mm:ss";
+      }
+      column.getClass().getMethod("setPattern", String.class).invoke(column, pattern);
       column.getClass().getMethod("setComment", String.class).invoke(column, JsonSpec.stringOrEmpty(definition, "comment"));
       column.getClass().getMethod("setSourceType", String.class).invoke(column, JsonSpec.stringOrEmpty(definition, "sourceType"));
       column.getClass().getMethod("setUsefulColumn", boolean.class).invoke(column, Boolean.TRUE);

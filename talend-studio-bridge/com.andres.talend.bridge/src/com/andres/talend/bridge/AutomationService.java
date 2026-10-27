@@ -151,6 +151,8 @@ public final class AutomationService {
 
     // Step 6: Wait for termination if requested using LaunchTrackerService
     if (waitForTermination && launchId != null) {
+      // La salida del job se devuelve con el Run: asi el harness no lo relanza.
+      LaunchTrackerService.capturarSalidaDe(launchId);
       LaunchTrackerService.LaunchRunInfo info = LaunchTrackerService.waitForLaunch(launchId, timeoutMs);
       if (info != null) {
         payload.put("terminated", info.terminatedAt != null);
@@ -159,6 +161,12 @@ public final class AutomationService {
         if (info.terminatedAt == null) {
           payload.put("timeout", true);
         }
+      }
+      String[] salida = LaunchTrackerService.recogerSalida(launchId);
+      if (salida != null) {
+        payload.put("captured", true);
+        payload.put("stdout", salida[0]);
+        payload.put("stderr", salida[1]);
       }
     }
 

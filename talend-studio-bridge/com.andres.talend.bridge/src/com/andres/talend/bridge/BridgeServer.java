@@ -73,6 +73,8 @@ final class BridgeServer {
   private static final Set<String> LONG_RUNNING_ROUTES = Set.of(
       "/automation/artifacts/install",
       "/automation/coverage",
+      "/automation/job/build",
+      "/automation/job/build-batch",
       "/automation/job/compile",
       "/automation/job/execute",
       "/automation/run-active-job",
@@ -236,6 +238,7 @@ final class BridgeServer {
     route("/workbench/activate-editor", this::handleActivateEditor);
     route("/workbench/find-editor", this::handleFindEditor);
     route("/workbench/show-view", this::handleShowView);
+    route("/workbench/hide-view", this::handleHideView);
 
     // Workspace y problemas. Solo leen disco; el refresh toca la vista del workspace.
     worker("/workspace/state", () -> WorkspaceService.state());
@@ -287,6 +290,9 @@ final class BridgeServer {
     uiBody("/automation/job/open", body -> JobOperationsService.openJob(body));
     // Generar el codigo valida la sintaxis en la UI y tarda varios segundos.
     uiBody("/automation/job/compile", 180_000L, body -> JobOperationsService.compile(body));
+    // Construye el job (genera y compila en la UI; el build de Maven va en el hilo de la peticion).
+    route("/automation/job/build", exchange -> respond(exchange, 200, JobOperationsService.build(readJsonBody(exchange))));
+    route("/automation/job/build-batch", exchange -> respond(exchange, 200, JobOperationsService.buildBatch(readJsonBody(exchange))));
     uiBody("/automation/job/problems", body -> JobOperationsService.problems(body));
     uiBody("/automation/job/contexts", body -> JobOperationsService.contexts(body));
     uiBody("/automation/job/contexts/create", body -> JobOperationsService.createContext(body));
@@ -450,6 +456,12 @@ final class BridgeServer {
     JsonObject body = readJsonBody(exchange);
     String titleContains = requiredParam(exchange, body, "titleContains");
     respond(exchange, 200, UiThread.sync(() -> WorkbenchService.findEditor(titleContains)));
+  }
+
+  private void handleHideView(HttpExchange exchange) throws IOException {
+    JsonObject body = readJsonBody(exchange);
+    String viewId = requiredParam(exchange, body, "viewId");
+    respond(exchange, 200, UiThread.sync(() -> WorkbenchService.hideView(viewId)));
   }
 
   private void handleShowView(HttpExchange exchange) throws IOException {

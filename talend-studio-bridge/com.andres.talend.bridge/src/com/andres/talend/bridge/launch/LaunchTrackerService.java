@@ -17,14 +17,16 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.debug.core.DebugException;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.model.IProcess;
+import org.eclipse.debug.core.model.IStreamMonitor;
+import org.eclipse.debug.core.model.IStreamsProxy;
 
 public final class LaunchTrackerService {
 
@@ -56,12 +58,6 @@ public final class LaunchTrackerService {
    */
   private static final long OBSERVE_POLL_MS = 3000L;
 
-  /** Sondeo lento, tras la ventana de arranque. Detectar el inicio con 10 s de retraso es aceptable. */
-  private static final long OBSERVE_SLOW_POLL_MS = 10_000L;
-
-  /** Durante cuanto tiempo se sondea rapido, desde que se registra el lanzamiento. */
-  private static final long OBSERVE_FAST_WINDOW_MS = 60_000L;
-
   private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase().startsWith("windows");
 
   /** Margen entre el instante de arranque del proceso y el del lanzamiento. */
@@ -71,7 +67,7 @@ public final class LaunchTrackerService {
   private static final long PROCESS_APPEAR_TIMEOUT_MS = 15L * 60L * 1000L;
 
   /** Cuanto se espera a que Eclipse marque como terminado el proceso del launch. */
-  private static final long EXIT_CODE_WAIT_MS = 10_000L;
+  private static final long EXIT_CODE_WAIT_MS = 2_000L;
 
   private static final long EXIT_CODE_POLL_MS = 200L;
 
@@ -81,10 +77,61 @@ public final class LaunchTrackerService {
   /** Launch de Eclipse de cada ejecucion, para leer el codigo de salida de su proceso. */
   private static final Map<String, ILaunch> launchOf = new ConcurrentHashMap<>();
 
+  /** Lanzamientos cuya salida pide alguien (ver `capturarSalidaDe`). */
+  private static final Set<String> capturando = ConcurrentHashMap.newKeySet();
+
+  /** Salida recogida al terminar, {stdout, stderr}, hasta que alguien la entrega. */
+  private static final Map<String, String[]> salidas = new ConcurrentHashMap<>();
+
+  /** Tope de espera a que la salida de un proceso termine de llegar. */
+  private static final long SALIDA_ESPERA_MS = 5_000L;
+
+  /** La salida se da por completa cuando no crece durante este tiempo. */
+  private static final long SALIDA_ESTABLE_MS = 200L;
+
   /** Procesos ya asignados a un lanzamiento, para no contarlos dos veces. */
   private static final Set<Long> claimedPids = ConcurrentHashMap.newKeySet();
 
   private LaunchTrackerService() {}
+
+  /**
+   * Pide capturar la salida (stdout y stderr) del lanzamiento al terminar.
+   *
+   * Se pide tras lanzarlo. Si el proceso acaba antes, no hay captura y quien la
+   * pide tiene que relanzar el job por su cuenta.
+   */
+  public static void capturarSalidaDe(String launchId) {
+    capturando.add(launchId);
+  }
+
+  /** Salida capturada del lanzamiento, {stdout, stderr}, o null si no se capturo. Se entrega una vez. */
+  public static String[] recogerSalida(String launchId) {
+    capturando.remove(launchId);
+    return salidas.remove(launchId);
+  }
+
+  /** Texto de una salida cuando deja de crecer, o al agotar la espera. */
+  private static String salidaCompleta(IStreamMonitor monitor) {
+    if (monitor == null) {
+      return "";
+    }
+    long limite = System.currentTimeMillis() + SALIDA_ESPERA_MS;
+    String texto = monitor.getContents();
+    while (System.currentTimeMillis() < limite) {
+      try {
+        Thread.sleep(SALIDA_ESTABLE_MS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+      String nuevo = monitor.getContents();
+      if (nuevo.equals(texto)) {
+        break;
+      }
+      texto = nuevo;
+    }
+    return texto;
+  }
 
   /**
    * Un lanzamiento que seguia "started" al cargar el plugin ya no tiene vigilante: los
@@ -273,11 +320,22 @@ public final class LaunchTrackerService {
     if (launch == null) {
       return null;
     }
+    // Eclipse no registra un IProcess para el job en estos lanzamientos (medido): sin
+    // procesos no hay nada que esperar, y esperar los 10 s de antes pagaba cada Run.
+    if (launch.getProcesses().length == 0) {
+      return null;
+    }
     long deadline = System.currentTimeMillis() + EXIT_CODE_WAIT_MS;
     while (true) {
       for (IProcess process : launch.getProcesses()) {
         try {
           if (process.isTerminated()) {
+            if (capturando.remove(launchId)) {
+              IStreamsProxy proxy = process.getStreamsProxy();
+              IStreamMonitor salida = proxy == null ? null : proxy.getOutputStreamMonitor();
+              IStreamMonitor errores = proxy == null ? null : proxy.getErrorStreamMonitor();
+              salidas.put(launchId, new String[] {salidaCompleta(salida), salidaCompleta(errores)});
+            }
             return process.getExitValue();
           }
         } catch (DebugException e) {
@@ -429,16 +487,72 @@ public final class LaunchTrackerService {
   private static ProcessHandle waitForJobProcess(String launchConfigName, long startedAt) throws InterruptedException {
     long begin = System.currentTimeMillis();
     long deadline = begin + PROCESS_APPEAR_TIMEOUT_MS;
+    long ultimoWmi = 0L;
+    // Hijos de Studio ya descartados como ajenos al job: no se vuelven a consultar.
+    Set<Long> descartados = new HashSet<>();
     while (System.currentTimeMillis() < deadline) {
-      for (ProcessHandle handle : processesOfJob(launchConfigName)) {
-        if (startedAfter(handle, startedAt) && claimedPids.add(handle.pid())) {
-          return handle;
+      // Studio lanza la JVM del job como proceso hijo suyo: se busca entre los hijos,
+      // sin PowerShell, cada 200 ms. Asi un job de 1 s tambien se ve.
+      List<ProcessHandle> candidatos = javaHijosDesde(startedAt, descartados);
+      if (!candidatos.isEmpty()) {
+        ProcessHandle job = elegirJob(candidatos, launchConfigName, descartados);
+        if (job != null) {
+          return job;
         }
       }
-      // Rapido al principio, para no perder el arranque; despues, lento: una compilacion
-      // puede tardar minutos y cada sondeo en Windows lanza PowerShell (~0,8 s).
-      long elapsed = System.currentTimeMillis() - begin;
-      Thread.sleep(elapsed < OBSERVE_FAST_WINDOW_MS ? OBSERVE_POLL_MS : OBSERVE_SLOW_POLL_MS);
+      // La busqueda por linea de comandos sigue como respaldo, pero cada sondeo en
+      // Windows lanza PowerShell (~0,8 s): se hace solo cada pocos segundos.
+      long ahora = System.currentTimeMillis();
+      if (ahora - ultimoWmi >= OBSERVE_POLL_MS) {
+        ultimoWmi = ahora;
+        for (ProcessHandle handle : processesOfJob(launchConfigName)) {
+          if (startedAfter(handle, startedAt) && claimedPids.add(handle.pid())) {
+            return handle;
+          }
+        }
+      }
+      Thread.sleep(200);
+    }
+    return null;
+  }
+
+  /**
+   * Los `java.exe` hijos de Studio que arrancaron despues del lanzamiento, sin asignar
+   * a otro lanzamiento y sin descartar.
+   */
+  private static List<ProcessHandle> javaHijosDesde(long startedAt, Set<Long> descartados) {
+    List<ProcessHandle> found = new ArrayList<>();
+    for (ProcessHandle hijo : ProcessHandle.current().children().toArray(ProcessHandle[]::new)) {
+      String comando = hijo.info().command().orElse("");
+      if (comando.toLowerCase().endsWith("java.exe") && startedAfter(hijo, startedAt)
+          && !descartados.contains(hijo.pid()) && !claimedPids.contains(hijo.pid())) {
+        found.add(hijo);
+      }
+    }
+    return found;
+  }
+
+  /**
+   * El hijo que es el proceso del job. Studio puede lanzar mas de un `java` tras el
+   * Run, y el primero que aparece no siempre es el job: un `java` ajeno que vive mas
+   * tiempo dejaba el lanzamiento en `started` hasta agotar la espera (120 s y 157 s
+   * medidos). La linea de comandos de Windows solo se lee por WMI, asi que se
+   * consulta una vez por tanda de candidatos: los que no llevan el nombre del job se
+   * descartan. Si WMI no devuelve ningun proceso del job, se toma el primero.
+   */
+  private static ProcessHandle elegirJob(List<ProcessHandle> candidatos, String launchConfigName, Set<Long> descartados) {
+    Set<Long> delJob = new HashSet<>();
+    for (ProcessHandle handle : processesOfJob(launchConfigName)) {
+      delJob.add(handle.pid());
+    }
+    for (ProcessHandle candidato : candidatos) {
+      if (delJob.isEmpty() || delJob.contains(candidato.pid())) {
+        if (claimedPids.add(candidato.pid())) {
+          return candidato;
+        }
+      } else {
+        descartados.add(candidato.pid());
+      }
     }
     return null;
   }

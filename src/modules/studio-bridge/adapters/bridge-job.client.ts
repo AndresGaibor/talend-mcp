@@ -35,15 +35,20 @@ export class BridgeJobClient extends BridgeWorkbenchClient {
     });
   }
 
-  async runActiveJob(options: {
-    dryRun?: boolean;
-    saveBefore?: boolean;
-    waitForTermination?: boolean;
-    timeoutMs?: number;
-  }): Promise<BridgeResult<Record<string, unknown>>> {
+  /** `init.timeoutMs` es el tiempo de la peticion HTTP; `options.timeoutMs`, el de la espera del job. */
+  async runActiveJob(
+    options: {
+      dryRun?: boolean;
+      saveBefore?: boolean;
+      waitForTermination?: boolean;
+      timeoutMs?: number;
+    },
+    init?: { timeoutMs?: number },
+  ): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/run-active-job", {
       method: "POST",
       body: options,
+      timeoutMs: init?.timeoutMs,
     });
   }
 
@@ -70,6 +75,28 @@ export class BridgeJobClient extends BridgeWorkbenchClient {
     return await this.request<Record<string, unknown>>("/automation/job/compile", {
       method: "POST",
       body: options ?? {},
+    });
+  }
+
+  /**
+   * Construye el job sin ejecutarlo: genera el codigo, lo compila y hace el build de Maven
+   * (deja `target/classpath.jar`). Un error de compilacion vuelve en `result.error`.
+   */
+  async jobBuild(options?: { job?: string; instalar?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/build", {
+      method: "POST",
+      body: options ?? {},
+    });
+  }
+
+  /**
+   * Construye muchos jobs del repositorio sin abrir su editor: genera el codigo desde el item y lo compila
+   * en paralelo. Devuelve el resultado de cada job en `result.jobs`.
+   */
+  async jobBuildBatch(options: { jobs: string[]; parallelism?: number }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/build-batch", {
+      method: "POST",
+      body: options,
     });
   }
 

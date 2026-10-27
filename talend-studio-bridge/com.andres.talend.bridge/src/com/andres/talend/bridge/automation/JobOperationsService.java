@@ -204,6 +204,24 @@ public final class JobOperationsService {
   }
 
   /**
+   * Construye el job sin ejecutarlo: genera, compila y hace el build de Maven.
+   *
+   * @param spec `job` opcional.
+   */
+  public static Map<String, Object> build(JsonObject spec) {
+    return run("build", () -> JobBuilder.build(spec));
+  }
+
+  /**
+   * Construye muchos jobs del repositorio sin abrir editores (ver JobBuilder.buildBatch).
+   *
+   * @param spec `jobs` (nombres) y `parallelism` opcional.
+   */
+  public static Map<String, Object> buildBatch(JsonObject spec) {
+    return run("build-batch", () -> JobBuilder.buildBatch(spec));
+  }
+
+  /**
    * Memoria del JVM de Studio.
    *
    * Las mediciones largas (el codigo generado de cada job) llenan el heap: el

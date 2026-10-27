@@ -100,13 +100,28 @@ public final class RepositoryConnections {
       for (Object child : (Iterable<?>) value) collectTables(child, depth, visited, consumer);
       return;
     }
-    if (!(value instanceof org.eclipse.emf.ecore.EObject) || !visited.add(value)) return;
+    if (!esEObject(value) || !visited.add(value)) return;
 
     if ("MetadataTable".equals(value.getClass().getSimpleName())) {
       consumer.accept(value);
       return;
     }
     collectTables(invoke(value, "getOwnedElement"), depth + 1, visited, consumer);
+  }
+
+  /**
+   * Si el valor es un EObject de EMF.
+   *
+   * `EObject` es API restringida de EMF: el bundle no la importa, asi que se
+   * comprueba por nombre (igual que en `JobPersistence`). Con la referencia
+   * directa, el compilador de Tycho rechaza el plugin.
+   */
+  private static boolean esEObject(Object value) {
+    try {
+      return TalendClasses.load("org.eclipse.emf.ecore.EObject").isInstance(value);
+    } catch (ClassNotFoundException e) {
+      return false;
+    }
   }
 
   private static List<Map<String, Object>> describeColumns(Object value) {

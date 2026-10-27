@@ -173,6 +173,7 @@ public final class JobRepository {
     // una copia, Maven ve el proyecto dos veces y el build falla con "Project
     // ... is duplicated in the reactor".
     summary.put("generatedProjectRemoved", deleteGeneratedProject(name, version(spec)));
+    summary.put("staleProjectRemoved", deleteStaleProject(name, version(spec)));
     if (viewObject == null) {
       summary.put("deleted", false);
       summary.put("message", "No habia ningun job con esa etiqueta");
@@ -239,6 +240,35 @@ public final class JobRepository {
       return deleted;
     } catch (Exception e) {
       BridgeLog.warn("No se pudo borrar el proyecto generado del job '" + name + "'", e);
+    }
+    return false;
+  }
+
+  /**
+   * Quita el proyecto de Eclipse de un job cuya carpeta ya no existe.
+   *
+   * Talend borra la carpeta del job al eliminarlo, pero el proyecto sigue registrado en el
+   * workspace. Entonces m2e y JDT lo siguen resolviendo, y el build de cualquier job (no
+   * solo el de este) falla con "El recurso .../pom.xml no existe". Por eso se busca por
+   * nombre (`PRJ_<proyecto>_<JOB>_<version>`) y se borra si ya no tiene carpeta.
+   */
+  private static boolean deleteStaleProject(String name, String version) {
+    try {
+      IProject iProject = TalendApi.resourceProject();
+      if (iProject == null) {
+        return false;
+      }
+      String sufijo = "_" + name.toUpperCase() + "_" + version;
+      boolean deleted = false;
+      for (IProject candidate : iProject.getWorkspace().getRoot().getProjects()) {
+        if (candidate.getName().toUpperCase().endsWith(sufijo) && !candidate.exists()) {
+          candidate.delete(false, true, null);
+          deleted = true;
+        }
+      }
+      return deleted;
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo quitar el proyecto sin carpeta del job '" + name + "'", e);
     }
     return false;
   }

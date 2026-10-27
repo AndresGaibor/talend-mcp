@@ -83,15 +83,47 @@ final class ComponentParameterConfigurator {
    * error y por eso el metodo `onSubJobError` si se genera.
    */
   private static boolean isInputComponent(Object node) {
+    return componentNameOf(node).contains("Input");
+  }
+
+  /**
+   * Deja el `LINK_STYLE` del tMap con un valor valido.
+   *
+   * Studio no le pone valor: el XML del componente tiene `DEFAULT=""` y, vacio,
+   * el tMap queda con un error ("Unknown value in the list [Mapping links display
+   * as:]") y al ejecutar el job abre un dialogo modal. `AUTO` es la primera opcion
+   * de la lista del componente y el valor por defecto del registro de MCP.
+   */
+  static void fixMapLinkStyle(Object node) {
+    if (!"tMap".equals(componentNameOf(node))) {
+      return;
+    }
+    try {
+      Object parameter = node.getClass().getMethod("getElementParameter", String.class)
+          .invoke(node, "LINK_STYLE");
+      if (parameter == null) {
+        return;
+      }
+      Object value = parameter.getClass().getMethod("getValue").invoke(parameter);
+      if (value != null && !String.valueOf(value).isEmpty()) {
+        return;
+      }
+      parameter.getClass().getMethod("setValue", Object.class).invoke(parameter, "AUTO");
+    } catch (Exception e) {
+      // Si no se puede, se deja el valor tal cual: Studio lo marcara como error.
+    }
+  }
+
+  /** Nombre del componente del nodo (`tMap`, `tFileInputDelimited`...), o vacio si no se puede leer. */
+  private static String componentNameOf(Object node) {
     try {
       Object component = node.getClass().getMethod("getComponent").invoke(node);
       if (component == null) {
-        return false;
+        return "";
       }
-      String name = String.valueOf(component.getClass().getMethod("getName").invoke(component));
-      return name.contains("Input");
+      return String.valueOf(component.getClass().getMethod("getName").invoke(component));
     } catch (Exception e) {
-      return false;
+      return "";
     }
   }
 

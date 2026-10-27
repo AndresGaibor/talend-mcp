@@ -53,6 +53,7 @@ public final class ComponentConfigurator {
     applySchema(node, spec);
     applyNodeData(node, spec);
     ComponentParameterConfigurator.fixErrorTrigger(node);
+    ComponentParameterConfigurator.fixMapLinkStyle(node);
   }
 
   /**

@@ -65,13 +65,13 @@ public final class JobCompiler {
   }
 
   /** Errores de compilacion de la ultima generacion (lanza si los hay). */
-  private static void checkCompilation() throws Exception {
+  static void checkCompilation() throws Exception {
     Class<?> checker = org.eclipse.core.runtime.Platform.getBundle("org.talend.designer.runprocess")
         .loadClass("org.talend.designer.runprocess.JobErrorsChecker");
     checker.getMethod("checkLastGenerationHasCompilationError", boolean.class).invoke(null, true);
   }
 
-  private static String rootMessage(Throwable error) {
+  static String rootMessage(Throwable error) {
     Throwable cause = error;
     while (cause.getCause() != null && cause.getCause() != cause) {
       cause = cause.getCause();
@@ -81,7 +81,7 @@ public final class JobCompiler {
   }
 
   /** Separa linea y mensaje del texto de Studio, y conserva el texto completo. */
-  private static Map<String, Object> describe(String raw) {
+  static Map<String, Object> describe(String raw) {
     Map<String, Object> error = new LinkedHashMap<>();
     Matcher line = LINE.matcher(raw);
     if (line.find()) {

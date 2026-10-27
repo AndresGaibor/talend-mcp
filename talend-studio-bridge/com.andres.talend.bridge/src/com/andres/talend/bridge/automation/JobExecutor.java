@@ -97,6 +97,12 @@ public final class JobExecutor {
     command.add("-Xmx1024M");
     command.add("-Dfile.encoding=UTF-8");
     command.add("-Dstdout.encoding=UTF-8");
+    // Los conectores AWS (SDK v2) usan reflexion sobre java.lang: sin esto, Java 21 falla con
+    // InaccessibleObjectException (MethodHandles$Lookup). Comprobado a mano: con estos flags pasa.
+    command.add("--add-opens");
+    command.add("java.base/java.lang=ALL-UNNAMED");
+    command.add("--add-opens");
+    command.add("java.base/java.lang.invoke=ALL-UNNAMED");
     command.add("-cp");
     command.add(classpathJar.toString());
     command.add(mainClass);
@@ -154,7 +160,7 @@ public final class JobExecutor {
    * El nombre de la carpeta del proyecto va en minusculas y con guiones
    * bajos: `MCP_Fase6_Padre` 0.1 esta en `mcp_fase6_padre_0.1`.
    */
-  private static Path generatedFolder(String name, String version) {
+  static Path generatedFolder(String name, String version) {
     try {
       IProject iProject = TalendApi.resourceProject();
       if (iProject == null) {

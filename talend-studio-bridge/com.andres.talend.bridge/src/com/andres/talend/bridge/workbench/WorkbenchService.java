@@ -286,6 +286,38 @@ public final class WorkbenchService {
     return payload;
   }
 
+  /**
+   * Oculta una vista si esta abierta. Una vista oculta no reconstruye su contenido al cambiar
+   * la seleccion: con la de Job Settings abierta, cada borrado de job pagaba ~1,5 s de UI.
+   */
+  public static Map<String, Object> hideView(String viewId) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("ok", true);
+    payload.put("source", "studio-bridge");
+    payload.put("confidence", "medium");
+    payload.put("endpoint", "/workbench/hide-view");
+    payload.put("viewId", viewId);
+    try {
+      IWorkbenchPage page = activePage();
+      if (page == null) {
+        payload.put("ok", false);
+        payload.put("error", error("NO_ACTIVE_PAGE", "No hay página activa"));
+        return payload;
+      }
+      org.eclipse.ui.IViewPart view = page.findView(viewId);
+      if (view != null) {
+        page.hideView(view);
+        payload.put("hidden", true);
+      } else {
+        payload.put("hidden", false);
+      }
+    } catch (Exception e) {
+      payload.put("ok", false);
+      payload.put("error", error("HIDE_VIEW_FAILED", e.getMessage()));
+    }
+    return payload;
+  }
+
   public static Map<String, Object> showView(String viewId) {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ok", true);

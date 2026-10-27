@@ -127,6 +127,14 @@ export class BridgeWorkbenchClient extends BridgeTransportClient {
     });
   }
 
+  /** Oculta una vista abierta (`hidden: false` si ya estaba oculta). */
+  async hideView(viewId: string): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/workbench/hide-view", {
+      method: "POST",
+      body: { viewId },
+    });
+  }
+
   async refreshWorkspace(): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/workspace/refresh");
   }
