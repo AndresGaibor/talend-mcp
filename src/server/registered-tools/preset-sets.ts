@@ -90,6 +90,8 @@ export const PRESET_AGENT = new Set([
   "talend_job_context_set",
   "talend_job_verify",
   "talend_job_build_batch",
+  "talend_job_edit_offline",
+  "talend_jobs_create_from_spec",
   "talend_job_execute",
   "talend_runs_list",
   "talend_runs_read",

@@ -385,6 +385,25 @@ generadas lo usan en `readData`/`writeData`), asi que `classpathDelJob` las anad
 Medido con 200 jobs minimos: serie 382 ms/job, 4 hilos 190 ms/job, 8 hilos 191 ms/job (el techo es la
 generacion en serie). 200/200 compilan. Orden de magnitud: 100 000 jobs, unas 5 h en esta maquina.
 
+## 83. Crear y editar jobs sin Studio
+
+Un job es un `.item` (XML) y un `.properties` en `process/`. Studio no hace falta para escribirlos:
+
+- **Crear:** `talend_jobs_create_from_spec` (o `buildJobItemXml`/`buildJobPropertiesXml`) escribe ambos ficheros.
+- **Editar:** `talend_job_edit_offline` aplica un lote de operaciones (`add_node`, `remove_node`, `set_params`,
+  `set_schema`, `connect`, `disconnect`, `move`, `set_context`) sobre el `.item`. Las operaciones se validan con
+  zod y el lote es atomico: antes de escribir se comprueba la integridad (UNIQUE_NAME unicos, conexiones con
+  origen y destino existentes) y, si falla, no se toca el fichero. `dryRun` devuelve solo el diff.
+  Motor y tests: `src/talend/editor/job-edit.ts`, `tests/talend/job-edit.test.ts`.
+- **Que Studio lo vea:** `POST /workspace/refresh` (la tool lo hace sola con `refreshStudio`).
+- **Comprobar:** `talend_job_build_batch` (compila sin editor) o `talend_job_verify` (ejecuta).
+
+Comprobado con Studio: un job escrito por fichero, ampliado offline con un `tLogRow` y su conexion, se refresca,
+compila (≈0,4 s de generacion y ≈0,4 s de javac) y ejecuta con codigo 0 y las dos salidas.
+
+Un job sin variables de contexto no tiene `contexts/Default.properties`; con `--context=Default` el runtime
+escribe `Could not find the context Default` en stderr. `JobExecutor` ya no pasa `--context` en ese caso.
+
 ## Relacionado
 
 - Guardian de modales y el riesgo de `Save Resource`: [seccion 13](02-operar-el-job.md#13-el-guardian-de-modales).

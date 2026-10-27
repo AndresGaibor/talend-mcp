@@ -106,7 +106,14 @@ public final class JobExecutor {
     command.add("-cp");
     command.add(classpathJar.toString());
     command.add(mainClass);
-    command.add("--context=" + context);
+    // Un job sin variables de contexto no tiene contexts/<contexto>.properties, y con --context el runtime
+    // escribe "Could not find the context" en stderr. Sin el argumento usa el contexto por defecto, sin aviso.
+    String paquete = mainClass.contains(".") ? mainClass.substring(0, mainClass.lastIndexOf('.')).replace('.', '/') : "";
+    Path propiedades = folder.resolve("target").resolve("classes").resolve(paquete)
+        .resolve("contexts").resolve(context + ".properties");
+    if (Files.isRegularFile(propiedades) || !"Default".equals(context)) {
+      command.add("--context=" + context);
+    }
     // Los valores del contexto no viajan en el codigo generado: los inyecta
     // el runtime, y aqui se le pasan como argumentos ("--context_type
     // CLAVE=VALOR"). Sin esto, un job relanzado a mano no ve sus variables.
