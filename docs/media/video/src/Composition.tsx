@@ -22,9 +22,9 @@ export const FPS = 30;
 export const WIDTH = 1280;
 export const HEIGHT = 640;
 
-const SCENES = { title: 75, mapa: 105, vivo: 360, cierre: 60 } as const;
+const SCENES = { title: 75, mapa: 90, chat: 450, cierre: 60 } as const;
 export const DURATION =
-  SCENES.title + SCENES.mapa + SCENES.vivo + SCENES.cierre;
+  SCENES.title + SCENES.mapa + SCENES.chat + SCENES.cierre;
 
 const fade = (frame: number, total: number) =>
   interpolate(frame, [0, 10, total - 10, total], [0, 1, 1, 0], {
@@ -207,26 +207,45 @@ const Mapa: React.FC = () => {
   );
 };
 
-// Llamadas reales a las tools contra un Talend Studio 8.0.1 abierto, con los
-// tiempos medidos en esa ejecucion. `at` es el fotograma en que aparece cada una.
+// Todo lo de esta escena sale de una ejecucion real contra un Talend Studio 8.0.1
+// abierto: las llamadas, sus tiempos, las capturas de Studio y el contenido de los
+// archivos. Solo el mensaje del usuario esta escrito a mano.
+const PETICION =
+  "De ventas.xls, filtrame las ventas de Bogota con monto mayor a 1000 y guardalas en un CSV.";
+
+const COLUMNAS = ["id", "cliente", "ciudad", "producto", "monto"];
+const VENTAS: string[][] = [
+  ["1", "Ana Torres", "Bogota", "Laptop", "2400"],
+  ["2", "Jose Ruiz", "Medellin", "Mouse", "85"],
+  ["3", "Lucia Gomez", "Bogota", "Monitor", "980"],
+  ["4", "Mateo Diaz", "Cali", "Teclado", "150"],
+  ["5", "Sofia Rios", "Bogota", "Tablet", "1350"],
+  ["6", "Camilo Vega", "Medellin", "Laptop", "2100"],
+  ["7", "Paula Mora", "Bogota", "Impresora", "1100"],
+  ["8", "Andres Leon", "Cali", "Monitor", "890"],
+];
+const FILTRADAS = VENTAS.filter((fila) => ["1", "5", "7"].includes(fila[0]!));
+
+// `at` es el fotograma (dentro de la escena) en que aparece cada llamada.
 const LLAMADAS = [
-  { tool: "talend_job_create_in_studio", detalle: "job nuevo", tiempo: "2,7 s", at: 10 },
-  { tool: "talend_job_add_node", detalle: "x3 componentes", tiempo: "146 ms", at: 70 },
-  { tool: "talend_job_set_schema", detalle: "x2", tiempo: "50 ms", at: 120 },
-  { tool: "talend_job_configure_node", detalle: "monto > 150", tiempo: "9 ms", at: 150 },
-  { tool: "talend_job_connect_nodes", detalle: "x2", tiempo: "135 ms", at: 180 },
-  { tool: "talend_job_verify", detalle: "compila y ejecuta", tiempo: "5,2 s", at: 215 },
+  { tool: "talend_job_create_in_studio", tiempo: "2,6 s", at: 100 },
+  { tool: "talend_job_add_node  x3", tiempo: "107 ms", at: 125 },
+  { tool: "talend_job_set_schema  x2", tiempo: "52 ms", at: 150 },
+  { tool: "talend_job_configure_node  x3", tiempo: "30 ms", at: 175 },
+  { tool: "talend_job_connect_nodes  x2", tiempo: "143 ms", at: 200 },
+  { tool: "talend_job_verify", tiempo: "5,5 s", at: 225 },
 ] as const;
 
 // Captura del lienzo de Studio que corresponde a cada momento.
 const LIENZOS = [
-  { from: 0, file: "canvas-s0.png" },
-  { from: 70, file: "canvas-s1.png" },
-  { from: 195, file: "canvas-s2.png" },
-  { from: 280, file: "canvas-s3.png" },
+  { from: 100, file: "canvas-t0.png" },
+  { from: 125, file: "canvas-t1.png" },
+  { from: 205, file: "canvas-t2.png" },
+  { from: 295, file: "canvas-t3.png" },
 ] as const;
 
-const VERIFY_AT = 280;
+const VERIFY_AT = 295;
+const RESPUESTA_AT = 325;
 
 const WindowFrame: React.FC<{
   title: string;
@@ -264,77 +283,139 @@ const WindowFrame: React.FC<{
   </div>
 );
 
-const Vivo: React.FC = () => {
+const Tabla: React.FC<{ filas: string[][]; ancho: number; tamano?: number }> = ({
+  filas,
+  ancho,
+  tamano = 15,
+}) => (
+  <div style={{ width: ancho, fontFamily: MONO, fontSize: tamano, color: TEXT }}>
+    {[COLUMNAS, ...filas].map((fila, i) => (
+      <div
+        key={i}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "0.4fr 1.4fr 1fr 1.2fr 0.8fr",
+          padding: "5px 12px",
+          background: i === 0 ? "#18222d" : "transparent",
+          color: i === 0 ? MUTED : TEXT,
+          borderTop: i === 0 ? "none" : `1px solid ${BORDER}`,
+        }}
+      >
+        {fila.map((celda, j) => (
+          <span key={j} style={{ textAlign: j === 4 ? "right" : "left" }}>
+            {celda}
+          </span>
+        ))}
+      </div>
+    ))}
+  </div>
+);
+
+const Chat: React.FC = () => {
   const frame = useCurrentFrame();
-  const lienzo = [...LIENZOS].reverse().find((l) => frame >= l.from) ?? LIENZOS[0];
+  const peticion = typed(PETICION, frame, 8, 1.7);
+  const lienzo = [...LIENZOS].reverse().find((l) => frame >= l.from);
   const verified = frame >= VERIFY_AT;
   return (
     <AbsoluteFill
       style={{
-        opacity: fade(frame, SCENES.vivo),
+        opacity: fade(frame, SCENES.chat),
         fontFamily: SANS,
-        padding: "58px 40px 0",
+        padding: "34px 40px 0",
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 16 }}>
-        <div style={{ fontSize: 34, fontWeight: 700, color: TEXT }}>
-          Automatizando Talend Studio
+        <div style={{ fontSize: 32, fontWeight: 700, color: TEXT }}>
+          Pidelo en lenguaje natural
         </div>
-        <div style={{ fontSize: 20, color: MUTED }}>
-          llamadas reales a las tools, sin tocar la interfaz
+        <div style={{ fontSize: 19, color: MUTED }}>
+          el asistente llama al MCP y Talend Studio hace el trabajo
         </div>
       </div>
-      <div style={{ display: "flex", gap: 24, marginTop: 26 }}>
-        <WindowFrame title="cliente MCP" width={440}>
-          <div style={{ padding: "16px 18px", fontFamily: MONO, fontSize: 17, minHeight: 330 }}>
-            {LLAMADAS.map((c) => (
-              <div
-                key={c.tool}
-                style={{
-                  marginBottom: 14,
-                  opacity: rise(frame, c.at),
-                  color: c.tool === "talend_job_verify" ? ACCENT : TEXT,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: 24, marginTop: 22 }}>
+        <WindowFrame title="asistente (cliente MCP)" width={520}>
+          <div style={{ padding: "16px 18px", minHeight: 470 }}>
+            <div
+              style={{
+                background: "#1b2a3a",
+                border: `1px solid ${BORDER}`,
+                borderRadius: 10,
+                padding: "10px 14px",
+                fontSize: 18,
+                color: TEXT,
+                lineHeight: 1.4,
+                minHeight: 52,
+              }}
+            >
+              {peticion}
+            </div>
+            <div
+              style={{
+                marginTop: 16,
+                fontSize: 17,
+                color: TEXT,
+                opacity: rise(frame, 82),
+              }}
+            >
+              Voy a montar el job en Talend Studio.
+            </div>
+            <div style={{ marginTop: 10, fontFamily: MONO, fontSize: 15 }}>
+              {LLAMADAS.map((c) => (
+                <div
+                  key={c.tool}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginTop: 7,
+                    opacity: rise(frame, c.at),
+                    color: c.tool === "talend_job_verify" ? ACCENT : TEXT,
+                  }}
+                >
                   <span>{c.tool}</span>
                   <span style={{ color: MUTED }}>{c.tiempo}</span>
                 </div>
-                <div style={{ color: MUTED, fontSize: 15, marginTop: 2 }}>{c.detalle}</div>
-              </div>
-            ))}
-            {verified && (
-              <div
-                style={{
-                  marginTop: 6,
-                  paddingTop: 12,
-                  borderTop: `1px solid ${BORDER}`,
-                  opacity: rise(frame, VERIFY_AT),
-                  color: TEXT,
-                  lineHeight: 1.5,
-                }}
-              >
-                <span style={{ color: ACCENT }}>verdict: ok</span>
-                <br />
-                compiles: true &nbsp; executed: true
-                <br />
-                problemas: 0
+              ))}
+            </div>
+            {frame >= RESPUESTA_AT && (
+              <div style={{ marginTop: 16, opacity: rise(frame, RESPUESTA_AT) }}>
+                <div style={{ fontSize: 17, color: TEXT, marginBottom: 8 }}>
+                  Listo. De 8 ventas, 3 cumplen. Las guarde en{" "}
+                  <span style={{ fontFamily: MONO, color: ACCENT }}>
+                    ventas_filtradas.csv
+                  </span>
+                  .
+                </div>
+                <div
+                  style={{
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                  }}
+                >
+                  <Tabla filas={FILTRADAS} ancho={482} tamano={14} />
+                </div>
               </div>
             )}
           </div>
         </WindowFrame>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <WindowFrame title="Talend Studio 8.0.1 | lienzo del job" width={760}>
-            <Img
-              src={staticFile(lienzo.file)}
-              style={{ width: 760, display: "block", background: "#fff" }}
-            />
-          </WindowFrame>
+          {lienzo ? (
+            <WindowFrame title="Talend Studio 8.0.1 | lienzo del job" width={640}>
+              <Img
+                src={staticFile(lienzo.file)}
+                style={{ width: 640, display: "block", background: "#fff" }}
+              />
+            </WindowFrame>
+          ) : (
+            <WindowFrame title="ventas.xls" width={640}>
+              <Tabla filas={VENTAS} ancho={640} />
+            </WindowFrame>
+          )}
           <div style={{ opacity: verified ? rise(frame, VERIFY_AT) : 0 }}>
-            <WindowFrame title="Talend Studio 8.0.1 | Run" width={760}>
+            <WindowFrame title="Talend Studio 8.0.1 | Run" width={640}>
               <Img
                 src={staticFile("console.png")}
-                style={{ width: 760, display: "block", background: "#fff" }}
+                style={{ width: 640, display: "block", background: "#fff" }}
               />
             </WindowFrame>
           </div>
@@ -380,8 +461,8 @@ export const MyComposition: React.FC = () => {
       <Sequence from={at(SCENES.mapa)} durationInFrames={SCENES.mapa}>
         <Mapa />
       </Sequence>
-      <Sequence from={at(SCENES.vivo)} durationInFrames={SCENES.vivo}>
-        <Vivo />
+      <Sequence from={at(SCENES.chat)} durationInFrames={SCENES.chat}>
+        <Chat />
       </Sequence>
       <Sequence from={at(SCENES.cierre)} durationInFrames={SCENES.cierre}>
         <Cierre />
