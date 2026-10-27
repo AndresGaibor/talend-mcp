@@ -1,6 +1,6 @@
 # Video de demostración
 
-Fuente de `docs/media/demo.gif`, el GIF del README. Es un proyecto [Remotion](https://www.remotion.dev/)
+Fuente de `docs/media/demo-chat.gif`, el GIF del README. Es un proyecto [Remotion](https://www.remotion.dev/)
 independiente: no forma parte del servidor ni de `bun run verify`.
 
 Todo lo que sale en pantalla es real:
@@ -20,5 +20,5 @@ Si cambian las cifras (por ejemplo el número de tools), actualiza `src/Composit
 cd docs/media/video
 bun install
 bunx remotion studio                    # vista previa
-bunx remotion render src/index.ts Demo ../demo.gif --codec=gif --every-nth-frame=2 --scale=0.75
+bunx remotion render src/index.ts Demo ../demo-chat.gif --codec=gif --every-nth-frame=2 --scale=0.75
 ```

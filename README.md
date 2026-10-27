@@ -17,7 +17,7 @@
 
 <br>
 
-<img src="docs/media/demo.gif" alt="Demostración: se pide en lenguaje natural filtrar un Excel y el asistente monta, compila y ejecuta el job en Talend Studio" width="720">
+<img src="docs/media/demo-chat.gif" alt="Demostración: se pide en lenguaje natural filtrar un Excel y el asistente monta, compila y ejecuta el job en Talend Studio" width="720">
 
 </div>
 
