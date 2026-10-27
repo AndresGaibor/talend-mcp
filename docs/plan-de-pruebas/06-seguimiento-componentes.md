@@ -42,6 +42,7 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 2026-10-27 | tReplaceList | C5 | `execution-check --suite calidad` | Pendiente: el conector LOOKUP se genera sin nombre ni esquema (tHash_null). |
 | 2026-10-27 | tKafka*, tS3*, tAddCRCRow | C1 | sin definicion en la instalacion de Studio | No se pueden ejecutar aqui: no hay definicion del componente (Kafka, S3) o falta OneWireAPI (tAddCRCRow). |
 | 2026-10-27 | tXSLT | C5, C6 | `execution-check --suite calidad` (Saxon-HE 10.6, commons-io 2.20.0) | Pasa con la salida a fichero (OVERRIDE_OUTPUT=false). Con OVERRIDE_OUTPUT=true la salida va a una columna y el job no compila sin ella. |
+| 2026-10-27 | tWriteXMLField | C5 | `execution-check --suite calidad` | Pendiente: el codigo generado tiene try/catch desbalanceado (catch sin try) con las tablas ROOT y LOOP. Sin resolver. |
 
 ## Estado
 

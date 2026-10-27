@@ -1,0 +1,122 @@
+{
+  "nombre": "calidad: escribir un XML desde filas con tWriteXMLField",
+  "job": "MCP_L5_WriteXMLField",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Jose"
+        ]
+      ]
+    },
+    {
+      "type": "tWriteXMLField",
+      "nombre": "escribe",
+      "parameters": {
+        "XMLFIELD": {
+          "value": "xml",
+          "literal": true
+        },
+        "GENERATION_MODE": {
+          "value": "DOM4J"
+        },
+        "OUTPUT_AS_XSD": {
+          "value": "false"
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        }
+      },
+      "tablas": {
+        "ROOT": {
+          "columns": [
+            "PATH",
+            "COLUMN",
+            "VALUE",
+            "ATTRIBUTE",
+            "ORDER"
+          ],
+          "rows": [
+            {
+              "PATH": "clientes",
+              "COLUMN": "",
+              "VALUE": "",
+              "ATTRIBUTE": "",
+              "ORDER": "1"
+            }
+          ]
+        },
+        "LOOP": {
+          "columns": [
+            "PATH",
+            "COLUMN",
+            "VALUE",
+            "ATTRIBUTE",
+            "ORDER"
+          ],
+          "rows": [
+            {
+              "PATH": "clientes/cliente",
+              "COLUMN": "",
+              "VALUE": "",
+              "ATTRIBUTE": "",
+              "ORDER": "1"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "xml",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    },
+    {
+      "origen": "escribe",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "<clientes>"
+    ]
+  },
+  "pendiente": "tWriteXMLField genera codigo con try/catch desbalanceado (catch sin try, lineas 1399-1413) con las tablas ROOT y LOOP con celdas vacias. Sin resolver: falta la forma correcta de las filas de LOOP/MAP."
+}
