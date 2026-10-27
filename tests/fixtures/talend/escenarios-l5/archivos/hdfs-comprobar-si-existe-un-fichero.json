@@ -1,0 +1,85 @@
+{
+  "nombre": "archivos: comprobar si existe un fichero en HDFS con tHDFSExist",
+  "job": "MCP_L5_HDFSExist",
+  "nodos": [
+    {
+      "type": "tHDFSPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "LOCALDIR": {
+          "value": "\"@TESTDATA@\""
+        },
+        "REMOTEDIR": {
+          "value": "\"/l5/existe\""
+        },
+        "FILE_ACTION": {
+          "value": "OVERWRITE"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_hdfs_existe.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tHDFSExist",
+      "nombre": "existe",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "HDFSDIR": {
+          "value": "\"/l5/existe\""
+        },
+        "FILENAME": {
+          "value": "\"l5_hdfs_existe.csv\""
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"existe: \" + globalMap.get(\"@uniqueName:existe\" + \"_EXISTS\"));"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "sube",
+      "destino": "existe",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "existe",
+      "destino": "imprime",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "existe: true"
+    ]
+  }
+}

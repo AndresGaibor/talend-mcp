@@ -1,0 +1,122 @@
+{
+  "nombre": "archivos: renombrar un fichero en HDFS con tHDFSRename",
+  "job": "MCP_L5_HDFSRename",
+  "nodos": [
+    {
+      "type": "tHDFSPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "LOCALDIR": {
+          "value": "\"@TESTDATA@\""
+        },
+        "REMOTEDIR": {
+          "value": "\"/l5/renombrar\""
+        },
+        "FILE_ACTION": {
+          "value": "OVERWRITE"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_hdfs_a.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tHDFSRename",
+      "nombre": "renombra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        },
+        "REMOTEDIR": {
+          "value": "\"/l5/renombrar\""
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_hdfs_a.csv\"",
+              "NEWNAME": "\"l5_hdfs_b.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tHDFSExist",
+      "nombre": "comprueba",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "HDFSDIR": {
+          "value": "\"/l5/renombrar\""
+        },
+        "FILENAME": {
+          "value": "\"l5_hdfs_b.csv\""
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"renombrado, existe: \" + globalMap.get(\"@uniqueName:comprueba\" + \"_EXISTS\"));"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "sube",
+      "destino": "renombra",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "renombra",
+      "destino": "comprueba",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "comprueba",
+      "destino": "imprime",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "renombrado, existe: true"
+    ]
+  }
+}

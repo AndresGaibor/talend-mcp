@@ -1,0 +1,105 @@
+{
+  "nombre": "archivos: borrar un fichero en HDFS con tHDFSDelete y comprobar que ya no existe",
+  "job": "MCP_L5_HDFSDelete",
+  "nodos": [
+    {
+      "type": "tHDFSPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "LOCALDIR": {
+          "value": "\"@TESTDATA@\""
+        },
+        "REMOTEDIR": {
+          "value": "\"/l5/borrar\""
+        },
+        "FILE_ACTION": {
+          "value": "OVERWRITE"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_hdfs_borrar.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tHDFSDelete",
+      "nombre": "borra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "PATH": {
+          "value": "\"/l5/borrar/l5_hdfs_borrar.csv\""
+        }
+      }
+    },
+    {
+      "type": "tHDFSExist",
+      "nombre": "comprueba",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "false"
+        },
+        "FS_DEFAULT_NAME": {
+          "value": "\"hdfs://localhost:9000/\""
+        },
+        "HDFSDIR": {
+          "value": "\"/l5/borrar\""
+        },
+        "FILENAME": {
+          "value": "\"l5_hdfs_borrar.csv\""
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"borrado, existe: \" + globalMap.get(\"@uniqueName:comprueba\" + \"_EXISTS\"));"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "sube",
+      "destino": "borra",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "borra",
+      "destino": "comprueba",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "comprueba",
+      "destino": "imprime",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "borrado, existe: false"
+    ]
+  }
+}
