@@ -29,5 +29,5 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  "exclude": []
+  "exclude": ["docs/media/video"]
 }
