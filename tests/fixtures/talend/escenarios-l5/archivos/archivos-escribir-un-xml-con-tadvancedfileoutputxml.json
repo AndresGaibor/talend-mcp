@@ -1,0 +1,117 @@
+{
+  "nombre": "archivos: escribir un XML con tAdvancedFileOutputXML",
+  "job": "MCP_L5_AdvXMLOutput",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Jose"
+        ]
+      ]
+    },
+    {
+      "type": "tAdvancedFileOutputXML",
+      "nombre": "escribe",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_salida_adv.xml",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "CREATE": {
+          "value": "true"
+        },
+        "ROW_TAG": {
+          "value": "cliente",
+          "literal": true
+        },
+        "AS_ATTRIBUTE": {
+          "value": "false"
+        },
+        "DELETE_EMPTYFILE": {
+          "value": "false"
+        },
+        "SPLIT": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "tablas": {
+        "ROOT_TAGS": {
+          "columns": [
+            "TAG"
+          ],
+          "rows": [
+            {
+              "TAG": "clientes"
+            }
+          ]
+        },
+        "MAPPING": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "AS_ATTRIBUTE",
+            "SCHEMA_COLUMN_NAME"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "AS_ATTRIBUTE": "false",
+              "SCHEMA_COLUMN_NAME": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "AS_ATTRIBUTE": "false",
+              "SCHEMA_COLUMN_NAME": "true"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_salida_adv.xml",
+      "contiene": [
+        "<cliente>",
+        "<nombre>Ana</nombre>"
+      ]
+    }
+  },
+  "pendiente": "tAdvancedFileOutputXML usa las tablas ROOT, LOOP y MAP del modo avanzado: el codigo generado referencia nameToElement_tAFOX_2 sin declararlo. Mismo patron que tWriteXMLField. Sin resolver."
+}
