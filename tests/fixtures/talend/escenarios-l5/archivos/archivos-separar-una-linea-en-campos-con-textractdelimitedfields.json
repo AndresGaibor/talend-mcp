@@ -78,5 +78,5 @@
       "2|Jose|Medellin"
     ]
   },
-  "pendiente": "tExtractDelimitedFields: la entrada se conserva con linea al marcarla schemaDespuesDeConectar (diagnostico de propagacion confirmado). Queda un generador con try/catch desbalanceado (catch sin try, linea 1393), el mismo patron que tWriteXMLField. Sin resolver."
+  "pendiente": "tExtractDelimitedFields: el generador busca FIELD (linea) en la tabla de metadatos de la CONEXION de entrada, que conserva las columnas del destino (id, nombre, ciudad). Reaplicar el esquema del origen despues de conectar (schemaDespuesDeConectar) actualiza el nodo pero no la conexion; por eso no se emite el try. Sin resolver: hace falta refrescar la metadata de la conexion en el bridge (o reconectar tras fijar el esquema)."
 }
