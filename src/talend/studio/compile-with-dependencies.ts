@@ -22,13 +22,23 @@ export type CompileWithDependencies = {
   hint?: string;
 };
 
+/**
+ * El bridge responde `{ result: { compiles, error... } }`; los dobles de prueba y
+ * versiones anteriores lo devolvian plano. Se acepta cualquiera de las dos formas.
+ */
+function aplanarResultado(data: Record<string, unknown> | undefined): Record<string, unknown> {
+  const cuerpo = data ?? {};
+  const resultado = cuerpo.result;
+  return resultado && typeof resultado === "object" ? { ...cuerpo, ...(resultado as Record<string, unknown>) } : cuerpo;
+}
+
 export async function compileWithDependencies(
   bridge: TalendStudioBridgeClient,
   job: string | undefined,
   installMissing: boolean,
 ): Promise<CompileWithDependencies> {
   let result = await bridge.jobCompile({ job });
-  let payload: Record<string, unknown> = result.data ?? {};
+  let payload: Record<string, unknown> = aplanarResultado(result.data);
   let missing = findMissingArtifacts(JSON.stringify(payload));
   const autoInstalled: AutoInstalled[] = [];
 
@@ -51,7 +61,7 @@ export async function compileWithDependencies(
     // Solo se vuelve a compilar si algo se descargo: si no, el resultado seria el mismo.
     if (autoInstalled.some((item) => item.ok)) {
       result = await bridge.jobCompile({ job });
-      payload = result.data ?? {};
+      payload = aplanarResultado(result.data);
       missing = findMissingArtifacts(JSON.stringify(payload));
     }
   }

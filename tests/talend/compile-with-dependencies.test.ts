@@ -43,6 +43,13 @@ describe("compileWithDependencies", () => {
     expect(outcome.hint).toBeUndefined();
   });
 
+  test("lee `compiles` del `result` que devuelve el bridge real", async () => {
+    const anidado: CompileReply = { ok: true, data: { ok: true, result: { job: "MCP_X", compiles: true } } };
+    const { bridge } = fakeBridge([anidado]);
+    const outcome = await compileWithDependencies(bridge, "MCP_X", false);
+    expect(outcome.data.compiles).toBe(true);
+  });
+
   test("sin installMissing solo lista lo que falta y como instalarlo", async () => {
     const { bridge, compileCalls, installCalls } = fakeBridge([missingJsonPath]);
     const outcome = await compileWithDependencies(bridge, "MCP_X", false);
