@@ -1,0 +1,69 @@
+{
+  "nombre": "bases de datos: ejecutar una sentencia con tMSSqlRow",
+  "job": "MCP_L5_MSSql_Row",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_fila",
+    "CREATE TABLE l5_ms_fila (id INT, nombre NVARCHAR(50))"
+  ],
+  "nodos": [
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": {
+          "value": "MSSQL_PROP"
+        },
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "1434",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "talend_test",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        },
+        "PROPERTIES": {
+          "value": "trustServerCertificate=true;",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tMSSqlRow",
+      "nombre": "inserta",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "insert into l5_ms_fila values (9, 'Nueva')",
+          "literal": true
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*) FROM l5_ms_fila",
+      "valor": 1
+    }
+  },
+  "motor": "mssql"
+}

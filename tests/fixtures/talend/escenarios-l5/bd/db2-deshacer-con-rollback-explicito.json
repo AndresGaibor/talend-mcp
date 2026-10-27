@@ -1,0 +1,164 @@
+{
+  "nombre": "bases de datos: deshacer con rollback explicito en Db2",
+  "job": "MCP_L5_DB2_Rollback",
+  "prepara": [
+    "DROP TABLE IF EXISTS L5_DB2_ROLLBACK",
+    "CREATE TABLE L5_DB2_ROLLBACK (id INTEGER, nombre VARCHAR(50))",
+    "INSERT INTO L5_DB2_ROLLBACK VALUES (1, 'Ana')",
+    "INSERT INTO L5_DB2_ROLLBACK VALUES (2, 'Jose')"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "2",
+          "Jose Cambiado"
+        ]
+      ]
+    },
+    {
+      "type": "tDB2Connection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "50001",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "TALEND",
+          "literal": true
+        },
+        "USER": {
+          "value": "db2inst1"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "TABLESCHEMA": {
+          "value": "DB2INST1"
+        },
+        "AUTO_COMMIT": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tDB2Output",
+      "nombre": "actualiza",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "L5_DB2_ROLLBACK"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "DATA_ACTION": {
+          "value": "UPDATE"
+        },
+        "MAPPING": {
+          "value": "ibmdb2_id"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "true",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "false",
+              "INSERTABLE": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String",
+          "sourceType": "VARCHAR"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tDB2Rollback",
+      "nombre": "deshace",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "CLOSE": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "actualiza"
+    },
+    {
+      "origen": "entrada",
+      "destino": "deshace",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT nombre FROM L5_DB2_ROLLBACK WHERE id = 2",
+      "valor": "Jose"
+    }
+  },
+  "motor": "db2"
+}

@@ -1,0 +1,178 @@
+{
+  "nombre": "archivos: vaciar un fichero remoto con tFTPTruncate y comprobar que la copia bajada queda sin lineas",
+  "job": "MCP_L5_FTPTruncate",
+  "nodos": [
+    {
+      "type": "tFTPConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "2121"
+        },
+        "LOGON_TYPE": {
+          "value": "PASSWORD"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "CONNECT_MODE": {
+          "value": "PASSIVE"
+        }
+      }
+    },
+    {
+      "type": "tFTPPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@"
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "MODE": {
+          "value": "binary"
+        },
+        "OVERWRITE": {
+          "value": "always"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_ftp_trunc.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFTPTruncate",
+      "nombre": "vacia",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "FILEMASK": {
+          "value": "l5_ftp_trunc.csv",
+          "literal": true
+        },
+        "REMOTEDIR": {
+          "value": "/",
+          "literal": true
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tFileDelete",
+      "nombre": "limpia_local",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_ftp_trunc.csv",
+          "literal": true
+        },
+        "FAILON": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tFTPGet",
+      "nombre": "baja",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@"
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "MODE": {
+          "value": "binary"
+        },
+        "OVERWRITE": {
+          "value": "always"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_ftp_trunc.csv\""
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "sube",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "vacia",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "vacia",
+      "destino": "limpia_local",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "limpia_local",
+      "destino": "baja",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_ftp_trunc.csv",
+      "lineas": 0
+    }
+  },
+  "pendiente": "tFTPTruncate termina sin error, pero el fichero remoto conserva sus 5 lineas tras el truncado (descargado despues). Diagnosticado: sigue existiendo y con contenido. Sin resolver: revisar FILEMASK/REMOTEDIR o el significado real del componente en este servidor."
+}

@@ -1,0 +1,111 @@
+{
+  "nombre": "archivos: ordenar filas por una columna numerica con tExternalSortOutput",
+  "job": "MCP_L5_ExternalSort",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "3",
+          "Lucia"
+        ],
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Jose"
+        ]
+      ]
+    },
+    {
+      "type": "tExternalSortOutput",
+      "nombre": "ordena",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_ordenado.csv",
+          "literal": true
+        },
+        "FIELDSEPARATOR": {
+          "value": ";",
+          "literal": true
+        },
+        "CREATE": {
+          "value": "true"
+        },
+        "ADD_EOF": {
+          "value": "false"
+        },
+        "MAX_MEMORY": {
+          "value": "100"
+        },
+        "SET_INPUT_TEMP_DIR": {
+          "value": "false"
+        },
+        "SORT_CMDPATH": {
+          "value": "sort",
+          "literal": true
+        },
+        "TEMP_DIR": {
+          "value": "",
+          "literal": true
+        }
+      },
+      "tablas": {
+        "CRITERIA": {
+          "columns": [
+            "COLNAME",
+            "SORT",
+            "ORDER"
+          ],
+          "rows": [
+            {
+              "COLNAME": "id",
+              "SORT": "num",
+              "ORDER": "asc"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "ordena"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_ordenado.csv",
+      "lineas": [
+        "1;Ana",
+        "2;Jose",
+        "3;Lucia"
+      ]
+    }
+  },
+  "pendiente": "tExternalSortOutput arranca el comando sort (SORT_CMDPATH=sort) pero el fichero de salida queda vacio; sin resolver. Revisar si el componente necesita el sort externo en otra ruta o la escritura final."
+}

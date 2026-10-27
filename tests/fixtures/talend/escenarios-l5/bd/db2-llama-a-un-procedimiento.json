@@ -1,0 +1,77 @@
+{
+  "nombre": "bases de datos: llamar a un procedimiento almacenado de Db2 con tDB2SP",
+  "job": "MCP_L5_DB2_SP",
+  "motor": "db2",
+  "prepara": [
+    "DROP TABLE IF EXISTS L5_DB2_SP_TABLA",
+    "CREATE TABLE L5_DB2_SP_TABLA (id INTEGER NOT NULL)",
+    "DROP PROCEDURE IF EXISTS L5_DB2_SP_INSERTA",
+    "CREATE PROCEDURE L5_DB2_SP_INSERTA() LANGUAGE SQL BEGIN INSERT INTO L5_DB2_SP_TABLA VALUES (7); END"
+  ],
+  "nodos": [
+    {
+      "type": "tDB2Connection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "50001",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "TALEND",
+          "literal": true
+        },
+        "USER": {
+          "value": "db2inst1"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "TABLESCHEMA": {
+          "value": "DB2INST1"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tDB2SP",
+      "nombre": "llama",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "SP_NAME": {
+          "value": "L5_DB2_SP_INSERTA",
+          "literal": true
+        },
+        "SCHEMA": {
+          "value": "DB2INST1",
+          "literal": true
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "llama",
+      "tipo": "COMPONENT_OK"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT COUNT(*) FROM L5_DB2_SP_TABLA WHERE id = 7",
+      "valor": 1
+    }
+  }
+}

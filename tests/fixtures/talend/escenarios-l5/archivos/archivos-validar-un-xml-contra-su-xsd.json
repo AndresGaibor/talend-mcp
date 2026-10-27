@@ -1,0 +1,44 @@
+{
+  "nombre": "archivos: validar un XML contra su XSD con tXSDValidator",
+  "job": "MCP_L5_XSDValidator",
+  "nodos": [
+    {
+      "type": "tXSDValidator",
+      "nombre": "valida",
+      "parameters": {
+        "FILE_MODE": {
+          "value": "true"
+        },
+        "XMLFILE": {
+          "value": "@TESTDATA@/l5_cliente.xml",
+          "literal": true
+        },
+        "XSDFILE": {
+          "value": "@TESTDATA@/l5_cliente.xsd",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "PRINT": {
+          "value": "true"
+        },
+        "VALID_MESSAGE": {
+          "value": "valido",
+          "literal": true
+        },
+        "INVALID_MESSAGE": {
+          "value": "invalido",
+          "literal": true
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "contiene": [
+      "valido"
+    ]
+  }
+}

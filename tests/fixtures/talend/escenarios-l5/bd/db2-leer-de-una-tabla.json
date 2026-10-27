@@ -1,0 +1,95 @@
+{
+  "nombre": "bases de datos: leer de una tabla de Db2",
+  "job": "MCP_L5_DB2_Leer",
+  "motor": "db2",
+  "prepara": [
+    "DROP TABLE IF EXISTS L5_DB2_CLIENTES",
+    "CREATE TABLE L5_DB2_CLIENTES (id INTEGER, nombre VARCHAR(80), ciudad VARCHAR(80), monto DECIMAL(12,2))",
+    "INSERT INTO L5_DB2_CLIENTES VALUES (1, 'Ana Maria Nunez', 'Bogota', 1500.50)",
+    "INSERT INTO L5_DB2_CLIENTES VALUES (2, 'Jose Canizares', 'Medellin', 2300.00)",
+    "INSERT INTO L5_DB2_CLIENTES VALUES (3, 'Lucia Pena', 'Cali', 1850.00)"
+  ],
+  "nodos": [
+    {
+      "type": "tDB2Connection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "50001",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "TALEND",
+          "literal": true
+        },
+        "USER": {
+          "value": "db2inst1"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "TABLESCHEMA": {
+          "value": "DB2INST1"
+        }
+      }
+    },
+    {
+      "type": "tDB2Input",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "L5_DB2_CLIENTES"
+        },
+        "QUERY": {
+          "value": "select id, nombre, ciudad, monto from L5_DB2_CLIENTES order by id",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana Maria Nunez|Bogota|1500.5",
+      "3|Lucia Pena|Cali|1850.0"
+    ]
+  }
+}

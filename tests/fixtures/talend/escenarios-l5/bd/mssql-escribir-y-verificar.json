@@ -1,0 +1,159 @@
+{
+  "nombre": "bases de datos: escribir en un SQL Server y verificar",
+  "job": "MCP_L5_MSSql_Escritura",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana",
+          "Bogota",
+          "100.5"
+        ],
+        [
+          "2",
+          "Jose",
+          "Medellin",
+          "200.25"
+        ]
+      ]
+    },
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": {
+          "value": "MSSQL_PROP"
+        },
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "1434",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "talend_test",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        },
+        "PROPERTIES": {
+          "value": "trustServerCertificate=true;",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tMSSqlOutput",
+      "nombre": "escribe",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_ms_salida"
+        },
+        "TABLE_ACTION": {
+          "value": "TRUNCATE"
+        },
+        "MAPPING": {
+          "value": "id_MSSQL"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "ciudad",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "monto",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*) FROM l5_ms_salida",
+      "valor": 2
+    }
+  },
+  "motor": "mssql",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_salida",
+    "CREATE TABLE l5_ms_salida (id INT, nombre NVARCHAR(50), ciudad NVARCHAR(50), monto DECIMAL(12,2))"
+  ]
+}

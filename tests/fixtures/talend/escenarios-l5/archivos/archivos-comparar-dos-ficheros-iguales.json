@@ -1,0 +1,44 @@
+{
+  "nombre": "archivos: comparar dos ficheros iguales con tFileCompare",
+  "job": "MCP_L5_CompareIguales",
+  "nodos": [
+    {
+      "type": "tFileCompare",
+      "nombre": "compara",
+      "parameters": {
+        "FILE": {
+          "value": "@TESTDATA@/l5_clientes.csv",
+          "literal": true
+        },
+        "FILE_REF": {
+          "value": "@TESTDATA@/l5_clientes.csv",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "COMPARISON_MODE": {
+          "value": "TEXT_CMP"
+        },
+        "PRINT": {
+          "value": "true"
+        },
+        "DIFFER_MESSAGE": {
+          "value": "distintos",
+          "literal": true
+        },
+        "NO_DIFFER_MESSAGE": {
+          "value": "iguales",
+          "literal": true
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "contiene": [
+      "iguales"
+    ]
+  }
+}

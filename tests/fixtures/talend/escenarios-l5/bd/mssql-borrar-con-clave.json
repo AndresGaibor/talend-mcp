@@ -1,0 +1,134 @@
+{
+  "nombre": "bases de datos: borrar con clave en SQL Server",
+  "job": "MCP_L5_MSSql_Borra",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_borra",
+    "CREATE TABLE l5_ms_borra (id INT, nombre NVARCHAR(50))",
+    "INSERT INTO l5_ms_borra VALUES (1, 'Ana')",
+    "INSERT INTO l5_ms_borra VALUES (2, 'Jose')",
+    "INSERT INTO l5_ms_borra VALUES (3, 'Lucia')"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "2"
+        ]
+      ]
+    },
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": {
+          "value": "MSSQL_PROP"
+        },
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "1434",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "talend_test",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        },
+        "PROPERTIES": {
+          "value": "trustServerCertificate=true;",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tMSSqlOutput",
+      "nombre": "borra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_ms_borra"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "DATA_ACTION": {
+          "value": "DELETE"
+        },
+        "MAPPING": {
+          "value": "id_MSSQL"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "true",
+              "UPDATABLE": "false",
+              "INSERTABLE": "false"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "borra"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*) FROM l5_ms_borra",
+      "valor": 2
+    }
+  },
+  "motor": "mssql"
+}

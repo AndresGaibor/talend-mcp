@@ -1,0 +1,49 @@
+{
+  "nombre": "archivos: leer un fichero ARFF con tFileInputARFF",
+  "job": "MCP_L5_ARFFInput",
+  "nodos": [
+    {
+      "type": "tFileInputARFF",
+      "nombre": "lee",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_entrada.arff",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "WEKA": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "Ana Nunez|1500.5",
+      "Jose Canizares|2300.0"
+    ]
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "nombre": "bases de datos: borrar con clave en Oracle",
+  "job": "MCP_L5_Oracle_Borra",
+  "prepara": [
+    "BEGIN EXECUTE IMMEDIATE 'DROP TABLE l5_oracle_borra PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+    "CREATE TABLE l5_oracle_borra (id NUMBER(10), nombre VARCHAR2(50))",
+    "INSERT INTO l5_oracle_borra VALUES (1, 'Ana')",
+    "INSERT INTO l5_oracle_borra VALUES (2, 'Jose')",
+    "INSERT INTO l5_oracle_borra VALUES (3, 'Lucia')",
+    "COMMIT"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "2"
+        ]
+      ]
+    },
+    {
+      "type": "tOracleConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DB_VERSION": {
+          "value": "ORACLE_18"
+        },
+        "CONNECTION_TYPE": {
+          "value": "ORACLE_SERVICE_NAME"
+        },
+        "ORACLE_SERVICE_NAME": {
+          "value": "FREEPDB1"
+        },
+        "DBNAME": {
+          "value": "FREEPDB1"
+        },
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "1522"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tOracleOutput",
+      "nombre": "borra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_oracle_borra"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "DATA_ACTION": {
+          "value": "DELETE"
+        },
+        "MAPPING": {
+          "value": "oracle_id"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "true",
+              "UPDATABLE": "false",
+              "INSERTABLE": "false"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "borra"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*) FROM l5_oracle_borra",
+      "valor": 2
+    }
+  },
+  "motor": "oracle"
+}

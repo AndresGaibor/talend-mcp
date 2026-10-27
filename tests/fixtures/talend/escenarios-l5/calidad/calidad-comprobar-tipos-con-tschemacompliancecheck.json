@@ -1,0 +1,127 @@
+{
+  "nombre": "calidad: separar filas que no cumplen el tipo del esquema con tSchemaComplianceCheck",
+  "job": "MCP_L5_SchemaCompliance",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "x",
+          "Jose"
+        ]
+      ]
+    },
+    {
+      "type": "tSchemaComplianceCheck",
+      "nombre": "comprueba",
+      "parameters": {
+        "CHECK_ALL": {
+          "value": "true"
+        },
+        "CHECKCOLS": {
+          "value": ""
+        }
+      },
+      "tablas": {
+        "CHECKCOLS": {
+          "columns": [
+            "SELECTED_TYPE",
+            "MAX_LENGTH",
+            "NULLABLE"
+          ],
+          "rows": [
+            {
+              "SELECTED_TYPE": "INTEGER",
+              "MAX_LENGTH": "",
+              "NULLABLE": "false"
+            },
+            {
+              "SELECTED_TYPE": "STRING",
+              "MAX_LENGTH": "",
+              "NULLABLE": "true"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "esquemas": [
+        {
+          "conector": "REJECT",
+          "nombre": "@uniqueName",
+          "columnas": [
+            {
+              "name": "id",
+              "type": "id_String"
+            },
+            {
+              "name": "nombre",
+              "type": "id_String"
+            },
+            {
+              "name": "errorCode",
+              "type": "id_String"
+            },
+            {
+              "name": "errorMessage",
+              "type": "id_String"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "valida"
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "rechaza"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "comprueba"
+    },
+    {
+      "origen": "comprueba",
+      "destino": "valida"
+    },
+    {
+      "origen": "comprueba",
+      "destino": "rechaza",
+      "tipo": "REJECT"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana",
+      "x|Jose"
+    ]
+  },
+  "pendiente": "tSchemaComplianceCheck: el codigo generado tiene row3Struct (salida REJECT) solo con id; no aparecen errorCode ni errorMessage, que el componente escribe (lineas 1756-1757 del fuente). Diagnosticado con L5_KEEP_JOBS=1. Sin resolver: el esquema REJECT no llega al struct con el mecanismo esquemas del harness; falta la forma de declarar SCHEMA_REJECT."
+}

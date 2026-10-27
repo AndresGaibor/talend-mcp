@@ -1,0 +1,74 @@
+{
+  "nombre": "archivos: escribir entradas LDIF con tFileOutputLDIF",
+  "job": "MCP_L5_LDIFOutput",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "dn",
+          "type": "id_String"
+        },
+        {
+          "name": "cn",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "cn=Ana Nunez,dc=banco,dc=local",
+          "Ana Nunez"
+        ]
+      ]
+    },
+    {
+      "type": "tFileOutputLDIF",
+      "nombre": "escribe",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_salida.ldif",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "CREATE": {
+          "value": "true"
+        },
+        "OPERATION": {
+          "value": "ADD"
+        },
+        "LDIFFILE": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "dn",
+          "type": "id_String"
+        },
+        {
+          "name": "cn",
+          "type": "id_String"
+        }
+      ]
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_salida.ldif",
+      "contiene": [
+        "dn: cn=Ana Nunez,dc=banco,dc=local",
+        "cn: Ana Nunez"
+      ]
+    }
+  }
+}

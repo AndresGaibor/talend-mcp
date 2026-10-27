@@ -1,0 +1,44 @@
+{
+  "nombre": "archivos: contar las filas de un fichero con tFileRowCount",
+  "job": "MCP_L5_RowCount",
+  "nodos": [
+    {
+      "type": "tFileRowCount",
+      "nombre": "cuenta",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.csv",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "IGNORE_EMPTY_ROW": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"filas: \" + globalMap.get(\"@uniqueName:cuenta\" + \"_COUNT\"));"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "cuenta",
+      "destino": "imprime",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "filas: 5"
+    ]
+  }
+}

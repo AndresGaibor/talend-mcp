@@ -1,0 +1,130 @@
+{
+  "nombre": "bases de datos: borrar con clave en Db2",
+  "job": "MCP_L5_DB2_Borra",
+  "prepara": [
+    "DROP TABLE IF EXISTS L5_DB2_BORRA",
+    "CREATE TABLE L5_DB2_BORRA (id INTEGER, nombre VARCHAR(50))",
+    "INSERT INTO L5_DB2_BORRA VALUES (1, 'Ana')",
+    "INSERT INTO L5_DB2_BORRA VALUES (2, 'Jose')",
+    "INSERT INTO L5_DB2_BORRA VALUES (3, 'Lucia')"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        }
+      ],
+      "values": [
+        [
+          "2"
+        ]
+      ]
+    },
+    {
+      "type": "tDB2Connection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "50001",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "TALEND",
+          "literal": true
+        },
+        "USER": {
+          "value": "db2inst1"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "TABLESCHEMA": {
+          "value": "DB2INST1"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tDB2Output",
+      "nombre": "borra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "L5_DB2_BORRA"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "DATA_ACTION": {
+          "value": "DELETE"
+        },
+        "MAPPING": {
+          "value": "ibmdb2_id"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "true",
+              "UPDATABLE": "false",
+              "INSERTABLE": "false"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "borra"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*) FROM L5_DB2_BORRA",
+      "valor": 2
+    }
+  },
+  "motor": "db2"
+}

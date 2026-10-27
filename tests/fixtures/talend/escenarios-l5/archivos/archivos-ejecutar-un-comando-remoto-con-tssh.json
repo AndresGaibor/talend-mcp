@@ -1,0 +1,51 @@
+{
+  "nombre": "archivos: ejecutar un comando remoto por SSH con tSSH",
+  "job": "MCP_L5_SSHComando",
+  "nodos": [
+    {
+      "type": "tSSH",
+      "nombre": "comando",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "2223",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend",
+          "literal": true
+        },
+        "AUTH_METHOD": {
+          "value": "PASSWORD"
+        },
+        "PASSWORD": {
+          "value": "talend",
+          "literal": true
+        },
+        "COMMAND": {
+          "value": "echo hola-ssh-l5",
+          "literal": true
+        },
+        "TO_CONSOLE": {
+          "value": "true"
+        },
+        "USE_TIMEOUT": {
+          "value": "false"
+        },
+        "PTY": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "contiene": [
+      "hola-ssh-l5"
+    ]
+  },
+  "pendiente": "tSSH no compila con sshd-core/common/scp 2.17.1 (instalados por bridge): error cannot find symbol en el codigo generado (la carpeta del job se borra al fallar). Falta identificar la clase o dependencia de la version que usa Studio."
+}

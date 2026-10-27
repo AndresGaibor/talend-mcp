@@ -1,0 +1,68 @@
+{
+  "nombre": "bases de datos: ejecutar una sentencia con tOracleRow",
+  "job": "MCP_L5_Oracle_Row",
+  "prepara": [
+    "BEGIN EXECUTE IMMEDIATE 'DROP TABLE l5_oracle_fila PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+    "CREATE TABLE l5_oracle_fila (id NUMBER(10), nombre VARCHAR2(50))"
+  ],
+  "nodos": [
+    {
+      "type": "tOracleConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DB_VERSION": {
+          "value": "ORACLE_18"
+        },
+        "CONNECTION_TYPE": {
+          "value": "ORACLE_SERVICE_NAME"
+        },
+        "ORACLE_SERVICE_NAME": {
+          "value": "FREEPDB1"
+        },
+        "DBNAME": {
+          "value": "FREEPDB1"
+        },
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "1522"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tOracleRow",
+      "nombre": "inserta",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "insert into l5_oracle_fila values (9, 'Nueva')",
+          "literal": true
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*) FROM l5_oracle_fila",
+      "valor": 1
+    }
+  },
+  "motor": "oracle"
+}

@@ -119,6 +119,8 @@ export type Escenario = {
   nombre: string;
   /** Nombre del job de pruebas en el proyecto de Studio. */
   job: string;
+  /** Base de datos de pruebas que usa el escenario. Por defecto, el Postgres local. */
+  motor?: "postgres" | "oracle" | "mssql" | "db2";
   /** Escenario conocido pero todavia sin resolver: se informa y se salta. */
   pendiente?: string;
   /**

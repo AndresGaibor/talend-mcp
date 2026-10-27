@@ -1,0 +1,52 @@
+{
+  "nombre": "bases de datos: listar las tablas de una base en SQL Server con tMSSqlTableList",
+  "job": "MCP_L5_MSSql_TableList",
+  "motor": "mssql",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_lista",
+    "CREATE TABLE l5_ms_lista (id INT)"
+  ],
+  "nodos": [
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": { "value": "MSSQL_PROP" },
+        "HOST": { "value": "localhost", "literal": true },
+        "PORT": { "value": "1434", "literal": true },
+        "DBNAME": { "value": "talend_test", "literal": true },
+        "USER": { "value": "talend" },
+        "PASS": { "value": "talend" },
+        "PROPERTIES": { "value": "trustServerCertificate=true;", "literal": true }
+      }
+    },
+    {
+      "type": "tMSSqlTableList",
+      "nombre": "tablas",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": { "value": "true" },
+        "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
+        "DATABASE_NAME": { "value": "talend_test", "literal": true }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"tabla: \" + globalMap.get(\"@uniqueName:tablas\" + \"_CURRENT_TABLE\"));"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "tablas",
+      "destino": "imprime",
+      "tipo": "ITERATE"
+    }
+  ],
+  "espera": {
+    "contiene": ["tabla: l5_ms_lista"]
+  }
+}

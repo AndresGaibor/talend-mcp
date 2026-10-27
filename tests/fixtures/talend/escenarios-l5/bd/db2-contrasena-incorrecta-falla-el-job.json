@@ -1,0 +1,85 @@
+{
+  "nombre": "bases de datos: contrasena incorrecta de Db2 falla el job",
+  "job": "MCP_L5_DB2_Contrasena",
+  "motor": "db2",
+  "prepara": [
+    "DROP TABLE IF EXISTS L5_DB2_ERROR",
+    "CREATE TABLE L5_DB2_ERROR (id INTEGER, nombre VARCHAR(50))",
+    "INSERT INTO L5_DB2_ERROR VALUES (1, 'Ana')"
+  ],
+  "nodos": [
+    {
+      "type": "tDB2Connection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "50001",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "TALEND",
+          "literal": true
+        },
+        "USER": {
+          "value": "db2inst1"
+        },
+        "PASS": {
+          "value": "clave-equivocada"
+        },
+        "TABLESCHEMA": {
+          "value": "DB2INST1"
+        }
+      }
+    },
+    {
+      "type": "tDB2Input",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "L5_DB2_ERROR"
+        },
+        "QUERY": {
+          "value": "select id, nombre from L5_DB2_ERROR order by id",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "error_esperado": true,
+    "avisos_tolerados": [
+      "SQLCODE=-30082"
+    ]
+  }
+}

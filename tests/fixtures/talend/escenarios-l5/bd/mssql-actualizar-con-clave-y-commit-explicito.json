@@ -1,0 +1,168 @@
+{
+  "nombre": "bases de datos: actualizar con clave y commit explicito en SQL Server",
+  "job": "MCP_L5_MSSql_Actualiza",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_update",
+    "CREATE TABLE l5_ms_update (id INT, nombre NVARCHAR(50))",
+    "INSERT INTO l5_ms_update VALUES (1, 'Ana')",
+    "INSERT INTO l5_ms_update VALUES (2, 'Jose')"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "2",
+          "Jose Actualizado"
+        ]
+      ]
+    },
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": {
+          "value": "MSSQL_PROP"
+        },
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "1434",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "talend_test",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "AUTO_COMMIT": {
+          "value": "false"
+        },
+        "PROPERTIES": {
+          "value": "trustServerCertificate=true;",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tMSSqlOutput",
+      "nombre": "actualiza",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_ms_update"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "DATA_ACTION": {
+          "value": "UPDATE"
+        },
+        "MAPPING": {
+          "value": "id_MSSQL"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "true",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "false",
+              "INSERTABLE": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String",
+          "sourceType": "VARCHAR"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tMSSqlCommit",
+      "nombre": "confirma",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "CLOSE": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "actualiza"
+    },
+    {
+      "origen": "entrada",
+      "destino": "confirma",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT nombre FROM l5_ms_update WHERE id = 2",
+      "valor": "Jose Actualizado"
+    }
+  },
+  "motor": "mssql"
+}

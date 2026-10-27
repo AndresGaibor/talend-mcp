@@ -1,0 +1,117 @@
+{
+  "nombre": "archivos: propiedades de un fichero en FTP con tFTPFileProperties",
+  "job": "MCP_L5_FTPProps",
+  "nodos": [
+    {
+      "type": "tFTPConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "2121"
+        },
+        "LOGON_TYPE": {
+          "value": "PASSWORD"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "CONNECT_MODE": {
+          "value": "PASSIVE"
+        }
+      }
+    },
+    {
+      "type": "tFTPPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@"
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "MODE": {
+          "value": "binary"
+        },
+        "OVERWRITE": {
+          "value": "always"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_ftp_props.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFTPFileProperties",
+      "nombre": "propiedades",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "FILENAME": {
+          "value": "l5_ftp_props.csv",
+          "literal": true
+        },
+        "MODE": {
+          "value": "ascii"
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "sube",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "propiedades",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "propiedades",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "l5_ftp_props.csv|101"
+    ]
+  }
+}

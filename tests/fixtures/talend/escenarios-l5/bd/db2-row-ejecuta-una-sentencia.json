@@ -1,0 +1,65 @@
+{
+  "nombre": "bases de datos: ejecutar una sentencia con tDB2Row",
+  "job": "MCP_L5_DB2_Row",
+  "prepara": [
+    "DROP TABLE IF EXISTS L5_DB2_FILA",
+    "CREATE TABLE L5_DB2_FILA (id INTEGER, nombre VARCHAR(50))"
+  ],
+  "nodos": [
+    {
+      "type": "tDB2Connection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "50001",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "TALEND",
+          "literal": true
+        },
+        "USER": {
+          "value": "db2inst1"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "TABLESCHEMA": {
+          "value": "DB2INST1"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tDB2Row",
+      "nombre": "inserta",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "insert into L5_DB2_FILA values (9, 'Nueva')",
+          "literal": true
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT count(*) FROM L5_DB2_FILA",
+      "valor": 1
+    }
+  },
+  "motor": "db2"
+}

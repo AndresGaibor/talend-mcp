@@ -1,0 +1,105 @@
+{
+  "nombre": "bases de datos: cerrar una conexion de Oracle",
+  "job": "MCP_L5_Oracle_Close",
+  "prepara": [
+    "BEGIN EXECUTE IMMEDIATE 'DROP TABLE l5_oracle_cierre PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+    "CREATE TABLE l5_oracle_cierre (id NUMBER(10), nombre VARCHAR2(50))",
+    "INSERT INTO l5_oracle_cierre VALUES (1, 'Ana')",
+    "INSERT INTO l5_oracle_cierre VALUES (2, 'Jose')",
+    "COMMIT"
+  ],
+  "nodos": [
+    {
+      "type": "tOracleConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DB_VERSION": {
+          "value": "ORACLE_18"
+        },
+        "CONNECTION_TYPE": {
+          "value": "ORACLE_SERVICE_NAME"
+        },
+        "ORACLE_SERVICE_NAME": {
+          "value": "FREEPDB1"
+        },
+        "DBNAME": {
+          "value": "FREEPDB1"
+        },
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "1522"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        }
+      }
+    },
+    {
+      "type": "tOracleInput",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_oracle_cierre"
+        },
+        "QUERY": {
+          "value": "select id, nombre from l5_oracle_cierre order by id",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    },
+    {
+      "type": "tOracleClose",
+      "nombre": "cierra",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    },
+    {
+      "origen": "lee",
+      "destino": "cierra",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana",
+      "2|Jose"
+    ]
+  },
+  "motor": "oracle"
+}

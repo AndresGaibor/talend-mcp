@@ -1,0 +1,107 @@
+{
+  "nombre": "archivos: subir un fichero por SCP y comprobarlo con tSSH",
+  "job": "MCP_L5_SCPPut",
+  "nodos": [
+    {
+      "type": "tSCPConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "2223",
+          "literal": true
+        },
+        "USERNAME": {
+          "value": "talend",
+          "literal": true
+        },
+        "AUTH_METHOD": {
+          "value": "PASSWORD"
+        },
+        "PASSWORD": {
+          "value": "talend",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tSCPPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion"
+        },
+        "SOURCE": {
+          "value": "@TESTDATA@/l5_clientes.csv",
+          "literal": true
+        },
+        "REMOTEDIR": {
+          "value": "/config",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tSSH",
+      "nombre": "verifica",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "2223",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend",
+          "literal": true
+        },
+        "AUTH_METHOD": {
+          "value": "PASSWORD"
+        },
+        "PASSWORD": {
+          "value": "talend",
+          "literal": true
+        },
+        "COMMAND": {
+          "value": "cat /config/l5_clientes.csv",
+          "literal": true
+        },
+        "TO_CONSOLE": {
+          "value": "true"
+        },
+        "USE_TIMEOUT": {
+          "value": "false"
+        },
+        "PTY": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "sube",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "verifica",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1;Ana;Bogota;100.5"
+    ]
+  },
+  "pendiente": "tSCPPut necesita talend-scp-helper 1.2.0 (org.talend.components.lib), que no esta en Maven Central (404) ni en Studio. Sin ese jar no compila. Pendiente de obtenerlo de un origen autorizado."
+}

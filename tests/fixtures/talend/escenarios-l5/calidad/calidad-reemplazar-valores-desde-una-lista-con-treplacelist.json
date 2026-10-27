@@ -1,0 +1,121 @@
+{
+  "nombre": "calidad: reemplazar valores de una columna desde una lista de busqueda con tReplaceList",
+  "job": "MCP_L5_ReplaceList",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Bogota"
+        ],
+        [
+          "2",
+          "Cali"
+        ]
+      ]
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "busqueda",
+      "columnas": [
+        {
+          "name": "buscar",
+          "type": "id_String"
+        },
+        {
+          "name": "reemplazo",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "Bogota",
+          "BOG"
+        ]
+      ]
+    },
+    {
+      "type": "tReplaceList",
+      "nombre": "reemplaza",
+      "parameters": {
+        "CASE_INSENSITIVE": {
+          "value": "false"
+        },
+        "LOOKUP_SEARCH_COLUMN": {
+          "value": "buscar",
+          "literal": true
+        },
+        "LOOKUP_REPLACEMENT_COLUMN": {
+          "value": "reemplazo",
+          "literal": true
+        }
+      },
+      "tablas": {
+        "COLUMN_OPTIONS": {
+          "columns": [
+            "REPLACE",
+            "CASE_INSENSITIVE"
+          ],
+          "rows": [
+            {
+              "REPLACE": "false",
+              "CASE_INSENSITIVE": "false"
+            },
+            {
+              "REPLACE": "true",
+              "CASE_INSENSITIVE": "false"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "reemplaza"
+    },
+    {
+      "origen": "busqueda",
+      "destino": "reemplaza",
+      "tipo": "LOOKUP"
+    },
+    {
+      "origen": "reemplaza",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "1|BOG",
+      "2|Cali"
+    ]
+  },
+  "pendiente": "tReplaceList genera el lookup como tHash_null con nullStruct (linea 1230 del fuente): el conector LOOKUP no recibe nombre ni esquema con el harness actual. Sin resolver: declarar el esquema del LOOKUP (esquemas) o el nombre del tHash."
+}

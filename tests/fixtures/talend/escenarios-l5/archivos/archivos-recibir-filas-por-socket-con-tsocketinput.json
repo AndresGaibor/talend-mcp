@@ -1,0 +1,44 @@
+{
+  "nombre": "archivos: recibir filas por socket con tSocketInput",
+  "job": "MCP_L5_SocketInput",
+  "pendiente": "tSocketInput escucha en el puerto y espera a un cliente que llegue mientras el job ya corre; el harness no puede sincronizar ese cliente con el arranque del job. Sin resolver: hace falta un cliente que reintente la conexion durante la ejecucion.",
+  "nodos": [
+    {
+      "type": "tSocketInput",
+      "nombre": "recibe",
+      "parameters": {
+        "PORT": {
+          "value": "18091"
+        },
+        "BIND_HOSTNAME": {
+          "value": "127.0.0.1",
+          "literal": true
+        },
+        "TIMEOUT": {
+          "value": "5000"
+        }
+      },
+      "columnas": [
+        {
+          "name": "linea",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "recibe",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "hola socket"
+    ]
+  }
+}

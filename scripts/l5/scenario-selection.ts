@@ -22,6 +22,8 @@ export const SCENARIO_SUITES = {
   orquestacion: "orquestacion",
   codigo: "codigo",
   aws: "aws",
+  mensajeria: "mensajeria",
+  apis: "apis",
   privacidad: "privacidad",
   calidad: "calidad",
   formatos: "formatos",

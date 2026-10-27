@@ -1,0 +1,89 @@
+{
+  "nombre": "calidad: sustituir un texto en una columna con tReplace",
+  "job": "MCP_L5_Replace",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Bogota"
+        ],
+        [
+          "2",
+          "Cali"
+        ]
+      ]
+    },
+    {
+      "type": "tReplace",
+      "nombre": "sustituye",
+      "parameters": {
+        "SIMPLE_MODE": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ],
+      "tablas": {
+        "SUBSTITUTIONS": {
+          "columns": [
+            "INPUT_COLUMN",
+            "SEARCH_PATTERN",
+            "REPLACE_STRING",
+            "WHOLE_WORD",
+            "CASE_SENSITIVE"
+          ],
+          "rows": [
+            {
+              "INPUT_COLUMN": "ciudad",
+              "SEARCH_PATTERN": "\"Bogota\"",
+              "REPLACE_STRING": "\"BOG\"",
+              "WHOLE_WORD": "false",
+              "CASE_SENSITIVE": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "sustituye"
+    },
+    {
+      "origen": "sustituye",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": [
+      "1|BOG",
+      "2|Cali"
+    ]
+  }
+}

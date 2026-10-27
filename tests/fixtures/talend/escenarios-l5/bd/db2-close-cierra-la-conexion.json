@@ -1,0 +1,104 @@
+{
+  "nombre": "bases de datos: cerrar una conexion de Db2",
+  "job": "MCP_L5_DB2_Close",
+  "prepara": [
+    "DROP TABLE IF EXISTS L5_DB2_CIERRE",
+    "CREATE TABLE L5_DB2_CIERRE (id INTEGER, nombre VARCHAR(50))",
+    "INSERT INTO L5_DB2_CIERRE VALUES (1, 'Ana')",
+    "INSERT INTO L5_DB2_CIERRE VALUES (2, 'Jose')"
+  ],
+  "nodos": [
+    {
+      "type": "tDB2Connection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "50001",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "TALEND",
+          "literal": true
+        },
+        "USER": {
+          "value": "db2inst1"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "TABLESCHEMA": {
+          "value": "DB2INST1"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tDB2Input",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "L5_DB2_CIERRE"
+        },
+        "QUERY": {
+          "value": "select id, nombre from L5_DB2_CIERRE order by id",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    },
+    {
+      "type": "tDB2Close",
+      "nombre": "cierra",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    },
+    {
+      "origen": "lee",
+      "destino": "cierra",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana",
+      "2|Jose"
+    ]
+  },
+  "motor": "db2"
+}

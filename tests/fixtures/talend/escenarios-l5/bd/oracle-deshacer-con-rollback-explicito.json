@@ -1,0 +1,168 @@
+{
+  "nombre": "bases de datos: deshacer con rollback explicito en Oracle",
+  "job": "MCP_L5_Oracle_Rollback",
+  "prepara": [
+    "BEGIN EXECUTE IMMEDIATE 'DROP TABLE l5_oracle_rollback PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+    "CREATE TABLE l5_oracle_rollback (id NUMBER(10), nombre VARCHAR2(50))",
+    "INSERT INTO l5_oracle_rollback VALUES (1, 'Ana')",
+    "INSERT INTO l5_oracle_rollback VALUES (2, 'Jose')",
+    "COMMIT"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "2",
+          "Jose Cambiado"
+        ]
+      ]
+    },
+    {
+      "type": "tOracleConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DB_VERSION": {
+          "value": "ORACLE_18"
+        },
+        "CONNECTION_TYPE": {
+          "value": "ORACLE_SERVICE_NAME"
+        },
+        "ORACLE_SERVICE_NAME": {
+          "value": "FREEPDB1"
+        },
+        "DBNAME": {
+          "value": "FREEPDB1"
+        },
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "1522"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "AUTO_COMMIT": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tOracleOutput",
+      "nombre": "actualiza",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_oracle_rollback"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "DATA_ACTION": {
+          "value": "UPDATE"
+        },
+        "MAPPING": {
+          "value": "oracle_id"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "true",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "false",
+              "INSERTABLE": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String",
+          "sourceType": "VARCHAR"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    },
+    {
+      "type": "tOracleRollback",
+      "nombre": "deshace",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "CLOSE": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "actualiza"
+    },
+    {
+      "origen": "entrada",
+      "destino": "deshace",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT nombre FROM l5_oracle_rollback WHERE id = 2",
+      "valor": "Jose"
+    }
+  },
+  "motor": "oracle"
+}

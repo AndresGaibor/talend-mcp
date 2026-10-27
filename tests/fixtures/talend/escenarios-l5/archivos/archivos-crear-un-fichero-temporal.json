@@ -1,0 +1,54 @@
+{
+  "nombre": "archivos: crear un fichero temporal con tCreateTemporaryFile",
+  "job": "MCP_L5_TempFile",
+  "nodos": [
+    {
+      "type": "tCreateTemporaryFile",
+      "nombre": "temporal",
+      "parameters": {
+        "USE_DEFAULT_DIR": {
+          "value": "false"
+        },
+        "DIRECTORY": {
+          "value": "@TESTDATA@",
+          "literal": true
+        },
+        "USE_PREFIX": {
+          "value": "true"
+        },
+        "PREFIX": {
+          "value": "l5tmp",
+          "literal": true
+        },
+        "SUFFIX": {
+          "value": ".txt",
+          "literal": true
+        },
+        "REMOVE": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(((String)globalMap.get(\"@uniqueName:temporal\" + \"_FILEPATH\")).endsWith(\".txt\") ? \"tmp: ok\" : \"tmp: mal\");"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "temporal",
+      "destino": "imprime",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "tmp: ok"
+    ]
+  }
+}

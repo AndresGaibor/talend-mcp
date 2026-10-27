@@ -1,0 +1,52 @@
+{
+  "nombre": "archivos: leer un fichero .properties con tFileInputProperties",
+  "job": "MCP_L5_PropsInput",
+  "nodos": [
+    {
+      "type": "tFileInputProperties",
+      "nombre": "lee",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_entrada.properties",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "FILE_FORMAT": {
+          "value": "PROPERTIES_FORMAT"
+        },
+        "RETRIVE_MODE": {
+          "value": "RETRIVE_ALL"
+        }
+      },
+      "columnas": [
+        {
+          "name": "key",
+          "type": "id_String"
+        },
+        {
+          "name": "value",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "clave1|valor1",
+      "clave2|valor con espacios"
+    ]
+  }
+}

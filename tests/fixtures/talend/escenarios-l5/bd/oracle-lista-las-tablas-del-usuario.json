@@ -1,0 +1,80 @@
+{
+  "nombre": "bases de datos: listar las tablas del usuario en Oracle con tOracleTableList",
+  "job": "MCP_L5_Oracle_TableList",
+  "motor": "oracle",
+  "prepara": [
+    "BEGIN EXECUTE IMMEDIATE 'DROP TABLE l5_oracle_lista PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+    "CREATE TABLE l5_oracle_lista (id NUMBER(10))"
+  ],
+  "nodos": [
+    {
+      "type": "tOracleConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DB_VERSION": {
+          "value": "ORACLE_18"
+        },
+        "CONNECTION_TYPE": {
+          "value": "ORACLE_SERVICE_NAME"
+        },
+        "ORACLE_SERVICE_NAME": {
+          "value": "FREEPDB1"
+        },
+        "DBNAME": {
+          "value": "FREEPDB1"
+        },
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "1522"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        }
+      }
+    },
+    {
+      "type": "tOracleTableList",
+      "nombre": "tablas",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "FETCH_FROM": {
+          "value": "USER_TABLES"
+        },
+        "WHERE_CLAUSE": {
+          "value": "TABLE_NAME not like '%$%'",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"tabla: \" + globalMap.get(\"@uniqueName:tablas\" + \"_CURRENT_TABLE\"));"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "tablas",
+      "destino": "imprime",
+      "tipo": "ITERATE"
+    }
+  ],
+  "espera": {
+    "contiene": ["tabla: L5_ORACLE_LISTA"]
+  }
+}

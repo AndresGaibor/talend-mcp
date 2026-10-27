@@ -1,0 +1,77 @@
+{
+  "nombre": "archivos: comprimir un fichero con tFileArchive y descomprimirlo con tFileUnarchive",
+  "job": "MCP_L5_ZipRoundTrip",
+  "nodos": [
+    {
+      "type": "tFileArchive",
+      "nombre": "comprime",
+      "parameters": {
+        "SOURCE": {
+          "value": "@TESTDATA@/l5_zip_origen",
+          "literal": true
+        },
+        "TARGET": {
+          "value": "@TESTDATA@/l5_archivo.zip",
+          "literal": true
+        },
+        "ARCHIVE_FORMAT": {
+          "value": "zip"
+        },
+        "ALL_FILES": {
+          "value": "true"
+        },
+        "OVERWRITE": {
+          "value": "true"
+        },
+        "MKDIR": {
+          "value": "true"
+        },
+        "ENCRYPT_FILES": {
+          "value": "false"
+        },
+        "LEVEL": {
+          "value": "9"
+        }
+      }
+    },
+    {
+      "type": "tFileUnarchive",
+      "nombre": "descomprime",
+      "parameters": {
+        "ZIPFILE": {
+          "value": "@TESTDATA@/l5_archivo.zip",
+          "literal": true
+        },
+        "DIRECTORY": {
+          "value": "@TESTDATA@/l5_zip_salida",
+          "literal": true
+        },
+        "EXTRACTPATH": {
+          "value": "true"
+        },
+        "CHECKPASSWORD": {
+          "value": "false"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "comprime",
+      "destino": "descomprime",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_zip_salida/l5_clientes.csv",
+      "contiene": [
+        "id;nombre;ciudad;monto",
+        "3;Lucia;Cali;300"
+      ]
+    }
+  }
+}

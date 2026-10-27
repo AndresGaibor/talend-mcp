@@ -1,0 +1,94 @@
+{
+  "nombre": "archivos: extraer campos de un XML guardado en una columna con tExtractXMLField",
+  "job": "MCP_L5_ExtractXML",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "xml",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "<clientes><cliente><id>1</id><nombre>Ana</nombre></cliente><cliente><id>2</id><nombre>Jose</nombre></cliente></clientes>"
+        ]
+      ]
+    },
+    {
+      "type": "tExtractXMLField",
+      "nombre": "extrae",
+      "parameters": {
+        "XMLFIELD": {
+          "value": "xml"
+        },
+        "LOOP_QUERY": {
+          "value": "\"/clientes/cliente\""
+        },
+        "IGNORE_NS": {
+          "value": "true"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        },
+        "USE_XML_FIELD": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "tablas": {
+        "MAPPING": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "QUERY",
+            "NODECHECK"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "QUERY": "id",
+              "NODECHECK": "false"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "QUERY": "nombre",
+              "NODECHECK": "false"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "extrae"
+    },
+    {
+      "origen": "extrae",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana",
+      "2|Jose"
+    ]
+  },
+  "pendiente": "tExtractXMLField con USE_XML_FIELD=true llega a parsear pero recibe cadena vacia (SAXParseException: final de archivo prematuro): la columna xml no llega al componente. Sin resolver; revisar como se pasa la columna XMLFIELD desde tFixedFlowInput."
+}

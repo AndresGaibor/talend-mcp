@@ -1,0 +1,75 @@
+{
+  "nombre": "archivos: escribir y leer un fichero .properties con tFileOutputProperties",
+  "job": "MCP_L5_PropsRoundTrip",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "key",
+          "type": "id_String"
+        },
+        {
+          "name": "value",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "clave1",
+          "valor1"
+        ],
+        [
+          "clave2",
+          "valor2"
+        ]
+      ]
+    },
+    {
+      "type": "tFileOutputProperties",
+      "nombre": "escribe",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_salida.properties",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "FILE_FORMAT": {
+          "value": "PROPERTIES_FORMAT"
+        },
+        "APPEND": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "key",
+          "type": "id_String"
+        },
+        {
+          "name": "value",
+          "type": "id_String"
+        }
+      ]
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_salida.properties",
+      "contiene": [
+        "clave1=valor1",
+        "clave2=valor2"
+      ]
+    }
+  }
+}

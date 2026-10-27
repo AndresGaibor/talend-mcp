@@ -1,0 +1,57 @@
+{
+  "nombre": "archivos: leer lineas completas con tFileInputFullRow",
+  "job": "MCP_L5_FullRow",
+  "nodos": [
+    {
+      "type": "tFileInputFullRow",
+      "nombre": "lee",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_clientes.csv",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "HEADER": {
+          "value": "0"
+        },
+        "FOOTER": {
+          "value": "0"
+        },
+        "REMOVE_EMPTY_ROW": {
+          "value": "true"
+        },
+        "LIMIT": {
+          "value": ""
+        },
+        "RANDOM": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "linea",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "id;nombre;ciudad;monto",
+      "3;Lucia;Cali;300"
+    ]
+  }
+}

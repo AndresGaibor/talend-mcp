@@ -1,0 +1,101 @@
+{
+  "nombre": "archivos: escribir un fichero ARFF con tFileOutputARFF",
+  "job": "MCP_L5_ARFFOutput",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "values": [
+        [
+          "Ana Nunez",
+          "1500.5"
+        ],
+        [
+          "Jose Canizares",
+          "2300"
+        ]
+      ]
+    },
+    {
+      "type": "tFileOutputARFF",
+      "nombre": "escribe",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_salida.arff",
+          "literal": true
+        },
+        "CREATE": {
+          "value": "true"
+        },
+        "RELATION": {
+          "value": "l5_salida",
+          "literal": true
+        },
+        "STRING": {
+          "value": "STRING"
+        },
+        "NUMERIC": {
+          "value": "NUMERIC"
+        },
+        "NOMINAL": {
+          "value": "NOMINAL"
+        },
+        "WEKA": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "tablas": {
+        "COLDEFINE": {
+          "columns": [
+            "TYPE"
+          ],
+          "rows": [
+            {
+              "TYPE": "STRING"
+            },
+            {
+              "TYPE": "NUMERIC"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_salida.arff",
+      "contiene": [
+        "@relation l5_salida",
+        "@attribute monto numeric",
+        "Ana Nunez"
+      ]
+    }
+  },
+  "pendiente": "tFileOutputARFF compila y escribe @relation y @data, pero sin @attribute ni filas aunque el flujo de entrada tiene dos filas (tabla COLDEFINE probada con SCHEMA_COLUMN y solo TYPE). Sin resolver; revisar la tabla COLDEFINE y el orden de escritura del componente."
+}

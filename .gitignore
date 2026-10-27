@@ -83,3 +83,9 @@ scratch/
 /.freebuff/
 # Manifiesto de un job de Studio que se habia commiteado en la raiz por error.
 /META-INF/
+
+# Drivers de prueba copiados desde el repositorio de Studio (jars grandes, no se versionan).
+testdata/drivers/
+
+# Ficheros que generan las pruebas L5 (entrada y salida de los escenarios).
+testdata/l5_*

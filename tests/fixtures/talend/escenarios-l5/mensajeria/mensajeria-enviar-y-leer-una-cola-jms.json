@@ -1,0 +1,137 @@
+{
+  "nombre": "mensajeria: enviar mensajes a una cola JMS y leerlos con tJMSInput",
+  "job": "MCP_L5_JMSColaIdaVuelta",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "message",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "uno"
+        ],
+        [
+          "dos"
+        ]
+      ]
+    },
+    {
+      "type": "tJMSOutput",
+      "nombre": "envia",
+      "parameters": {
+        "SERVER_URL": {
+          "value": "tcp://localhost:61616",
+          "literal": true
+        },
+        "CONN_FACTORY_NAME": {
+          "value": "ActiveMQConnectionFactory",
+          "literal": true
+        },
+        "USER": {
+          "value": "admin",
+          "literal": true
+        },
+        "PASS": {
+          "value": "admin",
+          "literal": true
+        },
+        "MSGTYPE": {
+          "value": "Queue"
+        },
+        "QUEUE": {
+          "value": "l5.cola",
+          "literal": true
+        },
+        "DRIVER_JAR": {
+          "value": "@TESTDATA@/drivers/activemq-all-6.2.8.jar",
+          "literal": true
+        },
+        "PROCESSING_MODE": {
+          "value": "RAW"
+        }
+      },
+      "columnas": [
+        {
+          "name": "message",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tJMSInput",
+      "nombre": "recibe",
+      "parameters": {
+        "SERVER_URL": {
+          "value": "tcp://localhost:61616",
+          "literal": true
+        },
+        "CONN_FACTORY_NAME": {
+          "value": "ActiveMQConnectionFactory",
+          "literal": true
+        },
+        "USER": {
+          "value": "admin",
+          "literal": true
+        },
+        "PASS": {
+          "value": "admin",
+          "literal": true
+        },
+        "MSGTYPE": {
+          "value": "Queue"
+        },
+        "QUEUE": {
+          "value": "l5.cola",
+          "literal": true
+        },
+        "MAX_MSG": {
+          "value": "2"
+        },
+        "TIMEOUT": {
+          "value": "5000"
+        },
+        "DRIVER_JAR": {
+          "value": "@TESTDATA@/drivers/activemq-all-6.2.8.jar",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "message",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "envia"
+    },
+    {
+      "origen": "envia",
+      "destino": "recibe",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "recibe",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "uno",
+      "dos"
+    ]
+  },
+  "pendiente": "tJMSOutput en modo RAW exige un objeto jakarta.jms.Message en el flujo (linea 912: cast de String a Message); con un tFixedFlowInput el flujo es String. El modo CONTENT falla al compilar con getColumn null. Compilan ya createQueue, la cola y la columna message. Sin resolver: alimentar el flujo con Message o descubrir el mapeo de CONTENT."
+}

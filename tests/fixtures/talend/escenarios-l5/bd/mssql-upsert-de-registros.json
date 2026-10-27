@@ -1,0 +1,173 @@
+{
+  "nombre": "bases de datos: upsert de registros en SQL Server",
+  "job": "MCP_L5_MSSql_Upsert",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_upsert",
+    "CREATE TABLE l5_ms_upsert (id INT PRIMARY KEY, nombre NVARCHAR(80), estado NVARCHAR(20))",
+    "INSERT INTO l5_ms_upsert VALUES (1, 'Nombre anterior', 'ACTIVO')"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "key": true
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Nombre actualizado",
+          "INACTIVO"
+        ],
+        [
+          "2",
+          "Nuevo cliente",
+          "ACTIVO"
+        ]
+      ]
+    },
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": {
+          "value": "MSSQL_PROP"
+        },
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "1434",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "talend_test",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        },
+        "PROPERTIES": {
+          "value": "trustServerCertificate=true;",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tMSSqlOutput",
+      "nombre": "upsert",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_ms_upsert"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "DATA_ACTION": {
+          "value": "INSERT_OR_UPDATE"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "MAPPING": {
+          "value": "id_MSSQL"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "true",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "false",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "estado",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "sourceType": "INT4",
+          "key": true
+        },
+        {
+          "name": "nombre",
+          "type": "id_String",
+          "sourceType": "VARCHAR"
+        },
+        {
+          "name": "estado",
+          "type": "id_String",
+          "sourceType": "VARCHAR"
+        }
+      ],
+      "schemaDespuesDeConectar": true
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "upsert"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "SELECT CAST(count(*) AS NVARCHAR) + ':' + MAX(CASE WHEN id = 1 THEN nombre END) + ':' + MAX(CASE WHEN id = 2 THEN nombre END) FROM l5_ms_upsert",
+      "valor": "2:Nombre actualizado:Nuevo cliente"
+    }
+  },
+  "motor": "mssql"
+}

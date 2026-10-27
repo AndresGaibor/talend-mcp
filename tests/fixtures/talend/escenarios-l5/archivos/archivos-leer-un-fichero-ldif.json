@@ -1,0 +1,49 @@
+{
+  "nombre": "archivos: leer entradas de un fichero LDIF con tFileInputLDIF",
+  "job": "MCP_L5_LDIFInput",
+  "nodos": [
+    {
+      "type": "tFileInputLDIF",
+      "nombre": "lee",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_entrada.ldif",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "dn",
+          "type": "id_String"
+        },
+        {
+          "name": "cn",
+          "type": "id_String"
+        },
+        {
+          "name": "mail",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "cn=Ana Nunez,dc=banco,dc=local|Ana Nunez|ana@banco.local"
+    ]
+  }
+}

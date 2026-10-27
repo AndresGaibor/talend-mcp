@@ -1,0 +1,105 @@
+{
+  "nombre": "bases de datos: cerrar una conexion de SQL Server",
+  "job": "MCP_L5_MSSql_Close",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_cierre",
+    "CREATE TABLE l5_ms_cierre (id INT, nombre NVARCHAR(50))",
+    "INSERT INTO l5_ms_cierre VALUES (1, 'Ana')",
+    "INSERT INTO l5_ms_cierre VALUES (2, 'Jose')"
+  ],
+  "nodos": [
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": {
+          "value": "MSSQL_PROP"
+        },
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "1434",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "talend_test",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "PROPERTIES": {
+          "value": "trustServerCertificate=true;",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tMSSqlInput",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_ms_cierre"
+        },
+        "QUERY": {
+          "value": "select id, nombre from l5_ms_cierre order by id",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    },
+    {
+      "type": "tMSSqlClose",
+      "nombre": "cierra",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    },
+    {
+      "origen": "lee",
+      "destino": "cierra",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana",
+      "2|Jose"
+    ]
+  },
+  "motor": "mssql"
+}

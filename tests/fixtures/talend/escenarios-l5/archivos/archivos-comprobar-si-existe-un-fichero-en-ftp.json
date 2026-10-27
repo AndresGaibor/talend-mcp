@@ -1,0 +1,123 @@
+{
+  "nombre": "archivos: comprobar si existe un fichero en FTP con tFTPFileExist",
+  "job": "MCP_L5_FTPFileExist",
+  "nodos": [
+    {
+      "type": "tFTPConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "2121"
+        },
+        "LOGON_TYPE": {
+          "value": "PASSWORD"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "CONNECT_MODE": {
+          "value": "PASSIVE"
+        }
+      }
+    },
+    {
+      "type": "tFTPPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@"
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "MODE": {
+          "value": "binary"
+        },
+        "OVERWRITE": {
+          "value": "always"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_ftp_existe.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFTPFileExist",
+      "nombre": "existe",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "FILENAME": {
+          "value": "l5_ftp_existe.csv",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"existe: \" + globalMap.get(\"@uniqueName:existe\" + \"_EXISTS\"));"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "sube",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "existe",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "existe",
+      "destino": "imprime",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "existe: true"
+    ]
+  }
+}

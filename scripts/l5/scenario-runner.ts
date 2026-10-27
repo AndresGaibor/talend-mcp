@@ -9,7 +9,14 @@ import {
   sinTolerados,
   type Hallazgos,
 } from "./avisos";
-import { consultar, preparar } from "./postgres";
+import { consultar as consultarPostgres, preparar } from "./postgres";
+import { consultar as consultarOracle, preparar as prepararOracle } from "./oracle";
+import { consultar as consultarMssql, preparar as prepararMssql } from "./mssql";
+import { consultar as consultarDb2, preparar as prepararDb2 } from "./db2";
+
+/** Preparacion y consulta de la base de pruebas segun el `motor` del escenario. */
+const PREPARADORES = { postgres: preparar, oracle: prepararOracle, mssql: prepararMssql, db2: prepararDb2 };
+const CONSULTAS = { postgres: consultarPostgres, oracle: consultarOracle, mssql: consultarMssql, db2: consultarDb2 };
 import { conRutas } from "./testdata-paths";
 import { compararConsulta, compararContextos, compararFichero, compararSalida } from "./scenario-expectations";
 import { construirEnStudio } from "./studio-compile";
@@ -148,7 +155,7 @@ async function montarYConstruir(
   }
 
   if (escenario.prepara && escenario.prepara.length > 0) {
-    const preparado = await preparar(escenario.prepara);
+    const preparado = await PREPARADORES[escenario.motor ?? "postgres"](escenario.prepara);
     if (!preparado.ok) {
       return { fallo: { ejecutaOk: false, salidaCorrecta: false, mensaje: preparado.mensaje } };
     }
@@ -229,7 +236,7 @@ async function comprobarEspera(bridge: Bridge, escenario: Escenario, lineas: str
   if (espera.consulta) {
     // Lo que el job escribe en la base de datos: se consulta despues de
     // ejecutar (el tDBOutput no saca filas, asi que no hay nada en la salida).
-    const valor = await consultar(espera.consulta.sql);
+    const valor = await CONSULTAS[escenario.motor ?? "postgres"](espera.consulta.sql);
     fallos.push(...compararConsulta(espera.consulta, valor));
   }
 

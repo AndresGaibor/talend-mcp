@@ -1,0 +1,61 @@
+{
+  "nombre": "archivos: escribir un fichero en bruto con tFileOutputRaw (cada fila sobrescribe: queda la ultima)",
+  "job": "MCP_L5_OutputRaw",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "contenido",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "hola desde raw"
+        ],
+        [
+          "segunda linea"
+        ]
+      ]
+    },
+    {
+      "type": "tFileOutputRaw",
+      "nombre": "escribe",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_raw.txt",
+          "literal": true
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "columnas": [
+        {
+          "name": "contenido",
+          "type": "id_String"
+        }
+      ]
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_raw.txt",
+      "contiene": [
+        "segunda linea"
+      ]
+    }
+  }
+}

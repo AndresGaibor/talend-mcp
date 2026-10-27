@@ -1,0 +1,47 @@
+{
+  "nombre": "archivos: cambiar la codificacion de un fichero con tChangeFileEncoding",
+  "job": "MCP_L5_ChangeEncoding",
+  "nodos": [
+    {
+      "type": "tChangeFileEncoding",
+      "nombre": "cambia",
+      "parameters": {
+        "INFILE_NAME": {
+          "value": "@TESTDATA@/l5_clientes.csv",
+          "literal": true
+        },
+        "OUTFILE_NAME": {
+          "value": "@TESTDATA@/l5_clientes_iso.csv",
+          "literal": true
+        },
+        "INENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "USE_INENCODING": {
+          "value": "true"
+        },
+        "ENCODING": {
+          "value": "ISO-8859-1",
+          "literal": true
+        },
+        "CREATE": {
+          "value": "true"
+        },
+        "BUFFERSIZE": {
+          "value": "4096"
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_clientes_iso.csv",
+      "contiene": [
+        "id;nombre;ciudad;monto",
+        "3;Lucia;Cali;300"
+      ]
+    }
+  }
+}

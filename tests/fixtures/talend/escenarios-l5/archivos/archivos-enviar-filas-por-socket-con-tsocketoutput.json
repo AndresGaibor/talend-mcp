@@ -1,0 +1,76 @@
+{
+  "nombre": "archivos: enviar filas por socket con tSocketOutput (campos entre comillas, como el componente)",
+  "job": "MCP_L5_SocketOutput",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Jose"
+        ]
+      ]
+    },
+    {
+      "type": "tSocketOutput",
+      "nombre": "envia",
+      "parameters": {
+        "HOST": {
+          "value": "127.0.0.1",
+          "literal": true
+        },
+        "PORT": {
+          "value": "18090"
+        },
+        "ENCODING": {
+          "value": "UTF-8",
+          "literal": true
+        },
+        "FIELDSEPARATOR": {
+          "value": ";",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "envia"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_socket_recibido.txt",
+      "contiene": [
+        "\"1\";\"Ana\"",
+        "\"2\";\"Jose\""
+      ]
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "nombre": "bases de datos: contrasena incorrecta de SQL Server falla el job",
+  "job": "MCP_L5_MSSql_Contrasena",
+  "motor": "mssql",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_error",
+    "CREATE TABLE l5_ms_error (id INT, nombre NVARCHAR(50))",
+    "INSERT INTO l5_ms_error VALUES (1, 'Ana')"
+  ],
+  "nodos": [
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": {
+          "value": "MSSQL_PROP"
+        },
+        "HOST": {
+          "value": "localhost",
+          "literal": true
+        },
+        "PORT": {
+          "value": "1434",
+          "literal": true
+        },
+        "DBNAME": {
+          "value": "talend_test",
+          "literal": true
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "clave-equivocada"
+        }
+      }
+    },
+    {
+      "type": "tMSSqlInput",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_ms_error"
+        },
+        "QUERY": {
+          "value": "select id, nombre from l5_ms_error order by id",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "error_esperado": true,
+    "avisos_tolerados": [
+      "Login failed"
+    ]
+  }
+}

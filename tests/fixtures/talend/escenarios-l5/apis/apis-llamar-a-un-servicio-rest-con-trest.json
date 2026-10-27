@@ -1,0 +1,56 @@
+{
+  "nombre": "apis: llamar a un servicio REST con tREST",
+  "job": "MCP_L5_RESTGet",
+  "nodos": [
+    {
+      "type": "tREST",
+      "nombre": "llama",
+      "parameters": {
+        "URL": {
+          "value": "http://127.0.0.1:18080/saludo",
+          "literal": true
+        },
+        "METHOD": {
+          "value": "GET"
+        },
+        "GET": {
+          "value": "true"
+        },
+        "POST": {
+          "value": "false"
+        },
+        "PUT": {
+          "value": "false"
+        },
+        "DELETE": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "Body",
+          "type": "id_String"
+        },
+        {
+          "name": "ERROR_CODE",
+          "type": "id_Integer"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "llama",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "hola"
+    ]
+  }
+}

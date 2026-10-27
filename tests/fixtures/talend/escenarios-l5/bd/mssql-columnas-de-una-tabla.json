@@ -1,0 +1,72 @@
+{
+  "nombre": "bases de datos: columnas de una tabla de SQL Server con tMSSqlColumnList",
+  "job": "MCP_L5_MSSql_ColumnList",
+  "motor": "mssql",
+  "pendiente": "tMSSqlColumnList no devuelve filas en la salida FLOW aunque la tabla existe: con la cadena tMSSqlTableList -> ITERATE -> tMSSqlColumnList -> FLOW el aviso 'too much Row type outputs' sigue. Sin resolver; revisar el patron de conexion del componente.",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_ms_columnas",
+    "CREATE TABLE l5_ms_columnas (id INT, nombre NVARCHAR(50))"
+  ],
+  "nodos": [
+    {
+      "type": "tMSSqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "DRIVER": { "value": "MSSQL_PROP" },
+        "HOST": { "value": "localhost", "literal": true },
+        "PORT": { "value": "1434", "literal": true },
+        "DBNAME": { "value": "talend_test", "literal": true },
+        "USER": { "value": "talend" },
+        "PASS": { "value": "talend" },
+        "PROPERTIES": { "value": "trustServerCertificate=true;", "literal": true }
+      }
+    },
+    {
+      "type": "tMSSqlTableList",
+      "nombre": "tablas",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": { "value": "true" },
+        "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
+        "DATABASE_NAME": { "value": "talend_test", "literal": true },
+        "WHERE_CLAUSE": { "value": "TABLE_NAME = 'l5_ms_columnas'", "literal": true }
+      }
+    },
+    {
+      "type": "tMSSqlColumnList",
+      "nombre": "columnas",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": { "value": "true" },
+        "CONNECTION": { "value": "@uniqueName:conexion", "literal": false },
+        "TABLE_NAME": { "value": "((String)globalMap.get(\"@uniqueName:tablas_CURRENT_TABLE\"))", "literal": false }
+      },
+      "columnas": [
+        { "name": "COLUMN_NAME", "type": "id_String" },
+        { "name": "DATA_TYPE", "type": "id_String" }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "tablas",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "tablas",
+      "destino": "columnas",
+      "tipo": "ITERATE"
+    },
+    {
+      "origen": "columnas",
+      "destino": "salida",
+      "tipo": "FLOW"
+    }
+  ],
+  "espera": {
+    "lineas": ["id|int", "nombre|nvarchar"]
+  }
+}
