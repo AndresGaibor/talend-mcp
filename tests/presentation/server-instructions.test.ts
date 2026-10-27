@@ -13,7 +13,7 @@ describe("instrucciones del servidor", () => {
   test("son cortas y explican por donde empezar", () => {
     const instructions = buildServerInstructions();
     expect(instructions).toContain('talend_guide { mode: "overview" }');
-    expect(instructions).toContain("nunca escribiendo el .item");
+    expect(instructions).toContain("ESTRATEGIA MIXTA");
     expect(instructions.length).toBeLessThan(4000);
   });
 

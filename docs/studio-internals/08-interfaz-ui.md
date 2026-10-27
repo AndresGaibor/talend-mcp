@@ -325,10 +325,12 @@ con volcados de hilos de la JVM de Studio (`jstack` sobre el hilo `main`), varia
 - **Intento fallido (superado por lo anterior): `dbms` en el schema.** Poner `MetadataTable.setDbms("PostgreSQL" | "MYSQL_8")` para quitar
   el aviso `the schema's dbType not correct` hace que Studio valide los tipos con un `MappingTypeRetriever` que
   es `null`, y el job deja de compilar. Se revirtio: el aviso sigue, ahora visible en el resumen.
-- **Pendiente.** `A value must be set for Date Pattern` (tAssertCatcher, tLogRow) no se quita con el patron por
-  defecto de las columnas `id_Date` de nuestro schema: esas columnas las crea el propio catcher. `cargar archivo
-  a S3` recibe `Status Code: 100` del emulador local. `leer atributos de cola SQS` falla con
-  `NumberFormatException` en un atributo con decimales.
+- **Resuelto: `A value must be set for Date Pattern`.** Lo daban las columnas `id_Date` que crea el propio
+  catcher (tAssertCatcher, tStatCatcher) y que no pasan por nuestro schema. `SchemaOperations.ponerPatronDeFecha`
+  (se llama en `JobPersistence.persist`, junto al alineado con el mapeo de BD) pone `"yyyy-MM-dd HH:mm:ss"` a toda
+  columna de fecha sin patron de cualquier nodo.
+- **Pendiente.** `cargar archivo a S3` recibe `Status Code: 100` del emulador local. `leer atributos de cola SQS`
+  falla con `NumberFormatException` en un atributo con decimales.
 
 ### Memoria: Studio retiene cada editor de job abierto
 

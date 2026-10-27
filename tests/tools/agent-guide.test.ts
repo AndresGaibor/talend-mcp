@@ -131,7 +131,7 @@ describe("Guia para agentes", () => {
   test("las instrucciones del servidor dirigen al agente al punto de entrada", () => {
     const instructions = buildServerInstructions();
     expect(instructions).toContain("talend_guide { mode: \"overview\" }");
-    expect(instructions).toContain("nunca escribiendo el .item");
+    expect(instructions).toContain("ESTRATEGIA MIXTA");
     expect(instructions).toContain("talend_job_execute");
   });
 });

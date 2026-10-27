@@ -15,11 +15,14 @@ El catalogo generado de tools, argumentos y requisitos esta en
 [CATALOGO-DE-TOOLS.md](../CATALOGO-DE-TOOLS.md). Para aprender el codigo de este repositorio, consulta
 [ARQUITECTURA.md](../ARQUITECTURA.md) y [PLAN-DE-TRABAJO.md](../PLAN-DE-TRABAJO.md).
 
-La regla que resume todo: **los jobs se crean y se modifican con la API de Studio (via el
-bridge), nunca escribiendo el `.item` a mano.** Cuando se escribio el XML por fuera, Studio
-dejo el modelo en memoria obsoleto, aparecieron tipos que no existen (`id_Decimal`), valores
-corruptos (`Main1100Main1`) y jobs vacios. Con la API, cada nodo nace con todos sus parametros
-por defecto y Studio escribe el archivo.
+La regla que resume todo: **estrategia mixta.** Para migraciones, lotes y jobs cerrados se trabaja
+**offline** (escribiendo el `.item` con `talend_jobs_create_batch`, `talend_job_edit_offline` y
+`talend_jobs_edit_batch`, que validan la integridad y son atomicas; ver [MODO-OFFLINE.md](../MODO-OFFLINE.md)).
+Para un job **abierto en un editor** y para los componentes que Studio configura al conectarlos (tMap) se usa
+la **API de Studio** (via el bridge). Escribir el XML con otra herramienta, o editar en disco un job abierto,
+dejo el modelo en memoria obsoleto: aparecieron tipos que no existen (`id_Decimal`), valores corruptos
+(`Main1100Main1`) y jobs vacios. Con la API, cada nodo nace con todos sus parametros por defecto y Studio
+escribe el archivo.
 
 ## 1. Las piezas y como hablan
 
@@ -45,8 +48,8 @@ Dos familias de tools, con reglas distintas:
 
 `talend_jobs_list` y `talend_jobs_read` leen el proyecto del disco (no hace falta Studio): la lista trae nombre,
 version, carpeta, fecha, tamano y numero de componentes de cada job, y la lectura trae los componentes con sus
-parametros y las conexiones. `talend_jobs_create` **si** necesita Studio: crea el job con la API del IDE, no
-escribiendo el `.item` a mano.
+parametros y las conexiones. `talend_jobs_create` **si** necesita Studio: crea el job con la API del IDE (para crear sin Studio, usa `talend_jobs_create_from_spec` o `talend_jobs_create_batch`); no
+escribe el `.item` a mano.
 
 ## 2. Antes de empezar: comprobar el entorno
 

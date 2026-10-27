@@ -3,6 +3,7 @@ import { jobEditOperationSchema } from "../../../talend/editor/job-edit";
 import { inspectComponent } from "../../../talend/components/component-catalog-builder";
 import { createJobsFromTemplate, editJobsBatch, type BatchItemResult } from "../../../talend/job-batch/batch";
 import { resolveProjectPath } from "../../../talend/workspace";
+import { jobsAbiertosEnStudio } from "../../../talend/job-batch/open-guard";
 import { okResult, errorResult } from "../common/result";
 
 const TRAMO_DE_CONSTRUCCION = 500;
@@ -140,6 +141,7 @@ export function createJobsCreateBatchTool() {
 const EditBatchSchema = z.object({
   jobs: z.array(z.string().min(1)).max(20000).optional().describe("Nombres exactos de los jobs"),
   namePattern: z.string().optional().describe("Expresion regular sobre el nombre del job, p. ej. ^MIG_"),
+  force: z.boolean().optional().default(false).describe("Editar tambien los jobs abiertos en un editor de Studio"),
   folderPath: z.string().optional().describe("Limitar a una carpeta de process/"),
   operations: z.array(jobEditOperationSchema).min(1).max(200),
   dryRun: z.boolean().optional().default(false),
@@ -168,6 +170,7 @@ export function createJobsEditBatchTool() {
           jobs: input.jobs,
           namePattern: input.namePattern,
           folderPath: input.folderPath,
+          force: input.force,
           dryRun: input.dryRun,
         });
         const edicionMs = Date.now() - inicio;

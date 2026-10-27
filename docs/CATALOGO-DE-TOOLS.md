@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **236**.
+Tools registradas en el preset actual: **240**.
 
 ## Empezar
 
@@ -38,7 +38,7 @@ Evita:
 
 Un job nuevo en el proyecto, con componentes, schema, conexiones y una ejecucion verificada.
 
-**Cuando:** Cuando el job no existe. Si ya existe, usa la tarea `editar-job`.
+**Cuando:** Cuando el job no existe y quieres montarlo en el lienzo de Studio. Para crear muchos jobs, o uno sin abrir Studio, usa `migracion-masiva` (offline). Si ya existe, usa `editar-job`.
 
 1. `talend_studio_list_components`: Saber que componentes hay en la paleta (filtra por nombre para no traer 897).
    - Ejemplo: `{"filter":"Delimited"}`
@@ -60,7 +60,7 @@ Un job nuevo en el proyecto, con componentes, schema, conexiones y una ejecucion
    - Ejemplo: `{"name":"MI_JOB"}`
 
 Evita:
-- No escribas el .item a mano: crea y edita con las tools de Studio.
+- Para muchos jobs o jobs cerrados usa la tarea `migracion-masiva` (offline): es mucho mas rapida que montar nodo a nodo en Studio.
 - Sin schema, la conexion no propaga columnas y el codigo generado no compila.
 - En tMap, tAggregateRow, tNormalize y tJavaRow el schema y el modelo se aplican al final, despues de conectar.
 - No lances un job mientras Studio lo esta compilando: deja el classpath bloqueado.
@@ -91,6 +91,31 @@ Evita:
 - El nombre de la conexion lo pone el bridge (`row1`, `row2`...) y es el que usan las tablas del tMap.
 
 **Completado cuando:** `talend_job_verify` con `verdict` `ok` (o `ok_con_avisos` con los avisos informados).
+
+### Crear o modificar muchos jobs sin Studio (offline) (`migracion-masiva`)
+
+Decenas o miles de jobs creados o cambiados en disco y comprobados que compilan, sin abrir su editor.
+
+**Cuando:** Migraciones, familias de jobs iguales con distinto origen o destino, y cambios repetidos en muchos jobs cerrados. Para montar un job a mano en el lienzo o editar uno abierto en un editor, usa `crear-job` o `editar-job`.
+
+1. `talend_jobs_create_batch`: Crear un job por fila a partir de una plantilla con {{variables}} (hasta 20000). Con dryRun valida sin escribir; con verify:true refresca Studio y compila cada job.
+   - Ejemplo: `{"template":{"jobName":"MIG_{{tabla}}","folderPath":"migracion","components":[{"uniqueName":"tFixedFlowInput_1","componentName":"tFixedFlowInput"},{"uniqueName":"tLogRow_1","componentName":"tLogRow"}],"connections":[{"source":"tFixedFlowInput_1","target":"tLogRow_1","label":"row1"}]},"rows":[{"tabla":"CLIENTES"},{"tabla":"CUENTAS"}],"dryRun":true}`
+2. `talend_jobs_edit_batch` (opcional): Aplicar el mismo lote de operaciones (add_node, set_params, set_schema, connect...) a muchos jobs por nombre o por regex. Cada job es atomico por separado; los abiertos en un editor se saltan.
+   - Ejemplo: `{"namePattern":"^MIG_","operations":[{"op":"set_params","uniqueName":"tLogRow_1","parameters":{"TABLE_PRINT":"true"}}],"dryRun":true}`
+3. `talend_job_edit_offline` (opcional): Retocar un solo job en disco con el mismo motor, con diff previo (dryRun).
+   - Ejemplo: `{"job":"MIG_CLIENTES","operations":[{"op":"move","uniqueName":"tLogRow_1","posX":400,"posY":96}]}`
+4. `talend_job_build_batch`: Generar y compilar los jobs sin abrir su editor (~0,2 s por job, en paralelo). Devuelve cuales no compilan.
+   - Ejemplo: `{"jobs":["MIG_CLIENTES","MIG_CUENTAS"],"parallelism":4}`
+5. `talend_job_verify`: Ejecutar de verdad uno o unos pocos jobs representativos y revisar sus avisos. La compilacion masiva no ejecuta.
+   - Ejemplo: `{"job":"MIG_CLIENTES"}`
+
+Evita:
+- Un lote que falla la integridad no escribe ese job: lee `fallos` en la respuesta.
+- Las tools offline se niegan a tocar un job abierto en un editor de Studio (usa force solo si sabes que no hay cambios sin guardar).
+- Compilar no es ejecutar: verifica con `talend_job_verify` una muestra, no solo con `talend_job_build_batch`.
+- Los componentes complejos (tMap, esquemas dinamicos) se configuran mejor con la API de Studio; combina ambos caminos.
+
+**Completado cuando:** `talend_job_build_batch` (o `verify:true`) devuelve `noCompilan` vacio y una muestra pasa `talend_job_verify` con `verdict` `ok`.
 
 ### Ejecutar un job y verificar la salida (`ejecutar-y-verificar`)
 
@@ -2295,6 +2320,17 @@ Argumentos principales:
 - `instructions` (object, opcional)
 - `replaceManagedTodoContexts` (boolean, opcional)
 
+#### `talend_job_build_batch`
+
+Genera el codigo y compila MUCHOS jobs del repositorio sin abrir su editor, en paralelo (unos 0,2 s por job). Pensada para migraciones masivas: devuelve por cada job si compila y el error de javac si no. No ejecuta los jobs; para uno concreto usa talend_job_verify. Los jobs deben existir ya en el repositorio de Studio (si los has escrito por fichero, refresca el workspace antes).
+
+**Uso:** escribe/ejecuta; funciona sin Studio.
+
+Argumentos principales:
+
+- `jobs` (array, obligatorio): Nombres de los jobs a construir (maximo 5000 por llamada)
+- `parallelism` (integer, opcional): Hilos de compilacion (por defecto 4; mas de 4 no suele mejorar)
+
 #### `talend_job_compile`
 
 Genera el codigo Java del job y comprueba que compila, sin ejecutarlo. Devuelve 'compiles' y, si falla, la linea y el mensaje del error (por ejemplo 'no_comillas cannot be resolved to a variable'). Es la forma de saber si una configuracion genera codigo valido antes de correr el job. Si faltan dependencias Maven las lista en 'missingArtifacts'; con installMissing:true las descarga de Maven Central y vuelve a compilar. Se bloquea con STUDIO_DIALOG_OPEN si hay un dialogo modal abierto en Studio. Tarda unos segundos y ocupa el hilo de la interfaz de Studio mientras genera, igual que un Run.
@@ -2362,6 +2398,21 @@ Argumentos principales:
 
 - `name` (string, obligatorio): Nombre del job
 - `version` (string, opcional): Version del job
+
+#### `talend_job_edit_offline`
+
+Edita un job EXISTENTE directamente en su fichero .item, sin abrir Talend Studio: anade o quita componentes, cambia parametros y esquemas, conecta, mueve y pone variables de contexto, todo en un lote atomico (o se aplica entero o no se toca nada). Comprueba la integridad (nombres unicos, conexiones con extremos que existen). Con dryRun devuelve el diff sin escribir. Para crear un job desde cero usa talend_jobs_create_from_spec; para comprobar que compila y ejecuta usa talend_job_verify o talend_job_build_batch.
+
+**Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
+
+Argumentos principales:
+
+- `job` (string, obligatorio): Nombre del job
+- `folderPath` (string, opcional): Carpeta del job, si hay dos con el mismo nombre
+- `operations` (array, obligatorio): Operaciones en orden: add_node, remove_node, set_params, set_schema, connect, disconnect, move, set_context
+- `force` (boolean, opcional): Editar aunque Studio tenga el job abierto en un editor (al guardar, Studio pisaria el cambio)
+- `dryRun` (boolean, opcional): Con true no escribe: devuelve solo el diff y las comprobaciones
+- `refreshStudio` (boolean, opcional): Refrescar el workspace de Studio si esta abierto, para que vea el cambio
 
 #### `talend_job_execute`
 
@@ -2534,6 +2585,21 @@ Argumentos principales:
 - `description` (string, opcional): Descripción inicial
 - `purpose` (string, opcional): Propósito inicial
 
+#### `talend_jobs_create_batch`
+
+Crea MUCHOS jobs a la vez, sin Studio, a partir de una plantilla con {{variables}} y una fila de valores por job (hasta 20000). Escribe los .item y .properties en disco en milisegundos. Con verify:true refresca Studio y compila cada job sin abrir su editor (~0,2 s por job), y devuelve cuales no compilan. Pensada para migraciones masivas.
+
+**Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
+
+Argumentos principales:
+
+- `template` (object, obligatorio): Plantilla del job. Los textos admiten {{variable}}
+- `rows` (array, obligatorio): Una fila por job: valores de las variables de la plantilla
+- `overwrite` (boolean, opcional): Sobrescribir los jobs que ya existen
+- `dryRun` (boolean, opcional): Validar sin escribir
+- `verify` (boolean, opcional): Refrescar Studio y compilar cada job creado (necesita Studio abierto)
+- `parallelism` (integer, opcional)
+
 #### `talend_jobs_create_from_spec`
 
 Crea un job de Talend a partir de una especificacion de componentes y conexiones, y escribe los archivos .item y .properties en el proyecto. Requiere confirmacion.
@@ -2561,6 +2627,23 @@ Argumentos principales:
 
 - `jobName` (string, obligatorio): Nombre del job a analizar
 - `folderPath` (string, opcional): Ruta opcional del folder
+
+#### `talend_jobs_edit_batch`
+
+Aplica el MISMO lote de operaciones (add_node, set_params, set_schema, connect...) a muchos jobs a la vez, directamente en disco y sin Studio. Eliges los jobs por lista de nombres o por expresion regular. Cada job es atomico por separado: el que falle la integridad no se toca y se informa, los demas se escriben. Con verify:true compila los modificados.
+
+**Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
+
+Argumentos principales:
+
+- `jobs` (array, opcional): Nombres exactos de los jobs
+- `namePattern` (string, opcional): Expresion regular sobre el nombre del job, p. ej. ^MIG_
+- `force` (boolean, opcional): Editar tambien los jobs abiertos en un editor de Studio
+- `folderPath` (string, opcional): Limitar a una carpeta de process/
+- `operations` (array, obligatorio)
+- `dryRun` (boolean, opcional)
+- `verify` (boolean, opcional): Refrescar Studio y compilar los jobs modificados
+- `parallelism` (integer, opcional)
 
 #### `talend_jobs_list`
 

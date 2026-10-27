@@ -192,9 +192,31 @@ public final class SchemaOperations {
     try {
       for (Object node : TalendApi.allNodes(process)) {
         alinearConMapeoDeBd(node);
+        ponerPatronDeFecha(node);
       }
     } catch (Exception e) {
       BridgeLog.warn("No se pudieron alinear los schemas con el mapeo de BD", e);
+    }
+  }
+
+  /**
+   * Pone el patron por defecto de Talend a toda columna de fecha sin patron del nodo, incluidas las que crea
+   * Studio (las del tAssertCatcher o el tStatCatcher), que son las que dan "A value must be set for Date Pattern".
+   */
+  private static void ponerPatronDeFecha(Object node) {
+    try {
+      List<?> tablas = (List<?>) node.getClass().getMethod("getMetadataList").invoke(node);
+      for (Object table : tablas) {
+        for (Object columna : (List<?>) table.getClass().getMethod("getListColumns").invoke(table)) {
+          Object tipo = columna.getClass().getMethod("getTalendType").invoke(columna);
+          Object patron = columna.getClass().getMethod("getPattern").invoke(columna);
+          if ("id_Date".equals(String.valueOf(tipo)) && (patron == null || String.valueOf(patron).replace("\"", "").isEmpty())) {
+            columna.getClass().getMethod("setPattern", String.class).invoke(columna, "\"yyyy-MM-dd HH:mm:ss\"");
+          }
+        }
+      }
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo poner el patron de fecha", e);
     }
   }
 

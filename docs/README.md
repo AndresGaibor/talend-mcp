@@ -8,6 +8,7 @@
 | Vas a... | Lee | Y luego |
 |---|---|---|
 | **Usar el MCP** para crear, editar o ejecutar jobs en un Studio abierto | [GUIA-AGENTE.md](GUIA-AGENTE.md) (flujo, reglas de configuración, errores) | [PLAN-DE-PRUEBAS.md](PLAN-DE-PRUEBAS.md) |
+| **Crear o editar muchos jobs sin Studio** (migraciones, lotes, plantillas) | [MODO-OFFLINE.md](MODO-OFFLINE.md) | [GUIA-AGENTE.md](GUIA-AGENTE.md) |
 | **Cambiar el código** del servidor o de los scripts | [AGENTS.md](../AGENTS.md), [ARQUITECTURA.md](ARQUITECTURA.md) | [PLAN-DE-TRABAJO.md](PLAN-DE-TRABAJO.md) (recetas) |
 | **Agregar una tool MCP** | [PLAN-DE-TRABAJO.md](PLAN-DE-TRABAJO.md) | [CATALOGO-DE-TOOLS.md](CATALOGO-DE-TOOLS.md) (generado) |
 | **Tocar el plugin Java** (bridge) | [talend-studio-bridge/README.md](../talend-studio-bridge/README.md) | [studio-internals/04-bridge-e-instalacion.md](studio-internals/04-bridge-e-instalacion.md) |

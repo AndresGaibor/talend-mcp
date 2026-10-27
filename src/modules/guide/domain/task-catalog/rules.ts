@@ -7,9 +7,9 @@ import type { GuideRule } from "../guide.types";
 export const GUIDE_RULES: GuideRule[] = [
   {
     id: "no-escribir-xml",
-    rule: "Crea y edita jobs con la API de Studio, nunca escribiendo el .item.",
+    rule: "Edita en disco solo con las tools offline, y nunca un job abierto en un editor de Studio.",
     detail:
-      "Escribir el XML por fuera deja el modelo en memoria de Studio obsoleto: aparecen tipos inexistentes (id_Decimal), valores corruptos y jobs vacios.",
+      "Las tools offline (talend_jobs_create_from_spec, talend_jobs_create_batch, talend_job_edit_offline, talend_jobs_edit_batch) generan el .item con el mismo modelo que Studio, validan la integridad y son atomicas. Escribir el XML a mano o con otra herramienta puede dejar tipos inexistentes (id_Decimal) o jobs vacios, y un job abierto en un editor se sobrescribe al guardar.",
   },
   {
     id: "valores-literales-java",

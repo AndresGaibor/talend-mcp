@@ -49,9 +49,12 @@ terminado hace fallar el escenario, y los avisos salen en el informe. Lo esperad
 
 **Tres reglas que mas dano hacen:**
 
-1. **Los jobs se crean y modifican con las tools que usan la API de Studio** (`talend_job_*_in_studio`,
-   `talend_job_add_node`...), nunca escribiendo el `.item` a mano. Studio mantiene el modelo en
-   memoria: un XML escrito por fuera deja el job inconsistente.
+1. **Estrategia mixta para crear y modificar jobs** ([docs/MODO-OFFLINE.md](docs/MODO-OFFLINE.md)).
+   *Offline* (por defecto en migraciones, lotes y jobs cerrados): `talend_jobs_create_batch`,
+   `talend_job_edit_offline`, `talend_jobs_edit_batch`; son atomicas, validan la integridad y no necesitan
+   Studio. *Studio en vivo* (`talend_job_*_in_studio`, `talend_job_add_node`...): para jobs abiertos en un
+   editor y componentes que Studio configura al conectar (tMap). Nunca edites en disco un job abierto en
+   un editor: Studio lo pisaria al guardar.
 2. **Studio es un entorno vivo.** `bun run bridge:install` recarga el plugin en el Studio abierto:
    no lo ejecutes mientras hay jobs o dialogos en curso. Las acciones con `unsafeActions`
    (ejecutar codigo Java, borrar, escribir en el workspace) pueden ser irreversibles.
@@ -63,8 +66,7 @@ El servidor expone decenas de herramientas MCP, agrupadas por area (`talend_<are
 `bun run mapa` da el numero exacto por preset: un cliente externo nuevo usa
 `TALEND_MCP_FILTER=agent`; `all` expone todo.
 
-Regla de fondo para quien usa el MCP: los jobs se crean y modifican **con la API de Studio**, nunca
-escribiendo el `.item` a mano (ver regla 1 arriba).
+Regla de fondo para quien usa el MCP: estrategia mixta, offline para lotes y jobs cerrados, Studio en vivo para jobs abiertos (ver regla 1 arriba).
 
 ## 2. Stack y comandos
 

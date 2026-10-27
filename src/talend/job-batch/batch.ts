@@ -4,6 +4,7 @@ import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec }
 import { applyJobEdits, type JobEditOperation } from "../editor/job-edit";
 import { resolveFolderDir } from "../job-crud/paths";
 import { listJobs } from "../repository";
+import { jobsAbiertosEnStudio } from "./open-guard";
 
 /**
  * Operaciones masivas sobre jobs en disco: crear muchos a partir de una plantilla y editar muchos con el mismo
@@ -124,11 +125,13 @@ export type EditBatchOptions = {
   namePattern?: string;
   folderPath?: string;
   dryRun?: boolean;
+  /** Editar tambien los jobs que Studio tiene abiertos en un editor (por defecto se saltan y se informa). */
+  force?: boolean;
 };
 
 /** Aplica el mismo lote de operaciones a cada job elegido. Cada job es atomico por separado. */
 export async function editJobsBatch(options: EditBatchOptions): Promise<{ matched: number; results: BatchItemResult[] }> {
-  const { projectPath, operations, jobs, namePattern, folderPath, dryRun = false } = options;
+  const { projectPath, operations, jobs, namePattern, folderPath, dryRun = false, force = false } = options;
   if (!jobs && !namePattern) throw new Error("Indica 'jobs' o 'namePattern'");
   const pattern = namePattern ? new RegExp(namePattern) : undefined;
   const wanted = jobs ? new Set(jobs) : undefined;
@@ -139,7 +142,12 @@ export async function editJobsBatch(options: EditBatchOptions): Promise<{ matche
     return wanted ? wanted.has(job.label) : pattern!.test(job.label);
   });
 
+  const abiertos = new Set(dryRun || force ? [] : await jobsAbiertosEnStudio(elegidos.map((job) => job.label)));
+
   const results = await enParalelo(elegidos, 32, async (job): Promise<BatchItemResult> => {
+    if (abiertos.has(job.label)) {
+      return { job: job.label, ok: false, error: "Abierto en un editor de Studio: se salta (cierralo o usa force)" };
+    }
     try {
       const xml = await Bun.file(job.itemPath).text();
       const edited = applyJobEdits(xml, operations);

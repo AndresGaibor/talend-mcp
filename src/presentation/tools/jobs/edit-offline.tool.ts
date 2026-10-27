@@ -3,6 +3,7 @@ import { applyJobEdits, jobEditOperationSchema } from "../../../talend/editor/jo
 import { findTalendJob } from "../../../talend/job-crud";
 import { readTextFile, writeTextFile } from "../../../talend/files";
 import { resolveProjectPath } from "../../../talend/workspace";
+import { jobsAbiertosEnStudio } from "../../../talend/job-batch/open-guard";
 import { okResult, errorResult } from "../common/result";
 
 const EditOfflineSchema = z.object({
@@ -10,6 +11,8 @@ const EditOfflineSchema = z.object({
   folderPath: z.string().optional().describe("Carpeta del job, si hay dos con el mismo nombre"),
   operations: z.array(jobEditOperationSchema).min(1).max(500)
     .describe("Operaciones en orden: add_node, remove_node, set_params, set_schema, connect, disconnect, move, set_context"),
+  force: z.boolean().optional().default(false)
+    .describe("Editar aunque Studio tenga el job abierto en un editor (al guardar, Studio pisaria el cambio)"),
   dryRun: z.boolean().optional().default(false)
     .describe("Con true no escribe: devuelve solo el diff y las comprobaciones"),
   refreshStudio: z.boolean().optional().default(true)
@@ -35,6 +38,12 @@ export function createJobEditOfflineTool() {
           return errorResult(tool, "NO_PROJECT", "No se pudo detectar el proyecto Talend. Define TALEND_PROJECT.");
         }
         const job = await findTalendJob(projectPath, input.job, input.folderPath);
+        if (!input.dryRun && !input.force) {
+          const abiertos = await jobsAbiertosEnStudio([input.job]);
+          if (abiertos.length > 0) {
+            return errorResult(tool, "JOB_OPEN_IN_STUDIO", `El job ${input.job} esta abierto en un editor de Studio: al guardarlo, Studio pisaria el cambio. Cierralo (o usa talend_job_* de la API de Studio), o repite con force:true.`);
+          }
+        }
         const xml = await readTextFile(job.itemPath, projectPath);
 
         let result;

@@ -73,3 +73,13 @@ describe("lotes de jobs", () => {
     expect(out.results[0]!.ok).toBe(false);
   });
 });
+
+describe("guarda de jobs abiertos", () => {
+  test("reconoce el titulo del editor de un job", async () => {
+    const { esEditorDelJob } = await import("../../src/talend/job-batch/open-guard");
+    expect(esEditorDelJob("Job MIG_A 0.1", "MIG_A")).toBe(true);
+    expect(esEditorDelJob("*Job MIG_A 0.1", "MIG_A")).toBe(true);
+    expect(esEditorDelJob("Job MIG_AB 0.1", "MIG_A")).toBe(false);
+    expect(esEditorDelJob("Welcome", "MIG_A")).toBe(false);
+  });
+});

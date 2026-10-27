@@ -12,6 +12,9 @@ Resumen de lo imprescindible:
 - **No hay apps ni UI.** El servidor expone solo tools MCP.
 - **No hay tunnel ni exposicion publica.** El servidor es local (`127.0.0.1`) o stdio.
 - **No hay aliases de tools.** Una sola tool por capacidad, siempre `talend_<area>_<verbo>`.
+- **Estrategia mixta:** offline (`talend_jobs_create_batch`, `talend_job_edit_offline`, `talend_jobs_edit_batch`,
+  `talend_job_build_batch`) para migraciones, lotes y jobs cerrados; Studio en vivo para jobs abiertos y tMap.
+  Detalle en [docs/MODO-OFFLINE.md](docs/MODO-OFFLINE.md).
 - **Verifica con `talend_job_verify`.** Una llamada: diseno, compilacion, ejecucion y avisos
   (`[WARN]`/`[ERROR]`/`[FATAL]`, excepciones) aunque el job termine con codigo 0. Informa de cada
   aviso. Detalle en AGENTS.md, seccion 0.
