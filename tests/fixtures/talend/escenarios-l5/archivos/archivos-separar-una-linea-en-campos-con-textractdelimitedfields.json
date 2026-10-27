@@ -1,0 +1,81 @@
+{
+  "nombre": "archivos: separar una linea en campos con tExtractDelimitedFields",
+  "job": "MCP_L5_ExtractDelimited",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "linea",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1;Ana;Bogota"
+        ],
+        [
+          "2;Jose;Medellin"
+        ]
+      ]
+    },
+    {
+      "type": "tExtractDelimitedFields",
+      "nombre": "separa",
+      "parameters": {
+        "FIELD": {
+          "value": "linea"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";",
+          "literal": true
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        },
+        "CHECK_FIELDS_NUM": {
+          "value": "false"
+        },
+        "TRIM": {
+          "value": "false"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_String"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "entrada",
+      "destino": "separa"
+    },
+    {
+      "origen": "separa",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana|Bogota",
+      "2|Jose|Medellin"
+    ]
+  },
+  "pendiente": "tExtractDelimitedFields compila y corre, pero la entrada se queda con id, nombre y ciudad (la propagacion del esquema de salida hacia el origen) en vez de linea: el codigo generado divide row1.id. Sin resolver: mismo problema de propagacion que el REJECT."
+}
