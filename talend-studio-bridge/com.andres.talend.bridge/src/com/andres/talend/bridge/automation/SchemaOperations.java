@@ -1,5 +1,6 @@
 package com.andres.talend.bridge.automation;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.Map;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.andres.talend.bridge.BridgeLog;
 
 /**
  * Schema de un nodo: las columnas y, cuando el componente las tiene, las
@@ -85,6 +87,7 @@ public final class SchemaOperations {
       tablas.add(otra);
     }
     node.getClass().getMethod("setMetadataList", List.class).invoke(node, tablas);
+    alinearConMapeoDeBd(node);
     // La conexion de entrada tiene su propia tabla de metadata, y puede ser la
     // vieja (la que Studio creo al soltar el componente, con otro nombre). Si
     // se queda vacia, el generador arma la fila de entrada sin columnas: el
@@ -171,6 +174,70 @@ public final class SchemaOperations {
       } catch (Exception e) {
         // La tabla es de otro tipo: se deja como esta.
       }
+    }
+  }
+
+  /**
+   * En un componente de base de datos, deja el schema con el mapeo del componente: el `dbms` de la tabla
+   * (el parametro MAPPING del nodo, p. ej. `postgres_id`) y el tipo de BD de cada columna.
+   *
+   * Sin eso Studio avisa "the schema's dbType not correct". Un `dbms` con el nombre del producto
+   * ("PostgreSQL") en vez del id del mapeo dejaba sin resolver el `MappingTypeRetriever` y el job no compilaba:
+   * aqui solo se usa el id que declara el propio componente y, si Studio no lo resuelve, no se toca nada.
+   *
+   * Se llama al guardar el job (`JobPersistence.persist`), cuando el parametro MAPPING ya esta puesto y las
+   * conexiones ya han propagado el schema; un tipo de BD valido que ya haya (el VARCHAR del REJECT) se respeta.
+   */
+  static void alinearTodosConMapeoDeBd(Object process) {
+    try {
+      for (Object node : TalendApi.allNodes(process)) {
+        alinearConMapeoDeBd(node);
+      }
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudieron alinear los schemas con el mapeo de BD", e);
+    }
+  }
+
+  private static void alinearConMapeoDeBd(Object node) {
+    try {
+      Object parametro = node.getClass().getMethod("getElementParameter", String.class).invoke(node, "MAPPING");
+      if (parametro == null) {
+        return;
+      }
+      Object valor = parametro.getClass().getMethod("getValue").invoke(parametro);
+      // El valor guardado lleva comillas (es una expresion Java): "postgres_id".
+      String dbms = valor == null ? "" : String.valueOf(valor).replace("\"", "").trim();
+      if (dbms.isEmpty() || !dbms.endsWith("_id")) {
+        return;
+      }
+      Class<?> tipos = TalendClasses.load("org.talend.core.model.metadata.MetadataTalendType");
+      Object retriever = tipos.getMethod("getMappingTypeRetriever", String.class).invoke(null, dbms);
+      if (retriever == null) {
+        return;
+      }
+      Method porDefecto = retriever.getClass().getMethod("getDefaultSelectedDbType", String.class);
+      List<?> tablas = (List<?>) node.getClass().getMethod("getMetadataList").invoke(node);
+      for (Object table : tablas) {
+        List<?> columnas = (List<?>) table.getClass().getMethod("getListColumns").invoke(table);
+        for (Object columna : columnas) {
+          Object actual = columna.getClass().getMethod("getType").invoke(columna);
+          String tipoActual = actual == null ? "" : String.valueOf(actual);
+          // Un tipo de BD valido ya puesto (p. ej. el VARCHAR del REJECT) se respeta.
+          if (!tipoActual.isEmpty() && !tipoActual.startsWith("id_")) {
+            continue;
+          }
+          String talend = String.valueOf(columna.getClass().getMethod("getTalendType").invoke(columna));
+          Object dbType = porDefecto.invoke(retriever, talend);
+          if (dbType != null && !String.valueOf(dbType).isEmpty()) {
+            columna.getClass().getMethod("setType", String.class).invoke(columna, String.valueOf(dbType));
+          }
+        }
+        if (table.getClass().getMethod("getDbms").invoke(table) == null) {
+          table.getClass().getMethod("setDbms", String.class).invoke(table, dbms);
+        }
+      }
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo alinear el schema con el mapeo de BD del componente", e);
     }
   }
 

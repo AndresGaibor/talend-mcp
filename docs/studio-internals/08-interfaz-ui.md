@@ -315,7 +315,14 @@ con volcados de hilos de la JVM de Studio (`jstack` sobre el hilo `main`), varia
   fallaba en `executeJob`; a mano, con los flags, sale con codigo 0.
 - **Dos casos AWS dependian del orden.** Borrar un bucket o una cola que crea otro caso falla (404/400) si se
   ejecuta solo. Ahora cada uno crea lo que borra, con el nodo de creacion unido por `SUBJOB_OK`.
-- **Intento fallido: `dbms` en el schema.** Poner `MetadataTable.setDbms("PostgreSQL" | "MYSQL_8")` para quitar
+- **Resuelto despues: el aviso `dbType` era el tipo de BD de cada columna.** En el modelo del designer
+  `IMetadataColumn.getType()` es el tipo de BD (`sourceType` en el `.item`) y `getTalendType()` el de Talend. Studio
+  copiaba `id_Integer` a `sourceType` en los nodos de BD. `SchemaOperations.alinearTodosConMapeoDeBd` (se llama en
+  `JobPersistence.persist`) lee el parametro `MAPPING` del nodo (`postgres_id`, `mysql_id`; el valor guardado
+  lleva comillas), pide el tipo por defecto a `MetadataTalendType.getMappingTypeRetriever(id)`
+  (`getDefaultSelectedDbType`) y lo pone: `id_Integer` -> `INT4`. Un tipo de BD valido que ya haya se respeta.
+  Suite `bd`: 13 de 13 sin avisos. El `dbms` de la tabla solo se pone si hay un id de mapeo real.
+- **Intento fallido (superado por lo anterior): `dbms` en el schema.** Poner `MetadataTable.setDbms("PostgreSQL" | "MYSQL_8")` para quitar
   el aviso `the schema's dbType not correct` hace que Studio valide los tipos con un `MappingTypeRetriever` que
   es `null`, y el job deja de compilar. Se revirtio: el aviso sigue, ahora visible en el resumen.
 - **Pendiente.** `A value must be set for Date Pattern` (tAssertCatcher, tLogRow) no se quita con el patron por
@@ -403,6 +410,24 @@ compila (≈0,4 s de generacion y ≈0,4 s de javac) y ejecuta con codigo 0 y la
 
 Un job sin variables de contexto no tiene `contexts/Default.properties`; con `--context=Default` el runtime
 escribe `Could not find the context Default` en stderr. `JobExecutor` ya no pasa `--context` en ese caso.
+
+## 84. Lotes de jobs: plantillas, edicion masiva y el coste del workspace
+
+- `talend_jobs_create_batch`: una plantilla con `{{variable}}` y una fila por job (hasta 20 000). Escribe `.item` y
+  `.properties`; con `verify:true` refresca Studio y compila por tramos de 500 con `build-batch`.
+- `talend_jobs_edit_batch`: el mismo lote de operaciones de `talend_job_edit_offline` sobre muchos jobs (por nombres
+  o regex). Cada job es atomico por separado.
+- Motor y tests: `src/talend/job-batch/batch.ts`, `tests/talend/job-batch.test.ts`.
+
+**Medido (1 000 jobs, Studio abierto):** crear 1,1 s; compilar 268 s (0,27 s/job); editar 0,9 s; recompilar 234 s.
+1 000 de 1 000 compilan.
+
+**El cuello de botella era el workspace de Eclipse, no Talend.** Un `jstack` durante el lote mostro cada
+`generateCode` creando y reescribiendo recursos del workspace (`File.create`, `setContents`, el pom del job) y
+esperando reglas (`ThreadJob.waitForRun`) y deltas (`ElementTree`). Suelto, cada recurso es una operacion con sus
+notificaciones, y el coste crece con el tamano del workspace: 50 jobs tardaban 30 s al principio y 105 s con 1 000
+jobs presentes. `buildBatch` ahora agrupa toda la generacion en un solo `IWorkspace.run(..., root, AVOID_UPDATE)`:
+50 jobs en 11 s en cualquier posicion (~0,15 s de generacion por job, constante).
 
 ## Relacionado
 

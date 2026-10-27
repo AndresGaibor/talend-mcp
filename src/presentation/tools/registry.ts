@@ -6,6 +6,7 @@ import { createAnalyzeJobTool } from "./jobs/analyze-job.tool";
 import { createCreateJobTool } from "./jobs/create-job.tool";
 import { createJobsCreateFromSpecTool } from "./jobs/create-from-spec.tool";
 import { createJobEditOfflineTool } from "./jobs/edit-offline.tool";
+import { createJobsCreateBatchTool, createJobsEditBatchTool } from "./jobs/batch.tool";
 import { createCreateFolderTool } from "./jobs/create-folder.tool";
 import { createDeleteJobTool } from "./jobs/delete-job.tool";
 import { createDuplicateJobTool } from "./jobs/duplicate-job.tool";
@@ -84,6 +85,8 @@ export const allTools = [
 
   createJobsCreateFromSpecTool(),
   createJobEditOfflineTool(),
+  createJobsCreateBatchTool(),
+  createJobsEditBatchTool(),
   createCreateFolderTool(),
   createDeleteJobTool(),
   createDuplicateJobTool(),

@@ -487,6 +487,12 @@ public final class JobBuilder {
     Map<String, Map<String, Object>> resultados = new java.util.LinkedHashMap<>();
     Map<String, java.util.concurrent.Future<Map<String, Object>>> pendientes = new java.util.LinkedHashMap<>();
     try {
+      // Cada generateCode crea y reescribe recursos del workspace (proyecto Maven, pom, plantillas). Sueltos, cada
+      // uno es una operacion con su regla, sus deltas y sus notificaciones, y el coste crece con el tamano del
+      // workspace (medido: de 0,4 a 2,2 s por job con 1000 jobs). Agrupados en una sola operacion con la regla
+      // raiz, el workspace trabaja una vez y notifica al final.
+      org.eclipse.core.resources.IWorkspace workspace = org.eclipse.core.resources.ResourcesPlugin.getWorkspace();
+      workspace.run(monitor -> {
       for (String nombre : nombres) {
         Map<String, Object> fila = new LinkedHashMap<>();
         resultados.put(nombre, fila);
@@ -502,7 +508,7 @@ public final class JobBuilder {
           Map<String, Object> opciones = new HashMap<>();
           opciones.put("GENERATE_OPTION", GENERATE_MAIN_ONLY | GENERATE_WITHOUT_COMPILING);
           processor = generate.invoke(null, encontrado[0], "Default", encontrado[1], opciones, monitores);
-        } catch (InvocationTargetException e) {
+        } catch (ReflectiveOperationException e) {
           fila.put("ok", false);
           fila.put("error", JobCompiler.describe(JobCompiler.rootMessage(e)));
           continue;
@@ -524,6 +530,7 @@ public final class JobBuilder {
           return parte;
         }));
       }
+      }, workspace.getRoot(), org.eclipse.core.resources.IWorkspace.AVOID_UPDATE, new NullProgressMonitor());
       for (Map.Entry<String, java.util.concurrent.Future<Map<String, Object>>> entrada : pendientes.entrySet()) {
         Map<String, Object> fila = resultados.get(entrada.getKey());
         try {

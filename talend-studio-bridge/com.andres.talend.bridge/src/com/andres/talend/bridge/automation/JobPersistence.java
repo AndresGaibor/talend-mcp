@@ -30,6 +30,7 @@ public final class JobPersistence {
    */
   public static boolean persist(Object process) {
     try {
+      SchemaOperations.alinearTodosConMapeoDeBd(process);
       Object nuevo = process.getClass().getMethod("saveXmlFile").invoke(process);
       if (nuevo == null) {
         return false;
