@@ -35,6 +35,18 @@ bun test         # debe estar en verde antes de tocar nada
 | Saber **que esta probado** | [docs/COBERTURA-POR-FAMILIA.md](docs/COBERTURA-POR-FAMILIA.md) | `bun run mapa` |
 | **No sabes donde esta algo** | [docs/README.md](docs/README.md) | `bun run mapa` |
 
+**Verifica siempre con `talend_job_verify`.** Un job puede ejecutarse "bien" y llevar avisos. Tras
+crear o cambiar un job, una sola llamada, `talend_job_verify { job }`, revisa el diseno (vista
+Problemas), compila, ejecuta y busca `[WARN]`, `[ERROR]`, `[FATAL]` y excepciones **aunque el
+codigo de salida sea 0**. Devuelve `verdict` (`ok`, `ok_con_avisos`, `error`) y `findings`: informa
+de cada aviso al usuario. Para el detalle: `talend_tail_run_output` (stderr), `talend_analyze_logs` y `talend_bridge_log_tail` (Error Log de
+Studio). `talend_job_problems`, `talend_job_compile`, `talend_job_run_by_name` y
+`talend_job_wait_run` siguen existiendo pero solo con `TALEND_MCP_FILTER=all`: `verify` ya los
+encadena. `talend_job_execute` tambien devuelve `findings`. En el arnes L5 se hace solo
+(`src/talend/diagnostics/output-findings.ts`): un `[ERROR]` o un error de diseno con el job
+terminado hace fallar el escenario, y los avisos salen en el informe. Lo esperado se declara en
+`espera.avisos_tolerados`.
+
 **Tres reglas que mas dano hacen:**
 
 1. **Los jobs se crean y modifican con las tools que usan la API de Studio** (`talend_job_*_in_studio`,

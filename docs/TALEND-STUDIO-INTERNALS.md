@@ -24,7 +24,7 @@ conservan porque otras guias los citan como `INTERNALS N`.
 | [Componentes](studio-internals/05-componentes.md) | Catalogo, definiciones y cobertura | 24-30 |
 | [Cobertura y conexiones](studio-internals/06-cobertura-y-conexiones.md) | Conexiones, contextos y procesos | 31-40 |
 | [Componentes avanzados](studio-internals/07-componentes-avanzados.md) | Transformaciones, bases de datos y ejecucion | 41-71 |
-| [Interfaz de usuario](studio-internals/08-interfaz-ui.md) | Menus, pestanas, dialogos por flujo, guardian de modales y control de dialogos desde el flujo | 72-78 |
+| [Interfaz de usuario](studio-internals/08-interfaz-ui.md) | Menus, pestanas, dialogos por flujo, guardian de modales y control de dialogos desde el flujo | 72-81 |
 
 ## Indice por seccion
 

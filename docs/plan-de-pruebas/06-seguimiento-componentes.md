@@ -17,62 +17,66 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 2026-10-26 | Todos (L4) | Medicion de compilacion | `bun run scripts/coverage.ts --components ... --compile` | Cancelada: heap de Studio al 89-93%. Pendiente tras liberar memoria. |
 | 2026-10-26 | Todos (C1, C2) | Descubrimiento y configuracion | `talend_components_definition` (42 XML) | Texto para el agente reescrito: separa lo que pone quien llama de lo que ya tiene valor. 10 tests. |
 | 2026-10-26 | Todos (C3) | Contrato generico | `talend_components_parameters` | Acepta `name` ademas de `componentName`; error que dice que falta. |
+| 2026-10-26 | Todos (C5, C6) | Ejecucion L5 por suites | `scripts/execution-check.ts --suite <s> --todas` | Lote parado a mitad (memoria del sistema critica). Estado derivado de `testdata/resultados-l5.csv`: 28 componentes OK, 14 con fallo, 8 pendientes. Los fallos "no termino a tiempo" se separan de los que tienen causa. |
+| 2026-10-26 | Todos (C5, C6) | Parada del lote y reinicio de Studio | `Stop-Process` por PID de los procesos del lote; `CloseMainWindow` de Studio | Lote parado en la suite `control` (colgado y sin memoria). Studio cerrado sin guardar nada pendiente y reabierto; el bridge responde en `0.1.0.202610262156`. Pendiente: repetir los fallidos con poca memoria. |
+| 2026-10-26 | tPostgresqlRow, tPostgresqlClose | C5, C6 | `execution-check --todas tPostgresqlRow` | Pasan en Talend tras quitar el disparador desde la conexion y el relanzamiento doble del arnes. |
+| 2026-10-26 | tJDBC* | C5 | `talend_job_compile` con `installMissing` | Bloqueado: `components-jdbc-runtime` no esta en repositorios publicos. Escenarios marcados pendientes. |
 | 2026-10-26 | tJDBC*, tHttpRequest | C2 | `talend_studio_component_parameters` | Bloqueado: el hilo de Studio no responde y hay un dialogo "Network Issue" abierto. |
 
 ## Estado
 
 | # | Componente | Grupo | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | Estado | Notas previas |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | tMap | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en informes L4 (antes de los cambios de mapper). Bridge con los cambios compila; falta publicarlo. Fixture usa `row2`. |
-| 2 | tFileInputDelimited | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4. Varios escenarios L5. El validador exige FILENAME y esquema. |
-| 3 | tFileOutputDelimited | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (3 informes). |
-| 4 | tJDBCInput | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBInput, que no existe en esta Studio. Presente en el catalogo DI. Sin medicion de compilacion. |
-| 5 | tJDBCOutput | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBOutput. Sin medicion de compilacion. |
-| 6 | tJDBCConnection | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBConnection. Sin medicion de compilacion. |
-| 7 | tFilterRow | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (4 informes). Escenario L5 existente. |
-| 8 | tAggregateRow | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (3 informes). Reglas en 04-reglas-de-componentes.md. |
-| 9 | tSortRow | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 2 informes (`defaultRow cannot be resolved`) y pasa en 1. |
-| 10 | tUniqRow | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 1 informe (`IllegalArgumentException`) y pasa en 2. |
-| 11 | tJava | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 12 | tLogRow | A | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 13 | tRunJob | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 3 informes (`Syntax error on token "new"`). Escenario L5 con hijo existe. |
-| 14 | tPrejob | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Escenario tPrejob -> tRunJob -> tPostjob. |
-| 15 | tPostjob | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 16 | tDie | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Escenario con SUBJOB_ERROR existe. |
-| 17 | tWarn | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 18 | tLogCatcher | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (3 informes). |
-| 19 | tStatCatcher | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 20 | tSetGlobalVar | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 21 | tContextLoad | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 4 informes (`Duplicate local variable key_tContextLoad_2`). |
-| 22 | tLoop | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Escenario de bucle existe. |
-| 23 | tFileList | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4. Un fallo del arnes (`duplicated in the reactor`): volver a medir. |
-| 24 | tFileInputExcel | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 3 informes (`Syntax error on token ""`). |
-| 25 | tFileOutputExcel | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (3 informes). |
-| 26 | tFileInputXML | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 5 informes (`NameSpaceTool_... cannot be resolved`). Un fallo del arnes: volver a medir. |
-| 27 | tFileInputJSON | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (1 informe). Escenario L5 de JSON existe. |
-| 28 | tFileInputPositional | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (1 informe). Escenario de ancho fijo existe. |
-| 29 | tFileCopy | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 1 informe (`IllegalArgumentException`). |
-| 30 | tFileDelete | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Un fallo del arnes: volver a medir. |
-| 31 | tFileExist | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Un fallo del arnes: volver a medir. |
-| 32 | tHttpRequest | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tRESTClient, que no existe en esta Studio (el REST de la paleta, tREST, esta deprecated). Sin medicion. |
-| 33 | tSendMail | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Creado y guardado; sin compilacion medida en L4. |
-| 34 | tJavaRow | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 35 | tJavaFlex | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (3 informes). Escenario de tJavaFlex existe. |
-| 36 | tJoin | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 37 | tUnite | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Escenario L5 existe. |
-| 38 | tReplicate | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Escenario L5 existe. |
-| 39 | tNormalize | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 2 informes (`split(String`). |
-| 40 | tDenormalize | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Falla en 4 informes (`ciudad cannot be resolved`). |
-| 41 | tConvertType | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 42 | tFlowToIterate | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 43 | tIterateToFlow | D | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). |
-| 44 | tJDBCRow | E | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBRow. Sin medicion de compilacion. |
-| 45 | tJDBCClose | E | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBClose. Sin medicion de compilacion. |
-| 46 | tJDBCCommit | E | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBCommit. Sin medicion de compilacion. |
-| 47 | tJDBCRollback | E | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Sustituye a tDBRollback. Sin medicion de compilacion. |
-| 48 | tFixedFlowInput | E | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (1 informe). Escenario L5 existe. |
-| 49 | tRowGenerator | E | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (2 informes). Escenario L5 existe. |
-| 50 | tPostgresqlInput | E | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | Compila en L4 (1 informe). |
+| 1 | tMap | A | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: sale con codigo 1 sin salida (causa oculta en stderr: corregido el arnes, repetir). Compila en informes L4 (antes de los cambios de mapper). Bridge con los cambios compila; falta publicarlo. Fixture usa `row2`. |
+| 2 | tFileInputDelimited | A | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4. Varios escenarios L5. El validador exige FILENAME y esquema. |
+| 3 | tFileOutputDelimited | A | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (3 informes). |
+| 4 | tJDBCInput | A | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Sustituye a tDBInput, que no existe en esta Studio. Presente en el catalogo DI. Sin medicion de compilacion. |
+| 5 | tJDBCOutput | A | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | L5: escenario pendiente (ver fixture). Sustituye a tDBOutput. Sin medicion de compilacion. |
+| 6 | tJDBCConnection | A | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | L5: escenario pendiente (ver fixture). Sustituye a tDBConnection. Sin medicion de compilacion. |
+| 7 | tFilterRow | A | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (4 informes). Escenario L5 existente. |
+| 8 | tAggregateRow | A | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: sale con codigo 1 sin salida (causa oculta en stderr: corregido el arnes, repetir). Compila en L4 (3 informes). Reglas en 04-reglas-de-componentes.md. |
+| 9 | tSortRow | A | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Falla en 2 informes (`defaultRow cannot be resolved`) y pasa en 1. |
+| 10 | tUniqRow | A | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Falla en 1 informe (`IllegalArgumentException`) y pasa en 2. |
+| 11 | tJava | A | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). |
+| 12 | tLogRow | A | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). |
+| 13 | tRunJob | B | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Falla en 3 informes (`Syntax error on token "new"`). Escenario L5 con hijo existe. |
+| 14 | tPrejob | B | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). Escenario tPrejob -> tRunJob -> tPostjob. |
+| 15 | tPostjob | B | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). |
+| 16 | tDie | B | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). Escenario con SUBJOB_ERROR existe. |
+| 17 | tWarn | B | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). |
+| 18 | tLogCatcher | B | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (3 informes). |
+| 19 | tStatCatcher | B | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | L5: escenario pendiente (ver fixture). Compila en L4 (2 informes). |
+| 20 | tSetGlobalVar | B | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Compila en L4 (2 informes). |
+| 21 | tContextLoad | B | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Falla en 4 informes (`Duplicate local variable key_tContextLoad_2`). |
+| 22 | tLoop | B | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). Escenario de bucle existe. |
+| 23 | tFileList | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4. Un fallo del arnes (`duplicated in the reactor`): volver a medir. |
+| 24 | tFileInputExcel | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Falla en 3 informes (`Syntax error on token ""`). |
+| 25 | tFileOutputExcel | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (3 informes). |
+| 26 | tFileInputXML | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Falla en 5 informes (`NameSpaceTool_... cannot be resolved`). Un fallo del arnes: volver a medir. |
+| 27 | tFileInputJSON | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (1 informe). Escenario L5 de JSON existe. |
+| 28 | tFileInputPositional | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (1 informe). Escenario de ancho fijo existe. |
+| 29 | tFileCopy | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Falla en 1 informe (`IllegalArgumentException`). |
+| 30 | tFileDelete | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). Un fallo del arnes: volver a medir. |
+| 31 | tFileExist | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). Un fallo del arnes: volver a medir. |
+| 32 | tHttpRequest | C | ✅ | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | L5: escenario pendiente (ver fixture). Sustituye a tRESTClient, que no existe en esta Studio (el REST de la paleta, tREST, esta deprecated). Sin medicion. |
+| 33 | tSendMail | C | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Creado y guardado; sin compilacion medida en L4. |
+| 34 | tJavaRow | D | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). |
+| 35 | tJavaFlex | D | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Compila en L4 (3 informes). Escenario de tJavaFlex existe. |
+| 36 | tJoin | D | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Compila en L4 (2 informes). |
+| 37 | tUnite | D | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Compila en L4 (2 informes). Escenario L5 existe. |
+| 38 | tReplicate | D | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: sale con codigo 1 sin salida (causa oculta en stderr: corregido el arnes, repetir). Compila en L4 (2 informes). Escenario L5 existe. |
+| 39 | tNormalize | D | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: sale con codigo 1 sin salida (causa oculta en stderr: corregido el arnes, repetir). Falla en 2 informes (`split(String`). |
+| 40 | tDenormalize | D | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Falla en 4 informes (`ciudad cannot be resolved`). |
+| 41 | tConvertType | D | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Compila en L4 (2 informes). |
+| 42 | tFlowToIterate | D | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). |
+| 43 | tIterateToFlow | D | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (2 informes). |
+| 44 | tJDBCRow | E | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | L5: escenario pendiente (ver fixture). Sustituye a tDBRow. Sin medicion de compilacion. |
+| 45 | tJDBCClose | E | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | L5: escenario pendiente (ver fixture). Sustituye a tDBClose. Sin medicion de compilacion. |
+| 46 | tJDBCCommit | E | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | L5: escenario pendiente (ver fixture). Sustituye a tDBCommit. Sin medicion de compilacion. |
+| 47 | tJDBCRollback | E | ✅ | 🟡 | 🟡 | 🟡 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | L5: escenario pendiente (ver fixture). Sustituye a tDBRollback. Sin medicion de compilacion. |
+| 48 | tFixedFlowInput | E | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (1 informe). Escenario L5 existe. |
+| 49 | tRowGenerator | E | ✅ | 🟡 | 🟡 | 🟡 | 🟡 | ❌ | ⬜ | ⬜ | ❌ | L5: el job no termino a tiempo (Studio bloqueado o memoria; no hay causa del componente aun). Compila en L4 (2 informes). Escenario L5 existe. |
+| 50 | tPostgresqlInput | E | ✅ | 🟡 | 🟡 | 🟡 | ✅ | ✅ | ⬜ | ⬜ | 🟡 | L5: pasa en Talend (ultimo informe). Compila en L4 (1 informe). |
 
 ## C9 por grupo (agente frio)
 

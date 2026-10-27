@@ -12,6 +12,9 @@ Resumen de lo imprescindible:
 - **No hay apps ni UI.** El servidor expone solo tools MCP.
 - **No hay tunnel ni exposicion publica.** El servidor es local (`127.0.0.1`) o stdio.
 - **No hay aliases de tools.** Una sola tool por capacidad, siempre `talend_<area>_<verbo>`.
+- **Verifica con `talend_job_verify`.** Una llamada: diseno, compilacion, ejecucion y avisos
+  (`[WARN]`/`[ERROR]`/`[FATAL]`, excepciones) aunque el job termine con codigo 0. Informa de cada
+  aviso. Detalle en AGENTS.md, seccion 0.
 - **El plugin Java se instala por CLI:** `bun run scripts/start.ts --install-bridge`.
 
 Mapas utiles:

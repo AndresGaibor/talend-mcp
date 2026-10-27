@@ -13,3 +13,4 @@ salida esperada (L5) y reglas de configuracion de componentes.
 - [Reglas para configurar un componente](plan-de-pruebas/04-reglas-de-componentes.md)
 - [Plan componente a componente (50 componentes)](plan-de-pruebas/05-componentes-uno-a-uno.md)
 - [Seguimiento de los 50 componentes](plan-de-pruebas/06-seguimiento-componentes.md)
+- [Los 50 componentes principales: cómo configurarlos](COMPONENTES-PRINCIPALES.md)

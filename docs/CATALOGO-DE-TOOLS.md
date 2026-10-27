@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **233**.
+Tools registradas en el preset actual: **236**.
 
 ## Empezar
 
@@ -54,13 +54,9 @@ Un job nuevo en el proyecto, con componentes, schema, conexiones y una ejecucion
    - Ejemplo: `{"uniqueName":"tFixedFlowInput_1","columns":[{"name":"id","type":"id_Integer"},{"name":"ciudad","type":"id_String"}],"values":[["1","Bogota"]]}`
 7. `talend_job_connect_nodes`: Conectar por `uniqueName` con el conector real del componente (FLOW, UNIQUE, REJECT...).
    - Ejemplo: `{"source":"tFixedFlowInput_1","target":"tLogRow_1","type":"FLOW"}`
-8. `talend_job_problems`: Comprobar la vista Problemas antes de compilar. `clean: true` es lo que buscas.
+8. `talend_job_verify`: Todo en una llamada: diseno (Problemas), compilacion, ejecucion y revision de avisos. `verdict: ok` es lo que buscas; informa de los `findings`.
    - Ejemplo: `{"job":"MI_JOB"}`
-9. `talend_job_compile`: Generar el codigo y verificar que compila, sin ejecutar.
-   - Ejemplo: `{"job":"MI_JOB"}`
-10. `talend_job_run_by_name`: Compilar y lanzar el job en Studio.
-   - Ejemplo: `{"jobName":"MI_JOB","waitForTermination":true}`
-11. `talend_job_execute`: Relanzar y obtener `exitCode`, `stdout` y las `lines` para comparar con lo esperado.
+9. `talend_job_execute` (opcional): Solo si `verify` no capturo la salida: obtener `exitCode`, `stdout` y `findings`.
    - Ejemplo: `{"name":"MI_JOB"}`
 
 Evita:
@@ -69,7 +65,7 @@ Evita:
 - En tMap, tAggregateRow, tNormalize y tJavaRow el schema y el modelo se aplican al final, despues de conectar.
 - No lances un job mientras Studio lo esta compilando: deja el classpath bloqueado.
 
-**Completado cuando:** `talend_job_problems` devuelve `clean: true`, `talend_job_compile` devuelve `compiles: true` y `talend_job_execute` trae la salida esperada.
+**Completado cuando:** `talend_job_verify` devuelve `verdict` `ok` (o `ok_con_avisos` con los avisos informados) y las `lines` coinciden con lo esperado.
 
 ### Modificar un job existente (`editar-job`)
 
@@ -86,17 +82,15 @@ Cambiar parametros, schema, etiquetas o conexiones de un job sin recrearlo.
 4. `talend_job_configure_node`: Cambiar parametros, tablas, schema o el modelo del tMap de un nodo.
    - Ejemplo: `{"uniqueName":"tFileInputDelimited_1","parameters":{"FILENAME":{"value":"\"C:/datos/entrada.csv\""}}}`
 5. `talend_job_update_node` (opcional): Cambiar solo la etiqueta o un conjunto pequeno de parametros; guarda el job.
-6. `talend_job_problems`: Verificar que el job sigue sin errores de diseno.
-   - Ejemplo: `{"job":"MI_JOB"}`
-7. `talend_job_compile`: Confirmar que el cambio genera codigo valido.
-   - Ejemplo: `{"job":"MI_JOB"}`
+6. `talend_job_verify`: Confirmar que el cambio no deja avisos de diseno y genera codigo valido. Con `run: false` no ejecuta el job.
+   - Ejemplo: `{"job":"MI_JOB","run":false}`
 
 Evita:
 - Los valores de texto son literales Java: una ruta va entre comillas (`"C:/datos/a.csv"`) o usa `literal: true`.
 - Al conectar, Studio propaga el schema del destino hacia atras; revisa el schema del origen despues de conectar.
 - El nombre de la conexion lo pone el bridge (`row1`, `row2`...) y es el que usan las tablas del tMap.
 
-**Completado cuando:** `talend_job_problems` sin errores y `talend_job_compile` con `compiles: true`.
+**Completado cuando:** `talend_job_verify` con `verdict` `ok` (o `ok_con_avisos` con los avisos informados).
 
 ### Ejecutar un job y verificar la salida (`ejecutar-y-verificar`)
 
@@ -104,21 +98,23 @@ Saber si el job corre, con que codigo termina y que datos produjo.
 
 **Cuando:** Despues de crear o cambiar un job, o para reproducir un fallo reportado.
 
-1. `talend_job_compile`: Verificar que compila antes de gastar una ejecucion.
+1. `talend_job_verify`: Todo en una llamada: diseno (Problemas), compilacion, ejecucion y revision de avisos. Devuelve `verdict` y `findings`. Usala siempre primero.
    - Ejemplo: `{"job":"MI_JOB"}`
-2. `talend_job_run_by_name`: Lanzar el job por su launch config; con `waitForTermination` espera el final.
-   - Ejemplo: `{"jobName":"MI_JOB","waitForTermination":true,"timeoutMs":120000}`
-3. `talend_job_execute`: Relanzar y traer `exitCode` y `stdout`. Es la unica forma de leer la salida desde el MCP.
+2. `talend_job_execute` (opcional): Relanzar y traer `exitCode`, `stdout` y `findings` (avisos y errores de la salida), si `verify` no capturo la salida.
    - Ejemplo: `{"name":"MI_JOB"}`
-4. `talend_job_wait_run` (opcional): Esperar un launch ya iniciado cuando no se espero en el paso anterior.
-5. `talend_runs_list` (opcional): Ver el historial de ejecuciones guardadas y sus identificadores.
-6. `talend_runs_read` (opcional): Leer el detalle de una ejecucion por `runId`.
+3. `talend_runs_list` (opcional): Ver el historial de ejecuciones guardadas y sus identificadores.
+4. `talend_runs_read` (opcional): Leer el detalle de una ejecucion por `runId`.
+5. `talend_tail_run_output` (opcional): Leer stdout y stderr de una ejecucion guardada, para buscar `[WARN]`, `[ERROR]` y excepciones.
+   - Ejemplo: `{"runId":"RUN_ID","stream":"both"}`
+6. `talend_bridge_log_tail` (opcional): Error Log de Studio: avisos de componentes y plugins que no salen en la salida del job.
+   - Ejemplo: `{"lines":200}`
 
 Evita:
-- `talend_job_run_by_name` no devuelve la salida: usa `talend_job_execute` para leerla.
+- Un job con `exitCode` 0 puede llevar avisos: busca `[WARN]`, `[ERROR]`, `[FATAL]` y excepciones en la salida y en `talend_bridge_log_tail`, e informa de cada uno.
+- Si `verify` termina por tiempo (`timedOut`), sube `timeoutMs`; el job puede seguir corriendo en Studio.
 - Si el job escribe un fichero, borra la salida anterior o usa `FILE_EXIST_EXCEPTION=false`.
 
-**Completado cuando:** `exitCode` es 0 y las `lines` de `talend_job_execute` coinciden con lo esperado.
+**Completado cuando:** `talend_job_verify` devuelve `verdict` `ok` (o `ok_con_avisos` con los avisos informados), `exitCode` es 0, las `lines` de `talend_job_execute` coinciden con lo esperado y no hay `[ERROR]`, `[FATAL]` ni excepciones sin explicar (los `[WARN]` se informan).
 
 ### Diagnosticar un job que falla (`diagnosticar-error`)
 
@@ -126,16 +122,14 @@ Pasar de un sintoma (job que no corre, error de compilacion, filas vacias) a una
 
 **Cuando:** Cuando el job compila pero falla, o cuando el resultado no es el esperado.
 
-1. `talend_job_problems`: Primero los errores de diseno de la vista Problemas, sin ejecutar nada.
+1. `talend_job_verify`: Diseno, compilacion, ejecucion y avisos de una vez: `problems`, `compileDetail`, `findings` y `lines` dicen donde falla.
    - Ejemplo: `{"job":"MI_JOB"}`
-2. `talend_job_compile`: Si compila, el problema es de datos o de configuracion en tiempo de ejecucion.
-   - Ejemplo: `{"job":"MI_JOB"}`
-3. `talend_errors_explain`: Explicar el mensaje de error (o el `runId`) y mapearlo a un componente.
+2. `talend_errors_explain`: Explicar el mensaje de error (o el `runId`) y mapearlo a un componente.
    - Ejemplo: `{"errorMessage":"column \"null\" does not exist"}`
-4. `talend_errors_suggest_fix`: Obtener el fix sugerido con el nivel de confianza.
-5. `talend_job_quality_report` (opcional): Revisar antipatrones y hallazgos de calidad del job.
+3. `talend_errors_suggest_fix`: Obtener el fix sugerido con el nivel de confianza.
+4. `talend_job_quality_report` (opcional): Revisar antipatrones y hallazgos de calidad del job.
    - Ejemplo: `{"jobId":"MI_JOB"}`
-6. `talend_bridge_problems_markers` (opcional): Leer los markers de Eclipse cuando el fallo es del IDE y no del job.
+5. `talend_bridge_problems_markers` (opcional): Leer los markers de Eclipse cuando el fallo es del IDE y no del job.
 
 Evita:
 - Si el job termina con codigo 0 pero no hay filas, sospecha del conector: `tUniqRow` sale por `UNIQUE`, no por `FLOW`.
@@ -735,14 +729,14 @@ Argumentos principales:
 
 #### `talend_bridge_close_saved_editors`
 
-Cierra los editores de jobs sin cambios sin guardar, para liberar memoria del heap de Studio. Los editores con cambios sin guardar se dejan abiertos: nunca se guarda ni se descarta nada.
+Cierra los editores de jobs que no tienen cambios sin guardar, para liberar memoria del heap de Studio. Con `prefix` solo cierra los jobs cuyo nombre empieza por ese texto (por ejemplo MCP_L5_, los del arnes). Por defecto solo lista lo que cerraria: con `dryRun: false` lo cierra. No guarda ni descarta nada: un editor con cambios sin guardar se deja abierto.
 
-**Uso:** escribe/ejecuta; requiere Studio + bridge. Por defecto solo lista (`dryRun` true).
+**Uso:** escribe/ejecuta; requiere Studio + bridge.
 
 Argumentos principales:
 
-- `prefix` (string, opcional): Solo jobs cuyo nombre empieza por este texto (por ejemplo `MCP_L5_`)
-- `dryRun` (boolean, opcional, por defecto `true`): Con `false` cierra los editores
+- `prefix` (string, opcional): Solo jobs cuyo nombre empieza por este texto
+- `dryRun` (boolean, opcional): Por defecto solo lista lo que cerraria; false cierra los editores
 
 #### `talend_bridge_commands`
 
@@ -815,6 +809,16 @@ Argumentos principales:
 
 - `launchId` (string, obligatorio): ID de la launch
 
+#### `talend_bridge_log_tail`
+
+Ultimas lineas del Error Log de Talend Studio: errores y avisos de componentes y plugins que no salen en la salida del job. Revisalo despues de ejecutar o compilar, aunque todo haya ido bien.
+
+**Uso:** escribe/ejecuta; requiere Studio + bridge.
+
+Argumentos principales:
+
+- `lines` (integer, opcional): Cuantas lineas finales leer (el servidor acota el maximo)
+
 #### `talend_bridge_open_component_settings`
 
 Abre la configuración de un componente en Talend Studio.
@@ -849,7 +853,7 @@ Probe de clases de Talend.
 
 #### `talend_bridge_problems_markers`
 
-Obtiene los markers de problemas.
+Obtiene los markers de problemas del IDE (Eclipse). Para los avisos de un job concreto usa talend_job_problems.
 
 **Uso:** solo lectura; requiere Studio + bridge.
 
@@ -1712,7 +1716,8 @@ Lista los parámetros de un componente.
 
 Argumentos principales:
 
-- `componentName` (string, obligatorio): Nombre del componente
+- `componentName` (string, opcional): Nombre del componente, por ejemplo tFileInputDelimited
+- `name` (string, opcional): Igual que componentName (el nombre que usan talend_components_definition y talend_studio_component_parameters)
 
 #### `talend_components_preview_patch`
 
@@ -2254,7 +2259,7 @@ Detecta el job que probablemente está abierto en Talend Studio.
 
 #### `talend_job_add_node`
 
-Anade un componente al job abierto. El componente se crea con la API de Studio, con todos sus parametros por defecto, y se configura de forma declarativa (parametros, tablas, schema y, en el tMap, sus transformaciones).
+Anade un componente al job abierto, con sus parametros por defecto de Studio, y lo configura de forma declarativa (parametros, tablas, schema y, en el tMap, sus transformaciones). Orden recomendado: 1) talend_components_definition {name} para ver que parametros tu pones; 2) esta tool con type y lo que pusiste; 3) talend_job_connect_nodes para conectar; 4) talend_job_compile para comprobar que el codigo compila. El tMap se configura despues de conectar: sus tablas tienen que llamarse como sus conexiones (row1, row2...).
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -2271,7 +2276,7 @@ Argumentos principales:
 
 #### `talend_job_apply_custom_spec`
 
-Crea o completa una estructura de Jobs con la API de Studio. Valida componentes y conexiones, conserva valores existentes y rechaza destinos ajenos. No compila, ejecuta ni publica Jobs.
+Crea o completa una estructura de Jobs con la API de Studio. Valida componentes y conexiones, conserva valores existentes y rechaza destinos ajenos. No ejecuta ni publica Jobs. Devuelve `problems` (errores y avisos de diseno por componente, vista Problemas) del job ya montado: revisalo antes de ejecutar y arregla los errores; despues usa talend_job_verify.
 
 **Uso:** escribe/ejecuta; requiere confirmacion; funciona sin Studio.
 
@@ -2304,7 +2309,7 @@ Argumentos principales:
 
 #### `talend_job_configure_node`
 
-Configura un componente ya anadido al job: sus parametros, sus tablas, su schema o las transformaciones de un tMap. Es la via para retocar un job existente sin recrearlo.
+Configura un componente ya anadido al job: sus parametros, sus tablas, su schema o las transformaciones de un tMap. Es la via para retocar un job existente sin recrearlo. Solo cambia lo que le pases; los parametros que no nombres se quedan como estaban. Usa el uniqueName que devolvio talend_job_add_node o talend_job_list_nodes.
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -2360,7 +2365,7 @@ Argumentos principales:
 
 #### `talend_job_execute`
 
-Ejecuta un job ya generado y devuelve su salida (las filas que imprime el tLogRow). Sirve para comprobar que el resultado es el esperado: la vista Run de Studio no se puede leer desde el MCP.
+Ejecuta un job ya generado y devuelve su salida (las filas que imprime el tLogRow). Sirve para comprobar que el resultado es el esperado: la vista Run de Studio no se puede leer desde el MCP. 'findings' lista los [WARN], [ERROR], [FATAL] y excepciones de la salida aunque el codigo de salida sea 0: informa de ellos. Para comprobar un job completo (diseno + compilacion + ejecucion) usa talend_job_verify.
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -2483,6 +2488,19 @@ Argumentos principales:
 - `uniqueName` (string, obligatorio): Unique name del nodo
 - `label` (string, opcional): Nueva etiqueta
 - `parameters` (object, opcional): Parametros a cambiar
+
+#### `talend_job_verify`
+
+Comprueba un job de principio a fin en UNA llamada: (1) errores y avisos de diseno (vista Problemas), (2) que compila, (3) lo ejecuta y revisa su salida buscando [WARN], [ERROR], [FATAL] y excepciones aunque el codigo de salida sea 0. Devuelve 'verdict' (ok | ok_con_avisos | error) con 'problems', 'compiles', 'exitCode', 'lines' y 'findings'. Es la tool que hay que usar tras crear o cambiar un job; informa al usuario de cada aviso. Con run:false solo comprueba diseno y compilacion, sin ejecutar.
+
+**Uso:** escribe/ejecuta; funciona sin Studio.
+
+Argumentos principales:
+
+- `job` (string, obligatorio): Nombre del job
+- `run` (boolean, opcional): Ejecutar el job (false = solo diseno y compilacion)
+- `installMissing` (boolean, opcional): Descargar las dependencias que falten al compilar
+- `timeoutMs` (number, opcional): Tiempo maximo de la ejecucion en milisegundos (por defecto 120000)
 
 #### `talend_jobs_apply_pipeline_spec`
 

@@ -9,8 +9,22 @@ Una operacion puede devolver `ok: true` y no haber escrito nada. Despues de escr
 1. `talend_job_list_nodes` y comparar con lo esperado, y `talend_job_problems` para que no haya avisos.
 2. Mirar el `.item`: un job vacio pesa ~196 bytes; si no cambia de tamano tras anadir nodos, no
    llego al disco.
-3. Ejecutar con `talend_job_execute` y **comparar la salida contra lo que definiste antes de
+3. `talend_job_compile`: `compiles: true`.
+4. Ejecutar con `talend_job_execute` y **comparar la salida contra lo que definiste antes de
    ejecutar**. Es el criterio del [plan de pruebas](../PLAN-DE-PRUEBAS.md).
+5. **Buscar avisos y errores en la salida aunque el job haya terminado bien** (codigo 0):
+   lineas `[WARN]`, `[ERROR]`, `[FATAL]` y excepciones. Para el detalle usa `talend_runs_read` y
+   `talend_tail_run_output` (stderr), `talend_analyze_logs` y el Error Log de Studio
+   (`talend_bridge_log_tail`). Un aviso se informa al usuario; no se da por ruido.
+   Los `[WARN]` previos a un error real son ruido de fondo (Hadoop, winutils...), pero hay que
+   leerlos para saberlo.
+
+**Atajo: `talend_job_verify { job }` hace los pasos 1, 3, 4 y 5 en una llamada** y devuelve `verdict` y `findings`.
+
+En el arnes L5 esto es automatico (`src/talend/diagnostics/output-findings.ts`): lee `talend_job_problems` antes de
+ejecutar y la salida (stdout y stderr) despues. Un `[ERROR]`/`[FATAL]` o un error de diseno con el
+job terminado hace fallar el escenario; los avisos salen en el detalle del informe. Lo que el
+escenario deja a proposito se declara en `espera.avisos_tolerados` (fragmentos de texto).
 
 ## 6. Dialogos y bloqueos de Studio
 
