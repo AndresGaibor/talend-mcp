@@ -46,6 +46,9 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 2026-10-27 | tAdvancedFileOutputXML | C5 | `execution-check --suite archivos` | Pendiente: usa ROOT, LOOP y MAP; el codigo generado referencia una variable no declarada (nameToElement_tAFOX_2). Mismo patron que tWriteXMLField. |
 | 2026-10-27 | tExtractDelimitedFields | C5 | `execution-check --suite archivos` | Pendiente: el generador busca FIELD en la metadata de la conexion de entrada, que conserva las columnas del destino. Reaplicar el esquema del origen no actualiza la conexion. Hace falta refrescarla en el bridge. |
 | 2026-10-27 | Bridge: sincronizacion de conexiones de salida | C5 | `set-schema` + `execution-check` (tExtractDelimitedFields) | Probado y revertido: copiar el esquema del origen a sus conexiones de salida (la tabla llega con `linea`) no basta; el generador sigue sin emitir el try. Probablemente una segunda propagacion al persistir el job. Pendiente de investigar en JobPersistence.persist. |
+| 2026-10-27 | tMongoDBInput, tMongoDBOutput, tMongoDBConnection, tMongoDBClose | C5, C6 | `execution-check --suite bd` (Mongo 7, auth SCRAM) | Pasan. Los dos escenarios que estaban pendientes pasan al poner la tabla MAPPING (una fila por columna). La marca de cuelgue era consecuencia de ese error de diseno. |
+| 2026-10-27 | tMongoDBRow | C5, C6 | `execution-check --suite bd` | Pasa: inserta con un comando JSON (`insert`) y lo lee de vuelta. |
+| 2026-10-27 | tMongoDBGridFSPut, tMongoDBGridFSList | C5, C6 | `execution-check --suite bd` | Pasan. GridFSList emite por ITERATE (CURRENT_FILENAME), no por fila. |
 
 ## Estado
 

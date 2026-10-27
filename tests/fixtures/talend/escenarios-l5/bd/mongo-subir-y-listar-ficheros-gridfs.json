@@ -1,0 +1,129 @@
+{
+  "nombre": "bases de datos: subir un fichero a GridFS con tMongoDBGridFSPut y listarlo",
+  "job": "MCP_L5_MongoGridFS",
+  "nodos": [
+    {
+      "type": "tMongoDBConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "27018"
+        },
+        "DATABASE": {
+          "value": "talend_test"
+        },
+        "REQUIRED_AUTHENTICATION": {
+          "value": "true"
+        },
+        "AUTHENTICATION_MECHANISM": {
+          "value": "SCRAMSHA256_MEC"
+        },
+        "SET_AUTHENTICATION_DATABASE": {
+          "value": "true"
+        },
+        "AUTHENTICATION_DATABASE": {
+          "value": "admin"
+        },
+        "USERNAME": {
+          "value": "talend"
+        },
+        "PASSWORD": {
+          "value": "talend"
+        }
+      }
+    },
+    {
+      "type": "tMongoDBGridFSPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "BUCKET": {
+          "value": "l5_fs",
+          "literal": true
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@",
+          "literal": true
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_gridfs.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tMongoDBGridFSList",
+      "nombre": "lista",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "BUCKET": {
+          "value": "l5_fs",
+          "literal": true
+        },
+        "FILENAME": {
+          "value": "l5_gridfs.csv",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"archivo: \" + globalMap.get(\"@uniqueName:lista\" + \"_CURRENT_FILENAME\"));"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "sube",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "lista",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lista",
+      "destino": "imprime",
+      "tipo": "ITERATE"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "archivo: l5_gridfs.csv"
+    ]
+  }
+}

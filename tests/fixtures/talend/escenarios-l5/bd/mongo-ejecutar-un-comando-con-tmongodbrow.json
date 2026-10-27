@@ -1,0 +1,135 @@
+{
+  "nombre": "bases de datos: insertar con un comando en MongoDB con tMongoDBRow",
+  "job": "MCP_L5_MongoRow",
+  "nodos": [
+    {
+      "type": "tMongoDBConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "27018"
+        },
+        "DATABASE": {
+          "value": "talend_test"
+        },
+        "REQUIRED_AUTHENTICATION": {
+          "value": "true"
+        },
+        "AUTHENTICATION_MECHANISM": {
+          "value": "SCRAMSHA256_MEC"
+        },
+        "SET_AUTHENTICATION_DATABASE": {
+          "value": "true"
+        },
+        "AUTHENTICATION_DATABASE": {
+          "value": "admin"
+        },
+        "USERNAME": {
+          "value": "talend"
+        },
+        "PASSWORD": {
+          "value": "talend"
+        }
+      }
+    },
+    {
+      "type": "tMongoDBRow",
+      "nombre": "comando",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "EXECUTE_JSONCOMMAND": {
+          "value": "true"
+        },
+        "JSON_COMMAND": {
+          "value": "{\"insert\":\"l5_mongo_row\",\"documents\":[{\"id\":1,\"nombre\":\"Ana\"}]}",
+          "literal": true
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tMongoDBInput",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "COLLECTION": {
+          "value": "l5_mongo_row",
+          "literal": true
+        },
+        "QUERY_TYPE": {
+          "value": "FIND_QUERY"
+        },
+        "QUERY": {
+          "value": "\"{}\""
+        }
+      },
+      "tablas": {
+        "MAPPING": {
+          "columns": [
+            "PARENT_NODE_PATH"
+          ],
+          "rows": [
+            {
+              "PARENT_NODE_PATH": ""
+            },
+            {
+              "PARENT_NODE_PATH": ""
+            }
+          ]
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "comando",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "comando",
+      "destino": "lee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana"
+    ]
+  }
+}
