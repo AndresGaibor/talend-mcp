@@ -17,7 +17,7 @@
 
 <br>
 
-<img src="docs/media/demo.gif" alt="Demostración: mapa de herramientas y flujo de creación de un job" width="720">
+<img src="docs/media/demo.gif" alt="Demostración: un asistente crea, conecta, compila y ejecuta un job en Talend Studio" width="720">
 
 </div>
 
