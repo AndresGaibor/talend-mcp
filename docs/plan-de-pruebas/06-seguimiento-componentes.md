@@ -49,6 +49,8 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 2026-10-27 | tMongoDBInput, tMongoDBOutput, tMongoDBConnection, tMongoDBClose | C5, C6 | `execution-check --suite bd` (Mongo 7, auth SCRAM) | Pasan. Los dos escenarios que estaban pendientes pasan al poner la tabla MAPPING (una fila por columna). La marca de cuelgue era consecuencia de ese error de diseno. |
 | 2026-10-27 | tMongoDBRow | C5, C6 | `execution-check --suite bd` | Pasa: inserta con un comando JSON (`insert`) y lo lee de vuelta. |
 | 2026-10-27 | tMongoDBGridFSPut, tMongoDBGridFSList | C5, C6 | `execution-check --suite bd` | Pasan. GridFSList emite por ITERATE (CURRENT_FILENAME), no por fila. |
+| 2026-10-27 | tMongoDBGridFSGet | C5, C6 | `execution-check --suite bd` | Pasa: sube, baja y el contenido coincide. OUTPUT_LOCAL_PATH es una carpeta (guarda dentro con el nombre del fichero). |
+| 2026-10-27 | tMongoDBGridFSDelete | C5, C6 | `execution-check --suite bd` | Pasa: sube, borra y el listado posterior no devuelve nada. |
 
 ## Estado
 

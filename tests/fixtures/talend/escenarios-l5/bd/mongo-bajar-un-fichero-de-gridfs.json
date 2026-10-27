@@ -1,0 +1,129 @@
+{
+  "nombre": "bases de datos: bajar un fichero de GridFS con tMongoDBGridFSGet y comprobar su contenido",
+  "job": "MCP_L5_MongoGridFSGet",
+  "nodos": [
+    {
+      "type": "tMongoDBConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "27018"
+        },
+        "DATABASE": {
+          "value": "talend_test"
+        },
+        "REQUIRED_AUTHENTICATION": {
+          "value": "true"
+        },
+        "AUTHENTICATION_MECHANISM": {
+          "value": "SCRAMSHA256_MEC"
+        },
+        "SET_AUTHENTICATION_DATABASE": {
+          "value": "true"
+        },
+        "AUTHENTICATION_DATABASE": {
+          "value": "admin"
+        },
+        "USERNAME": {
+          "value": "talend"
+        },
+        "PASSWORD": {
+          "value": "talend"
+        }
+      }
+    },
+    {
+      "type": "tMongoDBGridFSPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "BUCKET": {
+          "value": "l5_fs",
+          "literal": true
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@",
+          "literal": true
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_gridfs.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tMongoDBGridFSGet",
+      "nombre": "baja",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "BUCKET": {
+          "value": "l5_fs",
+          "literal": true
+        },
+        "FILENAME": {
+          "value": "l5_gridfs.csv",
+          "literal": true
+        },
+        "OUTPUT_LOCAL_PATH": {
+          "value": "@TESTDATA@/l5_gridfs_bajado",
+          "literal": true
+        },
+        "OVERWRITE_LOCAL_FILES": {
+          "value": "true"
+        },
+        "ID_AS_FILENAME": {
+          "value": "false"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "sube",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "baja",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "fichero": {
+      "ruta": "@TESTDATA@/l5_gridfs_bajado/l5_gridfs.csv",
+      "contiene": [
+        "id;nombre;ciudad;monto",
+        "3;Lucia;Cali;300"
+      ]
+    }
+  }
+}
