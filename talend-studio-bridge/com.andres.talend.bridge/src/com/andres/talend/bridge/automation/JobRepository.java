@@ -599,9 +599,13 @@ public final class JobRepository {
     if (iProject == null) {
       return null;
     }
+    String itemName = name + "_" + version + ".item";
     for (String base : new String[] {"process", "process_mr"}) {
       org.eclipse.core.resources.IFolder root = iProject.getFolder(base);
       root.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
+      if (!root.exists()) {
+        continue;
+      }
 
       org.eclipse.core.resources.IFolder relativeFolder = root;
       if (folder != null && !folder.trim().isEmpty()) {
@@ -613,7 +617,7 @@ public final class JobRepository {
       }
       org.eclipse.core.resources.IFolder jobFolder = relativeFolder.getFolder(name);
       jobFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
-      org.eclipse.core.resources.IFile file = jobFolder.getFile(name + "_" + version + ".item");
+      org.eclipse.core.resources.IFile file = jobFolder.getFile(itemName);
       if (file.exists()) {
         return file;
       }
@@ -622,14 +626,45 @@ public final class JobRepository {
       if (relativeFolder != root) {
         org.eclipse.core.resources.IFolder legacyJobFolder = root.getFolder(name);
         legacyJobFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
-        file = legacyJobFolder.getFile(name + "_" + version + ".item");
+        file = legacyJobFolder.getFile(itemName);
         if (file.exists()) {
           return file;
         }
       }
-      file = root.getFile(name + "_" + version + ".item");
+      file = root.getFile(itemName);
       if (file.exists()) {
         return file;
+      }
+
+      // Talend puede escribir el codigo de la carpeta despues del nombre del job
+      // (`process/<job>/<carpeta>/<job>_v.item`) en vez de antes. Sin esta busqueda
+      // el job queda creado pero el bridge no lo encuentra para abrirlo.
+      org.eclipse.core.resources.IFile desplazado = findItemBelow(root, itemName, 5);
+      if (desplazado != null) {
+        return desplazado;
+      }
+    }
+    return null;
+  }
+
+  /** Busca un archivo por nombre dentro de un contenedor, con profundidad acotada. */
+  private static org.eclipse.core.resources.IFile findItemBelow(
+      org.eclipse.core.resources.IContainer container, String itemName, int depth) throws Exception {
+    if (depth < 0) {
+      return null;
+    }
+    container.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ONE, null);
+    for (org.eclipse.core.resources.IResource member : container.members()) {
+      if (member instanceof org.eclipse.core.resources.IFile
+          && member.getName().equalsIgnoreCase(itemName)) {
+        return (org.eclipse.core.resources.IFile) member;
+      }
+      if (member instanceof org.eclipse.core.resources.IContainer) {
+        org.eclipse.core.resources.IFile nested = findItemBelow(
+            (org.eclipse.core.resources.IContainer) member, itemName, depth - 1);
+        if (nested != null) {
+          return nested;
+        }
       }
     }
     return null;
