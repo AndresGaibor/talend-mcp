@@ -95,6 +95,9 @@
     }
   ],
   "espera": {
+    "avisos_tolerados": [
+      "tWaitForFile_2: This component should have outputs linked"
+    ],
     "contiene": [
       "archivo recibido"
     ]

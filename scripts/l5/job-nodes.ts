@@ -11,6 +11,23 @@ export function datosConRutas(filas: string[][]): string[][] {
   return filas.map((fila) => fila.map((celda) => conRutas(celda)));
 }
 
+/** Las tablas de un nodo con `@TESTDATA@` sustituido en cada celda (las filas son listas u objetos). */
+export function tablasConRutas(tablas: NonNullable<Nodo["tablas"]>): NonNullable<Nodo["tablas"]> {
+  return Object.fromEntries(
+    Object.entries(tablas).map(([nombre, tabla]) => [
+      nombre,
+      {
+        ...tabla,
+        rows: tabla.rows.map((fila) =>
+          Array.isArray(fila)
+            ? fila.map((celda) => conRutas(celda))
+            : Object.fromEntries(Object.entries(fila).map(([columna, celda]) => [columna, conRutas(celda)])),
+        ),
+      },
+    ]),
+  );
+}
+
 /**
  * Nodos del job: alta en Studio y primer schema.
  *

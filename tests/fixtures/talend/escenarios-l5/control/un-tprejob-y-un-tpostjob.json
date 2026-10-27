@@ -129,6 +129,9 @@
     }
   ],
   "espera": {
+    "avisos_tolerados": [
+      "tPrejob_2: This component has too much"
+    ],
     "fichero": {
       "ruta": "@TESTDATA@/l5_prepost.txt",
       "lineas": [

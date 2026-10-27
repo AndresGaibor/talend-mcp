@@ -63,12 +63,17 @@ export function leerResultados(ruta: string): Map<string, string> {
 
 /** Linea CSV de un escenario ejecutado. */
 export function filaResultado(escenario: Escenario, detalle: Resultado): string {
+  // El mensaje solo muestra los primeros avisos: el informe guarda todos.
+  const completos = detalle.avisos && detalle.avisos.length > 3
+    ? `avisos completos (${detalle.avisos.length}): ${detalle.avisos.join(" | ")}`
+    : "";
+  const detalleFila = [detalle.mensaje, completos].filter(Boolean).join("; ");
   return [
     escenario.nombre,
     escenario.job,
     detalle.ejecutaOk ? "si" : "no",
     detalle.salidaCorrecta ? "si" : "no",
-    detalle.mensaje ?? "",
+    detalleFila,
   ]
     .map(escaparCampo)
     .join(",");
@@ -77,6 +82,19 @@ export function filaResultado(escenario: Escenario, detalle: Resultado): string 
 /** Escribe el informe completo (cabecera y filas ya ordenadas por el llamador). */
 export function escribirResultados(ruta: string, filas: Iterable<string>): void {
   writeFileSync(ruta, `${[CABECERA_CSV, ...filas].join("\n")}\n`, "utf8");
+}
+
+/** Nombres que salieron bien en el informe (escenario y salida correctos). */
+export function nombresOk(ruta: string): Set<string> {
+  if (!existsSync(ruta)) return new Set();
+  const nombres = new Set<string>();
+  for (const linea of readFileSync(ruta, "utf8").split(/\r?\n/).slice(1)) {
+    if (!linea.trim()) continue;
+    const campos = parsearLinea(linea);
+    if (campos[2] === "si" && campos[3] === "si") nombres.add(campos[0] ?? "");
+  }
+  nombres.delete("");
+  return nombres;
 }
 
 /** Nombres que no salieron bien en el informe anterior. */

@@ -96,6 +96,9 @@
     }
   ],
   "espera": {
+    "avisos_tolerados": [
+      "tStandardizePhoneNumber_2: The schema from the input link"
+    ],
     "contiene": [
       "+14155552671",
       "true"

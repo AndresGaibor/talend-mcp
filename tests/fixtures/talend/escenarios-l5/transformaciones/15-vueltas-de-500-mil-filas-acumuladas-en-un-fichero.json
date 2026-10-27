@@ -1,6 +1,7 @@
 {
   "nombre": "transformaciones: 15 vueltas de 500 mil filas acumuladas en un fichero",
   "job": "MCP_L5_Rendimiento",
+  "timeoutMs": 600000,
   "nodos": [
     {
       "type": "tJava",

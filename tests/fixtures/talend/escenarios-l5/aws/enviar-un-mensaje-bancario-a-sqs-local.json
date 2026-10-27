@@ -7,23 +7,13 @@
       "nombre": "entrada",
       "columnas": [
         {
-          "name": "id",
-          "type": "id_Integer"
-        },
-        {
-          "name": "cuenta",
-          "type": "id_String"
-        },
-        {
-          "name": "evento",
+          "name": "Body",
           "type": "id_String"
         }
       ],
       "values": [
         [
-          "9001",
-          "CTA-9001",
-          "ALERTA_FRAUDE"
+          "{\"id\":9001,\"cuenta\":\"CTA-9001\",\"evento\":\"ALERTA_FRAUDE\"}"
         ]
       ],
       "schemaDespuesDeConectar": true
@@ -33,15 +23,7 @@
       "nombre": "envia",
       "columnas": [
         {
-          "name": "id",
-          "type": "id_Integer"
-        },
-        {
-          "name": "cuenta",
-          "type": "id_String"
-        },
-        {
-          "name": "evento",
+          "name": "Body",
           "type": "id_String"
         }
       ],

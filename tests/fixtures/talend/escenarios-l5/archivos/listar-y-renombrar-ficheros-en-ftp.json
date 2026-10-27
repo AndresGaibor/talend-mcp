@@ -1,0 +1,300 @@
+{
+  "nombre": "archivos: listar y renombrar ficheros en FTP",
+  "job": "MCP_L5_FtpListaRenombra",
+  "nodos": [
+    {
+      "type": "tFTPConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "2121"
+        },
+        "LOGON_TYPE": {
+          "value": "PASSWORD"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "CONNECT_MODE": {
+          "value": "PASSIVE"
+        }
+      }
+    },
+    {
+      "type": "tFTPDelete",
+      "nombre": "limpia",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "DIE_ON_ERROR": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_ftp_*.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFTPPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@"
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "MODE": {
+          "value": "binary"
+        },
+        "OVERWRITE": {
+          "value": "always"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_ftp_a.csv\""
+            },
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_ftp_b.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFTPFileList",
+      "nombre": "lista1",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_ftp_*.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime1",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"lista1: \" + globalMap.get(\"@uniqueName:lista1\" + \"_CURRENT_FILE\"));"
+        }
+      }
+    },
+    {
+      "type": "tFTPRename",
+      "nombre": "renombra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "OVERWRITE": {
+          "value": "never"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_ftp_a.csv\"",
+              "NEWNAME": "\"l5_ftp_renombrado.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFTPFileList",
+      "nombre": "lista2",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_ftp_*.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tJava",
+      "nombre": "imprime2",
+      "parameters": {
+        "CODE": {
+          "value": "System.out.println(\"lista2: \" + globalMap.get(\"@uniqueName:lista2\" + \"_CURRENT_FILE\"));"
+        }
+      }
+    },
+    {
+      "type": "tFTPDelete",
+      "nombre": "borra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "DIE_ON_ERROR": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_ftp_*.csv\""
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "limpia",
+      "destino": "sube",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "lista1",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lista1",
+      "destino": "imprime1",
+      "tipo": "ITERATE"
+    },
+    {
+      "origen": "lista1",
+      "destino": "renombra",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "renombra",
+      "destino": "lista2",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lista2",
+      "destino": "imprime2",
+      "tipo": "ITERATE"
+    },
+    {
+      "origen": "lista2",
+      "destino": "borra",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "lineas": 4,
+    "contiene": [
+      "lista1: l5_ftp_a.csv",
+      "lista1: l5_ftp_b.csv",
+      "lista2: l5_ftp_b.csv",
+      "lista2: l5_ftp_renombrado.csv"
+    ]
+  }
+}

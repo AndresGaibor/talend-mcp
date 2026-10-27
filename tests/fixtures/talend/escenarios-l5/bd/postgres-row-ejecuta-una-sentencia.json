@@ -1,0 +1,58 @@
+{
+  "nombre": "bases de datos: ejecutar una sentencia con tPostgresqlRow",
+  "job": "MCP_L5_PgRow",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_fila CASCADE",
+    "CREATE TABLE l5_fila (id integer, nombre varchar(50))"
+  ],
+  "nodos": [
+    {
+      "type": "tPostgresqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "5433"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "DBNAME": {
+          "value": "talend_test"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tPostgresqlRow",
+      "nombre": "inserta",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "insert into l5_fila values (9, 'Nueva')",
+          "literal": true
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "consulta": {
+      "sql": "select count(*) from l5_fila",
+      "valor": 1
+    }
+  }
+}

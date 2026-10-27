@@ -1,0 +1,46 @@
+{
+  "job": "MCP_L5_JdbcRow",
+  "pendiente": "Bloqueado en este entorno: el runtime components-jdbc-runtime:0.37.61 no esta en los repositorios publicos (Maven Central) y Studio no lo descarga, asi que los tJDBC no compilan. La misma prueba se valida con la familia tPostgresql* (escenarios postgres-*).",
+  "prepara": [
+    "DROP TABLE IF EXISTS jdbc_salida CASCADE",
+    "CREATE TABLE jdbc_salida (id integer, nombre varchar(80))"
+  ],
+  "nodos": [
+    {
+      "type": "tJDBCRow",
+      "nombre": "inserta",
+      "parameters": {
+        "connection.jdbcUrl": {
+          "value": "jdbc:postgresql://localhost:5433/talend_test"
+        },
+        "connection.driverClass": {
+          "value": "org.postgresql.Driver"
+        },
+        "connection.driverTable": {
+          "value": [
+            {
+              "drivers": "mvn:org.postgresql/postgresql/42.7.13"
+            }
+          ]
+        },
+        "connection.userPassword.userId": {
+          "value": "talend"
+        },
+        "connection.userPassword.password": {
+          "value": "talend"
+        },
+        "sql": {
+          "value": "insert into jdbc_salida values (9, 'Nueva')",
+          "literal": true
+        }
+      }
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "select count(*) from jdbc_salida",
+      "valor": 1
+    }
+  },
+  "nombre": "bases de datos: ejecutar una sentencia con tJDBCRow"
+}

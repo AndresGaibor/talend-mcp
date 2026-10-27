@@ -1,6 +1,7 @@
 {
   "nombre": "aws: leer atributos de cola SQS local",
   "job": "MCP_L5_SQSQueueAttributes",
+  "pendiente": "El emulador local de SQS devuelve CreatedTimestamp con decimales (1793048309.27295) y el componente lo lee como entero: NumberFormatException. El SQS real devuelve un entero.",
   "nodos": [
     {
       "type": "SQSQueueAttributes",

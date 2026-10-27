@@ -1,0 +1,34 @@
+{
+  "nombre": "control de flujo: capturar estadisticas con tStatCatcher",
+  "job": "MCP_L5_StatCatcher",
+  "pendiente": "Sin validar en Studio: falta saber en que linea del log sale el evento de tStatCatcher (los campos son moment, pid, job, message_type, message...) para escribir la expectativa. Se valida con el primer run y se completa el espera.",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        { "name": "id", "type": "id_Integer" }
+      ],
+      "values": [
+        ["1"]
+      ],
+      "parameters": {
+        "TSTATCATCHER_STATS": { "value": "true" }
+      }
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    },
+    {
+      "type": "tStatCatcher",
+      "nombre": "estadisticas"
+    }
+  ],
+  "conexiones": [
+    { "origen": "entrada", "destino": "salida" }
+  ],
+  "espera": {
+    "contiene": ["1"]
+  }
+}

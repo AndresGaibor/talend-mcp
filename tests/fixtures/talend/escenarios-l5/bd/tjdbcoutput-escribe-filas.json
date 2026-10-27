@@ -1,0 +1,82 @@
+{
+  "job": "MCP_L5_JdbcOutput",
+  "pendiente": "Bloqueado en este entorno: el runtime components-jdbc-runtime:0.37.61 no esta en los repositorios publicos (Maven Central) y Studio no lo descarga, asi que los tJDBC no compilan. La misma prueba se valida con la familia tPostgresql* (escenarios postgres-*).",
+  "prepara": [
+    "DROP TABLE IF EXISTS jdbc_salida CASCADE",
+    "CREATE TABLE jdbc_salida (id integer, nombre varchar(80))"
+  ],
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "origen",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        [
+          "1",
+          "Ana"
+        ],
+        [
+          "2",
+          "Jose"
+        ],
+        [
+          "3",
+          "Lucia"
+        ]
+      ]
+    },
+    {
+      "type": "tJDBCOutput",
+      "nombre": "escribe",
+      "parameters": {
+        "connection.jdbcUrl": {
+          "value": "jdbc:postgresql://localhost:5433/talend_test"
+        },
+        "connection.driverClass": {
+          "value": "org.postgresql.Driver"
+        },
+        "connection.driverTable": {
+          "value": [
+            {
+              "drivers": "mvn:org.postgresql/postgresql/42.7.13"
+            }
+          ]
+        },
+        "connection.userPassword.userId": {
+          "value": "talend"
+        },
+        "connection.userPassword.password": {
+          "value": "talend"
+        },
+        "tableSelection.tablename": {
+          "value": "jdbc_salida"
+        },
+        "dataAction": {
+          "value": "INSERT"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "origen",
+      "destino": "escribe"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "select count(*) from jdbc_salida",
+      "valor": 3
+    }
+  },
+  "nombre": "bases de datos: escribir filas con tJDBCOutput"
+}

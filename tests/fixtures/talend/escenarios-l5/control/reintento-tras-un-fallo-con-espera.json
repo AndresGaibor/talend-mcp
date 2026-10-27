@@ -74,6 +74,10 @@
     }
   ],
   "espera": {
+    "avisos_tolerados": [
+      "archivo en uso, se reintenta",
+      "tRunJob_2 Child job running failed"
+    ],
     "contiene": [
       "archivo en uso, se reintenta",
       "intento correcto"

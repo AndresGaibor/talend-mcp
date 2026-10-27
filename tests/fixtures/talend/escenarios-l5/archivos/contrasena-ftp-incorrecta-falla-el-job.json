@@ -1,0 +1,65 @@
+{
+  "nombre": "archivos: contraseña FTP incorrecta falla el job",
+  "job": "MCP_L5_FtpClaveMala",
+  "nodos": [
+    {
+      "type": "tFTPConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "2121"
+        },
+        "LOGON_TYPE": {
+          "value": "PASSWORD"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "clave-equivocada"
+        },
+        "CONNECT_MODE": {
+          "value": "PASSIVE"
+        }
+      }
+    },
+    {
+      "type": "tFTPFileList",
+      "nombre": "lista",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"*.csv\""
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conexiones": [],
+  "espera": {
+    "error_esperado": true
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "nombre": "transformaciones: convertir tipos con tConvertType",
+  "job": "MCP_L5_ConvierteTipos",
+  "nodos": [
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "origen",
+      "schemaDespuesDeConectar": true,
+      "columnas": [
+        { "name": "id", "type": "id_String" },
+        { "name": "monto", "type": "id_String" }
+      ],
+      "values": [
+        ["1", "2.5"],
+        ["2", "3.0"]
+      ]
+    },
+    {
+      "type": "tConvertType",
+      "nombre": "convierte",
+      "parameters": {
+        "AUTOCAST": { "value": "true" }
+      },
+      "columnas": [
+        { "name": "id", "type": "id_Integer" },
+        { "name": "monto", "type": "id_Double" }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    { "origen": "origen", "destino": "convierte" },
+    { "origen": "convierte", "destino": "salida" }
+  ],
+  "espera": {
+    "contiene": ["1|2.5", "2|3.0"]
+  }
+}

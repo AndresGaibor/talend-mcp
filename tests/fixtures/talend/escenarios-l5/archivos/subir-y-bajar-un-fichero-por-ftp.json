@@ -1,0 +1,212 @@
+{
+  "nombre": "archivos: subir un fichero por FTP y bajarlo de nuevo",
+  "job": "MCP_L5_FtpPutGet",
+  "nodos": [
+    {
+      "type": "tFTPConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "2121"
+        },
+        "LOGON_TYPE": {
+          "value": "PASSWORD"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "CONNECT_MODE": {
+          "value": "PASSIVE"
+        }
+      }
+    },
+    {
+      "type": "tFTPDelete",
+      "nombre": "limpia",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "DIE_ON_ERROR": {
+          "value": "false"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_ftp_subido.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFTPPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@"
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "MODE": {
+          "value": "binary"
+        },
+        "OVERWRITE": {
+          "value": "always"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_ftp_subido.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFTPGet",
+      "nombre": "baja",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@"
+        },
+        "REMOTEDIR": {
+          "value": "/"
+        },
+        "MODE": {
+          "value": "binary"
+        },
+        "OVERWRITE": {
+          "value": "always"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_ftp_subido.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tFileInputDelimited",
+      "nombre": "lee",
+      "parameters": {
+        "FILENAME": {
+          "value": "@TESTDATA@/l5_ftp_subido.csv"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";"
+        },
+        "HEADER": {
+          "value": "1"
+        },
+        "ENCODING": {
+          "value": "UTF-8"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "limpia",
+      "destino": "sube",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "baja",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "baja",
+      "destino": "lee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 4,
+    "contiene": [
+      "1|Ana|Bogota|100.5",
+      "2|Jose|Medellin|200.25",
+      "3|Lucia|Cali|300.0"
+    ]
+  }
+}

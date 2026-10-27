@@ -5,9 +5,11 @@ import {
   anadirNodo,
   parametrosDe,
   pendientesVacios,
+  tablasConRutas,
   ponerSchemaInicial,
 } from "./job-nodes";
 import { aplicarPendientes, conectarNodos } from "./job-wiring";
+import { medir } from "./tiempos";
 
 /**
  * Montaje de un job completo: limpiar, crear, nodos, conexiones y
@@ -80,32 +82,34 @@ export async function montarJob(
   }
 
   // 1. Job limpio.
-  const borrado = await reintentar(
-    () => bridge.deleteJob({ name: spec.job }),
-    transitorioDeStudio,
+  const borrado = await medir("borrar job anterior", () =>
+    reintentar(() => bridge.deleteJob({ name: spec.job }), transitorioDeStudio),
   );
   if (!borrado.ok && !borradoTolerable(errorDe(borrado))) {
     return { ok: false, mensaje: `no se pudo borrar: ${errorDe(borrado)}` };
   }
 
-  const creado = await reintentar(
-    () => bridge.createJob({ name: spec.job, replace: true }),
-    transitorioDeStudio,
+  const creado = await medir("crear job", () =>
+    reintentar(() => bridge.createJob({ name: spec.job, replace: true }), transitorioDeStudio),
   );
   if (!creado.ok) {
     return { ok: false, mensaje: `no se pudo crear: ${errorDe(creado)}` };
   }
 
   // Los contextos (entornos) del job, con sus variables.
-  const contextsOk = await crearContextos(bridge, spec.job, spec.contextos);
+  const contextsOk = await medir("contextos", () => crearContextos(bridge, spec.job, spec.contextos));
   if (!contextsOk.ok) return contextsOk;
 
   // El job tiene que estar abierto en el editor antes de anadir nodos. Studio
   // a veces contesta "No se pudo abrir el job ... en el editor" (le pasa
   // tambien con jobs del usuario): es transitorio y se reintenta.
-  const abierto = await reintentar(
-    () => bridge.openJob({ name: spec.job }),
-    transitorioDeStudio,
+  // El job tiene que estar abierto en el editor antes de anadir nodos. Studio
+  // a veces contesta "No se pudo abrir el job ... en el editor" (le pasa
+  // tambien con jobs del usuario): es transitorio y se reintenta.
+  // `createJob` ya lo deja abierto. Esta llamada espera a que el editor termine de
+  // abrirse (~0,6 s medidos), y garantiza que es el job activo que el Run ejecutara.
+  const abierto = await medir("abrir job", () =>
+    reintentar(() => bridge.openJob({ name: spec.job }), transitorioDeStudio),
   );
   if (!abierto.ok) {
     return { ok: false, mensaje: `no se pudo abrir el job: ${errorDe(abierto)}` };
@@ -124,19 +128,23 @@ export async function montarJob(
     const [nodo, indiceNodo] = entrada;
     const nombrePlan = nodo.nombre ?? `#${indiceNodo}`;
 
-    const anadido = await anadirNodo(bridge, spec.job, nodo, parametrosDe(nodo, nombres));
+    const anadido = await medir(`anadir ${nombrePlan}`, () =>
+      anadirNodo(bridge, spec.job, nodo, parametrosDe(nodo, nombres)),
+    );
     if (!anadido.ok) return { ok: false, mensaje: anadido.mensaje };
     const uniqueName = anadido.uniqueName;
 
     if (nodo.nombre) nombres.set(nodo.nombre, uniqueName);
 
-    const schema = await ponerSchemaInicial(bridge, spec.job, nodo, uniqueName, nombrePlan, pendientes);
+    const schema = await medir(`schema ${nombrePlan}`, () =>
+      ponerSchemaInicial(bridge, spec.job, nodo, uniqueName, nombrePlan, pendientes),
+    );
     if (!schema.ok) return schema;
 
     // Las tablas y el mapa se aplican despues de conectar: al conectar,
     // Talend rehace las tablas del componente y se pierde lo que habia.
     if (nodo.tablas) {
-      pendientes.tablas.push({ nombre: nombrePlan, uniqueName, tablas: nodo.tablas });
+      pendientes.tablas.push({ nombre: nombrePlan, uniqueName, tablas: tablasConRutas(nodo.tablas) });
     }
     if (nodo.mapper) {
       pendientes.mappers.push({ nombre: nombrePlan, uniqueName, mapper: nodo.mapper });
@@ -144,8 +152,8 @@ export async function montarJob(
   }
 
   // 3. Conexiones y configuracion posterior.
-  const cableado = await conectarNodos(bridge, spec.job, jobPlan, nombres);
+  const cableado = await medir("conectar nodos", () => conectarNodos(bridge, spec.job, jobPlan, nombres));
   if (!cableado.ok) return cableado;
 
-  return aplicarPendientes(bridge, spec.job, jobPlan, pendientes);
+  return medir("configuracion posterior", () => aplicarPendientes(bridge, spec.job, jobPlan, pendientes));
 }

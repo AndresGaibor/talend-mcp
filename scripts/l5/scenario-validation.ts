@@ -310,6 +310,12 @@ function validarEspera(espera: Record<string, unknown>, path: string, problems: 
   if (espera.error_esperado !== undefined && typeof espera.error_esperado !== "boolean") {
     problems.push(`${path}: "espera.error_esperado" tiene que ser true o false`);
   }
+  if (
+    espera.avisos_tolerados !== undefined &&
+    !(Array.isArray(espera.avisos_tolerados) && espera.avisos_tolerados.every((a) => typeof a === "string"))
+  ) {
+    problems.push(`${path}: "espera.avisos_tolerados" tiene que ser una lista de textos`);
+  }
   if (espera.fichero !== undefined && !isRecord(espera.fichero)) {
     problems.push(`${path}: "espera.fichero" tiene que ser un objeto`);
   }

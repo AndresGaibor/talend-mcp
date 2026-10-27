@@ -1,0 +1,98 @@
+{
+  "job": "MCP_L5_JdbcConexion",
+  "pendiente": "Bloqueado en este entorno: el runtime components-jdbc-runtime:0.37.61 no esta en los repositorios publicos (Maven Central) y Studio no lo descarga, asi que los tJDBC no compilan. La misma prueba se valida con la familia tPostgresql* (escenarios postgres-*).",
+  "prepara": [
+    "DROP TABLE IF EXISTS jdbc_clientes CASCADE",
+    "CREATE TABLE jdbc_clientes (id integer, nombre varchar(80))",
+    "INSERT INTO jdbc_clientes VALUES (1, 'Ana'), (2, 'Jose'), (3, 'Lucia')"
+  ],
+  "nodos": [
+    {
+      "type": "tJDBCConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "connection.jdbcUrl": {
+          "value": "jdbc:postgresql://localhost:5433/talend_test"
+        },
+        "connection.driverClass": {
+          "value": "org.postgresql.Driver"
+        },
+        "connection.driverTable": {
+          "value": [
+            {
+              "drivers": "mvn:org.postgresql/postgresql/42.7.13"
+            }
+          ]
+        },
+        "connection.userPassword.userId": {
+          "value": "talend"
+        },
+        "connection.userPassword.password": {
+          "value": "talend"
+        },
+        "shareConnection": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tJDBCInput",
+      "nombre": "lee",
+      "parameters": {
+        "referencedComponent": {
+          "value": "@uniqueName:conexion"
+        },
+        "sql": {
+          "value": "select id, nombre from jdbc_clientes order by id",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    },
+    {
+      "type": "tJDBCClose",
+      "nombre": "cierra",
+      "parameters": {
+        "referencedComponent": {
+          "value": "@uniqueName:conexion"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "lee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    },
+    {
+      "origen": "lee",
+      "destino": "cierra",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana",
+      "3|Lucia"
+    ]
+  },
+  "nombre": "bases de datos: compartir una conexion con tJDBCConnection y cerrarla con tJDBCClose"
+}

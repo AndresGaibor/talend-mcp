@@ -101,6 +101,12 @@ export type Espera = {
   /** El job termina en error a proposito (un trigger de error, por ejemplo). */
   error_esperado?: boolean;
   /**
+   * Fragmentos de errores o avisos que el job deja a proposito (un `[ERROR]` de
+   * log, un aviso de diseno). Lo que no coincida con ninguno hace fallar el
+   * escenario si es un error, o se anota en el informe si es un aviso.
+   */
+  avisos_tolerados?: string[];
+  /**
    * Consulta a la base de datos de pruebas despues de ejecutar.
    *
    * Es la forma de comprobar lo que el job escribe en una base de datos:
@@ -115,6 +121,12 @@ export type Escenario = {
   job: string;
   /** Escenario conocido pero todavia sin resolver: se informa y se salta. */
   pendiente?: string;
+  /**
+   * Tiempo maximo de la ejecucion del job, en milisegundos. Por defecto, 180 s: un
+   * job de prueba normal acaba en segundos. Solo los de volumen (cientos de miles de
+   * filas) necesitan mas.
+   */
+  timeoutMs?: number;
   /**
    * Contextos (entornos) del job y sus variables.
    *
@@ -147,7 +159,13 @@ export type Escenario = {
 };
 
 /** Resultado de montar o ejecutar un escenario. */
-export type Resultado = { ejecutaOk: boolean; salidaCorrecta: boolean; mensaje?: string };
+export type Resultado = {
+  ejecutaOk: boolean;
+  salidaCorrecta: boolean;
+  mensaje?: string;
+  /** Todos los avisos del job (vista Problemas y salida [WARN]), sin recortar. */
+  avisos?: string[];
+};
 
 /** Resultado de un paso intermedio (montar, compilar, conectar...). */
 export type Paso = { ok: boolean; mensaje?: string };

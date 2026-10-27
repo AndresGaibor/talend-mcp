@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 /**
- * Escenarios ya probados, para no volver a ejecutarlos.
+ * Escenarios ya validados, para no volver a ejecutarlos.
  *
- * Un escenario que pasa queda guardado con su huella: el propio escenario, el
- * codigo del arnes y el contexto de la corrida (version del plugin de Studio y
- * definiciones de componentes). Mientras la huella no cambie, la corrida lo omite.
- * Si cambia cualquiera de esas tres cosas, se vuelve a probar.
+ * Un escenario que pasa queda guardado con su huella: el propio escenario y las
+ * definiciones de componentes con las que se monta su job. Mientras no cambien,
+ * la corrida lo omite. No cuentan la version del plugin ni el codigo del arnés:
+ * cambiarlos no invalida lo ya validado (que era justo el desperdicio). Para
+ * repetirlo todo, `--todas`.
  *
  * No recoge el estado externo (Postgres, S3, HDFS, SMTP). Si esos servicios
  * cambian, hay que repetir con `--todas`.
@@ -23,16 +23,9 @@ export function huellaDe(partes: string[]): string {
   return hash.digest("hex");
 }
 
-/** Huella del codigo del arnes: cualquier cambio en `scripts/l5` la invalida. */
-export function huellaDelArnes(): string {
-  const carpeta = import.meta.dir;
-  const ficheros = readdirSync(carpeta).filter((fichero) => fichero.endsWith(".ts")).sort();
-  return huellaDe(ficheros.flatMap((fichero) => [fichero, readFileSync(join(carpeta, fichero), "utf8")]));
-}
-
-/** Huella de un escenario dentro de una corrida concreta. */
-export function huellaDeEscenario(escenario: unknown, huellaArnes: string, huellaContexto: string): string {
-  return huellaDe([JSON.stringify(escenario), huellaArnes, huellaContexto]);
+/** Huella de un escenario con las definiciones de componentes de la corrida. */
+export function huellaDeEscenario(escenario: unknown, huellaDefiniciones: string): string {
+  return huellaDe([JSON.stringify(escenario), huellaDefiniciones]);
 }
 
 /** Lee la cache. Si no existe o esta rota, empieza vacia: solo significa repetir pruebas. */
@@ -51,4 +44,47 @@ export function escribirCache(ruta: string, cache: CacheL5): void {
 
 export function estaProbado(cache: CacheL5, nombre: string, huella: string): boolean {
   return cache[nombre]?.huella === huella;
+}
+
+/**
+ * Tipos de componente que usa un escenario: los de su job y los de los jobs
+ * auxiliares. Son los unicos cuyas definiciones afectan a su resultado.
+ */
+export function tiposDeComponentes(escenario: {
+  nodos: Array<{ type: string }>;
+  jobs?: Array<{ nodos: Array<{ type: string }> }>;
+}): string[] {
+  const tipos = new Set<string>();
+  for (const nodo of escenario.nodos) tipos.add(nodo.type);
+  for (const job of escenario.jobs ?? []) for (const nodo of job.nodos) tipos.add(nodo.type);
+  return [...tipos].sort();
+}
+
+/**
+ * Huella de las definiciones de esos componentes. Cambiar un componente que el
+ * escenario no usa no invalida su resultado.
+ */
+export function huellaDeDefiniciones(tipos: string[], definiciones: ReadonlyMap<string, unknown>): string {
+  return huellaDe(tipos.map((tipo) => JSON.stringify(definiciones.get(tipo) ?? null)));
+}
+
+/**
+ * Marca como probados los escenarios que el informe da por buenos, cuando su
+ * fichero no cambio despues del informe. Sirve para no repetir lo que ya paso
+ * al empezar a usar la cache. Un fichero editado despues no tiene resultado
+ * que le corresponda: se vuelve a probar.
+ */
+export function sembrarDesdeInforme(
+  cache: CacheL5,
+  entradas: Array<{ nombre: string; huella: string; mtimeFichero: number }>,
+  mtimeInforme: number,
+): number {
+  let agregados = 0;
+  for (const entrada of entradas) {
+    if (entrada.mtimeFichero > mtimeInforme) continue;
+    if (estaProbado(cache, entrada.nombre, entrada.huella)) continue;
+    cache[entrada.nombre] = { huella: entrada.huella, fecha: new Date(mtimeInforme).toISOString() };
+    agregados++;
+  }
+  return agregados;
 }

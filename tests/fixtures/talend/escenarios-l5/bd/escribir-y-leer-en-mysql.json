@@ -1,0 +1,206 @@
+{
+  "nombre": "bases de datos: escribir y leer en MySQL 8.4",
+  "job": "MCP_L5_MySqlEscribeLee",
+  "nodos": [
+    {
+      "type": "tMysqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "3307"
+        },
+        "DBNAME": {
+          "value": "talend_test"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "DB_VERSION": {
+          "value": "MYSQL_8"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tMysqlRow",
+      "nombre": "borra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"DROP TABLE IF EXISTS clientes_mysql\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tMysqlRow",
+      "nombre": "crea",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"CREATE TABLE clientes_mysql (id INT, nombre VARCHAR(80), ciudad VARCHAR(80), monto DOUBLE)\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "values": [
+        ["1", "Ana", "Bogota", "100.5"],
+        ["2", "Jose", "Medellin", "200.25"],
+        ["3", "Lucia", "Cali", "300.0"]
+      ]
+    },
+    {
+      "type": "tMysqlOutput",
+      "nombre": "escribe",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "clientes_mysql"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "DATA_ACTION": {
+          "value": "INSERT"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        },
+        "MAPPING": {
+          "value": "mysql_id"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tMysqlInput",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "clientes_mysql"
+        },
+        "QUERY": {
+          "value": "\"SELECT id, nombre, ciudad, monto FROM clientes_mysql ORDER BY id\""
+        },
+        "MAPPING": {
+          "value": "mysql_id"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "borra",
+      "destino": "crea",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "crea",
+      "destino": "entrada",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    },
+    {
+      "origen": "entrada",
+      "destino": "lee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 3,
+    "contiene": [
+      "1|Ana|Bogota|100.5",
+      "2|Jose|Medellin|200.25",
+      "3|Lucia|Cali|300.0"
+    ]
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "nombre": "bases de datos: consulta con filtro en MongoDB",
+  "pendiente": "mismo problema que la escritura y lectura de MongoDB: el job no termina tras la ultima operacion y el Run de Studio agota el tiempo. Investigar antes de quitar esta marca.",
+  "job": "MCP_L5_MongoFiltra",
+  "nodos": [
+    {
+      "type": "tMongoDBConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "27018"
+        },
+        "DATABASE": {
+          "value": "talend_test"
+        },
+        "REQUIRED_AUTHENTICATION": {
+          "value": "true"
+        },
+        "AUTHENTICATION_MECHANISM": {
+          "value": "SCRAMSHA256_MEC"
+        },
+        "SET_AUTHENTICATION_DATABASE": {
+          "value": "true"
+        },
+        "AUTHENTICATION_DATABASE": {
+          "value": "admin"
+        },
+        "USERNAME": {
+          "value": "talend"
+        },
+        "PASSWORD": {
+          "value": "talend"
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ],
+      "values": [
+        ["1", "Ana", "Bogota", "100.5"],
+        ["2", "Jose", "Medellin", "200.25"],
+        ["3", "Lucia", "Cali", "300.0"]
+      ]
+    },
+    {
+      "type": "tMongoDBOutput",
+      "nombre": "escribe",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "COLLECTION": {
+          "value": "clientes_mongo_filtro"
+        },
+        "DROP_COLLECTION_CREATE": {
+          "value": "true"
+        },
+        "DATA_ACTION": {
+          "value": "INSERT"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tMongoDBInput",
+      "nombre": "consulta",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "COLLECTION": {
+          "value": "clientes_mongo_filtro"
+        },
+        "QUERY_TYPE": {
+          "value": "FIND_QUERY"
+        },
+        "QUERY": {
+          "value": "\"{'monto': {'$gt': 150}}\""
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "ciudad",
+          "type": "id_String"
+        },
+        {
+          "name": "monto",
+          "type": "id_Double"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    },
+    {
+      "type": "tMongoDBClose",
+      "nombre": "cierra",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "entrada",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "entrada",
+      "destino": "escribe"
+    },
+    {
+      "origen": "entrada",
+      "destino": "consulta",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "consulta",
+      "destino": "salida"
+    },
+    {
+      "origen": "consulta",
+      "destino": "cierra",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "lineas": 2,
+    "contiene": [
+      "2|Jose|Medellin|200.25",
+      "3|Lucia|Cali|300.0"
+    ]
+  }
+}

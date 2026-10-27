@@ -109,7 +109,7 @@
             {
               "PRE_COLUMN": "word",
               "COLUMN": "suggestion",
-              "INDEX_PATH": "testdata/l5_synonym_index",
+              "INDEX_PATH": "@TESTDATA@/l5_synonym_index",
               "SEARCH_MODE": "MATCH_ANY",
               "SCORE_THRESHOLD": "0.0",
               "MAX_EDITS_FOR_FUZZY_MATCH": "1",

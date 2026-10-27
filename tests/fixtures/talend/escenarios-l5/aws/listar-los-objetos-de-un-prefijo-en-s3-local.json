@@ -1,6 +1,7 @@
 {
   "nombre": "aws: listar los objetos de un prefijo en S3 local",
   "job": "MCP_L5_S3Lista",
+  "pendiente": "El emulador local de S3 no cierra el Expect: 100-continue del SDK: el PutObject que prepara el caso recibe Status Code 100.",
   "nodos": [
     {
       "type": "S3BucketCreate",

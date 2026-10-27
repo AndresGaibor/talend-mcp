@@ -1,84 +1,59 @@
 import type { Bridge, Paso } from "./scenario-types";
-import { compilando, errorDe, esperar, reintentar, transitorioDeStudio } from "./studio-retry";
+import { errorDe, reintentar, transitorioDeStudio } from "./studio-retry";
 
 /**
- * Generacion y compilacion del job con el Run de Studio.
+ * Construccion del job para el arnes: generar el codigo, compilarlo y hacer el build
+ * de Maven que deja el `target/classpath.jar` que luego lee `executeJob`.
  *
- * El Run es asincrono: lanza el build y sigue. La ejecucion solo funciona
- * cuando el build ha terminado, asi que se espera probando la ejecucion.
+ * Es sincrona: cuando vuelve, el build ya ha terminado, asi que no hay que esperar a
+ * nada. Antes se hacia con un Run de Studio, que lanzaba el job y no informaba de su
+ * fin (ver la seccion 79 de docs/studio-internals/08-interfaz-ui.md).
  */
 
-export type EsperaCompiladoOptions = {
-  intentos?: number;
-  esperaInicialMs?: number;
-  esperaMs?: number;
-};
+type DetalleDeError = { message?: string; line?: number };
 
 /**
- * Lanza el Run de Studio: genera, compila y deja el `target/classpath.jar`
- * que la ejecucion necesita para releer la salida.
+ * Construye el job sin ejecutarlo: genera el codigo, lo compila y hace el build de
+ * Maven. Un error de compilacion sale con su linea y su mensaje.
  */
-export async function compilarEnStudio(bridge: Bridge, job: string): Promise<Paso> {
-  const abierto = await reintentar(
-    () => bridge.openJob({ name: job }),
-    transitorioDeStudio,
-  );
+export async function construirEnStudio(bridge: Bridge, job: string, instalar = false): Promise<Paso> {
+  const abierto = await reintentar(() => bridge.openJob({ name: job }), transitorioDeStudio);
   if (!abierto.ok) {
     return { ok: false, mensaje: `no se pudo abrir el job: ${errorDe(abierto)}` };
   }
 
-  const lanzado = await bridge.runActiveJob({
-    dryRun: false,
-    saveBefore: true,
-    waitForTermination: false,
-    timeoutMs: 30_000,
-  });
-  if (!lanzado.ok) {
-    return { ok: false, mensaje: `no se pudo ejecutar en Studio: ${errorDe(lanzado)}` };
+  const respuesta = await bridge.jobBuild({ job, instalar });
+  if (!respuesta.ok) {
+    return { ok: false, mensaje: `no se pudo construir el job: ${errorDe(respuesta)}` };
   }
-
-  const datos = (lanzado.data ?? {}) as { error?: { message?: string }; launched?: boolean };
-  if (datos.error) {
-    return {
-      ok: false,
-      mensaje: `el Run de Studio fallo: ${datos.error.message ?? JSON.stringify(datos.error)}`,
-    };
+  const cuerpo = (respuesta.data?.result ?? {}) as {
+    compiles?: boolean;
+    built?: boolean;
+    error?: DetalleDeError | string;
+    metodo?: string;
+    generationMs?: number;
+    generateMs?: number;
+    classpathMs?: number;
+    compileMs?: number;
+    jarMs?: number;
+  };
+  if (process.env.L5_TIEMPOS === "1") {
+    console.error(
+      `[tiempo] construir detalle: generar ${cuerpo.generateMs} ms, comprobar ${(cuerpo.generationMs ?? 0) - (cuerpo.generateMs ?? 0)} ms, classpath ${cuerpo.classpathMs} ms, ${cuerpo.metodo} ${cuerpo.compileMs} ms, jar ${cuerpo.jarMs} ms`,
+    );
   }
-  if (!datos.launched) {
-    return { ok: false, mensaje: "Studio no lanzo el job" };
+  if (!cuerpo.compiles) {
+    return { ok: false, mensaje: `no compila: ${textoDeError(cuerpo.error)}` };
+  }
+  if (!cuerpo.built) {
+    return { ok: false, mensaje: `no se pudo compilar el job: ${textoDeError(cuerpo.error)}` };
   }
   return { ok: true };
 }
 
-/**
- * Espera a que un job este compilado.
- *
- * Se espera un poco antes del primer intento: ejecutar el job abre su
- * `classpath.jar`, y si Studio esta justo reemplazandolo el build falla con
- * "El proceso no tiene acceso al archivo" y la carpeta se queda sin codigo
- * (INTERNALS 55). Unos segundos de margen evitan casi siempre el choque.
- */
-export async function esperarCompilado(
-  bridge: Bridge,
-  job: string,
-  options: EsperaCompiladoOptions = {},
-): Promise<Paso> {
-  const intentos = options.intentos ?? 30;
-  const esperaInicialMs = options.esperaInicialMs ?? 12_000;
-  const esperaMs = options.esperaMs ?? 5_000;
-
-  await esperar(esperaInicialMs);
-  for (let intento = 0; intento < intentos; intento++) {
-    const ejecutado = await bridge.executeJob({ name: job, timeoutMs: 120_000 });
-    const cuerpo = (ejecutado.data ?? {}) as {
-      result?: { error?: string };
-      error?: string;
-    };
-    const error = cuerpo.result?.error ?? cuerpo.error ?? "";
-    if (!compilando(error)) {
-      return { ok: true };
-    }
-    await esperar(esperaMs);
-  }
-  return { ok: false, mensaje: "el build no termino a tiempo" };
+function textoDeError(error: DetalleDeError | string | undefined): string {
+  if (!error) return "sin detalle";
+  if (typeof error === "string") return error;
+  const linea = error.line !== undefined ? ` (linea ${error.line})` : "";
+  return `${error.message ?? "sin detalle"}${linea}`;
 }

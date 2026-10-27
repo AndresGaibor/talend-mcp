@@ -109,6 +109,9 @@
     }
   ],
   "espera": {
+    "avisos_tolerados": [
+      "tFileInputDelimited_2: This component should have outputs linked"
+    ],
     "contiene": [
       "Fail"
     ]

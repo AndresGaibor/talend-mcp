@@ -151,6 +151,9 @@
     }
   ],
   "espera": {
+    "avisos_tolerados": [
+      "tFileInputDelimited_4: This component should have outputs linked"
+    ],
     "contiene": [
       "concilia: 4 filas",
       "Files are identical"

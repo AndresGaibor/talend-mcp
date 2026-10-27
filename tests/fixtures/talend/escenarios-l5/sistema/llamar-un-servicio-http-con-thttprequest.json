@@ -1,0 +1,28 @@
+{
+  "nombre": "sistema: llamar a un servicio HTTP con tHttpRequest",
+  "job": "MCP_L5_HttpRequest",
+  "nodos": [
+    {
+      "type": "tHttpRequest",
+      "nombre": "llama",
+      "parameters": {
+        "URI": { "value": "http://127.0.0.1:18080/saludo" },
+        "METHOD_CHOSED": { "value": "GET" },
+        "OUT_TO_FILE": { "value": "false" }
+      },
+      "columnas": [
+        { "name": "ResponseContent", "type": "id_String" }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    { "origen": "llama", "destino": "salida" }
+  ],
+  "espera": {
+    "contiene": ["hola"]
+  }
+}

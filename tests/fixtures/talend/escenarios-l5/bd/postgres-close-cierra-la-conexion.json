@@ -1,0 +1,93 @@
+{
+  "nombre": "bases de datos: cerrar una conexion de Postgres con tPostgresqlClose",
+  "job": "MCP_L5_PgClose",
+  "prepara": [
+    "DROP TABLE IF EXISTS l5_cierre CASCADE",
+    "CREATE TABLE l5_cierre (id integer, nombre varchar(50))",
+    "INSERT INTO l5_cierre VALUES (1, 'Ana'), (2, 'Jose')"
+  ],
+  "nodos": [
+    {
+      "type": "tPostgresqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "5433"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "DBNAME": {
+          "value": "talend_test"
+        }
+      }
+    },
+    {
+      "type": "tPostgresqlInput",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "l5_cierre"
+        },
+        "QUERY": {
+          "value": "select id, nombre from l5_cierre order by id",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    },
+    {
+      "type": "tPostgresqlClose",
+      "nombre": "cierra",
+      "parameters": {
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "lee",
+      "destino": "salida"
+    },
+    {
+      "origen": "lee",
+      "destino": "cierra",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "1|Ana",
+      "2|Jose"
+    ]
+  }
+}

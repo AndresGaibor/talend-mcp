@@ -195,6 +195,9 @@
     }
   ],
   "espera": {
+    "avisos_tolerados": [
+      "tFileInputDelimited_4: This component should have outputs linked"
+    ],
     "error_esperado": true,
     "contiene": [
       "no concilia: origen=4 destino=1"

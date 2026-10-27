@@ -1,0 +1,258 @@
+{
+  "nombre": "bases de datos: upsert de registros en MySQL",
+  "job": "MCP_L5_MySqlUpsert",
+  "nodos": [
+    {
+      "type": "tMysqlConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "3307"
+        },
+        "DBNAME": {
+          "value": "talend_test"
+        },
+        "USER": {
+          "value": "talend"
+        },
+        "PASS": {
+          "value": "talend"
+        },
+        "DB_VERSION": {
+          "value": "MYSQL_8"
+        },
+        "AUTO_COMMIT": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tMysqlRow",
+      "nombre": "borra",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"DROP TABLE IF EXISTS clientes_mysql_upsert\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tMysqlRow",
+      "nombre": "crea",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"CREATE TABLE clientes_mysql_upsert (id INT PRIMARY KEY, nombre VARCHAR(80), estado VARCHAR(20))\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tMysqlRow",
+      "nombre": "inserta",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "QUERY": {
+          "value": "\"INSERT INTO clientes_mysql_upsert VALUES (1, 'Nombre anterior', 'ACTIVO')\""
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      }
+    },
+    {
+      "type": "tFixedFlowInput",
+      "nombre": "entrada",
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer",
+          "key": true
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ],
+      "values": [
+        ["1", "Nombre actualizado", "INACTIVO"],
+        ["2", "Nuevo cliente", "ACTIVO"]
+      ]
+    },
+    {
+      "type": "tMysqlOutput",
+      "nombre": "upsert",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "clientes_mysql_upsert"
+        },
+        "TABLE_ACTION": {
+          "value": "NONE"
+        },
+        "DATA_ACTION": {
+          "value": "INSERT_OR_UPDATE"
+        },
+        "END_OF_FLOW": {
+          "value": "false"
+        },
+        "USE_FIELD_OPTIONS": {
+          "value": "true"
+        },
+        "MAPPING": {
+          "value": "mysql_id"
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FIELD_OPTIONS": {
+          "columns": [
+            "SCHEMA_COLUMN",
+            "UPDATE_KEY",
+            "DELETE_KEY",
+            "UPDATABLE",
+            "INSERTABLE"
+          ],
+          "rows": [
+            {
+              "SCHEMA_COLUMN": "id",
+              "UPDATE_KEY": "true",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "false",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "nombre",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            },
+            {
+              "SCHEMA_COLUMN": "estado",
+              "UPDATE_KEY": "false",
+              "DELETE_KEY": "false",
+              "UPDATABLE": "true",
+              "INSERTABLE": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tMysqlInput",
+      "nombre": "lee",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "TABLE": {
+          "value": "clientes_mysql_upsert"
+        },
+        "QUERY": {
+          "value": "\"SELECT id, nombre, estado FROM clientes_mysql_upsert ORDER BY id\""
+        },
+        "MAPPING": {
+          "value": "mysql_id"
+        }
+      },
+      "columnas": [
+        {
+          "name": "id",
+          "type": "id_Integer"
+        },
+        {
+          "name": "nombre",
+          "type": "id_String"
+        },
+        {
+          "name": "estado",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "borra",
+      "destino": "crea",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "crea",
+      "destino": "inserta",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "inserta",
+      "destino": "entrada",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "entrada",
+      "destino": "upsert"
+    },
+    {
+      "origen": "entrada",
+      "destino": "lee",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "lee",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "lineas": 2,
+    "contiene": [
+      "1|Nombre actualizado|INACTIVO",
+      "2|Nuevo cliente|ACTIVO"
+    ]
+  }
+}

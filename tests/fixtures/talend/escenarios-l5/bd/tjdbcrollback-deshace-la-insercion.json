@@ -1,0 +1,79 @@
+{
+  "job": "MCP_L5_JdbcRollback",
+  "pendiente": "Bloqueado en este entorno: el runtime components-jdbc-runtime:0.37.61 no esta en los repositorios publicos (Maven Central) y Studio no lo descarga, asi que los tJDBC no compilan. La misma prueba se valida con la familia tPostgresql* (escenarios postgres-*).",
+  "prepara": [
+    "DROP TABLE IF EXISTS jdbc_salida CASCADE",
+    "CREATE TABLE jdbc_salida (id integer, nombre varchar(80))"
+  ],
+  "nodos": [
+    {
+      "type": "tJDBCConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "connection.jdbcUrl": {
+          "value": "jdbc:postgresql://localhost:5433/talend_test"
+        },
+        "connection.driverClass": {
+          "value": "org.postgresql.Driver"
+        },
+        "connection.driverTable": {
+          "value": [
+            {
+              "drivers": "mvn:org.postgresql/postgresql/42.7.13"
+            }
+          ]
+        },
+        "connection.userPassword.userId": {
+          "value": "talend"
+        },
+        "connection.userPassword.password": {
+          "value": "talend"
+        },
+        "useAutoCommit": {
+          "value": "false"
+        }
+      }
+    },
+    {
+      "type": "tJDBCRow",
+      "nombre": "inserta",
+      "parameters": {
+        "referencedComponent": {
+          "value": "@uniqueName:conexion"
+        },
+        "sql": {
+          "value": "insert into jdbc_salida values (7, 'Se deshace')",
+          "literal": true
+        }
+      }
+    },
+    {
+      "type": "tJDBCRollback",
+      "nombre": "deshace",
+      "parameters": {
+        "referencedComponent": {
+          "value": "@uniqueName:conexion"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "inserta",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "inserta",
+      "destino": "deshace",
+      "tipo": "SUBJOB_OK"
+    }
+  ],
+  "espera": {
+    "consulta": {
+      "sql": "select count(*) from jdbc_salida",
+      "valor": 0
+    }
+  },
+  "nombre": "bases de datos: deshacer una insercion con tJDBCRollback"
+}

@@ -38,7 +38,17 @@ describe("causaDeFallo", () => {
     );
   });
 
-  test("sin [FATAL] ni [ERROR], cae en la ultima linea", () => {
+  test("una excepcion sin prefijo de log (stderr) es la causa, no la ultima linea de la traza", () => {
+    const lineas = [
+      "Exception in thread \"main\" java.lang.NoClassDefFoundError: org/talend/tmap/Runtime",
+      "\tat routines.MCP_L5_TMap.tMap_1Process(MCP_L5_TMap.java:120)",
+      "\tat routines.MCP_L5_TMap.runJobInTOS(MCP_L5_TMap.java:400)",
+    ];
+
+    expect(causaDeFallo(lineas)).toContain("NoClassDefFoundError");
+  });
+
+  test("sin [FATAL] ni [ERROR] ni excepciones, cae en la ultima linea", () => {
     expect(causaDeFallo(["aviso uno", "aviso dos"])).toBe("aviso dos");
   });
 

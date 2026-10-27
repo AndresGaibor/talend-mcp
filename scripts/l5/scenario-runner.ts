@@ -1,17 +1,42 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 
+import {
+  clasificarProblemas,
+  clasificarSalida,
+  juntar,
+  problemasDe,
+  resumir,
+  sinTolerados,
+  type Hallazgos,
+} from "./avisos";
 import { consultar, preparar } from "./postgres";
 import { conRutas } from "./testdata-paths";
 import { compararConsulta, compararContextos, compararFichero, compararSalida } from "./scenario-expectations";
-import { compilarEnStudio, esperarCompilado } from "./studio-compile";
+import { construirEnStudio } from "./studio-compile";
 import { montarJob } from "./job-mounter";
-import { ejecutarJob } from "./studio-execute";
+import { EJECUCION_RAPIDA, ejecutarJob, type ModoEjecucion } from "./studio-execute";
 import type { Bridge, Definiciones, Escenario, Resultado } from "./scenario-types";
+import { medir } from "./tiempos";
 
 /**
- * Ejecucion de un escenario: jobs auxiliares, montaje, compilacion, ejecucion
+ * Ejecucion de un escenario: jobs auxiliares, montaje, construccion, ejecucion
  * y comprobacion de lo esperado.
+ *
+ * Se divide en dos fases para poder solapar escenarios: `prepararEscenario` monta y
+ * construye (usa la UI de Studio), y `terminar` ejecuta y comprueba (usa la JVM del
+ * job). El harness prepara el siguiente escenario mientras el anterior se ejecuta.
  */
+
+/** Un escenario montado y construido, a la espera de ejecutarse. */
+export type EscenarioPreparado = {
+  /** Los jobs que ocupa: no se pueden montar otra vez mientras `terminar` no acabe. */
+  jobs: string[];
+  /** Ejecuta el job, comprueba lo esperado y borra los jobs del escenario. */
+  terminar: () => Promise<Resultado>;
+};
+
+/** Resultado de montar y construir: o el fallo que lo para, o lo que hace falta para ejecutar. */
+type Montaje = { fallo: Resultado } | { listo: { diseno: Hallazgos; tolerados?: string[] } };
 
 /**
  * Ejecuta un escenario completo y devuelve el resultado de la comprobacion.
@@ -25,75 +50,151 @@ export async function ejecutar(
   escenario: Escenario,
   definiciones: Definiciones,
 ): Promise<Resultado> {
-  try {
-    return await ejecutarEscenario(bridge, escenario, definiciones);
-  } finally {
-    await borrarJobs(bridge, jobsDelEscenario(escenario));
-  }
+  const preparado = await prepararEscenario(bridge, escenario, definiciones);
+  return preparado.terminar();
 }
 
-/** Los jobs que monta un escenario: los auxiliares y, al final, el principal. */
+/**
+ * Monta y construye un escenario sin ejecutarlo. Su ejecucion queda en `terminar`:
+ * asi el harness puede montar el siguiente escenario mientras este corre.
+ */
+export async function prepararEscenario(
+  bridge: Bridge,
+  escenario: Escenario,
+  definiciones: Definiciones,
+  modo: ModoEjecucion = EJECUCION_RAPIDA,
+): Promise<EscenarioPreparado> {
+  const jobs = jobsDelEscenario(escenario);
+  let montaje: Montaje;
+  try {
+    montaje = await montarYConstruir(bridge, escenario, definiciones);
+  } catch (error) {
+    await medir("borrado de jobs", () => borrarJobs(bridge, [escenario.job]));
+    throw error;
+  }
+  return {
+    jobs,
+    terminar: async () => {
+      try {
+        if ("fallo" in montaje) return montaje.fallo;
+        return await ejecutarYComprobar(bridge, escenario, montaje.listo, modo);
+      } finally {
+        await medir("borrado de jobs", () => borrarJobs(bridge, [escenario.job]));
+      }
+    },
+  };
+}
+
+/**
+ * Los jobs que monta un escenario: los auxiliares y, al final, el principal.
+ *
+ * Los auxiliares (el hijo de un tRunJob) no se borran al terminar: el pom del padre los
+ * referencia, y borrarlos deja a Eclipse con un proyecto sin carpeta, que rompe el build
+ * de todos los jobs siguientes en la misma sesion de Studio. Se reemplazan al montarlos.
+ */
 export function jobsDelEscenario(escenario: Escenario): string[] {
   return [...(escenario.jobs ?? []).map((auxiliar) => auxiliar.job), escenario.job];
 }
 
-async function ejecutarEscenario(
+async function montarYConstruir(
   bridge: Bridge,
   escenario: Escenario,
   definiciones: Definiciones,
-): Promise<Resultado> {
-  // Los jobs auxiliares (el hijo de un tRunJob) se montan antes que el
-  // principal, y se compilan: un job padre necesita su hijo generado para
-  // poder llamarlo.
+): Promise<Montaje> {
+  // Los jobs auxiliares (el hijo de un tRunJob) se montan y se construyen antes que el
+  // principal: el build del padre necesita el hijo ya generado.
   for (const auxiliar of escenario.jobs ?? []) {
     const montado = await montarJob(bridge, auxiliar, definiciones);
     if (!montado.ok) {
-      return { ejecutaOk: false, salidaCorrecta: false, mensaje: montado.mensaje };
+      return { fallo: { ejecutaOk: false, salidaCorrecta: false, mensaje: montado.mensaje } };
     }
-    const compilado = await compilarEnStudio(bridge, auxiliar.job);
-    if (!compilado.ok) {
+    const construido = await construirEnStudio(bridge, auxiliar.job, true);
+    if (!construido.ok) {
       return {
-        ejecutaOk: false,
-        salidaCorrecta: false,
-        mensaje: `no se pudo compilar el job auxiliar '${auxiliar.job}': ${compilado.mensaje}`,
-      };
-    }
-    // Y se espera a que este compilado: si no, el build del padre no lo
-    // encuentra y falla.
-    const listo = await esperarCompilado(bridge, auxiliar.job);
-    if (!listo.ok) {
-      return {
-        ejecutaOk: false,
-        salidaCorrecta: false,
-        mensaje: `el job auxiliar '${auxiliar.job}' no llego a compilarse: ${listo.mensaje}`,
+        fallo: {
+          ejecutaOk: false,
+          salidaCorrecta: false,
+          mensaje: `no se pudo construir el job auxiliar '${auxiliar.job}': ${construido.mensaje}`,
+        },
       };
     }
   }
 
-  const montado = await montarJob(bridge, escenario, definiciones);
+  const montado = await medir("montaje", () => montarJob(bridge, escenario, definiciones));
   if (!montado.ok) {
-    return { ejecutaOk: false, salidaCorrecta: false, mensaje: montado.mensaje };
+    return { fallo: { ejecutaOk: false, salidaCorrecta: false, mensaje: montado.mensaje } };
+  }
+
+  // Se construye antes de leer los problemas de diseno: la vista Problemas se actualiza
+  // al generar el codigo. Leida justo despues del montaje daba errores que ya no existian.
+  const construido = await medir("construir", () => construirEnStudio(bridge, escenario.job));
+  if (!construido.ok) {
+    return { fallo: { ejecutaOk: false, salidaCorrecta: false, mensaje: construido.mensaje } };
+  }
+
+  const tolerados = escenario.espera?.avisos_tolerados;
+  const diseno = sinTolerados(
+    await medir("problemas de diseno", () => leerProblemasDeDiseno(bridge, escenario.job)),
+    tolerados,
+  );
+  if (!escenario.espera?.error_esperado && diseno.errores.length > 0) {
+    return {
+      fallo: {
+        ejecutaOk: false,
+        salidaCorrecta: false,
+        mensaje: resumir("errores de diseno tras construir", diseno.errores),
+      },
+    };
   }
 
   if (escenario.prepara && escenario.prepara.length > 0) {
     const preparado = await preparar(escenario.prepara);
     if (!preparado.ok) {
-      return { ejecutaOk: false, salidaCorrecta: false, mensaje: preparado.mensaje };
+      return { fallo: { ejecutaOk: false, salidaCorrecta: false, mensaje: preparado.mensaje } };
     }
   }
 
-  const salida = await ejecutarJob(bridge, escenario);
+  return { listo: { diseno, tolerados } };
+}
+
+async function ejecutarYComprobar(
+  bridge: Bridge,
+  escenario: Escenario,
+  { diseno, tolerados }: { diseno: Hallazgos; tolerados?: string[] },
+  modo: ModoEjecucion,
+): Promise<Resultado> {
+  const salida = await medir("ejecucion", () => ejecutarJob(bridge, escenario, modo));
   if (!salida.ok) {
     return { ejecutaOk: false, salidaCorrecta: false, mensaje: salida.mensaje };
   }
 
   const fallos = await comprobarEspera(bridge, escenario, salida.lineas);
 
+  // Un job puede salir con codigo 0 y dejar [ERROR] en su salida o errores de diseno:
+  // eso es un fallo, salvo que el escenario lo espere. Los avisos solo se anotan.
+  const enSalida = sinTolerados(clasificarSalida([...salida.lineas, ...(salida.stderr ?? [])]), tolerados);
+  const hallazgos = juntar(diseno, enSalida);
+  if (!escenario.espera?.error_esperado && hallazgos.errores.length > 0) {
+    fallos.push(resumir("errores con el job terminado", hallazgos.errores));
+  }
+  const avisos = resumir("avisos", hallazgos.avisos);
+
   return {
     ejecutaOk: true,
     salidaCorrecta: fallos.length === 0,
-    mensaje: fallos.join("; ") || undefined,
+    mensaje: [...fallos, avisos].filter(Boolean).join("; ") || undefined,
+    avisos: hallazgos.avisos,
   };
+}
+
+/** Errores y avisos de la vista Problemas. Si Studio no los da, no se inventan. */
+async function leerProblemasDeDiseno(bridge: Bridge, job: string): Promise<Hallazgos> {
+  try {
+    const respuesta = await bridge.jobProblems({ job });
+    return clasificarProblemas(problemasDe(respuesta.data));
+  } catch {
+    return { errores: [], avisos: [] };
+  }
 }
 
 /**

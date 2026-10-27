@@ -100,6 +100,9 @@
     }
   ],
   "espera": {
+    "avisos_tolerados": [
+      "tDuplicateRow_2: The schema from the input link"
+    ],
     "contiene": [
       "false",
       "||false",
