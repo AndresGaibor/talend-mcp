@@ -22,6 +22,25 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 2026-10-26 | tPostgresqlRow, tPostgresqlClose | C5, C6 | `execution-check --todas tPostgresqlRow` | Pasan en Talend tras quitar el disparador desde la conexion y el relanzamiento doble del arnes. |
 | 2026-10-26 | tJDBC* | C5 | `talend_job_compile` con `installMissing` | Bloqueado: `components-jdbc-runtime` no esta en repositorios publicos. Escenarios marcados pendientes. |
 | 2026-10-26 | tJDBC*, tHttpRequest | C2 | `talend_studio_component_parameters` | Bloqueado: el hilo de Studio no responde y hay un dialogo "Network Issue" abierto. |
+| 2026-10-27 | tOracle* (Connection, Input, Output, Row, Close, Commit, Rollback, TableList) | C5, C6 | `execution-check --suite bd` (Oracle 23 Free, driver 19.19) | Pasan 10 escenarios en Talend: leer, escribir, actualizar con commit, borrar, rollback, Row, upsert, close, TableList y contrasena incorrecta. |
+| 2026-10-27 | tMSSql* (Connection, Input, Output, Row, Close, Commit, Rollback, TableList) | C5, C6 | `execution-check --suite bd` (SQL Server 2022) | Pasan 9 escenarios. Requiere `trustServerCertificate` y `PORT` literal. Pendiente: tMSSqlColumnList (salida FLOW vacia). |
+| 2026-10-27 | tDB2* (Connection, Input, Output, Row, Close, Commit, Rollback, SP) | C5, C6 | `execution-check --suite bd` (Db2 Community, base TALEND) | Pasan 11 escenarios, incluido tDB2SP. Requiere registrar db2jcc4 y las licencias por bridge y reiniciar Studio. |
+| 2026-10-27 | tFileRowCount, tFileCompare, tFileInputFullRow, tChangeFileEncoding, tCreateTemporaryFile, tFileOutputRaw | C5, C6 | `execution-check --suite archivos` | Pasan. tFileOutputRaw sobrescribe por fila: queda la ultima. |
+| 2026-10-27 | tFileInputProperties, tFileOutputProperties, tFileInputLDIF, tFileOutputLDIF, tFileInputARFF, tFileArchive, tFileUnarchive | C5, C6 | `execution-check --suite archivos` | Pasan. tFileArchive necesita una carpeta de origen (con un fichero suelto falla). |
+| 2026-10-27 | tFileOutputXML, tXSDValidator | C5, C6 | `execution-check --suite archivos` | Pasan. tFileOutputXML: ROOT_TAGS y MAPPING son tablas; SCHEMA_COLUMN_NAME es booleano. |
+| 2026-10-27 | tFTPFileExist, tFTPClose, tFTPFileProperties | C5, C6 | `execution-check --suite archivos` (FTP pure-ftpd) | Pasan. tFTPFileProperties: el esquema de salida lo fija el componente. |
+| 2026-10-27 | tSocketOutput | C5, C6 | `execution-check --suite archivos` (sumidero `scripts/l5/socket-sink.ts`) | Pasa. Entrecomilla los campos por defecto. |
+| 2026-10-27 | tReplace | C5, C6 | `execution-check --suite calidad` | Pasa con la regla en la tabla SUBSTITUTIONS. |
+| 2026-10-27 | tREST | C5, C6 | `execution-check --suite apis` (sumidero HTTP `scripts/l5/http-sink.ts`) | Pasa tras registrar JAX-RS y Jersey, `system-routines` y reiniciar Studio. Salida `Body` y `ERROR_CODE`. |
+| 2026-10-27 | tFTPTruncate | C5 | `execution-check --suite archivos` | Pendiente: termina sin error pero el fichero remoto conserva su contenido. Sin resolver. |
+| 2026-10-27 | tExtractXMLField | C5 | `execution-check --suite archivos` | Pendiente: con USE_XML_FIELD la columna xml llega vacia al componente. |
+| 2026-10-27 | tSSH, tSCPPut | C5 | `execution-check --suite archivos` | Pendiente: tSSH no compila contra sshd 2.17.1 (clase sin identificar). tSCPPut necesita talend-scp-helper, que no es publico. |
+| 2026-10-27 | tJMSOutput, tJMSInput | C5 | `execution-check --suite mensajeria` (ActiveMQ) | Pendiente: el modo RAW exige un objeto jakarta.jms.Message; el modo CONTENT no compila. |
+| 2026-10-27 | tSocketInput | C5 | escenario sin ejecutar | Pendiente: necesita un cliente sincronizado con el arranque del job. |
+| 2026-10-27 | tFileOutputARFF, tExternalSortOutput | C5 | `execution-check --suite archivos` | Pendiente: ARFF sin atributos ni filas; sort escribe fichero vacio. |
+| 2026-10-27 | tSchemaComplianceCheck | C5 | `execution-check --suite calidad` | Pendiente: la salida REJECT no genera errorCode ni errorMessage en el struct. Causa en el propagado de esquemas del bridge. |
+| 2026-10-27 | tReplaceList | C5 | `execution-check --suite calidad` | Pendiente: el conector LOOKUP se genera sin nombre ni esquema (tHash_null). |
+| 2026-10-27 | tKafka*, tS3*, tAddCRCRow | C1 | sin definicion en la instalacion de Studio | No se pueden ejecutar aqui: no hay definicion del componente (Kafka, S3) o falta OneWireAPI (tAddCRCRow). |
 
 ## Estado
 
