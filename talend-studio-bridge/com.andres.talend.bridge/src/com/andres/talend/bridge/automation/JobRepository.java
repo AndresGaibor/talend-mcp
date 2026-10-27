@@ -40,6 +40,7 @@ public final class JobRepository {
     if (folder == null) {
       folder = "";
     }
+    validateFolder(folder);
 
     Object project = TalendApi.currentProject();
     if (project == null) {
@@ -80,7 +81,8 @@ public final class JobRepository {
       } catch (Exception e) {
         BridgeLog.warn("El repositorio no tiene el tipo de job de Big Data", e);
       }
-    }    Object itemResource = xmiResourceManager.getClass()
+    }
+    Object itemResource = xmiResourceManager.getClass()
         .getMethod("createItemResource", TalendClasses.load("org.eclipse.core.resources.IProject"),
             TalendClasses.load("org.talend.core.model.properties.Item"),
             org.eclipse.core.runtime.IPath.class, typeClass, boolean.class)
@@ -132,7 +134,7 @@ public final class JobRepository {
             org.eclipse.core.runtime.IPath.class, boolean[].class)
         .invoke(repositoryFactory, project, processItem, ruta, new boolean[0]);
 
-    Map<String, Object> opened = openCreatedJob(name, version);
+    Map<String, Object> opened = openCreatedJob(folder, name, version);
     if (!Boolean.TRUE.equals(opened.get("opened"))) {
       throw new IllegalStateException(
           "No se pudo abrir el job recien creado: " + opened.get("error"));
@@ -313,19 +315,24 @@ public final class JobRepository {
   public static Map<String, Object> open(JsonObject spec) throws Exception {
     String name = JsonSpec.required(spec, "name");
     String version = version(spec);
-
-    // Si el job ya esta abierto, se activa el editor que hay. Abrirlo otra
-    // vez crea un segundo editor, con su propio proceso en memoria, y las
-    // operaciones pueden acabar en el que no toca.
-    org.eclipse.ui.IEditorPart existing = TalendApi.editorOfJob(name);
-    if (existing != null) {
-      Map<String, Object> result = new LinkedHashMap<>();
-      result.put("opened", true);
-      result.put("editorTitle", existing.getTitle());
-      return result;
+    String itemPath = JsonSpec.string(spec, "itemPath");
+    org.eclipse.core.resources.IFile file;
+    if (itemPath == null || itemPath.trim().isEmpty()) {
+      // Sin una ruta exacta, reutiliza el editor abierto para no crear otro
+      // proceso en memoria con la misma etiqueta.
+      org.eclipse.ui.IEditorPart existing = TalendApi.editorOfJob(name);
+      if (existing != null) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("opened", true);
+        result.put("editorTitle", existing.getTitle());
+        return result;
+      }
+      file = itemFile(name, version);
+    } else {
+      // La etiqueta del Job puede repetirse en otra carpeta. Cuando el MCP
+      // manda la ruta, resolver el recurso exacto evita activar otro editor.
+      file = itemFileAtProjectPath(itemPath, name, version);
     }
-
-    org.eclipse.core.resources.IFile file = itemFile(name, version);
     if (file == null || !file.exists()) {
       throw new IllegalStateException("No existe el job '" + name + "' en el proyecto");
     }
@@ -334,6 +341,36 @@ public final class JobRepository {
       throw new IllegalStateException("No se pudo abrir el job: " + opened.get("error"));
     }
     return opened;
+  }
+
+  /** Abre un item indicado por ruta relativa, limitado al arbol process del proyecto. */
+  private static org.eclipse.core.resources.IFile itemFileAtProjectPath(
+      String itemPath, String name, String version) throws Exception {
+    String normalized = itemPath.trim().replace('\\', '/');
+    String[] parts = normalized.split("/");
+    if (normalized.startsWith("/") || normalized.indexOf(':') >= 0 || parts.length < 2
+        || !("process".equalsIgnoreCase(parts[0]) || "process_mr".equalsIgnoreCase(parts[0]))) {
+      throw new IllegalArgumentException(
+          "itemPath debe ser relativo y comenzar con process/ o process_mr/");
+    }
+    for (String part : parts) {
+      if (part.isEmpty() || ".".equals(part) || "..".equals(part)) {
+        throw new IllegalArgumentException("itemPath contiene un segmento no permitido");
+      }
+    }
+    String expectedFile = name + "_" + version + ".item";
+    if (!expectedFile.equalsIgnoreCase(parts[parts.length - 1])) {
+      throw new IllegalArgumentException(
+          "itemPath debe terminar en " + expectedFile);
+    }
+    IProject project = TalendApi.resourceProject();
+    if (project == null) {
+      throw new IllegalStateException("No hay ningun proyecto de Talend abierto");
+    }
+    org.eclipse.core.resources.IFile file = project.getFile(
+        org.eclipse.core.runtime.Path.fromPortableString(normalized));
+    file.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
+    return file;
   }
 
   // ---------------------------------------------------------------------
@@ -480,12 +517,11 @@ public final class JobRepository {
   /**
    * Ruta de la carpeta del item para el repositorio.
    *
-   * El repositorio antepone la carpeta del tipo de objeto (`process`) y crea
-   * dentro los tres archivos del job. Por eso la ruta es solo el nombre de la
-   * carpeta, sin `process` delante.
+   * El repositorio antepone la carpeta del tipo de objeto (`process`). La ruta
+   * restante sigue el orden carpeta del usuario / nombre del Job.
    */
   private static org.eclipse.core.runtime.IPath processPath(String folder, String name) {
-    org.eclipse.core.runtime.IPath path = org.eclipse.core.runtime.Path.fromOSString(name);
+    org.eclipse.core.runtime.IPath path = org.eclipse.core.runtime.Path.fromOSString("");
     if (folder != null && !folder.trim().isEmpty()) {
       for (String part : folder.split("/")) {
         if (!part.trim().isEmpty()) {
@@ -493,7 +529,20 @@ public final class JobRepository {
         }
       }
     }
-    return path;
+    return path.append(name);
+  }
+
+  /** Rechaza segmentos que puedan escapar de la carpeta Process del proyecto. */
+  private static void validateFolder(String folder) {
+    if (folder == null || folder.trim().isEmpty()) {
+      return;
+    }
+    for (String part : folder.split("/")) {
+      if (part.trim().isEmpty() || ".".equals(part) || "..".equals(part)
+          || part.indexOf('\\') >= 0 || part.indexOf(':') >= 0) {
+        throw new IllegalArgumentException("La carpeta del Job contiene un segmento no permitido");
+      }
+    }
   }
 
   /**
@@ -540,22 +589,45 @@ public final class JobRepository {
   /** Archivo `.item` de un job del proyecto. */
   private static org.eclipse.core.resources.IFile itemFile(String name, String version)
       throws Exception {
+    return itemFile("", name, version);
+  }
+
+  /** Archivo `.item` de un job del proyecto en una carpeta configurada. */
+  private static org.eclipse.core.resources.IFile itemFile(String folder, String name, String version)
+      throws Exception {
     IProject iProject = TalendApi.resourceProject();
     if (iProject == null) {
       return null;
     }
-    // Los jobs de Big Data estan en `process_mr` y sin carpeta propia; los
-    // normales, en `process` y con una carpeta por job.
     for (String base : new String[] {"process", "process_mr"}) {
       org.eclipse.core.resources.IFolder root = iProject.getFolder(base);
       root.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
-      org.eclipse.core.resources.IFile file = root.getFile(name + "_" + version + ".item");
+
+      org.eclipse.core.resources.IFolder relativeFolder = root;
+      if (folder != null && !folder.trim().isEmpty()) {
+        for (String part : folder.split("/")) {
+          if (!part.trim().isEmpty()) {
+            relativeFolder = relativeFolder.getFolder(part);
+          }
+        }
+      }
+      org.eclipse.core.resources.IFolder jobFolder = relativeFolder.getFolder(name);
+      jobFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
+      org.eclipse.core.resources.IFile file = jobFolder.getFile(name + "_" + version + ".item");
       if (file.exists()) {
         return file;
       }
-      org.eclipse.core.resources.IFolder jobFolder = root.getFolder(name);
-      jobFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
-      file = jobFolder.getFile(name + "_" + version + ".item");
+
+      // Conserva la ubicacion historica sin carpeta para jobs normales y Big Data.
+      if (relativeFolder != root) {
+        org.eclipse.core.resources.IFolder legacyJobFolder = root.getFolder(name);
+        legacyJobFolder.refreshLocal(org.eclipse.core.resources.IResource.DEPTH_ZERO, null);
+        file = legacyJobFolder.getFile(name + "_" + version + ".item");
+        if (file.exists()) {
+          return file;
+        }
+      }
+      file = root.getFile(name + "_" + version + ".item");
       if (file.exists()) {
         return file;
       }
@@ -564,8 +636,8 @@ public final class JobRepository {
   }
 
   /** Abre el job recien creado en el editor. */
-  private static Map<String, Object> openCreatedJob(String name, String version) throws Exception {
-    org.eclipse.core.resources.IFile file = itemFile(name, version);
+  private static Map<String, Object> openCreatedJob(String folder, String name, String version) throws Exception {
+    org.eclipse.core.resources.IFile file = itemFile(folder, name, version);
     if (file == null || !file.exists()) {
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("opened", false);

@@ -99,7 +99,27 @@ async function startServer(): Promise<void> {
   // todas las capacidades: TALEND_MCP_FILTER=canonical (o all).
   const mcpFilter = process.env.TALEND_MCP_FILTER || "agent";
 
-  if (!IS_WIN) {
+  if (IS_WIN) {
+    const portNumber = Number(mcpPort);
+    if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
+      throw new Error(`TALEND_MCP_PORT no es válido: ${mcpPort}`);
+    }
+    const powershell = [
+      `$owners = Get-NetTCPConnection -State Listen -LocalPort ${portNumber} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique`,
+      "foreach ($owner in $owners) { taskkill.exe /F /T /PID $owner | Out-Null }",
+    ].join("; ");
+    try {
+      const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", powershell], {
+        encoding: "utf8",
+        windowsHide: true,
+      });
+      if (result.status !== 0) {
+        throw new Error(result.stderr?.trim() || `PowerShell terminó con código ${result.status}`);
+      }
+    } catch (error) {
+      ui.warn(`No se pudo liberar el puerto ${mcpPort}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  } else {
     try {
       const lsof = spawnSync("lsof", ["-ti", `tcp:${mcpPort}`], { encoding: "utf8" });
       const pids = (lsof.stdout ?? "").trim().split("\n").filter(Boolean);

@@ -63,6 +63,25 @@ test("no reemplaza un Job ajeno aunque coincidan nombre y carpeta", async () => 
   expect(fake.events).toEqual([]);
 });
 
+test("reutiliza un Job propio cuando la ruta de Talend incluye la subcarpeta del Job", async () => {
+  const fake = studio();
+  const spec: CustomJobSpec = {
+    jobName: "job_test",
+    folderPath: "Process/test",
+    components: [{ uniqueName: "log_1", componentName: "tLogRow" }],
+  };
+
+  const first = await applyCustomJobSpec(spec, fake.dependencies) as Record<string, unknown>;
+  expect(first["generatedComponents"]).toBe(1);
+
+  fake.jobs[0]!.folderPath = "test/job_test";
+  const second = await applyCustomJobSpec(spec, fake.dependencies) as Record<string, unknown>;
+
+  expect(second["reusedExisting"]).toBe(true);
+  expect(second["reusedComponents"]).toBe(1);
+  expect(fake.events.filter((event) => event === "create:job_test")).toHaveLength(1);
+});
+
 test("valida los hijos antes del primer cambio y los crea antes del padre", async () => {
   const fake = studio();
   const spec: CustomJobSpec = { jobName: "job_parent", folderPath: "Process/test", components: [], childJobs: [{ jobName: "job_child", folderPath: "Process/test", components: [] }] };
@@ -98,4 +117,50 @@ test("crea por Studio, conecta antes de terminar la configuracion y reintenta si
   expect(second["reusedConnections"]).toBe(1);
   expect(fake.variables["job_test"]![0]!["value"]).toBe("ruta_revisada_por_usuario");
   expect(fake.events.filter((event) => event.startsWith("create:"))).toHaveLength(1);
+});
+
+test("omite un borrador ausente en Studio y conserva el pendiente en el contexto", async () => {
+  const fake = studio();
+  fake.dependencies.bridge.componentParameters = async ({ name }) => {
+    if (name === "tDBRow") {
+      return {
+        ok: true,
+        source: "studio-bridge",
+        confidence: "medium",
+        endpoint: "/automation/components/parameters",
+        data: { ok: false, error: "OPERATION_FAILED: Componente 'tDBRow' no encontrado en el catalogo de Talend" },
+      };
+    }
+    return {
+      ok: true,
+      source: "studio-bridge",
+      confidence: "medium",
+      endpoint: "/automation/components/parameters",
+      data: { result: { parameters: [{ name: "HEADER", field: "TEXT" }] } },
+    };
+  };
+
+  const result = await applyCustomJobSpec({
+    jobName: "job_with_unavailable_draft",
+    folderPath: "Process/test",
+    components: [
+      { uniqueName: "source", componentName: "tFileInputDelimited" },
+      { uniqueName: "maintenance", componentName: "tDBRow", draftOnly: true, draftReason: "Confirmar mantenimiento SQL" },
+      { uniqueName: "sink", componentName: "tLogRow" },
+    ],
+    connections: [
+      { source: "source", target: "maintenance", connectorName: "FLOW", label: "rows_in" },
+      { source: "maintenance", target: "sink", connectorName: "FLOW", label: "rows_out" },
+    ],
+    contexts: [{ name: "migration_todo_123456789abc", type: "id_String", value: "", comment: "Confirmar mantenimiento SQL antes de usar el Job." }],
+  }, fake.dependencies);
+
+  expect(fake.nodes["job_with_unavailable_draft"]?.map((node) => node.componentName)).toEqual([
+    "tFileInputDelimited", "tLogRow",
+  ]);
+  expect(result.generatedComponents).toBe(2);
+  expect(result.generatedConnections).toBe(0);
+  expect(result.warnings.join(" ")).toContain("tDBRow");
+  expect(result.warnings.join(" ")).toContain("no se creó");
+  expect(fake.variables["job_with_unavailable_draft"]?.[0]?.comment).toContain("Confirmar mantenimiento SQL");
 });

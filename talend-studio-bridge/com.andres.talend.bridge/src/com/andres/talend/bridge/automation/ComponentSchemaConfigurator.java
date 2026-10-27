@@ -54,6 +54,9 @@ final class ComponentSchemaConfigurator {
     // que una conexion las tenga asignadas.
     for (Object actual : actuales) {
       if (!tables.contains(actual)) {
+        if (isStaleFilterRowFlowSchema(node, actual)) {
+          continue;
+        }
         tables.add(actual);
       }
     }
@@ -61,6 +64,35 @@ final class ComponentSchemaConfigurator {
     // La tabla de rechazo se deja como estaba: al conectar, Talend propaga el
     // esquema del destino hacia atras y mete sus columnas en la del origen.
     restoreRejectTables(actuales, tables);
+  }
+
+  /** Elimina restos FLOW de tFilterRow: sus salidas usan FILTER y REJECT. */
+  private static boolean isStaleFilterRowFlowSchema(Object node, Object table) {
+    if (!"tFilterRow".equals(componentNameOf(node)) || !"FLOW".equals(conectorDe(table))) {
+      return false;
+    }
+    try {
+      Object rawName = table.getClass().getMethod("getTableName").invoke(table);
+      String name = rawName == null ? "" : String.valueOf(rawName);
+      if (name.endsWith("_schema")) {
+        return true;
+      }
+      Object columns = table.getClass().getMethod("getListColumns").invoke(table);
+      return columns instanceof List && ((List<?>) columns).isEmpty();
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private static String componentNameOf(Object node) {
+    try {
+      Object parameter = node.getClass().getMethod("getElementParameter", String.class)
+          .invoke(node, "COMPONENT_NAME");
+      Object value = parameter == null ? null : parameter.getClass().getMethod("getValue").invoke(parameter);
+      return value == null ? "" : String.valueOf(value);
+    } catch (Exception e) {
+      return "";
+    }
   }
 
   /**
@@ -178,4 +210,3 @@ final class ComponentSchemaConfigurator {
   /** Cambia las columnas de una tabla que ya existe. */
   // ---------------------------------------------------------------------
 }
-

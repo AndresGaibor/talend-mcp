@@ -64,12 +64,24 @@ describe("Tools de operaciones sobre el job de Studio", () => {
       expect(Object.keys(forma?.shape ?? {})).toContain("name");
     });
 
+    test("abrir job admite la ruta exacta relativa al proyecto", () => {
+      const tool = byName.get("talend_job_open_in_studio");
+      const forma = tool?.inputSchema as { shape?: Record<string, unknown> } | undefined;
+      expect(Object.keys(forma?.shape ?? {})).toContain("itemPath");
+      expect(tool?.inputSchema.safeParse({
+        name: "CargaSAS",
+        version: "0.1",
+        itemPath: "process/PruebasWebSAS/CargaSAS/CargaSAS_0.1.item",
+      }).success).toBe(true);
+    });
+
     test("conectar pide origen y destino", () => {
       const tool = byName.get("talend_job_connect_nodes");
       const forma = tool?.inputSchema as { shape?: Record<string, unknown> } | undefined;
       const claves = Object.keys(forma?.shape ?? {});
       expect(claves).toContain("source");
       expect(claves).toContain("target");
+      expect(claves).toContain("job");
     });
 
     test("definir schema admite columnas y valores", () => {
@@ -81,6 +93,22 @@ describe("Tools de operaciones sobre el job de Studio", () => {
       expect(claves).toContain("uniqueName");
     });
 
+    test("reemplazar pendientes solo admite borrar marcadores administrados", () => {
+      const tool = byName.get("talend_job_add_context_parameters");
+      const forma = tool?.inputSchema as { shape?: Record<string, unknown> } | undefined;
+      expect(Object.keys(forma?.shape ?? {})).toContain("removeManagedTodoNames");
+      expect(tool?.inputSchema.safeParse({
+        job: "job_daily",
+        contexts: [],
+        removeManagedTodoNames: ["migration_todo_old"],
+      }).success).toBe(true);
+      expect(tool?.inputSchema.safeParse({
+        job: "job_daily",
+        contexts: [],
+        removeManagedTodoNames: ["CURR_DT"],
+      }).success).toBe(false);
+    });
+
     test("anadir y configurar un nodo admiten la configuracion declarativa", () => {
       for (const nombre of ["talend_job_add_node", "talend_job_configure_node"]) {
         const forma = byName.get(nombre)?.inputSchema as { shape?: Record<string, unknown> } | undefined;
@@ -90,6 +118,10 @@ describe("Tools de operaciones sobre el job de Studio", () => {
         expect(claves, `${nombre} sin schema`).toContain("schema");
         expect(claves, `${nombre} sin mapper`).toContain("mapper");
       }
+      const addNode = byName.get("talend_job_add_node")?.inputSchema as
+        | { shape?: Record<string, unknown> }
+        | undefined;
+      expect(Object.keys(addNode?.shape ?? {})).toContain("job");
     });
 
     test("consultar el catalogo pide el nombre del componente", () => {

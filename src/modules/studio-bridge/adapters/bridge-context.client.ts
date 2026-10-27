@@ -17,6 +17,18 @@ export class BridgeContextClient extends BridgeJobClient {
     });
   }
 
+  /** Agrega variables al contexto por defecto del job abierto. */
+  async addContextParameters(options: {
+    job?: string;
+    contexts: Array<{ name: string; type: string; value: string; comment?: string }>;
+    removeManagedTodoNames?: string[];
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/contexts/parameters", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   /** Crea un contexto (un entorno) en el job. */
   async createJobContext(options: { job?: string; name: string }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/job/contexts/create", {

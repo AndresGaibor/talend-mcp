@@ -216,6 +216,10 @@ final class BridgeServer {
     }
   }
 
+  int boundPort() {
+    return server == null ? config().port : server.getAddress().getPort();
+  }
+
   /** Tabla de rutas del bridge. Cada ruta aparece una sola vez. */
   private void registerRoutes() {
     // Latido: sin token. Es lo unico que se ve sin autenticarse.
@@ -295,6 +299,7 @@ final class BridgeServer {
     route("/automation/job/build-batch", exchange -> respond(exchange, 200, JobOperationsService.buildBatch(readJsonBody(exchange))));
     uiBody("/automation/job/problems", body -> JobOperationsService.problems(body));
     uiBody("/automation/job/contexts", body -> JobOperationsService.contexts(body));
+    uiBody("/automation/job/contexts/parameters", body -> JobOperationsService.addContextParameters(body));
     uiBody("/automation/job/contexts/create", body -> JobOperationsService.createContext(body));
     uiBody("/automation/job/contexts/parameter", body -> JobOperationsService.setContextParameter(body));
     uiBody("/automation/job/contexts/parameter/delete", body -> JobOperationsService.deleteContextParameter(body));
@@ -302,6 +307,7 @@ final class BridgeServer {
     uiBody("/automation/nodes/list", body -> JobOperationsService.listNodes(body));
     uiBody("/automation/nodes/add", body -> JobOperationsService.addNode(body));
     uiBody("/automation/nodes/connect", body -> JobOperationsService.connect(body));
+    uiBody("/automation/nodes/disconnect", body -> JobOperationsService.disconnect(body));
     uiBody("/automation/nodes/update", body -> JobOperationsService.updateNode(body));
     uiBody("/automation/nodes/delete", body -> JobOperationsService.deleteNodes(body));
     uiBody("/automation/nodes/copy", body -> JobOperationsService.copyNode(body));

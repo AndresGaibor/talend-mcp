@@ -20,11 +20,23 @@ function checked(result: { ok: boolean; data?: unknown; error?: { message: strin
   return payload;
 }
 
+function isMissingComponent(error: unknown, componentName: string): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(`Componente '${componentName}' no encontrado en el catalogo de Talend`);
+}
+
 function folderOf(spec: CustomJobSpec): string {
   const folder = (spec.folderPath ?? "Process").replace(/\\/g, "/");
   const parts = folder.split("/");
   if (parts[0]?.toLowerCase() !== "process" || parts.some((part) => !part || part === "." || part === ".." || part.includes(":"))) throw new Error("La carpeta debe estar dentro de Process, sin rutas relativas");
   return parts.slice(1).join("/");
+}
+
+function existingFolderOf(job: { label: string; folderPath?: string }): string {
+  const parts = (job.folderPath ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts[0]?.toLowerCase() === "process") parts.shift();
+  if (parts.at(-1)?.toLowerCase() === job.label.toLowerCase()) parts.pop();
+  return parts.join("/");
 }
 
 function canonical(value: unknown): unknown {
@@ -57,14 +69,27 @@ async function problemsOf(bridge: TalendStudioBridgeClient, job: string): Promis
   }
 }
 
-async function validate(spec: CustomJobSpec, deps: CustomSpecDependencies): Promise<string[]> {
+type SpecValidation = { warnings: string[]; unavailableDrafts: Set<string> };
+
+async function validate(spec: CustomJobSpec, deps: CustomSpecDependencies): Promise<SpecValidation> {
   folderOf(spec);
   const warnings: string[] = [];
+  const unavailableDrafts = new Set<string>();
   const components = new Map(spec.components.map((node) => [node.uniqueName, node]));
   if (components.size !== spec.components.length) throw new Error("Nombres de componentes duplicados");
   if (new Set((spec.contexts ?? []).map((context) => context.name)).size !== (spec.contexts ?? []).length) throw new Error("Nombres de contexto duplicados");
   for (const component of spec.components) {
-    const metadata = checked(await deps.bridge.componentParameters({ name: component.componentName })) as { parameters?: Array<{ name: string; field?: string }> };
+    let metadata: { parameters?: Array<{ name: string; field?: string }> };
+    try {
+      metadata = checked(await deps.bridge.componentParameters({ name: component.componentName })) as typeof metadata;
+    } catch (error) {
+      if (!component.draftOnly || !isMissingComponent(error, component.componentName)) throw error;
+      unavailableDrafts.add(component.uniqueName);
+      warnings.push(
+        `${component.uniqueName}: '${component.componentName}' no está en el catálogo de Studio; se omitirá este borrador y sus conexiones, y el pendiente permanecerá en el contexto del Job.`,
+      );
+      continue;
+    }
     if (!Array.isArray(metadata?.parameters)) throw new Error(`Studio no devolvio los parametros de ${component.componentName}`);
     const names = new Set(metadata.parameters.map((parameter) => parameter.name));
     for (const name of [...Object.keys(component.parameters ?? {}), ...Object.keys(component.tables ?? {})]) {
@@ -78,13 +103,17 @@ async function validate(spec: CustomJobSpec, deps: CustomSpecDependencies): Prom
   for (const edge of spec.connections ?? []) {
     const source = components.get(edge.source), target = components.get(edge.target);
     if (!source || !target || source === target) throw new Error("Conexion con nodos inexistentes o con el mismo nodo");
+    if (unavailableDrafts.has(edge.source) || unavailableDrafts.has(edge.target)) {
+      warnings.push(`Conexión ${edge.source} → ${edge.target} no se creó porque depende de un borrador ausente en Studio.`);
+      continue;
+    }
     if (["SUBJOB_OK", "SUBJOB_ERROR", "COMPONENT_OK", "COMPONENT_ERROR"].includes(edge.connectorName ?? "")) continue;
     if (edge.connectorName === "RUN_IF") throw new Error("RUN_IF necesita una condicion explicita; no se inventa una condicion");
     const check = await deps.validateConnection(source.componentName, target.componentName, edge.connectorName ?? "FLOW");
     if (!check.ok) throw new Error(check.errors.join(". "));
     warnings.push(...check.warnings);
   }
-  return warnings;
+  return { warnings, unavailableDrafts };
 }
 
 // Un montaje cambia el editor activo: no se intercalan dos montajes custom.
@@ -106,13 +135,13 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
       forest.push(job);
     };
     visit(spec, 0);
-    const warnings = new Map<CustomJobSpec, string[]>();
+    const validations = new Map<CustomJobSpec, SpecValidation>();
     // Se comprueba todo el arbol y todos los destinos antes de crear el primer Job.
     const existingJobs = await deps.listJobs();
     for (const job of forest) {
-      warnings.set(job, await validate(job, deps));
+      validations.set(job, await validate(job, deps));
       const existing = existingJobs.filter((item) => item.label.toLowerCase() === job.jobName.toLowerCase());
-      if (existing.length && (existing.length !== 1 || existing[0]!.version !== (job.version ?? "0.1") || (existing[0]!.folderPath ?? "").replace(/\\/g, "/") !== folderOf(job) || !existing[0]!.description?.includes(ownership(job)))) throw new Error(`CONFLICT: ya existe ${job.jobName} y no pertenece a esta especificacion; no se sobrescribe`);
+      if (existing.length && (existing.length !== 1 || existing[0]!.version !== (job.version ?? "0.1") || existingFolderOf(existing[0]!) !== folderOf(job) || !existing[0]!.description?.includes(ownership(job)))) throw new Error(`CONFLICT: ya existe ${job.jobName} y no pertenece a esta especificacion; no se sobrescribe`);
     }
     const results = new Map<string, Result>();
     for (const job of forest) {
@@ -121,14 +150,15 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
       if (previous) checked(await bridge.openJob({ name: job.jobName, version: job.version ?? "0.1" }));
       else checked(await bridge.createJob({ name: job.jobName, version: job.version ?? "0.1", folder: folderOf(job), description: `${job.description ?? ""}\n${ownership(job)}`, replace: false }));
       const savedJob = (await deps.listJobs()).find((item) => item.label === job.jobName);
-      if (!savedJob || (savedJob.folderPath ?? "").replace(/\\/g, "/") !== folderOf(job)) throw new Error(`Studio no confirmo el destino de ${job.jobName}`);
+      if (!savedJob || existingFolderOf(savedJob) !== folderOf(job)) throw new Error(`Studio no confirmo el destino de ${job.jobName}`);
       const result: Result = { jobName: job.jobName, folderPath: job.folderPath ?? "Process", itemPath: savedJob.itemPath, propertiesPath: savedJob.propertiesPath,
         generatedComponents: 0, reusedComponents: 0, totalComponents: job.components.length, generatedConnections: 0, reusedConnections: 0, connections: (job.connections ?? []).length,
-        generatedContexts: 0, updatedContexts: 0, reusedContexts: 0, removedContexts: 0, reusedExisting: Boolean(previous), componentAliases: {}, warnings: warnings.get(job) ?? [], childJobs: (job.childJobs ?? []).map((child) => results.get(child.jobName)!) };
+        generatedContexts: 0, updatedContexts: 0, reusedContexts: 0, removedContexts: 0, reusedExisting: Boolean(previous), componentAliases: {}, warnings: validations.get(job)?.warnings ?? [], childJobs: (job.childJobs ?? []).map((child) => results.get(child.jobName)!) };
       const nodes = checked(await bridge.listNodes({ job: job.jobName })) as Array<{ uniqueName: string; label?: string; componentName?: string }>;
       if (!Array.isArray(nodes)) throw new Error("Studio no devolvio la lista de nodos");
       const newNodes = new Set<string>();
       for (const component of job.components) {
+        if (validations.get(job)?.unavailableDrafts.has(component.uniqueName)) continue;
         const marker = `[portal:${component.uniqueName}]`;
         const matches = nodes.filter((node) => node.label?.endsWith(marker));
         if (matches.length > 1 || (matches[0] && matches[0].componentName !== component.componentName)) throw new Error(`CONFLICT: nodo ${component.uniqueName} ambiguo o de otro componente`);
@@ -143,6 +173,7 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
       const model = checked(await bridge.activeJobModel()) as { connections?: Array<{ source?: string; target?: string; connectorName?: string }> };
       if (!Array.isArray(model?.connections)) throw new Error("Studio no permite comprobar las conexiones existentes");
       for (const edge of job.connections ?? []) {
+        if (validations.get(job)?.unavailableDrafts.has(edge.source) || validations.get(job)?.unavailableDrafts.has(edge.target)) continue;
         const source = result.componentAliases[edge.source]!, target = result.componentAliases[edge.target]!;
         const connector = edge.connectorName ?? "FLOW";
         const existing = model.connections.filter((item) => item.source === source && item.target === target);
@@ -155,6 +186,7 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
       // Studio propaga schemas al conectar. Se termina la configuracion despues,
       // sin reconfigurar los nodos que una persona ya pudo haber corregido.
       for (const component of [...job.components].reverse()) {
+        if (validations.get(job)?.unavailableDrafts.has(component.uniqueName)) continue;
         if (!newNodes.has(component.uniqueName) || (!component.schema && !component.tables && !component.mapper)) continue;
         checked(await bridge.configureNode({ job: job.jobName, uniqueName: result.componentAliases[component.uniqueName]!, schema: component.schema ? [{ ...component.schema }] : undefined, tables: component.tables, mapper: component.mapper }));
       }

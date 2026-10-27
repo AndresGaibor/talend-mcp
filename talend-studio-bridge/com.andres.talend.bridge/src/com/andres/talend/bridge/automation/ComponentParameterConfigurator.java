@@ -402,4 +402,3 @@ final class ComponentParameterConfigurator {
    * - En cualquier otro caso, se entrecomilla.
    */
 }
-

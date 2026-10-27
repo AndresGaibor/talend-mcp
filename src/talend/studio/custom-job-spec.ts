@@ -6,7 +6,7 @@ export const customComponentSchema = z.strictObject({
   uniqueName: z.string().regex(/^[A-Za-z_]\w*$/), componentName: z.string().regex(/^t[A-Za-z0-9_]+$/),
   posX: z.number().finite().optional(), posY: z.number().finite().optional(), label: z.string().optional(),
   parameters: z.record(z.string(), z.string()).optional(), schema: schema.optional(),
-  tables: z.record(z.string(), z.object({ columns: z.array(z.string()).optional(), rows: z.array(z.union([z.array(z.string()), z.record(z.string(), z.string())])) })).optional(),
+  tables: z.record(z.string(), z.object({ columns: z.array(z.string()).optional(), rows: z.array(z.union([z.array(z.string()), z.record(z.string(), z.string())])).optional() })).optional(),
   mapper: z.record(z.string(), z.unknown()).optional(), draftOnly: z.boolean().optional(), draftReason: z.string().optional(),
 });
 const connection = z.strictObject({ source: z.string(), target: z.string(), label: z.string(), connectorName: z.string().optional(), metaname: z.string().optional(), uniqueName: z.string().optional() });

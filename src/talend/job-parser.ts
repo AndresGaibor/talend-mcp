@@ -78,6 +78,7 @@ function parseSchemas(node: XmlRecord): TalendSchema[] {
 
 function parseMapperEntries(node: XmlRecord): MapperEntry[] {
   const nodeData = node.nodeData as XmlRecord | undefined;
+  const componentUniqueName = parseParameters(node).UNIQUE_NAME;
   const entries: MapperEntry[] = [];
 
   for (const tableKey of ["outputTables", "inputTables", "varTables"] as const) {
@@ -85,6 +86,7 @@ function parseMapperEntries(node: XmlRecord): MapperEntry[] {
       const tableName = attr(table, "name") ?? tableKey;
       for (const entry of asArray(table.mapperTableEntries as XmlRecord | XmlRecord[] | undefined)) {
         entries.push({
+          componentUniqueName,
           table: tableName,
           name: attr(entry, "name") ?? "",
           expression: attr(entry, "expression"),

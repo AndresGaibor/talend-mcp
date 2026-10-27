@@ -28,6 +28,7 @@ export const DESCRIPCION_DE_CARPETAS: Record<string, string> = {
   "tests": "Suite de bun test. Solo corre lo que esta aqui (bunfig.toml).",
   "talend-studio-bridge": "Plugin Java/Eclipse que corre dentro de Talend Studio y expone su API por HTTP.",
   "docs": "Documentacion tecnica. Empieza por docs/README.md.",
+  "logs": "Logs locales generados durante la ejecucion del MCP; ignorados por git.",
   "addons": "Datos de sinonimos sin uso confirmado en el codigo. No borrar sin revisar.",
   "examples": "Ejemplos de entrada (perfiles de tarea y contextos).",
   "testdata": "Datos de prueba que generan los scripts; los grandes no se versionan.",

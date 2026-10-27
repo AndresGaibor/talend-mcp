@@ -95,10 +95,11 @@ export const jobLifecycle = [
     inputSchema: z.object({
       name: z.string().describe("Nombre del job"),
       version: z.string().optional().default("0.1").describe("Version del job"),
+      itemPath: z.string().optional().describe("Ruta exacta del .item relativa al proyecto Talend"),
     }),
-    handler: async ({ name, version }: { name: string; version?: string }) => {
+    handler: async ({ name, version, itemPath }: { name: string; version?: string; itemPath?: string }) => {
       const bridge = await loadBridge();
-      const result = await bridge.openJob({ name, version });
+      const result = await bridge.openJob({ name, version, itemPath });
       return bridgeOk({
         ok: result.ok,
         source: result.source,

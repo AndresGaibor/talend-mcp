@@ -71,6 +71,30 @@ export class BridgeNodeClient extends BridgeContextClient {
     });
   }
 
+  /** Desconecta un enlace exacto entre dos nodos del job abierto. */
+  async disconnectNodes(options: {
+    source: string;
+    target: string;
+    name: string;
+    job?: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/nodes/disconnect", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Borra los nodos indicados del job abierto. */
+  async deleteNodes(options: {
+    uniqueNames: string[];
+    job?: string;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/nodes/delete", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   /** Cambia parametros o etiqueta de un nodo del job abierto. */
   async updateNode(options: {
     uniqueName: string;

@@ -86,7 +86,10 @@ export class ValidateConnectionUseCase {
         );
       }
       check.ok = false;
-    } else if ((salida.maxOutput ?? 0) < 1) {
+    } else if (
+      (salida.maxOutput ?? 0) < 1 &&
+      !(source.name.toLowerCase() === "tmap" && check.connector === "FLOW")
+    ) {
       // El conector existe pero no puede emitir (el FLOW del tUniqRow).
       const otro = salidas.find((item) => (item.maxOutput ?? 0) >= 1 && item.name !== "FLOW");
       check.errors.push(`el conector '${check.connector}' de '${sourceType}' no admite salidas`);
@@ -108,7 +111,10 @@ export class ValidateConnectionUseCase {
         `'${targetType}' no tiene un conector '${check.connector}': la conexion entrara por su conector principal` +
           ` (${entradas.map((item) => item.name).join(", ")})`,
       );
-    } else if ((entrada.maxInput ?? 0) < 1) {
+    } else if (
+      (entrada.maxInput ?? 0) < 1 &&
+      !(target.name.toLowerCase() === "tmap" && check.connector === "FLOW")
+    ) {
       check.errors.push(`el conector '${check.connector}' de '${targetType}' no admite entradas`);
       check.ok = false;
     }

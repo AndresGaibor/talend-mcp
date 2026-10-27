@@ -32,6 +32,7 @@ describe("presets de tools", () => {
     const agent = withFilter("agent");
     const canonical = new Set(withFilter("canonical"));
     expect(agent).toContain("talend_guide");
+    expect(agent).toContain("talend_job_apply_custom_spec");
     expect(agent.length).toBeLessThan(80);
     expect(agent.every((name) => canonical.has(name))).toBe(true);
   });

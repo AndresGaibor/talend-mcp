@@ -18,7 +18,11 @@ import { isUpdateSite, referencedPath, unescapePrefsValue } from "./paths";
  */
 export function cleanLeftoverJars(studio: StudioInstall): number {
   let removed = 0;
-  const folders = [join(studio.studioDir, "plugins"), join(studio.studioDir, "dropins")];
+  const folders = [
+    join(studio.studioDir, "plugins"),
+    join(studio.studioDir, "dropins"),
+    join(studio.studioDir, "dropins", "plugins"),
+  ];
 
   for (const folder of folders) {
     for (const entry of safeReaddir(folder)) {

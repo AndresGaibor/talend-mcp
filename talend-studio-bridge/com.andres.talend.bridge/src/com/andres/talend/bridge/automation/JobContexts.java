@@ -53,6 +53,8 @@ public final class JobContexts {
         entry.put("name", String.valueOf(parameter.getClass().getMethod("getName").invoke(parameter)));
         entry.put("type", String.valueOf(parameter.getClass().getMethod("getType").invoke(parameter)));
         entry.put("value", String.valueOf(parameter.getClass().getMethod("getValue").invoke(parameter)));
+        Object comment = parameter.getClass().getMethod("getComment").invoke(parameter);
+        if (comment != null) entry.put("comment", String.valueOf(comment));
         parameters.add(entry);
       }
       item.put("parameters", parameters);
@@ -289,7 +291,7 @@ public final class JobContexts {
   }
 
   /** Anade la variable a los parametros nuevos del job. */
-  private static void addNewParameter(Object manager, String name, Object parameter) {
+  static void addNewParameter(Object manager, String name, Object parameter) {
     try {
       Object map = manager.getClass().getMethod("getNewParametersMap").invoke(manager);
       if (map instanceof java.util.Map) {
@@ -302,8 +304,22 @@ public final class JobContexts {
     }
   }
 
+  /** Quita del registro temporal del gestor una variable que se eliminó del contexto. */
+  static void removeNewParameter(Object manager, String name) {
+    try {
+      Object map = manager.getClass().getMethod("getNewParametersMap").invoke(manager);
+      if (map instanceof java.util.Map) {
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> typed = (java.util.Map<String, Object>) map;
+        typed.remove(name);
+      }
+    } catch (Exception e) {
+      BridgeLog.warn("No se pudo retirar la variable temporal '" + name + "'", e);
+    }
+  }
+
   /** Avisa a Studio del cambio y guarda el job. */
-  private static void save(Object manager, Object process) throws Exception {
+  static void save(Object manager, Object process) throws Exception {
     try {
       manager.getClass().getMethod("setModified", boolean.class).invoke(manager, Boolean.TRUE);
     } catch (Exception e) {
@@ -315,6 +331,6 @@ public final class JobContexts {
       BridgeLog.warn("No se pudo avisar del cambio de contextos", e);
     }
     TalendApi.markModified(process);
-    JobPersistence.persist(process);
+    JobPersistence.persistOrThrow(process);
   }
 }

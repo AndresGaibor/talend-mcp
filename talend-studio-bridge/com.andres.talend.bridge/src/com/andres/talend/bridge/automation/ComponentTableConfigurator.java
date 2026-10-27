@@ -16,28 +16,68 @@ final class ComponentTableConfigurator {
 
   static void apply(Object node, JsonObject spec) throws Exception {
     JsonObject tables = JsonSpec.objectOf(spec, "tables");
+    Map<String, String> schemaTypes = schemaTypesOf(spec);
     for (Map.Entry<String, JsonElement> entry : tables.entrySet()) {
       JsonElement raw = entry.getValue();
       if (raw == null || !raw.isJsonObject()) {
         continue;
       }
       JsonObject definition = raw.getAsJsonObject();
-      List<String> columnCodes = columnCodesOf(node, entry.getKey(), definition);
-
-      List<Object> rows = new ArrayList<>();
-      JsonElement rawRows = definition.get("rows");
-      if (rawRows != null && rawRows.isJsonArray()) {
-        for (JsonElement row : rawRows.getAsJsonArray()) {
-           rows.add(toRow(row, columnCodes, entry.getKey()));
-        }
-      }
       Object parameter = node.getClass().getMethod("getElementParameter", String.class)
           .invoke(node, entry.getKey());
       if (parameter == null) {
         BridgeLog.warn("El componente no tiene la tabla '" + entry.getKey() + "'");
         continue;
       }
+      boolean columnsBasedOnSchema = Boolean.TRUE.equals(
+          parameter.getClass().getMethod("isColumnsBasedOnSchema").invoke(parameter));
+      List<String> columnCodes = columnCodesOf(node, entry.getKey(), definition);
+
+      List<Object> rows = new ArrayList<>();
+      JsonElement rawRows = definition.get("rows");
+      if (rawRows != null && rawRows.isJsonArray()) {
+        for (JsonElement row : rawRows.getAsJsonArray()) {
+          rows.add(toRow(row, columnCodes, entry.getKey(),
+              columnsBasedOnSchema ? schemaTypes : Map.of()));
+        }
+      }
       parameter.getClass().getMethod("setValue", Object.class).invoke(parameter, rows);
+    }
+  }
+
+  /** Tipos declarados por nombre de columna en el schema del mismo spec. */
+  private static Map<String, String> schemaTypesOf(JsonObject spec) {
+    Map<String, String> types = new LinkedHashMap<>();
+    JsonElement rawSchema = spec.get("schema");
+    if (rawSchema == null) {
+      return types;
+    }
+    if (rawSchema.isJsonObject()) {
+      addSchemaTypes(rawSchema.getAsJsonObject(), types);
+    } else if (rawSchema.isJsonArray()) {
+      for (JsonElement table : rawSchema.getAsJsonArray()) {
+        if (table != null && table.isJsonObject()) {
+          addSchemaTypes(table.getAsJsonObject(), types);
+        }
+      }
+    }
+    return types;
+  }
+
+  private static void addSchemaTypes(JsonObject schema, Map<String, String> types) {
+    JsonElement columns = schema.get("columns");
+    if (columns == null || !columns.isJsonArray()) {
+      return;
+    }
+    for (JsonElement rawColumn : columns.getAsJsonArray()) {
+      if (rawColumn == null || !rawColumn.isJsonObject()) {
+        continue;
+      }
+      JsonObject column = rawColumn.getAsJsonObject();
+      String name = JsonSpec.string(column, "name");
+      if (name != null && !name.isEmpty()) {
+        types.put(name, ColumnTypes.normalize(JsonSpec.string(column, "type")));
+      }
     }
   }
 
@@ -86,11 +126,12 @@ final class ComponentTableConfigurator {
   }
 
   /** Convierte una fila del spec en el mapa que espera la tabla. */
-  private static Object toRow(JsonElement row, List<String> columnCodes, String tableName) {
+  private static Object toRow(
+      JsonElement row, List<String> columnCodes, String tableName, Map<String, String> schemaTypes) {
     Map<String, Object> values = new LinkedHashMap<>();
     if (row.isJsonObject()) {
       for (Map.Entry<String, JsonElement> entry : row.getAsJsonObject().entrySet()) {
-          values.put(entry.getKey(), valorDeCelda(tableName, entry.getKey(), entry.getValue()));
+        values.put(entry.getKey(), valorDeCelda(tableName, entry.getKey(), entry.getValue(), schemaTypes));
       }
       return values;
     }
@@ -99,7 +140,7 @@ final class ComponentTableConfigurator {
       for (int i = 0; i < array.size(); i++) {
         String code = i < columnCodes.size() ? columnCodes.get(i) : "column" + i;
         JsonElement value = array.get(i);
-        values.put(code, valorDeCelda(tableName, code, value));
+        values.put(code, valorDeCelda(tableName, code, value, schemaTypes));
       }
     }
     return values;
@@ -113,7 +154,8 @@ final class ComponentTableConfigurator {
    * `"$.clientes[*].id"`. Los que son nombres (de columna, de funcion, de
    * orden...) van sin comillas, y los booleanos y los numeros tampoco.
    */
-  private static Object valorDeCelda(String tableName, String code, JsonElement raw) {
+  private static Object valorDeCelda(
+      String tableName, String code, JsonElement raw, Map<String, String> schemaTypes) {
     if (raw == null || raw.isJsonNull()) {
       return "";
     }
@@ -143,6 +185,10 @@ final class ComponentTableConfigurator {
     }
     if (esNombreDeCelda(code)) {
       return value;
+    }
+    String type = schemaTypes.get(code);
+    if (type != null) {
+      return ComponentConfigurator.javaLiteral(value, type);
     }
     return ComponentConfigurator.asLiteral(value, null);
   }
@@ -181,4 +227,3 @@ final class ComponentTableConfigurator {
 
   // ---------------------------------------------------------------------
 }
-

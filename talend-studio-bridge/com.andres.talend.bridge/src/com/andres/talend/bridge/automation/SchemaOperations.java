@@ -75,6 +75,7 @@ public final class SchemaOperations {
     List<Object> tablas = new ArrayList<>();
     tablas.add(table);
     String conector = connectorName(spec);
+    boolean filterRow = "tFilterRow".equals(componentNameOf(node));
     for (Object otra : actuales) {
       if (otra == table) {
         continue;
@@ -82,6 +83,9 @@ public final class SchemaOperations {
       Object cuelgaDe = otra.getClass().getMethod("getAttachedConnector").invoke(otra);
       String de = cuelgaDe == null ? "" : String.valueOf(cuelgaDe);
       if (de.equals(conector)) {
+        if (filterRow && isStaleFilterRowInputSchema(otra, uniqueName)) {
+          continue;
+        }
         otra.getClass().getMethod("setListColumns", List.class).invoke(otra, columnas);
       }
       tablas.add(otra);
@@ -279,6 +283,40 @@ public final class SchemaOperations {
       }
     }
     return null;
+  }
+
+  /** Nombre del componente guardado en el modelo de Studio. */
+  private static String componentNameOf(Object node) {
+    Object parameters = TalendApi.invokeOrNull(node, "getElementParameters");
+    if (!(parameters instanceof Iterable)) {
+      return "";
+    }
+    for (Object parameter : (Iterable<?>) parameters) {
+      Object name = TalendApi.invokeOrNull(parameter, "getName");
+      if (!"COMPONENT_NAME".equals(String.valueOf(name))) {
+        continue;
+      }
+      Object value = TalendApi.invokeOrNull(parameter, "getValue");
+      return value == null ? "" : String.valueOf(value);
+    }
+    return "";
+  }
+
+  /**
+   * Quita solo tablas FLOW residuales de tFilterRow: el portal solia dejar
+   * una tabla con nombre pseudo y otra vacia, ademas de la entrada real.
+   */
+  private static boolean isStaleFilterRowInputSchema(Object table, String uniqueName) {
+    Object rawName = TalendApi.invokeOrNull(table, "getTableName");
+    String name = rawName == null ? "" : String.valueOf(rawName);
+    if (uniqueName.equals(name)) {
+      return false;
+    }
+    if (name.endsWith("_schema")) {
+      return true;
+    }
+    Object columns = TalendApi.invokeOrNull(table, "getListColumns");
+    return columns instanceof List && ((List<?>) columns).isEmpty();
   }
 
   /**

@@ -5,11 +5,13 @@ import { join } from "node:path";
 import { DESCRIPCION_DE_CARPETAS, construirMapa } from "../../scripts/mapa";
 
 const ROOT = join(import.meta.dir, "..", "..");
+const DIRECTORIOS_LOCALES = new Set(["logs", "workspace"]);
 
 describe("mapa del repo para agentes", () => {
   test("cada carpeta de primer nivel tiene descripcion: agregar una carpeta obliga a documentarla", () => {
     const sinDescripcion = readdirSync(ROOT)
       .filter((nombre) => !nombre.startsWith(".") && statSync(join(ROOT, nombre)).isDirectory())
+      .filter((nombre) => !DIRECTORIOS_LOCALES.has(nombre))
       .filter((nombre) => !(nombre in DESCRIPCION_DE_CARPETAS));
 
     expect(sinDescripcion).toEqual([]);
@@ -17,7 +19,8 @@ describe("mapa del repo para agentes", () => {
 
   test("las descripciones no quedan para carpetas que ya no existen", () => {
     const existentes = new Set(readdirSync(ROOT));
-    const huerfanas = Object.keys(DESCRIPCION_DE_CARPETAS).filter((nombre) => !existentes.has(nombre));
+    const huerfanas = Object.keys(DESCRIPCION_DE_CARPETAS)
+      .filter((nombre) => !DIRECTORIOS_LOCALES.has(nombre) && !existentes.has(nombre));
 
     expect(huerfanas).toEqual([]);
   });

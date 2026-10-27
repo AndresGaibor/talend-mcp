@@ -12,12 +12,12 @@ export function extractAnnotations(tool: unknown): McpToolAnnotation | undefined
   const nameLower = name.toLowerCase();
 
   // Determine if it matches any destructive verb
-  const isVerbDestructive = ["create", "apply", "patch", "restore", "delete"].some(verb => 
+  const isVerbDestructive = ["create", "apply", "patch", "restore", "delete"].some(verb =>
     nameLower.includes(verb)
   );
 
   // Determine if it is a read-only tool based on common verbs
-  const isReadOnlyVerb = ["list", "read", "inspect", "infer", "scan", "diagnose", "stats", "explain", "suggest", "validate", "get", "preview", "ping", "status", "recent", "state", "markers", "summarize", "find", "info", "generate"].some(verb => 
+  const isReadOnlyVerb = ["list", "read", "inspect", "infer", "scan", "diagnose", "stats", "explain", "suggest", "validate", "get", "preview", "ping", "status", "recent", "state", "markers", "summarize", "find", "info", "generate"].some(verb =>
     nameLower.includes(verb)
   );
 

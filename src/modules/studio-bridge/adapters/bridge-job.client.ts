@@ -170,6 +170,7 @@ export class BridgeJobClient extends BridgeWorkbenchClient {
   async openJob(options: {
     name: string;
     version?: string;
+    itemPath?: string;
   }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/job/open", {
       method: "POST",

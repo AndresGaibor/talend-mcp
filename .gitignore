@@ -9,6 +9,10 @@ dist
 # code coverage
 coverage
 *.lcov
+# Codigo fuente del CLI de cobertura (el patron anterior solo aplica a salidas).
+!scripts/coverage/
+!scripts/coverage/*.ts
+!scripts/coverage/**/*.ts
 
 # logs
 logs

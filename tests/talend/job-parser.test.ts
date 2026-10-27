@@ -23,6 +23,7 @@ describe("Talend job parser", () => {
     expect(job.mapperEntries.find((entry) => entry.name === "load_source")?.expression).toContain(
       "lab04_olist_orders_to_staging",
     );
+    expect(job.mapperEntries.find((entry) => entry.name === "load_source")?.componentUniqueName).toBe("tMap_1");
   });
 
   test("parsea properties y resuelve item", async () => {

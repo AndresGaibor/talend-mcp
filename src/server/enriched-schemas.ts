@@ -35,7 +35,8 @@ const ENRICHED_DATA_SCHEMAS: Record<string, z.ZodTypeAny | undefined> = {
 };
 
 // ─── Alias Assignments ───
-ENRICHED_DATA_SCHEMAS.talend_jobs_list = ENRICHED_DATA_SCHEMAS.talend_list_jobs;
+// talend_jobs_list is a canonical TalendResult tool, not the legacy Pattern A
+// envelope. Keep its generic envelope schema so source/confidence are valid.
 ENRICHED_DATA_SCHEMAS.talend_jobs_read = ENRICHED_DATA_SCHEMAS.talend_read_job;
 ENRICHED_DATA_SCHEMAS.talend_runs_list = ENRICHED_DATA_SCHEMAS.talend_list_runs;
 ENRICHED_DATA_SCHEMAS.talend_runs_read = ENRICHED_DATA_SCHEMAS.talend_read_run;

@@ -182,6 +182,16 @@ describe("Comprobacion de conexiones", () => {
     <PARAMETERS/>
   </COMPONENT>`;
 
+  const MAP = `<COMPONENT>
+    <HEADER NAME="tMap" VERSION="0.1" STARTABLE="false"/>
+    <FAMILIES><FAMILY>Processing</FAMILY></FAMILIES>
+    <CONNECTORS>
+      <CONNECTOR CTYPE="FLOW" MAX_INPUT="0" MAX_OUTPUT="0"/>
+      <CONNECTOR CTYPE="SUBJOB_OK" MAX_INPUT="1"/>
+    </CONNECTORS>
+    <PARAMETERS/>
+  </COMPONENT>`;
+
   const CIERRE = `<COMPONENT>
     <HEADER NAME="tClose" VERSION="0.1" STARTABLE="false"/>
     <FAMILIES><FAMILY>Orchestration</FAMILY></FAMILIES>
@@ -202,6 +212,7 @@ describe("Comprobacion de conexiones", () => {
     };
     escribir("org.talend.designer.components.localprovider_1.0", "tUniqRow", UNIQ);
     escribir("org.talend.designer.components.localprovider_1.0", "tLogRow", LOG);
+    escribir("org.talend.designer.components.localprovider_1.0", "tMap", MAP);
     escribir("org.talend.designer.components.localprovider_1.0", "tClose", CIERRE);
     const repositorio = new DefinitionIndexRepository({
       pluginsDir: plugins,
@@ -229,6 +240,17 @@ describe("Comprobacion de conexiones", () => {
     const check = await (await validador()).validate("tLogRow", "tClose", "FLOW");
     expect(check.ok).toBe(false);
     expect(check.errors.join(" ")).toContain("tClose");
+  });
+
+  test("acepta FLOW de entrada y salida en tMap aunque sus tablas sean dinamicas", async () => {
+    const validar = await validador();
+    const entrada = await validar.validate("tLogRow", "tMap", "FLOW");
+    const salida = await validar.validate("tMap", "tLogRow", "FLOW");
+
+    expect(entrada.ok).toBe(true);
+    expect(entrada.errors).toEqual([]);
+    expect(salida.ok).toBe(true);
+    expect(salida.errors).toEqual([]);
   });
 });
 

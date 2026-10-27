@@ -30,53 +30,55 @@ public final class JobPersistence {
    */
   public static boolean persist(Object process) {
     try {
-      SchemaOperations.alinearTodosConMapeoDeBd(process);
-      Object nuevo = process.getClass().getMethod("saveXmlFile").invoke(process);
-      if (nuevo == null) {
-        return false;
-      }
-      Object item = itemOf(process);
-      if (item == null) {
-        BridgeLog.warn("El proceso no tiene item: no se puede guardar");
-        return false;
-      }
-      Object enlazado = item.getClass().getMethod("getProcess").invoke(item);
-      if (enlazado == null) {
-        BridgeLog.warn("El item no tiene ProcessType: no se puede guardar");
-        return false;
-      }
-      Object resource = enlazado.getClass().getMethod("eResource").invoke(enlazado);
-      if (resource == null) {
-        BridgeLog.warn("El job no esta enlazado a un recurso EMF: no se puede guardar");
-        return false;
-      }
-
-      // El ProcessType enlazado al recurso tiene los nodos (el modelo
-      // grafico los va anadiendo ahi), pero no las conexiones ni el modelo
-      // propio de los componentes (el del tMap): eso solo aparece en el
-      // ProcessType que arma `saveXmlFile()`. Se sustituye el contenido del
-      // recurso por ese, que es lo que se quiere guardar.
-      @SuppressWarnings("unchecked")
-      List<Object> contents = (List<Object>) resource.getClass()
-          .getMethod("getContents").invoke(resource);
-      contents.clear();
-      contents.add(nuevo);
-      item.getClass()
-          .getMethod("setProcess", TalendClasses
-              .load("org.talend.designer.core.model.utils.emf.talendfile.ProcessType"))
-          .invoke(item, nuevo);
-
-      // El modelo propio de un nodo (el `nodeData` del tMap) se copia en
-      // profundidad: si no, el objeto sigue apuntando al recurso anterior y
-      // no se escribe en el `.item`. Es el mismo truco que usa Studio.
-      adoptNodeData(nuevo);
-
-      resource.getClass().getMethod("save", Map.class).invoke(resource, new HashMap());
+      persistOrThrow(process);
       return true;
     } catch (Exception e) {
       BridgeLog.warn("No se pudo guardar el job en el .item", e);
       return false;
     }
+  }
+
+  /** Guarda y conserva el detalle del fallo para que la tool lo devuelva al cliente. */
+  public static void persistOrThrow(Object process) throws Exception {
+    SchemaOperations.alinearTodosConMapeoDeBd(process);
+    Object nuevo = process.getClass().getMethod("saveXmlFile").invoke(process);
+    if (nuevo == null) {
+      throw new IllegalStateException("Studio no generó el modelo serializado del Job");
+    }
+    Object item = itemOf(process);
+    if (item == null) {
+      throw new IllegalStateException("El proceso no tiene item: no se puede guardar");
+    }
+    Object enlazado = item.getClass().getMethod("getProcess").invoke(item);
+    if (enlazado == null) {
+      throw new IllegalStateException("El item no tiene ProcessType: no se puede guardar");
+    }
+    Object resource = enlazado.getClass().getMethod("eResource").invoke(enlazado);
+    if (resource == null) {
+      throw new IllegalStateException("El job no está enlazado a un recurso EMF: no se puede guardar");
+    }
+
+    // El ProcessType enlazado al recurso tiene los nodos (el modelo
+    // gráfico los va añadiendo ahí), pero no las conexiones ni el modelo
+    // propio de los componentes (el del tMap): eso solo aparece en el
+    // ProcessType que arma `saveXmlFile()`. Se sustituye el contenido del
+    // recurso por ese, que es lo que se quiere guardar.
+    @SuppressWarnings("unchecked")
+    List<Object> contents = (List<Object>) resource.getClass()
+        .getMethod("getContents").invoke(resource);
+    contents.clear();
+    contents.add(nuevo);
+    item.getClass()
+        .getMethod("setProcess", TalendClasses
+            .load("org.talend.designer.core.model.utils.emf.talendfile.ProcessType"))
+        .invoke(item, nuevo);
+
+    // El modelo propio de un nodo (el `nodeData` del tMap) se copia en
+    // profundidad: si no, el objeto sigue apuntando al recurso anterior y
+    // no se escribe en el `.item`. Es el mismo truco que usa Studio.
+    adoptNodeData(nuevo);
+
+    resource.getClass().getMethod("save", Map.class).invoke(resource, new HashMap());
   }
 
   /**

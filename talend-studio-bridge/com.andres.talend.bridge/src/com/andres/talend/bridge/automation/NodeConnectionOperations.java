@@ -22,6 +22,70 @@ final class NodeConnectionOperations {
     return onUi(() -> connectOnUi(spec));
   }
 
+  static Map<String, Object> disconnect(JsonObject spec) throws Exception {
+    return onUi(() -> disconnectOnUi(spec));
+  }
+
+  private static Map<String, Object> disconnectOnUi(JsonObject spec) throws Exception {
+    Object editor = TalendApi.designerEditor(spec);
+    Object process = TalendApi.processOf(editor);
+    String sourceName = JsonSpec.required(spec, "source");
+    String targetName = JsonSpec.required(spec, "target");
+    String connectionName = JsonSpec.required(spec, "name");
+    Object source = TalendApi.nodeByUniqueName(process, sourceName);
+    Object target = TalendApi.nodeByUniqueName(process, targetName);
+    if (source == null || target == null) {
+      throw new IllegalStateException("No se encontro el origen o destino de la conexion");
+    }
+
+    Object incoming = TalendApi.invokeOrNull(target, "getIncomingConnections");
+    List<Object> matches = new ArrayList<>();
+    if (incoming instanceof Iterable) {
+      for (Object connection : (Iterable<?>) incoming) {
+        Object actualSource = TalendApi.invokeOrNull(connection, "getSource");
+        Object actualName = TalendApi.invokeOrNull(connection, "getName");
+        Object actualTarget = TalendApi.invokeOrNull(connection, "getTarget");
+        if (sourceName.equals(String.valueOf(TalendApi.invokeOrNull(actualSource, "getUniqueName")))
+            && targetName.equals(String.valueOf(TalendApi.invokeOrNull(actualTarget, "getUniqueName")))
+            && connectionName.equals(String.valueOf(actualName))) {
+          matches.add(connection);
+        }
+      }
+    }
+
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("source", sourceName);
+    result.put("target", targetName);
+    result.put("name", connectionName);
+    if (matches.isEmpty()) {
+      result.put("removed", false);
+      result.put("count", 0);
+      return result;
+    }
+
+    Class<?> commandClass = TalendClasses.load("org.talend.designer.core.ui.editor.cmd.ConnectionDeleteCommand");
+    Object command = commandClass.getConstructor(List.class).newInstance(matches);
+    Object commandStack = editor.getClass().getMethod("getCommandStack").invoke(editor);
+    commandStack.getClass().getMethod("execute", Command.class).invoke(commandStack, command);
+
+    Object after = TalendApi.invokeOrNull(target, "getIncomingConnections");
+    if (after instanceof Iterable) {
+      for (Object connection : (Iterable<?>) after) {
+        Object actualSource = TalendApi.invokeOrNull(connection, "getSource");
+        Object actualName = TalendApi.invokeOrNull(connection, "getName");
+        if (sourceName.equals(String.valueOf(TalendApi.invokeOrNull(actualSource, "getUniqueName")))
+            && connectionName.equals(String.valueOf(actualName))) {
+          throw new IllegalStateException("Studio no retiro la conexion " + connectionName);
+        }
+      }
+    }
+    TalendApi.markModified(process);
+    JobPersistence.persistOrThrow(process);
+    result.put("removed", true);
+    result.put("count", matches.size());
+    return result;
+  }
+
   private static Map<String, Object> connectOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);
@@ -205,4 +269,3 @@ final class NodeConnectionOperations {
     }
   }
 }
-

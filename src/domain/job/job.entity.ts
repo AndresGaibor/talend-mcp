@@ -43,6 +43,7 @@ export type TalendContextParameter = {
 };
 
 export type MapperEntry = {
+  componentUniqueName?: string;
   table: string;
   name: string;
   expression?: string;

@@ -402,4 +402,3 @@ final class TalendJobEditorOpener {
     return (IEditorInput) constructor.newInstance(file);
   }
 }
-

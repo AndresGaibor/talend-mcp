@@ -65,6 +65,11 @@ public final class JobOperationsService {
     return run("add-node", () -> NodeOperations.add(spec));
   }
 
+  /** Agrega variables al contexto por defecto del job abierto. */
+  public static Map<String, Object> addContextParameters(JsonObject spec) {
+    return run("job/contexts", () -> ContextOperations.addParameters(spec));
+  }
+
   /**
    * Configura un componente ya anadido al job.
    *
@@ -81,6 +86,11 @@ public final class JobOperationsService {
    */
   public static Map<String, Object> connect(JsonObject spec) {
     return run("connect", () -> NodeOperations.connect(spec));
+  }
+
+  /** Desconecta una conexion concreta del job abierto. */
+  public static Map<String, Object> disconnect(JsonObject spec) {
+    return run("disconnect", () -> NodeConnectionOperations.disconnect(spec));
   }
 
   /**

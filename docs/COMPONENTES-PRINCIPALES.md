@@ -363,4 +363,3 @@ Cada ficha sale de lo que devuelve `talend_components_definition` (lo que tú po
 - **Configuración:** Tú pones: PASS, QUERY. Ya tiene valor, no hace falta tocarlo: HOST, PORT, DBNAME, USER, SPECIFY_DATASOURCE_ALIAS. Hay 3 obligatorio(s) más que están ocultos o dependen de otros parámetros: ignóralos.
 - **Ejemplo ejecutable:** `bd/leer-de-un-postgres.json`.
 - **Validado en Studio:** no todavía (ver seguimiento).
-

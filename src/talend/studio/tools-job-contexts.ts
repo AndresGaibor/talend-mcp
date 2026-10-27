@@ -3,6 +3,37 @@ import { bridgeOk, loadBridge } from "./tools-base";
 
 export const jobContextTools = [
   {
+    name: "talend_job_add_context_parameters",
+    description:
+      "Agrega variables al contexto por defecto del job abierto. Solo reemplaza marcadores migration_todo_* vacios creados por el portal.",
+    inputSchema: z.object({
+      job: z.string().optional().describe("Job donde agregar las variables"),
+      contexts: z.array(z.object({
+        name: z.string(),
+        type: z.string(),
+        value: z.string(),
+        comment: z.string().optional(),
+      })),
+      removeManagedTodoNames: z.array(z.string().regex(/^migration_todo_/)).optional(),
+    }),
+    handler: async ({ job, contexts, removeManagedTodoNames }: {
+      job?: string;
+      contexts: Array<{ name: string; type: string; value: string; comment?: string }>;
+      removeManagedTodoNames?: string[];
+    }) => {
+      const bridge = await loadBridge();
+      const result = await bridge.addContextParameters({ job, contexts, removeManagedTodoNames });
+      return bridgeOk({
+        ok: result.ok,
+        source: result.source,
+        confidence: result.confidence,
+        endpoint: "/automation/job/contexts/parameters",
+        data: result.data,
+        error: result.error,
+      });
+    },
+  },
+  {
     name: "talend_job_contexts_list",
     description:
       "Lista los contextos (entornos) del job y sus variables, con el valor de cada variable en cada entorno. Los contextos se leen del modelo de Studio, no del archivo.",

@@ -45,6 +45,7 @@ export const TalendContextParameterSchema = z.object({
 });
 
 export const MapperEntrySchema = z.object({
+  componentUniqueName: z.string().optional().describe("UNIQUE_NAME del componente propietario del mapper"),
   table: z.string().describe("Table name"),
   name: z.string().describe("Entry name"),
   expression: z.string().optional().describe("Mapping expression"),

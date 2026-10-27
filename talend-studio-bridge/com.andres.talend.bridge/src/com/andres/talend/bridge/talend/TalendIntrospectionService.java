@@ -561,6 +561,7 @@ public final class TalendIntrospectionService {
         }
         item.put("name", invokeString(connection, "getName"));
         item.put("type", invokeString(connection, "getLineStyle"));
+        item.put("connectorName", invokeString(connection, "getConnectorName"));
         items.add(item);
       }
     }
