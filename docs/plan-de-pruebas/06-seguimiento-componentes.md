@@ -51,6 +51,8 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 2026-10-27 | tMongoDBGridFSPut, tMongoDBGridFSList | C5, C6 | `execution-check --suite bd` | Pasan. GridFSList emite por ITERATE (CURRENT_FILENAME), no por fila. |
 | 2026-10-27 | tMongoDBGridFSGet | C5, C6 | `execution-check --suite bd` | Pasa: sube, baja y el contenido coincide. OUTPUT_LOCAL_PATH es una carpeta (guarda dentro con el nombre del fichero). |
 | 2026-10-27 | tMongoDBGridFSDelete | C5, C6 | `execution-check --suite bd` | Pasa: sube, borra y el listado posterior no devuelve nada. |
+| 2026-10-27 | tMongoDBGridFSProperties | C5, C6 | `execution-check --suite bd` | Pasa: devuelve el nombre del fichero de GridFS. |
+| 2026-10-27 | tMongoDBBulkLoad | C5 | `execution-check --suite bd` | Pendiente: ejecuta el binario mongoimport (MongoDB Database Tools), que no esta instalado aqui. El escenario tiene la configuracion correcta (FILE_TYPE csv). |
 
 ## Estado
 

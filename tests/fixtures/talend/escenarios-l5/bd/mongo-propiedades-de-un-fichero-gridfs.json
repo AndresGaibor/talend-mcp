@@ -1,0 +1,129 @@
+{
+  "nombre": "bases de datos: propiedades de un fichero de GridFS con tMongoDBGridFSProperties",
+  "job": "MCP_L5_MongoGridFSProps",
+  "nodos": [
+    {
+      "type": "tMongoDBConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "27018"
+        },
+        "DATABASE": {
+          "value": "talend_test"
+        },
+        "REQUIRED_AUTHENTICATION": {
+          "value": "true"
+        },
+        "AUTHENTICATION_MECHANISM": {
+          "value": "SCRAMSHA256_MEC"
+        },
+        "SET_AUTHENTICATION_DATABASE": {
+          "value": "true"
+        },
+        "AUTHENTICATION_DATABASE": {
+          "value": "admin"
+        },
+        "USERNAME": {
+          "value": "talend"
+        },
+        "PASSWORD": {
+          "value": "talend"
+        }
+      }
+    },
+    {
+      "type": "tMongoDBGridFSPut",
+      "nombre": "sube",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "BUCKET": {
+          "value": "l5_fs",
+          "literal": true
+        },
+        "LOCALDIR": {
+          "value": "@TESTDATA@",
+          "literal": true
+        },
+        "DIE_ON_ERROR": {
+          "value": "true"
+        }
+      },
+      "tablas": {
+        "FILES": {
+          "columns": [
+            "FILEMASK",
+            "NEWNAME"
+          ],
+          "rows": [
+            {
+              "FILEMASK": "\"l5_clientes.csv\"",
+              "NEWNAME": "\"l5_gridfs.csv\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tMongoDBGridFSProperties",
+      "nombre": "propiedades",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "BUCKET": {
+          "value": "l5_fs",
+          "literal": true
+        },
+        "FILENAME": {
+          "value": "l5_gridfs.csv",
+          "literal": true
+        }
+      },
+      "columnas": [
+        {
+          "name": "filename",
+          "type": "id_String"
+        }
+      ]
+    },
+    {
+      "type": "tLogRow",
+      "nombre": "salida"
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "sube",
+      "tipo": "COMPONENT_OK"
+    },
+    {
+      "origen": "sube",
+      "destino": "propiedades",
+      "tipo": "SUBJOB_OK"
+    },
+    {
+      "origen": "propiedades",
+      "destino": "salida"
+    }
+  ],
+  "espera": {
+    "contiene": [
+      "l5_gridfs.csv"
+    ]
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "nombre": "bases de datos: carga masiva de un CSV en MongoDB con tMongoDBBulkLoad",
+  "job": "MCP_L5_MongoBulk",
+  "nodos": [
+    {
+      "type": "tMongoDBConnection",
+      "nombre": "conexion",
+      "parameters": {
+        "HOST": {
+          "value": "localhost"
+        },
+        "PORT": {
+          "value": "27018"
+        },
+        "DATABASE": {
+          "value": "talend_test"
+        },
+        "REQUIRED_AUTHENTICATION": {
+          "value": "true"
+        },
+        "AUTHENTICATION_MECHANISM": {
+          "value": "SCRAMSHA256_MEC"
+        },
+        "SET_AUTHENTICATION_DATABASE": {
+          "value": "true"
+        },
+        "AUTHENTICATION_DATABASE": {
+          "value": "admin"
+        },
+        "USERNAME": {
+          "value": "talend"
+        },
+        "PASSWORD": {
+          "value": "talend"
+        }
+      }
+    },
+    {
+      "type": "tMongoDBBulkLoad",
+      "nombre": "carga",
+      "parameters": {
+        "USE_EXISTING_CONNECTION": {
+          "value": "true"
+        },
+        "CONNECTION": {
+          "value": "@uniqueName:conexion",
+          "literal": false
+        },
+        "COLLECTION": {
+          "value": "l5_mongo_bulk",
+          "literal": true
+        },
+        "FILE": {
+          "value": "@TESTDATA@/l5_clientes.csv",
+          "literal": true
+        },
+        "FILE_TYPE": {
+          "value": "csv"
+        },
+        "HEADERLINE": {
+          "value": "1"
+        },
+        "FIELDSEPARATOR": {
+          "value": ";",
+          "literal": true
+        },
+        "DATA_ACTION": {
+          "value": "INSERT"
+        },
+        "DROP_COLLECTION_CREATE": {
+          "value": "true"
+        }
+      }
+    }
+  ],
+  "conexiones": [
+    {
+      "origen": "conexion",
+      "destino": "carga",
+      "tipo": "COMPONENT_OK"
+    }
+  ],
+  "espera": {},
+  "pendiente": "tMongoDBBulkLoad ejecuta el binario mongoimport del sistema (CreateProcess error=2): no esta instalado en este equipo. Instalar MongoDB Database Tools y ponerlo en el PATH de Studio; el escenario ya tiene la configuracion correcta (FILE_TYPE csv)."
+}
