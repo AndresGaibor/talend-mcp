@@ -1,6 +1,5 @@
 {
   "nombre": "bases de datos: consulta con filtro en MongoDB",
-  "pendiente": "mismo problema que la escritura y lectura de MongoDB: el job no termina tras la ultima operacion y el Run de Studio agota el tiempo. Investigar antes de quitar esta marca.",
   "job": "MCP_L5_MongoFiltra",
   "nodos": [
     {
@@ -58,9 +57,24 @@
         }
       ],
       "values": [
-        ["1", "Ana", "Bogota", "100.5"],
-        ["2", "Jose", "Medellin", "200.25"],
-        ["3", "Lucia", "Cali", "300.0"]
+        [
+          "1",
+          "Ana",
+          "Bogota",
+          "100.5"
+        ],
+        [
+          "2",
+          "Jose",
+          "Medellin",
+          "200.25"
+        ],
+        [
+          "3",
+          "Lucia",
+          "Cali",
+          "300.0"
+        ]
       ]
     },
     {
@@ -129,7 +143,28 @@
           "name": "monto",
           "type": "id_Double"
         }
-      ]
+      ],
+      "tablas": {
+        "MAPPING": {
+          "columns": [
+            "PARENT_NODE_PATH"
+          ],
+          "rows": [
+            {
+              "PARENT_NODE_PATH": ""
+            },
+            {
+              "PARENT_NODE_PATH": ""
+            },
+            {
+              "PARENT_NODE_PATH": ""
+            },
+            {
+              "PARENT_NODE_PATH": ""
+            }
+          ]
+        }
+      }
     },
     {
       "type": "tLogRow",
