@@ -354,7 +354,7 @@ es asumible. `JobBuilder.buildBatch` genera desde el `ProcessItem` del repositor
 - Codigo: `ProcessorUtilities.generateCode(ProcessItem, String, String, Map, IProgressMonitor[])` con
   `{"GENERATE_OPTION":34}` (main only + sin compilar) y un `NullProgressMonitor`. ~0,2 s/job, en serie.
 - Compilacion: `javac` + `target/classpath.jar` en un pool de hilos (`parallelism`).
-- Cliente: `jobBuildBatch({jobs, parallelism})`.
+- Cliente: `jobBuildBatch({jobs, parallelism})`. Tool MCP: `talend_job_build_batch` (hasta 5000 jobs por llamada, entradas validadas con zod).
 
 El generador por ficheros (`buildJobItemXml`/`buildJobPropertiesXml`) escribe items sin Studio: 20 000 jobs en
 2,4 s. Tras escribirlos en `process/`, `POST /workspace/refresh` (cuerpo `{}`) hace que Studio los vea.
@@ -374,7 +374,7 @@ Para migraciones masivas, abrir un editor por job (paleta GEF, ~1 s y ~13 MB que
 - Codigo: `ProcessorUtilities.generateCode(ProcessItem, String, String, Map, IProgressMonitor[])` con
   `{"GENERATE_OPTION":34}` (solo main, sin compilar) y un `NullProgressMonitor`. ~0,2 s/job, en serie.
 - Compilacion: `javac` y `target/classpath.jar` en un pool de hilos (`parallelism`).
-- Cliente: `jobBuildBatch({jobs, parallelism})`.
+- Cliente: `jobBuildBatch({jobs, parallelism})`. Tool MCP: `talend_job_build_batch` (hasta 5000 jobs por llamada, entradas validadas con zod).
 
 El generador por ficheros (`buildJobItemXml`/`buildJobPropertiesXml`) escribe items sin Studio: 20 000 jobs en
 2,4 s. Tras escribirlos en `process/`, `POST /workspace/refresh` (con cuerpo `{}`) hace que Studio los vea.
