@@ -2,11 +2,12 @@ import * as z from "zod/v4";
 import { bridgeFail, bridgeOk, loadBridge } from "./tools-base";
 import { compileWithDependencies } from "./compile-with-dependencies";
 import { prepareStudioForJob } from "./studio-dialogs";
+import { clasificarSalida } from "../diagnostics/output-findings";
 
 export const jobDiagnosticsTools = [
   {
     name: "talend_job_execute",
-    description: "Ejecuta un job ya generado y devuelve su salida (las filas que imprime el tLogRow). Sirve para comprobar que el resultado es el esperado: la vista Run de Studio no se puede leer desde el MCP.",
+    description: "Ejecuta un job ya generado y devuelve su salida (las filas que imprime el tLogRow). Sirve para comprobar que el resultado es el esperado: la vista Run de Studio no se puede leer desde el MCP. 'findings' lista los [WARN], [ERROR], [FATAL] y excepciones de la salida aunque el codigo de salida sea 0: informa de ellos. Para comprobar un job completo (diseno + compilacion + ejecucion) usa talend_job_verify.",
     inputSchema: z.object({
       name: z.string().describe("Nombre del job"),
       version: z.string().optional().default("0.1").describe("Version del job"),
@@ -21,12 +22,18 @@ export const jobDiagnosticsTools = [
     }) => {
       const bridge = await loadBridge();
       const result = await bridge.executeJob({ name, version, context, timeoutMs });
+      // Los avisos se revisan siempre, para que no dependan de que el agente los busque.
+      const body = ((result.data as { result?: Record<string, unknown> } | undefined)?.result ?? result.data ?? {}) as Record<string, unknown>;
+      const lines = Array.isArray(body.lines) ? body.lines.map(String) : String(body.stdout ?? "").split(/\r?\n/);
+      const found = clasificarSalida([...lines, ...String(body.stderr ?? "").split(/\r?\n/)]);
       return bridgeOk({
         ok: result.ok,
         source: result.source,
         confidence: result.confidence,
         endpoint: "/automation/job/execute",
-        data: result.data,
+        data: result.data && typeof result.data === "object"
+          ? { ...result.data, findings: { errors: found.errores, warnings: found.avisos } }
+          : result.data,
         error: result.error,
       });
     },

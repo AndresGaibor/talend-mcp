@@ -122,7 +122,8 @@ describe("Guia para agentes", () => {
     expect(names.size).toBeLessThan(allCount);
     expect(names).toContain("talend_guide");
     expect(names).toContain("talend_job_create_in_studio");
-    expect(names).toContain("talend_job_compile");
+    expect(names).toContain("talend_job_verify");
+    expect(names).not.toContain("talend_job_run_by_name");
     expect(names).toContain("talend_job_execute");
     expect(names).not.toContain("talend_snapshots_restore");
   });

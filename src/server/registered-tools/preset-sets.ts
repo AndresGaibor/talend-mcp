@@ -53,6 +53,8 @@ export const PRESET_CORE = new Set([
  * avanzadas, `talend_guide` avisa si el preset no expone los pasos necesarios.
  */
 export const PRESET_AGENT = new Set([
+  // Verificacion: `talend_job_verify` agrupa problems + compile + run; esas tools
+  // sueltas siguen en `all` pero no se exponen al agente para no multiplicar decisiones.
   "talend_guide",
   "talend_diagnose_environment",
   "talend_bridge_ping",
@@ -86,13 +88,15 @@ export const PRESET_AGENT = new Set([
   "talend_job_contexts_list",
   "talend_job_context_create",
   "talend_job_context_set",
-  "talend_job_problems",
-  "talend_job_compile",
-  "talend_job_run_by_name",
-  "talend_job_wait_run",
+  "talend_job_verify",
   "talend_job_execute",
   "talend_runs_list",
   "talend_runs_read",
+  "talend_tail_run_output",
+  "talend_read_run_log",
+  "talend_analyze_logs",
+  "talend_bridge_log_tail",
+  "talend_bridge_problems_markers",
   "talend_errors_explain",
   "talend_errors_suggest_fix",
   "talend_secrets_scan_project",

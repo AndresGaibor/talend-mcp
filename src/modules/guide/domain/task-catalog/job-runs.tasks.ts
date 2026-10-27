@@ -11,23 +11,14 @@ export const JOB_RUNS_TASKS: GuideTask[] = [
     aliases: ["run", "correr", "lanzar", "probar", "salida", "resultado", "exit code"],
     steps: [
       {
-        tool: "talend_job_compile",
-        purpose: "Verificar que compila antes de gastar una ejecucion.",
+        tool: "talend_job_verify",
+        purpose: "Todo en una llamada: diseno (Problemas), compilacion, ejecucion y revision de avisos. Devuelve `verdict` y `findings`. Usala siempre primero.",
         input: { job: "MI_JOB" },
       },
       {
-        tool: "talend_job_run_by_name",
-        purpose: "Lanzar el job por su launch config; con `waitForTermination` espera el final.",
-        input: { jobName: "MI_JOB", waitForTermination: true, timeoutMs: 120000 },
-      },
-      {
         tool: "talend_job_execute",
-        purpose: "Relanzar y traer `exitCode` y `stdout`. Es la unica forma de leer la salida desde el MCP.",
+        purpose: "Relanzar y traer `exitCode`, `stdout` y `findings` (avisos y errores de la salida), si `verify` no capturo la salida.",
         input: { name: "MI_JOB" },
-      },
-      {
-        tool: "talend_job_wait_run",
-        purpose: "Esperar un launch ya iniciado cuando no se espero en el paso anterior.",
         optional: true,
       },
       {
@@ -40,12 +31,25 @@ export const JOB_RUNS_TASKS: GuideTask[] = [
         purpose: "Leer el detalle de una ejecucion por `runId`.",
         optional: true,
       },
+      {
+        tool: "talend_tail_run_output",
+        purpose: "Leer stdout y stderr de una ejecucion guardada, para buscar `[WARN]`, `[ERROR]` y excepciones.",
+        input: { runId: "RUN_ID", stream: "both" },
+        optional: true,
+      },
+      {
+        tool: "talend_bridge_log_tail",
+        purpose: "Error Log de Studio: avisos de componentes y plugins que no salen en la salida del job.",
+        input: { lines: 200 },
+        optional: true,
+      },
     ],
     pitfalls: [
-      "`talend_job_run_by_name` no devuelve la salida: usa `talend_job_execute` para leerla.",
+      "Un job con `exitCode` 0 puede llevar avisos: busca `[WARN]`, `[ERROR]`, `[FATAL]` y excepciones en la salida y en `talend_bridge_log_tail`, e informa de cada uno.",
+      "Si `verify` termina por tiempo (`timedOut`), sube `timeoutMs`; el job puede seguir corriendo en Studio.",
       "Si el job escribe un fichero, borra la salida anterior o usa `FILE_EXIST_EXCEPTION=false`.",
     ],
-    doneWhen: "`exitCode` es 0 y las `lines` de `talend_job_execute` coinciden con lo esperado.",
+    doneWhen: "`talend_job_verify` devuelve `verdict` `ok` (o `ok_con_avisos` con los avisos informados), `exitCode` es 0, las `lines` de `talend_job_execute` coinciden con lo esperado y no hay `[ERROR]`, `[FATAL]` ni excepciones sin explicar (los `[WARN]` se informan).",
   },
   {
     id: "diagnosticar-error",
@@ -56,13 +60,8 @@ export const JOB_RUNS_TASKS: GuideTask[] = [
     aliases: ["error", "falla", "no compila", "excepcion", "depurar", "debug", "no salen filas"],
     steps: [
       {
-        tool: "talend_job_problems",
-        purpose: "Primero los errores de diseno de la vista Problemas, sin ejecutar nada.",
-        input: { job: "MI_JOB" },
-      },
-      {
-        tool: "talend_job_compile",
-        purpose: "Si compila, el problema es de datos o de configuracion en tiempo de ejecucion.",
+        tool: "talend_job_verify",
+        purpose: "Diseno, compilacion, ejecucion y avisos de una vez: `problems`, `compileDetail`, `findings` y `lines` dicen donde falla.",
         input: { job: "MI_JOB" },
       },
       {

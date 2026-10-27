@@ -54,24 +54,15 @@ export const JOB_LIFECYCLE_TASKS: GuideTask[] = [
         input: { source: "tFixedFlowInput_1", target: "tLogRow_1", type: "FLOW" },
       },
       {
-        tool: "talend_job_problems",
-        purpose: "Comprobar la vista Problemas antes de compilar. `clean: true` es lo que buscas.",
+        tool: "talend_job_verify",
+        purpose: "Todo en una llamada: diseno (Problemas), compilacion, ejecucion y revision de avisos. `verdict: ok` es lo que buscas; informa de los `findings`.",
         input: { job: "MI_JOB" },
-      },
-      {
-        tool: "talend_job_compile",
-        purpose: "Generar el codigo y verificar que compila, sin ejecutar.",
-        input: { job: "MI_JOB" },
-      },
-      {
-        tool: "talend_job_run_by_name",
-        purpose: "Compilar y lanzar el job en Studio.",
-        input: { jobName: "MI_JOB", waitForTermination: true },
       },
       {
         tool: "talend_job_execute",
-        purpose: "Relanzar y obtener `exitCode`, `stdout` y las `lines` para comparar con lo esperado.",
+        purpose: "Solo si `verify` no capturo la salida: obtener `exitCode`, `stdout` y `findings`.",
         input: { name: "MI_JOB" },
+        optional: true,
       },
     ],
     pitfalls: [
@@ -80,7 +71,7 @@ export const JOB_LIFECYCLE_TASKS: GuideTask[] = [
       "En tMap, tAggregateRow, tNormalize y tJavaRow el schema y el modelo se aplican al final, despues de conectar.",
       "No lances un job mientras Studio lo esta compilando: deja el classpath bloqueado.",
     ],
-    doneWhen: "`talend_job_problems` devuelve `clean: true`, `talend_job_compile` devuelve `compiles: true` y `talend_job_execute` trae la salida esperada.",
+    doneWhen: "`talend_job_verify` devuelve `verdict` `ok` (o `ok_con_avisos` con los avisos informados) y las `lines` coinciden con lo esperado.",
   },
   {
     id: "editar-job",
@@ -119,14 +110,9 @@ export const JOB_LIFECYCLE_TASKS: GuideTask[] = [
         optional: true,
       },
       {
-        tool: "talend_job_problems",
-        purpose: "Verificar que el job sigue sin errores de diseno.",
-        input: { job: "MI_JOB" },
-      },
-      {
-        tool: "talend_job_compile",
-        purpose: "Confirmar que el cambio genera codigo valido.",
-        input: { job: "MI_JOB" },
+        tool: "talend_job_verify",
+        purpose: "Confirmar que el cambio no deja avisos de diseno y genera codigo valido. Con `run: false` no ejecuta el job.",
+        input: { job: "MI_JOB", run: false },
       },
     ],
     pitfalls: [
@@ -134,6 +120,6 @@ export const JOB_LIFECYCLE_TASKS: GuideTask[] = [
       "Al conectar, Studio propaga el schema del destino hacia atras; revisa el schema del origen despues de conectar.",
       "El nombre de la conexion lo pone el bridge (`row1`, `row2`...) y es el que usan las tablas del tMap.",
     ],
-    doneWhen: "`talend_job_problems` sin errores y `talend_job_compile` con `compiles: true`.",
+    doneWhen: "`talend_job_verify` con `verdict` `ok` (o `ok_con_avisos` con los avisos informados).",
   },
 ];

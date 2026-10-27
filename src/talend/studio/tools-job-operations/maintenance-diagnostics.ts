@@ -11,10 +11,13 @@ import { studioMaintenanceTools } from "../tools-studio-maintenance";
 
 import { jobDiagnosticsTools } from "../tools-job-diagnostics";
 
+import { jobVerifyTools } from "../tools-job-verify";
+
 import { componentCatalogTools } from "../tools-component-catalog";
 
 import { nodeConnectionTools } from "../tools-node-connection";
 export const maintenanceDiagnostics = [
 ...studioMaintenanceTools,
-...jobDiagnosticsTools
+...jobDiagnosticsTools,
+...jobVerifyTools
 ];

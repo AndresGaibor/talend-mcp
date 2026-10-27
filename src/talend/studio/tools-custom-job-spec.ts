@@ -9,7 +9,7 @@ import type { z } from "zod/v4";
 
 export const customJobSpecTool = {
   name: "talend_job_apply_custom_spec",
-  description: "Crea o completa una estructura de Jobs con la API de Studio. Valida componentes y conexiones, conserva valores existentes y rechaza destinos ajenos. No compila, ejecuta ni publica Jobs.",
+  description: "Crea o completa una estructura de Jobs con la API de Studio. Valida componentes y conexiones, conserva valores existentes y rechaza destinos ajenos. No ejecuta ni publica Jobs. Devuelve `problems` (errores y avisos de diseno por componente, vista Problemas) del job ya montado: revisalo antes de ejecutar y arregla los errores; despues usa talend_job_verify.",
   // El schema es recursivo (childJobs) y por eso su tipo estatico es ZodType; en tiempo de ejecucion es un strictObject, es decir un ZodObject.
   inputSchema: customJobSpecSchema as unknown as z.ZodObject<any>,
   annotations: { readOnly: false, destructive: false, requiresConfirmation: true },

@@ -1,5 +1,6 @@
 import type { TalendStudioBridgeClient } from "../../modules/studio-bridge/adapters/http-studio-bridge.client";
 import { createHash } from "node:crypto";
+import { clasificarProblemas, problemasDe } from "../diagnostics/output-findings";
 import { customJobSpecSchema, type CustomJobSpec } from "./custom-job-spec";
 
 export type CustomSpecDependencies = {
@@ -42,7 +43,19 @@ type Result = {
   generatedConnections: number; reusedConnections: number; connections: number;
   generatedContexts: number; updatedContexts: number; reusedContexts: number; removedContexts: number;
   reusedExisting: boolean; componentAliases: Record<string, string>; warnings: string[]; childJobs: Result[];
+  /** Problemas de diseno del job ya montado (vista Problemas); `undefined` si Studio no los dio. */
+  problems?: { errors: string[]; warnings: string[]; clean: boolean };
 };
+
+/** Lee la vista Problemas tras montar, para que un nodo mal configurado se vea en la misma llamada. */
+async function problemsOf(bridge: TalendStudioBridgeClient, job: string): Promise<Result["problems"]> {
+  try {
+    const found = clasificarProblemas(problemasDe((await bridge.jobProblems({ job })).data));
+    return { errors: found.errores, warnings: found.avisos, clean: found.errores.length + found.avisos.length === 0 };
+  } catch {
+    return undefined;
+  }
+}
 
 async function validate(spec: CustomJobSpec, deps: CustomSpecDependencies): Promise<string[]> {
   folderOf(spec);
@@ -168,6 +181,7 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
           checked(await bridge.deleteJobContextParameter({ job: job.jobName, context: environment, name: variable.name })); result.removedContexts++;
         }
       }
+      result.problems = await problemsOf(bridge, job.jobName);
       results.set(job.jobName, result);
     }
     return results.get(spec.jobName)!;
