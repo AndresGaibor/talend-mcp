@@ -4,6 +4,7 @@
 //   all          → todas las tools talend_*
 //   canonical    → idem, sin los duplicados legacy conocidos
 //   agent        → flujo habitual de inspeccion, creacion, edicion y ejecucion
+//   portal       → agent + lectura de inspeccion y problemas que usa el migrador SAS
 //   core         → tools esenciales (las mas seguras para clientes limitados)
 //   jobs         → talend_jobs_* + tools de job relacionadas
 //   snapshots    → talend_snapshots_*
@@ -111,6 +112,27 @@ export const PRESET_AGENT = new Set([
   "talend_validation_validate_context_usage",
   "talend_job_quality_report",
   "talend_job_quality_issues",
+]);
+
+/**
+ * Preset `portal`: para un cliente que crea Jobs desde especificaciones y luego
+ * los inspecciona. Es `PRESET_AGENT` más las tools de lectura de inspección,
+ * problemas de Studio y verificación de componentes. `agent` sigue sin
+ * `talend_job_problems`: la decisión de ocultarla allí es deliberada.
+ */
+export const PRESET_PORTAL = new Set([
+  ...PRESET_AGENT,
+  // Lectura del contrato del portal (`contract/portal-tools.json`).
+  "talend_inspect_component",
+  "talend_inspect_job",
+  "talend_job_info",
+  "talend_job_problems",
+  "talend_list_components",
+  "talend_preview_component_parameter",
+  "talend_preview_schema_column",
+  "talend_repo_sources",
+  "talend_repo_status",
+  "talend_analyze_tdboutput",
 ]);
 
 /**

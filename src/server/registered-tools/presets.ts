@@ -3,6 +3,7 @@ import {
   LEGACY_TALEND_ALIASES,
   PRESET_AGENT,
   PRESET_CORE,
+  PRESET_PORTAL,
   RUNS_TOOLS,
 } from "./preset-sets";
 
@@ -14,6 +15,7 @@ const PRESET_RULES: Record<string, (name: string) => boolean> = {
   all: (name) => name.startsWith("talend_"),
   canonical: (name) => name.startsWith("talend_") && !LEGACY_TALEND_ALIASES.has(name),
   agent: (name) => PRESET_AGENT.has(name),
+  portal: (name) => PRESET_PORTAL.has(name),
   core: (name) => PRESET_CORE.has(name),
   jobs: (name) => name.startsWith("talend_jobs_") || JOBS_EXTRA.has(name),
   runs: (name) => name.startsWith("talend_runs_") || RUNS_TOOLS.has(name),

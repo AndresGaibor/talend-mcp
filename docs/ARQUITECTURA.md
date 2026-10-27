@@ -39,7 +39,9 @@ El MCP tiene dos modos de operacion y no deben confundirse:
 El handshake MCP da instrucciones para agentes nuevos. La tool `talend_guide` orienta en tareas,
 schemas, reglas del dominio y estado del entorno. Para un cliente externo nuevo se recomienda
 `TALEND_MCP_FILTER=agent`; `all` expone el catalogo completo y `core` limita las tools a una
-seleccion esencial. La guia permanece visible con todos los presets y avisa si el preset no expone
+seleccion esencial. `portal` agrega a `agent` la inspeccion de un Job creado (componentes,
+problemas de Studio, esquemas y repositorios) para clientes que construyen Jobs y luego los
+revisan. La guia permanece visible con todos los presets y avisa si el preset no expone
 los pasos necesarios para una tarea.
 
 ## 2. Capas del servidor

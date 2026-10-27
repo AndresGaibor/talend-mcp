@@ -62,4 +62,24 @@ describe("presets de tools", () => {
     });
     expect(vacios, `Presets sin tools: ${vacios.join(", ")}`).toEqual([]);
   });
+
+  test("portal preset publica todas las tools que necesita el portal", () => {
+    const portal = withFilter("portal");
+    const esperadas = [
+      "talend_job_apply_custom_spec",
+      "talend_inspect_job",
+      "talend_job_problems",
+      "talend_job_info",
+      "talend_inspect_component",
+      "talend_list_components",
+      "talend_preview_component_parameter",
+      "talend_preview_schema_column",
+      "talend_repo_sources",
+      "talend_repo_status",
+      "talend_analyze_tdboutput",
+    ];
+    expect(portal).toEqual(expect.arrayContaining(esperadas));
+    expect(knownPresets()).toContain("portal");
+    expect(withFilter("agent")).not.toContain("talend_job_problems");
+  });
 });
