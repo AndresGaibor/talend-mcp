@@ -45,6 +45,7 @@ son resultados de la revision: cada componente se revisa desde cero.
 | 2026-10-27 | tWriteXMLField | C5 | `execution-check --suite calidad` | Pendiente: el codigo generado tiene try/catch desbalanceado (catch sin try) con las tablas ROOT y LOOP. Sin resolver. |
 | 2026-10-27 | tAdvancedFileOutputXML | C5 | `execution-check --suite archivos` | Pendiente: usa ROOT, LOOP y MAP; el codigo generado referencia una variable no declarada (nameToElement_tAFOX_2). Mismo patron que tWriteXMLField. |
 | 2026-10-27 | tExtractDelimitedFields | C5 | `execution-check --suite archivos` | Pendiente: el generador busca FIELD en la metadata de la conexion de entrada, que conserva las columnas del destino. Reaplicar el esquema del origen no actualiza la conexion. Hace falta refrescarla en el bridge. |
+| 2026-10-27 | Bridge: sincronizacion de conexiones de salida | C5 | `set-schema` + `execution-check` (tExtractDelimitedFields) | Probado y revertido: copiar el esquema del origen a sus conexiones de salida (la tabla llega con `linea`) no basta; el generador sigue sin emitir el try. Probablemente una segunda propagacion al persistir el job. Pendiente de investigar en JobPersistence.persist. |
 
 ## Estado
 
