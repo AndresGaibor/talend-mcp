@@ -50,11 +50,26 @@ describe("job generator robusto", () => {
     // Verificaciones Properties
     expect(propertiesXml).toContain('label="JobRobustTest"');
     expect(propertiesXml).toContain('path="test/unit"');
-    expect(propertiesXml).toContain('href="JobRobustTest_0.1.item#' + rootId + '"');
+    // La raiz del .item se referencia como Studio: `#/`.
+    expect(propertiesXml).toContain('href="JobRobustTest_0.1.item#/"');
     
     // Verificar que el .properties tenga IDs validos
     expect(propertiesXml).toContain('TalendProperties:Property');
     const propIds = propertiesXml.match(/xmi:id=\"_[^\"]+\"/g);
     expect(propIds?.length).toBeGreaterThanOrEqual(3); // Property, ItemState, ProcessItem
+  });
+
+  test("las referencias cruzadas del .properties apuntan a ids que existen: sin ellas Studio no enlaza el item", () => {
+    const { xml, rootId } = buildJobItemXml({ jobName: "JobRefs", components: [{ uniqueName: "tLogRow_1", componentName: "tLogRow" }] });
+    const properties = buildJobPropertiesXml({ jobName: "JobRefs", components: [] }, rootId);
+    const xmiIds = new Set([...properties.matchAll(/xmi:id="([^"]+)"/g)].map((m) => m[1]));
+
+    const property = /<TalendProperties:Property[^>]*\sitem="([^"]+)"/.exec(properties)![1]!;
+    const processItem = /<TalendProperties:ProcessItem[^>]*\sproperty="([^"]+)"[^>]*\sstate="([^"]+)"/.exec(properties)!;
+
+    expect(xmiIds.has(property)).toBe(true);
+    expect(xmiIds.has(processItem[1]!)).toBe(true);
+    expect(xmiIds.has(processItem[2]!)).toBe(true);
+    expect(xml).toContain('xmi:id="' + rootId + '"');
   });
 });

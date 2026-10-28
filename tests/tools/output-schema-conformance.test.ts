@@ -244,3 +244,22 @@ function restoreEnv(name: string, value: string | undefined): void {
   if (value === undefined) delete process.env[name];
   else process.env[name] = value;
 }
+
+describe("talend_delete_job: la respuesta real valida contra su outputSchema publicado", () => {
+  test("borrar un job escrito offline devuelve lo que el schema declara", async () => {
+    const { createDeleteJobTool } = await import("../../src/presentation/tools/jobs/delete-job.tool");
+    const project = crearProyectoDePrueba();
+    const anterior = process.env.TALEND_PROJECT;
+    clearActiveRepo();
+    process.env.TALEND_PROJECT = project;
+    try {
+      const resultado = await createDeleteJobTool().handler({ jobName: "lab04_olist_orders_to_staging" });
+
+      expect((resultado as { ok: boolean }).ok).toBe(true);
+      expect(validar("talend_delete_job", resultado)).toEqual([]);
+    } finally {
+      restoreEnv("TALEND_PROJECT", anterior);
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+});

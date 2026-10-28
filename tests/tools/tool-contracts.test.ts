@@ -101,7 +101,10 @@ describe("schemas de salida enriquecidos por dominio", () => {
     expect(TalendColumnSchema.safeParse({ name: "id", type: "id_Integer" }).success).toBe(true);
 
     const deleteOutput = getEnrichedOutputSchema("talend_delete_job");
-    expect(deleteOutput.safeParse({ ok: true, data: { deleted: true, jobName: "ventas" } }).success).toBe(true);
+    expect(deleteOutput.safeParse({
+      ok: true,
+      data: { deletedJob: "ventas", itemPath: "process/ventas_0.1.item", propertiesPath: "process/ventas_0.1.properties" },
+    }).success).toBe(true);
 
     const updateOutput = getEnrichedOutputSchema("talend_update_schema_column");
     expect(updateOutput.safeParse({

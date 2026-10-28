@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -34,6 +34,11 @@ afterEach(() => {
 });
 
 describe("configuracion del cliente del bridge", () => {
+  // El arranque de las pruebas (tests/setup.ts) apunta el puente a un puerto muerto; aqui se prueba justo de donde sale el puerto.
+  beforeEach(() => {
+    delete process.env.TALEND_BRIDGE_PORT;
+  });
+
   test("combina la configuracion JSON con los overrides del entorno", async () => {
     const file = join(temporaryDirectory(), "bridge.json");
     writeFileSync(file, JSON.stringify({ port: 3940, unsafeActions: true }), "utf8");

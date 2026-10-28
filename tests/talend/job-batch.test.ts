@@ -192,3 +192,63 @@ describe("jobs que solo llevan contextos", () => {
     expect(xml).toContain('value="/datos"');
   });
 });
+
+describe("propiedades con el formato que escribe Studio", () => {
+  test("el .properties referencia la raiz del .item como #/ y lleva statusCode, para que Studio borre ambos archivos juntos", async () => {
+    const [resultado] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: { ...plantilla, jobName: "MIG_FORMATO_STUDIO", folderPath: "formato" },
+      rows: [{ tabla: "X" }],
+    });
+
+    const propiedades = readFileSync(resultado!.itemPath!.replace(/\.item$/, ".properties"), "utf8");
+    expect(propiedades).toContain('<process href="MIG_FORMATO_STUDIO_0.1.item#/"');
+    expect(propiedades).toMatch(/statusCode=""/);
+    expect(propiedades).not.toMatch(/\.item#_/);
+  });
+});
+
+/** Prefijos de espacio de nombres que usa un XML y los que declara: un prefijo sin declarar lo rechaza el parser de EMF de Studio. */
+function prefijosSinDeclarar(xml: string): string[] {
+  const usados = new Set<string>();
+  for (const [, nombre] of xml.matchAll(/<\/?([A-Za-z][\w.-]*):[\w.-]+/g)) usados.add(nombre!);
+  for (const [, nombre] of xml.matchAll(/\s([A-Za-z][\w.-]*):[\w.-]+\s*=/g)) usados.add(nombre!);
+  const declarados = new Set([...xml.matchAll(/xmlns:([\w.-]+)\s*=/g)].map((m) => m[1]!));
+  declarados.add("xml");
+  declarados.add("xmlns");
+  return [...usados].filter((prefijo) => !declarados.has(prefijo));
+}
+
+describe("el .item escrito es XML que Studio puede cargar", () => {
+  test("un job con tMap declara los espacios de nombres que usa (xsi, TalendMapper)", async () => {
+    const [resultado] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: {
+        jobName: "MIG_CON_TMAP",
+        folderPath: "xml",
+        components: [
+          { uniqueName: "tFixedFlowInput_1", componentName: "tFixedFlowInput" },
+          { uniqueName: "tMap_2", componentName: "tMap" },
+        ],
+        connections: [],
+      },
+      rows: [{}],
+    });
+
+    expect(resultado!.ok).toBe(true);
+    const xml = readFileSync(resultado!.itemPath!, "utf8");
+    expect(xml).toContain("nodeData");
+    expect(prefijosSinDeclarar(xml)).toEqual([]);
+  });
+
+  test("ningun job sencillo usa prefijos sin declarar", async () => {
+    const [resultado] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: { ...plantilla, jobName: "MIG_XML_SENCILLO", folderPath: "xml" },
+      rows: [{ tabla: "X" }],
+    });
+
+    expect(prefijosSinDeclarar(readFileSync(resultado!.itemPath!, "utf8"))).toEqual([]);
+    expect(prefijosSinDeclarar(readFileSync(resultado!.itemPath!.replace(/\.item$/, ".properties"), "utf8"))).toEqual([]);
+  });
+});

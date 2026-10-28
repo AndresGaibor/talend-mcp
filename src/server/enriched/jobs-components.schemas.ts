@@ -23,8 +23,9 @@ export const jobsAndComponentsSchemas: Record<string, z.ZodTypeAny> = {
     propertiesPath: z.string(),
   }),
   talend_delete_job: z.object({
-    deleted: z.boolean(),
-    jobName: z.string(),
+    deletedJob: z.string(),
+    itemPath: z.string(),
+    propertiesPath: z.string(),
   }),
   talend_duplicate_job: z.object({
     duplicated: z.boolean(),

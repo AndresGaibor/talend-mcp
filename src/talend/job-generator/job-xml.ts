@@ -57,6 +57,8 @@ export function buildJobItemXml(spec: JobSpec): { xml: string; rootId: string } 
   const root: Record<string, unknown> = {
     "@_xmi:version": "2.0",
     "@_xmlns:xmi": "http://www.omg.org/XMI",
+    "@_xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+    "@_xmlns:TalendMapper": "http://www.talend.org/mapper",
     "@_xmlns:talendfile": "platform:/resource/org.talend.model/model/TalendFile.xsd",
     "@_xmi:id": rootId,
     "@_defaultContext": defaultContext,
@@ -80,6 +82,8 @@ export function buildJobPropertiesXml(spec: JobSpec, rootItemId: string): string
   const version = spec.version ?? "0.1";
   const itemFileName = `${spec.jobName}_${version}.item`;
   const propId = generateTalendId();
+  // El ProcessItem referencia a la propiedad por su `xmi:id`, no por su atributo `id`.
+  const propXmiId = generateTalendId();
   const itemId = generateTalendId();
   const stateId = generateTalendId();
 
@@ -89,10 +93,11 @@ export function buildJobPropertiesXml(spec: JobSpec, rootItemId: string): string
       "@_xmlns:xmi": "http://www.omg.org/XMI",
       "@_xmlns:TalendProperties": "http://www.talend.org/properties",
       "TalendProperties:Property": {
-        "@_xmi:id": generateTalendId(),
+        "@_xmi:id": propXmiId,
         "@_id": propId,
         "@_label": spec.label ?? spec.jobName,
         "@_version": version,
+        "@_statusCode": "",
         "@_displayName": spec.label ?? spec.jobName,
         "@_purpose": spec.purpose ?? "",
         "@_description": spec.description ?? "",
@@ -104,9 +109,11 @@ export function buildJobPropertiesXml(spec: JobSpec, rootItemId: string): string
       },
       "TalendProperties:ProcessItem": {
         "@_xmi:id": itemId,
-        "@_property": propId,
+        "@_property": propXmiId,
         "@_state": stateId,
-        process: { "@_href": `${itemFileName}#${rootItemId}` },
+        // Como Studio: la raiz del .item es `#/`. Con el id de la raiz Studio no resuelve la referencia al borrar el
+        // job y deja el .item huerfano en disco.
+        process: { "@_href": `${itemFileName}#/` },
       },
     },
   };
