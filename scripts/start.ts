@@ -107,6 +107,8 @@ async function startServer(): Promise<void> {
     const powershell = [
       `$owners = Get-NetTCPConnection -State Listen -LocalPort ${portNumber} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique`,
       "foreach ($owner in $owners) { taskkill.exe /F /T /PID $owner | Out-Null }",
+      // Sin conexiones, `Get-NetTCPConnection` deja `$?` en falso y PowerShell sale con 1.
+      "if (-not $owners) { exit 0 }",
     ].join("; ");
     try {
       const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", powershell], {
