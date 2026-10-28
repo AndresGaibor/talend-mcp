@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec } from "../job-generator";
 import { applyJobEdits, type JobEditOperation } from "../editor/job-edit";
@@ -20,6 +20,7 @@ export type BatchItemResult = {
   /** Para editar: si el XML cambio. Para crear: siempre true cuando se escribio. */
   changed?: boolean;
   written?: boolean;
+  reusedExisting?: boolean;
   /** Ruta del `.item` (al crear, cuando el job es valido). */
   itemPath?: string;
   error?: string;
@@ -126,9 +127,6 @@ export async function createJobsFromTemplate(options: CreateBatchOptions): Promi
     if (otrasRutas.length) {
       return { job, ok: false, error: `Ya existe un job llamado '${job}' en otra carpeta (${otrasRutas[0]}); Talend exige nombres unicos en el proyecto` };
     }
-    if (existsSync(itemPath) && !overwrite) return { job, ok: false, error: "El job ya existe (usa overwrite)" };
-    if (dryRun) return { job, ok: true, changed: true, written: false, itemPath };
-
     try {
       const { xml, rootId } = buildJobItemXml(spec);
       const propiedades = buildJobPropertiesXml(spec, rootId);
@@ -137,9 +135,38 @@ export async function createJobsFromTemplate(options: CreateBatchOptions): Promi
       if (sinDeclarar.length) {
         return { job, ok: false, error: `El job generado no es XML valido para Studio: prefijos sin declarar (${sinDeclarar.join(", ")})` };
       }
+      const propertiesPath = join(folder, `${job}_${version}.properties`);
+      if (existsSync(itemPath) && !overwrite) {
+        const marker = /\[portal-spec:[a-f0-9]{64}\]/.exec(spec.description ?? "")?.[0];
+        const ownsCompletePair = marker
+          && existsSync(propertiesPath)
+          && readFileSync(propertiesPath, "utf8").includes(marker);
+        if (ownsCompletePair) {
+          return { job, ok: true, changed: false, written: false, reusedExisting: true, itemPath };
+        }
+        return { job, ok: false, error: "El job ya existe (usa overwrite)" };
+      }
+      if (dryRun) return { job, ok: true, changed: true, written: false, itemPath };
+
       mkdirSync(dirname(itemPath), { recursive: true });
-      await Bun.write(itemPath, xml);
-      await Bun.write(join(folder, `${job}_${version}.properties`), propiedades);
+      if (overwrite) {
+        await Bun.write(itemPath, xml);
+        await Bun.write(propertiesPath, propiedades);
+      } else {
+        const created: string[] = [];
+        try {
+          const itemFd = openSync(itemPath, "wx");
+          created.push(itemPath);
+          try { writeFileSync(itemFd, xml); } finally { closeSync(itemFd); }
+
+          const propertiesFd = openSync(propertiesPath, "wx");
+          created.push(propertiesPath);
+          try { writeFileSync(propertiesFd, propiedades); } finally { closeSync(propertiesFd); }
+        } catch (error) {
+          for (const path of created.reverse()) rmSync(path, { force: true });
+          throw error;
+        }
+      }
       return { job, ok: true, changed: true, written: true, itemPath };
     } catch (error) {
       return { job, ok: false, error: errorText(error) };

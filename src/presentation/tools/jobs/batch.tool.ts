@@ -86,7 +86,7 @@ function resumen(results: BatchItemResult[], compilacion?: Record<string, { ok: 
     correctos: results.length - fallos.length,
     escritos: results.filter((r) => r.written).length,
     fallos: fallos.slice(0, 50),
-    jobs: results.slice(0, 500).map((r) => ({ job: r.job, ok: r.ok, written: r.written === true, ...(r.itemPath ? { itemPath: r.itemPath } : {}), ...(r.error ? { error: r.error } : {}) })),
+    jobs: results.slice(0, 500).map((r) => ({ job: r.job, ok: r.ok, written: r.written === true, ...(r.reusedExisting ? { reusedExisting: true } : {}), ...(r.itemPath ? { itemPath: r.itemPath } : {}), ...(r.error ? { error: r.error } : {}) })),
     ...(omitidos.length ? { omitidos } : {}),
     ...(avisos.length ? { avisos } : {}),
     ...(compilacion

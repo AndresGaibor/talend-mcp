@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJobsFromTemplate, editJobsBatch, expandTemplate } from "../../src/talend/job-batch/batch";
@@ -52,6 +52,34 @@ describe("lotes de jobs", () => {
     const r = await createJobsFromTemplate({ projectPath: proyecto, template: plantilla, rows: [{ tabla: "SECO" }], dryRun: true });
     expect(r[0]).toMatchObject({ ok: true, written: false });
     expect(existsSync(join(proyecto, "process", "migracion", "MIG_SECO_0.1.item"))).toBe(false);
+  });
+
+  test("un reintento reconoce un par completo con la misma marca de propiedad", async () => {
+    const template = {
+      ...plantilla,
+      jobName: "OWNED_RETRY",
+      description: `Migración\n[portal-spec:${"a".repeat(64)}]`,
+    };
+    const first = await createJobsFromTemplate({ projectPath: proyecto, template, rows: [{ tabla: "X" }] });
+    const retry = await createJobsFromTemplate({ projectPath: proyecto, template, rows: [{ tabla: "X" }] });
+
+    expect(first[0]).toMatchObject({ ok: true, written: true });
+    expect(retry[0]).toMatchObject({ ok: true, written: false, changed: false, reusedExisting: true });
+  });
+
+  test("si falla la escritura de properties elimina el item recien creado", async () => {
+    const folder = join(proyecto, "process", "migracion");
+    const propertiesPath = join(folder, "MIG_ATOMIC_0.1.properties");
+    mkdirSync(propertiesPath, { recursive: true });
+
+    const [result] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: { ...plantilla, jobName: "MIG_ATOMIC" },
+      rows: [{ tabla: "X" }],
+    });
+
+    expect(result!.ok).toBe(false);
+    expect(existsSync(join(folder, "MIG_ATOMIC_0.1.item"))).toBe(false);
   });
 
   test("edita todos los jobs que casan con el patron", async () => {

@@ -40,6 +40,9 @@ para los pocos componentes complejos y para ejecutar una muestra.
 - **Atómico por job:** si una operación falla, o el resultado sería inconsistente (conexión a un nodo
   que no existe, `UNIQUE_NAME` repetido, nombre de conexión repetido), el fichero no se toca. El error
   dice qué operación falla (`Operacion 3 (connect): ...`).
+- **Creación por lote:** los `.item` y `.properties` nuevos se crean de forma exclusiva; si falla la escritura
+  del segundo fichero, se elimina el primero recién creado. El portal añade una marca de propiedad al spec
+  y un reintento reconoce el par existente con esa misma marca, sin sobrescribir Jobs ajenos.
 - **Un job que falla no impide los demás** en un lote; la respuesta trae `fallos`.
 - **No pisa un job abierto:** si Studio tiene el job en un editor, la tool se niega (`JOB_OPEN_IN_STUDIO`),
   salvo `force:true`. En un lote, esos jobs se saltan y se informan.
