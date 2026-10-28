@@ -33,7 +33,14 @@ export type StudioDialogCheck =
   | { status: "unavailable"; reason: string };
 
 const KIND_PATTERNS: Array<{ kind: StudioDialogKind; titles: string[] }> = [
-  { kind: "progress", titles: ["progress", "progreso", "building", "loading", "cargando", "compilando"] },
+  {
+    kind: "progress",
+    titles: [
+      "progress", "progreso", "building", "loading", "cargando", "compilando",
+      // El dialogo de Eclipse que espera un trabajo de segundo plano (refrescar el repositorio): se cierra solo.
+      "intervención del usuario", "intervencion del usuario", "user operation is waiting",
+    ],
+  },
   {
     kind: "missing_modules",
     titles: ["third part", "third-party", "missing third", "modulos de terceros", "third party modules"],

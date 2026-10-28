@@ -24,6 +24,9 @@ describe("classifyStudioDialog", () => {
   test("los progresos normales no son bloqueantes por su titulo", () => {
     expect(classifyStudioDialog("Building job MCP_X")).toBe("progress");
     expect(classifyStudioDialog("Cargando proyecto")).toBe("progress");
+    // Eclipse espera un trabajo de segundo plano (al refrescar el repositorio): se cierra solo, no bloquea.
+    expect(classifyStudioDialog("Se está a la espera de una intervención del usuario")).toBe("progress");
+    expect(classifyStudioDialog("User Operation is Waiting")).toBe("progress");
   });
 
   test("lo que no se conoce queda como unknown", () => {

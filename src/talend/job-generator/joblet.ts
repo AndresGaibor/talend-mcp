@@ -1,6 +1,6 @@
 import { buildXml } from "../xml";
 import { generateTalendId } from "../utils";
-import { buildComponentNode, buildConnectionNode } from "./component-node";
+import { buildComponentNode, buildConnectionNode, withMapperMetanames } from "./component-node";
 import type { JobletSpec } from "./types";
 
 export function buildJobletItemXml(spec: JobletSpec): { xml: string; rootId: string } {
@@ -34,12 +34,13 @@ export function buildJobletItemXml(spec: JobletSpec): { xml: string; rootId: str
 
   const contextSection = { context };
 
-  const nodes = spec.components.map((c) => buildComponentNode(c));
+  const connections = withMapperMetanames(spec.components, spec.connections ?? []);
+  const nodes = spec.components.map((c) => buildComponentNode(c, connections));
   const nodeSection = nodes.length === 1 ? nodes[0] : nodes;
 
   let connectionSection: unknown = [];
   if (spec.connections && spec.connections.length > 0) {
-    const connNodes = spec.connections.map((c) => buildConnectionNode(c));
+    const connNodes = connections.map((c) => buildConnectionNode(c));
     connectionSection = connNodes.length === 1 ? connNodes[0] : connNodes;
   }
 

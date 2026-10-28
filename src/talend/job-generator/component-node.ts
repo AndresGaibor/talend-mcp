@@ -1,5 +1,5 @@
 import { generateTalendId } from "../utils";
-import { buildMapNodeData } from "../component-mappers";
+import { buildMapNodeData, type MapTables } from "../component-mappers";
 import { buildColumn } from "./columns";
 import type { ComponentSpec, ConnectionSpec } from "./types";
 
@@ -27,7 +27,36 @@ function buildLogRowLengths(spec: ComponentSpec): Record<string, unknown>[] | nu
   return values;
 }
 
-export function buildComponentNode(spec: ComponentSpec): Record<string, unknown> {
+/** Nombre de una conexion en Studio: el `UNIQUE_NAME` explicito y, si no, la etiqueta. */
+export function connectionName(connection: ConnectionSpec): string {
+  return connection.uniqueName ?? connection.label;
+}
+
+/** Conexiones de datos (las que llevan filas); los disparadores y el rechazo no son tablas del mapper. */
+function isDataFlow(connection: ConnectionSpec): boolean {
+  return !connection.connectorName || connection.connectorName === "FLOW";
+}
+
+/** Tablas que necesita un tMap: una de entrada por conexion que entra y una de salida por cada que sale. */
+export function mapTablesFor(uniqueName: string, connections: ConnectionSpec[]): MapTables {
+  return {
+    inputs: connections.filter((c) => c.target === uniqueName && isDataFlow(c)).map(connectionName),
+    outputs: connections.filter((c) => c.source === uniqueName && isDataFlow(c)).map(connectionName),
+  };
+}
+
+/**
+ * Las conexiones que salen de un tMap llevan en `metaname` el nombre de su tabla de salida, como las escribe Studio.
+ * Sin ello (o con una tabla de otro nombre) Studio avisa de errores en la conexion al abrir el Job.
+ */
+export function withMapperMetanames(components: ComponentSpec[], connections: ConnectionSpec[]): ConnectionSpec[] {
+  const maps = new Set(components.filter((c) => c.componentName === "tMap").map((c) => c.uniqueName));
+  return connections.map((c) =>
+    maps.has(c.source) && isDataFlow(c) && !c.metaname ? { ...c, metaname: connectionName(c) } : c,
+  );
+}
+
+export function buildComponentNode(spec: ComponentSpec, connections: ConnectionSpec[] = []): Record<string, unknown> {
   const parameters: Record<string, unknown>[] = [buildElementParameter("UNIQUE_NAME", spec.uniqueName)];
   if (spec.label) parameters.push(buildElementParameter("LABEL", spec.label));
 
@@ -84,7 +113,24 @@ export function buildComponentNode(spec: ComponentSpec): Record<string, unknown>
   if (spec.posX !== undefined) node["@_posX"] = String(spec.posX);
   if (spec.posY !== undefined) node["@_posY"] = String(spec.posY);
 
-  if (spec.schema && spec.schema.columns && Array.isArray(spec.schema.columns)) {
+  const mapTables = spec.componentName === "tMap" ? mapTablesFor(spec.uniqueName, connections) : undefined;
+
+  if (mapTables && mapTables.outputs.length > 0) {
+    // Un tMap tiene un esquema por cada conexion de salida, con el nombre de la conexion. Con el esquema del
+    // componente (si lo hay) como columnas de cada una.
+    const columns = Array.isArray(spec.schema?.columns) ? spec.schema.columns.map((c) => buildColumn(c)) : [];
+    const tables = mapTables.outputs.map((name) => {
+      const table: Record<string, unknown> = {
+        "@_connector": "FLOW",
+        "@_label": name,
+        "@_name": name,
+        "@_xmi:id": generateTalendId(),
+      };
+      if (columns.length > 0) table.column = columns;
+      return table;
+    });
+    node.metadata = tables.length === 1 ? tables[0] : tables;
+  } else if (spec.schema && spec.schema.columns && Array.isArray(spec.schema.columns)) {
     // El nombre del metadata es el unique name del componente. Usar el nombre
     // de la primera columna deja el modelo de Studio inconsistente.
     const metadataName = spec.schema.name ?? spec.uniqueName;
@@ -99,7 +145,7 @@ export function buildComponentNode(spec: ComponentSpec): Record<string, unknown>
   }
 
   if (spec.componentName === "tMap") {
-    node.nodeData = (spec as any).nodeData ?? buildMapNodeData(spec.uniqueName);
+    node.nodeData = (spec as any).nodeData ?? buildMapNodeData(mapTables);
   }
 
   return node;

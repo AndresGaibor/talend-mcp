@@ -7,6 +7,7 @@ import { jobsAbiertosEnStudio } from "../../../talend/job-batch/open-guard";
 import { sinBorradoresAusentes, type Omitido } from "../../../talend/job-batch/borradores-ausentes";
 import { aplicarDefiniciones } from "../../../talend/job-batch/aplicar-definiciones";
 import { enlazarTRunJob } from "../../../talend/job-batch/enlazar-trunjob";
+import { comprobarConexiones } from "../../../talend/job-batch/comprobar-conexiones";
 import { DefinitionIndexRepository } from "../../../modules/component-definitions/infrastructure/definition-index.repository";
 import { okResult, errorResult } from "../common/result";
 
@@ -133,6 +134,11 @@ export function createJobsCreateBatchTool() {
 
         const definiciones = new DefinitionIndexRepository();
         const { plantilla: conDefiniciones, avisos: avisosDefiniciones } = await aplicarDefiniciones(plantilla, (nombre) => definiciones.find(nombre));
+        // Studio no rechaza una conexion imposible: carga el Job y avisa. Se rechaza aqui, antes de escribirlo.
+        const conexionesInvalidas = await comprobarConexiones(conDefiniciones, (nombre) => definiciones.find(nombre));
+        if (conexionesInvalidas.length) {
+          return errorResult(tool, "INVALID_CONNECTIONS", `Conexiones que Studio no admite: ${conexionesInvalidas.join("; ")}`);
+        }
         // En una validacion (dryRun) los hijos aun no estan escritos: no se avisa de lo que se resolvera al escribir.
         const { plantilla: traducida, avisos: avisosEnlace } = await enlazarTRunJob(projectPath, conDefiniciones);
         const avisos = [...avisosDefiniciones, ...(input.dryRun ? [] : avisosEnlace)];
