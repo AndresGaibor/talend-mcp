@@ -71,6 +71,8 @@ export type DefinitionConnector = {
   /** Tipo de enlace (`CTYPE`): FLOW, ITERATE, REJECT, LOOKUP, SUBJOB_OK... */
   type: string;
   maxInput?: number;
+  /** `MIN_INPUT`: un conector con entradas obligatorias y sin `MAX_INPUT` admite un numero indeterminado (tUnite). */
+  minInput?: number;
   maxOutput?: number;
 };
 

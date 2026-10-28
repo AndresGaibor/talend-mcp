@@ -205,6 +205,17 @@ describe("Comprobacion de conexiones", () => {
     <PARAMETERS/>
   </COMPONENT>`;
 
+  /** El tUnite recibe un numero indeterminado de flujos: MIN_INPUT sin MAX_INPUT. */
+  const UNION = `<COMPONENT>
+    <HEADER NAME="tUnite" VERSION="0.1" STARTABLE="false"/>
+    <FAMILIES><FAMILY>Processing</FAMILY></FAMILIES>
+    <CONNECTORS>
+      <CONNECTOR CTYPE="FLOW" MIN_INPUT="1" MAX_OUTPUT="1"/>
+      <CONNECTOR CTYPE="SUBJOB_OK" MAX_OUTPUT="1" MAX_INPUT="1"/>
+    </CONNECTORS>
+    <PARAMETERS/>
+  </COMPONENT>`;
+
   /** Un componente de entrada: su FLOW emite pero no recibe. */
   const ENTRADA = `<COMPONENT>
     <HEADER NAME="tFileInputDelimited" VERSION="0.1" STARTABLE="true"/>
@@ -239,6 +250,7 @@ describe("Comprobacion de conexiones", () => {
     escribir("org.talend.designer.components.localprovider_1.0", "tMap", MAP);
     escribir("org.talend.designer.components.localprovider_1.0", "tClose", CIERRE);
     escribir("org.talend.designer.components.localprovider_1.0", "tFilterRow", FILTRO);
+    escribir("org.talend.designer.components.localprovider_1.0", "tUnite", UNION);
     escribir("org.talend.designer.components.localprovider_1.0", "tFileInputDelimited", ENTRADA);
     const repositorio = new DefinitionIndexRepository({
       pluginsDir: plugins,
@@ -274,6 +286,17 @@ describe("Comprobacion de conexiones", () => {
     expect(check.ok).toBe(true);
     expect(check.errors).toEqual([]);
     expect(check.warnings.join(" ")).toContain("conector principal");
+  });
+
+  test("un componente con MIN_INPUT y sin MAX_INPUT admite varias entradas (tUnite)", async () => {
+    const validar = await validador();
+    const primera = await validar.validate("tLogRow", "tUnite", "FLOW");
+    const segunda = await validar.validate("tFilterRow", "tUnite", "FILTER");
+
+    expect(primera.ok).toBe(true);
+    expect(primera.errors).toEqual([]);
+    expect(segunda.ok).toBe(true);
+    expect(segunda.errors).toEqual([]);
   });
 
   test("sigue rechazando una conexion hacia un componente de entrada", async () => {

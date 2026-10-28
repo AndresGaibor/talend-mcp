@@ -104,8 +104,8 @@ export class ValidateConnectionUseCase {
 
     // Un conector del destino con el mismo nombre solo cuenta si puede recibir filas: el FILTER del
     // tFilterRow es una salida, y un tFilterRow encadenado a otro entra por su FLOW principal.
-    const entradaPrincipal = entradas.find((item) => (item.maxInput ?? 0) >= 1);
-    const mismoNombreSoloSale = entrada !== undefined && (entrada.maxInput ?? 0) < 1 && entradaPrincipal !== undefined;
+    const entradaPrincipal = entradas.find(acceptsInput);
+    const mismoNombreSoloSale = entrada !== undefined && !acceptsInput(entrada) && entradaPrincipal !== undefined;
 
     if (entradas.length === 0) {
       check.errors.push(`el componente '${targetType}' no tiene conectores de entrada`);
@@ -117,7 +117,7 @@ export class ValidateConnectionUseCase {
           ` (${entradas.map((item) => item.name).join(", ")})`,
       );
     } else if (
-      (entrada.maxInput ?? 0) < 1 &&
+      !acceptsInput(entrada) &&
       !(target.name.toLowerCase() === "tmap" && check.connector === "FLOW")
     ) {
       check.errors.push(`el conector '${check.connector}' de '${targetType}' no admite entradas`);
@@ -126,6 +126,17 @@ export class ValidateConnectionUseCase {
 
     return check;
   }
+}
+
+/**
+ * Si el conector puede recibir filas.
+ *
+ * `MAX_INPUT` ausente no significa cero: un conector con `MIN_INPUT` y sin tope (el FLOW del tUnite)
+ * recibe un numero indeterminado de flujos, y `-1` es ilimitado.
+ */
+function acceptsInput(connector: DefinitionConnector): boolean {
+  if (connector.maxInput === undefined) return (connector.minInput ?? 0) >= 1;
+  return connector.maxInput >= 1 || connector.maxInput === -1;
 }
 
 /** Los conectores de datos (no los triggers) de un componente. */

@@ -9,6 +9,7 @@ export function parseConnectors(component: Bag): DefinitionConnector[] {
     const type = attr(connector, "CTYPE") ?? attr(connector, "TYPE");
     if (!type) continue;
     const maxInput = attr(connector, "MAX_INPUT");
+    const minInput = attr(connector, "MIN_INPUT");
     const maxOutput = attr(connector, "MAX_OUTPUT");
     // El conector principal no tiene NAME: se llama como su tipo.
     const name = attr(connector, "NAME") ?? type;
@@ -16,6 +17,7 @@ export function parseConnectors(component: Bag): DefinitionConnector[] {
       name: name.toUpperCase(),
       type: type.toUpperCase(),
       maxInput: maxInput === undefined ? undefined : Number(maxInput),
+      minInput: minInput === undefined ? undefined : Number(minInput),
       maxOutput: maxOutput === undefined ? undefined : Number(maxOutput),
     });
   }
