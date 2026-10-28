@@ -26,7 +26,7 @@ const CACHE_FILE = "component-definitions.json";
 /** La instalación de Studio cambia muy seldom; el caché aguanta un día. */
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 /** Si cambia el formato del índice, el caché viejo no sirve. */
-const INDEX_VERSION = 3;
+const INDEX_VERSION = 4;
 
 /** Del id del plugin se deduce a qué tipo de job pertenece el componente. */
 function paletteOf(pluginId: string): ComponentPalette {
