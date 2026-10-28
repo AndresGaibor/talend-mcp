@@ -5,6 +5,7 @@ import { applyJobEdits, type JobEditOperation } from "../editor/job-edit";
 import { resolveFolderDir } from "../job-crud/paths";
 import { listJobs } from "../repository";
 import { jobsAbiertosEnStudio } from "./open-guard";
+import { prefijosSinDeclarar } from "./xml-valido";
 
 /**
  * Operaciones masivas sobre jobs en disco: crear muchos a partir de una plantilla y editar muchos con el mismo
@@ -130,9 +131,15 @@ export async function createJobsFromTemplate(options: CreateBatchOptions): Promi
 
     try {
       const { xml, rootId } = buildJobItemXml(spec);
+      const propiedades = buildJobPropertiesXml(spec, rootId);
+      // Un XML que Studio no puede cargar deja el job roto: mejor no escribirlo y decir por que.
+      const sinDeclarar = [...new Set([...prefijosSinDeclarar(xml), ...prefijosSinDeclarar(propiedades)])];
+      if (sinDeclarar.length) {
+        return { job, ok: false, error: `El job generado no es XML valido para Studio: prefijos sin declarar (${sinDeclarar.join(", ")})` };
+      }
       mkdirSync(dirname(itemPath), { recursive: true });
       await Bun.write(itemPath, xml);
-      await Bun.write(join(folder, `${job}_${version}.properties`), buildJobPropertiesXml(spec, rootId));
+      await Bun.write(join(folder, `${job}_${version}.properties`), propiedades);
       return { job, ok: true, changed: true, written: true, itemPath };
     } catch (error) {
       return { job, ok: false, error: errorText(error) };

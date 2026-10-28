@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJobsFromTemplate, editJobsBatch, expandTemplate } from "../../src/talend/job-batch/batch";
+import { prefijosSinDeclarar } from "../../src/talend/job-batch/xml-valido";
 
 let proyecto: string;
 
@@ -208,17 +209,6 @@ describe("propiedades con el formato que escribe Studio", () => {
   });
 });
 
-/** Prefijos de espacio de nombres que usa un XML y los que declara: un prefijo sin declarar lo rechaza el parser de EMF de Studio. */
-function prefijosSinDeclarar(xml: string): string[] {
-  const usados = new Set<string>();
-  for (const [, nombre] of xml.matchAll(/<\/?([A-Za-z][\w.-]*):[\w.-]+/g)) usados.add(nombre!);
-  for (const [, nombre] of xml.matchAll(/\s([A-Za-z][\w.-]*):[\w.-]+\s*=/g)) usados.add(nombre!);
-  const declarados = new Set([...xml.matchAll(/xmlns:([\w.-]+)\s*=/g)].map((m) => m[1]!));
-  declarados.add("xml");
-  declarados.add("xmlns");
-  return [...usados].filter((prefijo) => !declarados.has(prefijo));
-}
-
 describe("el .item escrito es XML que Studio puede cargar", () => {
   test("un job con tMap declara los espacios de nombres que usa (xsi, TalendMapper)", async () => {
     const [resultado] = await createJobsFromTemplate({
@@ -250,5 +240,25 @@ describe("el .item escrito es XML que Studio puede cargar", () => {
 
     expect(prefijosSinDeclarar(readFileSync(resultado!.itemPath!, "utf8"))).toEqual([]);
     expect(prefijosSinDeclarar(readFileSync(resultado!.itemPath!.replace(/\.item$/, ".properties"), "utf8"))).toEqual([]);
+  });
+});
+
+describe("guardia de XML valido al escribir", () => {
+  test("un job cuyo XML usaria un prefijo sin declarar no se escribe y se explica por que", async () => {
+    const [resultado] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: {
+        jobName: "MIG_XML_ROTO",
+        folderPath: "xml",
+        components: [
+          { uniqueName: "tLogRow_1", componentName: "tLogRow", parameters: { TABLA: [{ "@_zzz:ref": "a", "@_value": "b" }] as never } },
+        ],
+      },
+      rows: [{}],
+    });
+
+    expect(resultado!.ok).toBe(false);
+    expect(resultado!.error).toContain("zzz");
+    expect(existsSync(join(proyecto, "process", "xml", "MIG_XML_ROTO_0.1.item"))).toBe(false);
   });
 });
