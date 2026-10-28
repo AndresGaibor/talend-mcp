@@ -74,7 +74,7 @@ export const jobLifecycle = [
   },
 {
     name: "talend_studio_dismiss_dialogs",
-    description: "Cierra los dialogos modales que bloquean Talend Studio PULSANDO su boton: 'Jobname Error' y 'Save Resource' responden Yes (reemplaza el job o guarda los cambios pendientes). NO es de solo lectura. Para ver que dialogos hay sin tocarlos usa talend_studio_ui_inventory. El plugin ya lo hace solo; esta tool lo fuerza bajo demanda.",
+    description: "Cierra a peticion los dialogos modales CONOCIDOS que bloquean Talend Studio PULSANDO su boton: 'Jobname Error' y 'Save Resource' responden Yes (reemplaza el job o guarda los cambios pendientes). Cualquier otro modal se reporta y se deja abierto. NO es de solo lectura. Para ver que dialogos hay sin tocarlos usa talend_studio_ui_dialogs. El plugin NO cierra modales por su cuenta salvo que la configuracion del bridge tenga autoDismissModals: true.",
     inputSchema: z.object({}),
     handler: async () => {
       const bridge = await loadBridge();

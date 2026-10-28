@@ -268,10 +268,9 @@ Los componentes de "processing" (tMap, tJavaRow, tSortRow, tAggregateRow,
 tFilterRow) usan un runtime que no viene con Studio: hay que descargarlo. Al
 ejecutar un job con ellos, Studio abre un dialogo pidiendo los modulos.
 
-El guardian **no los descarga solo** (es una decision de red), pero da tiempo:
-el dialogo se deja abierto 30 s. Con la tool
-`talend_studio_install_modules` se pulsa "Download and Install" de forma
-explicita.
+El guardian **no los descarga solo** (es una decision de red) y tampoco cierra el dialogo
+por su cuenta salvo con `autoDismissModals`. Con la tool `talend_studio_install_modules` se pulsa
+"Download and Install" de forma explicita.
 
 Sin los modulos, el `classpath.jar` del job sale vacio y al ejecutarlo a mano
 falla con `NoClassDefFoundError: routines/system/api/TalendJob`.
@@ -327,9 +326,9 @@ Eso tiene dos consecuencias:
   de SWT no se ejecuta y **ninguna** llamada al hilo de la UI responde (el
   `UiThread.sync` se queda esperando hasta agotar el tiempo).
 
-La unica forma de cerrarlos desde Java es simular la tecla: el guardian
-detecta que la interfaz lleva unos segundos ocupada y pulsa Enter, que es el
-boton por defecto de esos avisos.
+Desde Java solo se podrian cerrar simulando la tecla Enter. El guardian **ya no lo hace**
+(se quito el `java.awt.Robot`): pulsar Enter a ciegas podia contestar un dialogo que esperaba a
+una persona. Estos avisos se contestan a mano en Studio.
 
 Para diagnosis: un volcado de hilos muestra el hilo principal de Studio
 parado en `org.eclipse.swt.internal.win32.OS.MessageBox(Native Method)`.

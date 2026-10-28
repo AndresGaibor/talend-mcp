@@ -28,9 +28,10 @@ escenario deja a proposito se declara en `espera.avisos_tolerados` (fragmentos d
 
 ## 6. Dialogos y bloqueos de Studio
 
-- El bridge trae un **guardian de modales** que cierra solo los dialogos que bloquean el IDE
-  (`Jobname Error`, `Save Resource`, avisos nativos de Windows...). Si Studio queda en "No
-  responde" por un dialogo, usa `talend_studio_dismiss_dialogs`.
+- El bridge **no cierra ningun modal por su cuenta**, salvo que su configuracion tenga
+  `"autoDismissModals": true`, y entonces solo los conocidos (`Jobname Error`, `Save Resource`...).
+  Si Studio queda en "No responde" por un dialogo, mira cual es con `talend_studio_ui_dialogs` y
+  contestalo en Studio; para los conocidos tambien sirve `talend_studio_dismiss_dialogs`.
 - Para no provocarlos: `talend_job_create_in_studio` con `replace: true` en vez de reusar la
   etiqueta de un job existente.
 - Studio puede tardar en responder mientras compila un job; la espera tiene tiempo maximo y

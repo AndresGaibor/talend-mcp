@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **240**.
+Tools registradas en el preset actual: **241**.
 
 ## Empezar
 
@@ -517,6 +517,18 @@ Argumentos principales:
 - `contextName` (string, obligatorio): Etiqueta del contexto
 - `parameterName` (string, obligatorio): Nombre de la variable a eliminar
 - `contextName_param` (string, opcional): Nombre del entorno (default: Default)
+
+#### `talend_job_add_context_parameters`
+
+Agrega variables al contexto por defecto del job abierto. Solo reemplaza marcadores migration_todo_* vacios creados por el portal.
+
+**Uso:** escribe/ejecuta; funciona sin Studio.
+
+Argumentos principales:
+
+- `job` (string, opcional): Job donde agregar las variables
+- `contexts` (array, obligatorio)
+- `removeManagedTodoNames` (array, opcional)
 
 #### `talend_job_context_create`
 
@@ -1912,7 +1924,7 @@ Argumentos principales:
 
 #### `talend_studio_dismiss_dialogs`
 
-Cierra los dialogos modales que bloquean Talend Studio PULSANDO su boton: 'Jobname Error' y 'Save Resource' responden Yes (reemplaza el job o guarda los cambios pendientes). NO es de solo lectura. Para ver que dialogos hay sin tocarlos usa talend_studio_ui_inventory. El plugin ya lo hace solo; esta tool lo fuerza bajo demanda.
+Cierra a peticion los dialogos modales CONOCIDOS que bloquean Talend Studio PULSANDO su boton: 'Jobname Error' y 'Save Resource' responden Yes (reemplaza el job o guarda los cambios pendientes). Cualquier otro modal se reporta y se deja abierto. NO es de solo lectura. Para ver que dialogos hay sin tocarlos usa talend_studio_ui_dialogs. El plugin NO cierra modales por su cuenta salvo que la configuracion del bridge tenga autoDismissModals: true.
 
 **Uso:** escribe/ejecuta; requiere Studio + bridge.
 
@@ -2484,6 +2496,7 @@ Argumentos principales:
 
 - `name` (string, obligatorio): Nombre del job
 - `version` (string, opcional): Version del job
+- `itemPath` (string, opcional): Ruta exacta del .item relativa al proyecto Talend
 
 #### `talend_job_problems`
 

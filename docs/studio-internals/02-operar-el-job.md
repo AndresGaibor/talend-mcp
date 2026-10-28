@@ -484,14 +484,16 @@ Studio abre modales que bloquean el IDE entero: el hilo de la UI se queda dentro
 modal del dialogo y ni el IDE ni el bridge pueden seguir. El mas molesto es el
 "Jobname Error" al reusar la etiqueta de un job.
 
-`ModalGuard` (en el plugin) los cierra solo:
+`ModalGuard` (en el plugin) puede cerrar los **conocidos**, pero **por defecto no cierra
+ninguno solo**: un modal lo contesta quien lo ve (o la tool `talend_studio_dismiss_dialogs`).
 
-- Un hilo vigilante revisa cada 1,2 s los shells del `Display` que no sean la ventana del
-  workbench.
-- Para los dialogos conocidos (`Jobname Error`, `Invalid Job Name`, `Save Resource`) pulsa
-  el boton que corresponde.
-- Para los que no conoce, pulsa el primer boton de una lista de botones seguros
-  (`Yes`, `OK`, `Accept`, `Save`...). Un modal bloqueando el IDE es peor que pulsar un boton.
+- Un hilo vigilante, **apagado por defecto**, revisa cada 1,2 s los shells del `Display` que no
+  sean la ventana del workbench. Se activa con `"autoDismissModals": true` en
+  `~/.talend-bridge/config.json` y hay que reiniciar Studio o recargar el plugin.
+- Solo actua sobre dialogos conocidos (`Jobname Error`, `Invalid Job Name`, `Save Resource`,
+  modulos de terceros): pulsa el boton que corresponde.
+- Un dialogo desconocido se reporta en `dialogs` y se deja abierto. No se pulsan botones "seguros"
+  ni se cierra el shell, y no se simulan teclas.
 - Los shells de SWT **solo se tocan desde el hilo de la UI**: el vigilante usa
   `UiThread.sync(...)`. Si se llama `Display.getShells()` desde otro hilo, SWT lanza
   `Invalid thread access`.
@@ -500,10 +502,11 @@ Para pulsar un boton hay que lanzar el evento de seleccion, no llamar a `click()
 dialogos de JFace escuchan la seleccion, no el raton. Y el texto del boton lleva el mnemonic
 ("&Yes"), asi que hay que comparar sin el.
 
-Verificado: un `MessageDialog` de JFace con el titulo "Jobname Error" se cierra solo en 0,3 s
-y devuelve la respuesta "Si".
+Verificado: un `MessageDialog` de JFace con el titulo "Jobname Error" se cierra en 0,3 s y
+devuelve la respuesta "Si" cuando se invoca el guardian.
 
-La tool `talend_studio_dismiss_dialogs` fuerza el cierre bajo demanda.
+La tool `talend_studio_dismiss_dialogs` fuerza el cierre de los conocidos bajo demanda. Para ver
+que hay abierto sin tocarlo, `talend_studio_ui_dialogs` (solo lectura).
 
 ## 14. El fin de la ejecucion de un job
 

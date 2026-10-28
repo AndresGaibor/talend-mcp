@@ -22,10 +22,14 @@ public final class Activator extends AbstractUIPlugin {
     bridgeServer = new BridgeServer(context);
     bridgeServer.start();
 
-    // El guardian cierra los modales que bloquean a Studio (por ejemplo el
-    // "Jobname Error" al reusar la etiqueta de un job). Sin el, el hilo de
-    // la UI se queda dentro del dialogo y el IDE no responde.
-    ModalGuard.startWatchdog();
+    // El guardian cierra solo los dialogos conocidos (por ejemplo el
+    // "Jobname Error" al reusar la etiqueta de un job), y solo si la
+    // configuracion lo pide con `autoDismissModals`. Por defecto no se cierra
+    // ningun modal solo: lo contesta quien lo ve, o la tool
+    // `talend_studio_dismiss_dialogs`.
+    if (BridgeConfig.load().autoDismissModals) {
+      ModalGuard.startWatchdog();
+    }
 
     hotReloadService = new HotReloadService();
     // Antes de recargar el bundle hay que soltar el servidor HTTP y el

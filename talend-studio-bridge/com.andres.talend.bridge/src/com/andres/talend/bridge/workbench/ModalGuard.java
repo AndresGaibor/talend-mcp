@@ -32,13 +32,16 @@ import org.eclipse.ui.PlatformUI;
  *
  * Este guardian hace dos cosas:
  *
- * 1. {@link #dismissBlockingDialogs()} cierra a mano los dialogos que
- *    bloquean, pulsando el boton que corresponde.
- * 2. {@link #startWatchdog()} deja un hilo vigilante que lo llama cada poco,
- *    de modo que un modal que aparece por sorpresa no deja el IDE colgado.
+ * 1. {@link #dismissBlockingDialogs()} cierra a mano los dialogos conocidos,
+ *    pulsando el boton que corresponde. Es la via explicita
+ *    (`talend_studio_dismiss_dialogs`).
+ * 2. {@link #startWatchdog()} deja un hilo vigilante que lo llama cada poco.
+ *    Solo arranca si `autoDismissModals` esta activo en la configuracion del
+ *    bridge; por defecto no se cierra ningun modal solo.
  *
  * Solo se tocan dialogos conocidos: cualquier otro modal se reporta pero se
- * deja abierto, porque suele estar esperando a que conteste una persona.
+ * deja abierto, porque esta esperando a que conteste una persona. Tampoco se
+ * simulan teclas.
  */
 public final class ModalGuard {
 
@@ -69,40 +72,8 @@ public final class ModalGuard {
   private static final List<String> CLOSE_BUTTONS =
       Arrays.asList("OK", "Aceptar", "Close", "Cerrar", "Yes", "Si", "Sí", "No");
 
-  /**
-   * Botones que el guardian pulsa en un dialogo que no conoce.
-   *
-   * Un modal bloquea el hilo de la UI de Studio: mientras siga abierto, ni el
-   * IDE ni el bridge pueden seguir. Por eso, si el dialogo tiene uno de estos
-   * botones, se pulsa. Van en orden de menor a mayor consecuencia: primero los
-   * que solo confirman y al final los que guardan.
-   *
-   * "Cancelar" no esta: cancelar puede dejar el job a medias.
-   */
-  private static final List<String> SAFE_BUTTONS = Arrays.asList(
-      "Yes", "Si", "Sí", "OK", "Accept", "Aceptar", "Continue", "Continuar",
-      "Save", "Guardar", "Save All", "Guardar todo", "Close", "Cerrar");
-
-  /**
-   * Dialogos de progreso.
-   *
-   * El progreso es normal mientras compila: solo se cancela si lleva mucho
-   * tiempo abierto, que es cuando se ha quedado colgado.
-   */
-  private static final String[] PROGRESS_DIALOGS = {
-      "progress", "progreso", "building", "loading", "cargando", "compilando", "building job",
-  };
-
-  /** Segundos que un dialogo de progreso puede estar abierto antes de cancelarlo. */
+  /** Milisegundos que el dialogo de modulos faltantes espera a que el MCP pida instalarlos. */
   private static final long PROGRESS_TIMEOUT_MS = 30_000L;
-
-  /**
-   * Intentos seguidos con la interfaz ocupada antes de pulsar Enter.
-   *
-   * Tres intentos son unos 12 s: tiempo de sobra para un job en curso, y
-   * suficiente para desatascar un aviso de Talend.
-   */
-  private static final int NATIVE_DIALOG_ROUNDS = 3;
 
   /** Momento en el que se vio cada dialogo por primera vez. */
   private static final Map<Shell, Long> FIRST_SEEN = Collections.synchronizedMap(new WeakHashMap<>());
@@ -126,30 +97,20 @@ public final class ModalGuard {
       return;
     }
     Thread thread = new Thread(() -> {
-      int blockedRounds = 0;
       while (!Thread.currentThread().isInterrupted()) {
         try {
           Thread.sleep(WATCHDOG_INTERVAL_MS);
           // Los shells de SWT solo se pueden tocar desde el hilo de la UI.
           // Con poco tiempo de espera: si la UI esta ocupada compilando, el
-          // guardian sigue vivo y puede cerrar los dialogos que la bloquean.
+          // guardian sigue vivo y reintenta en la ronda siguiente.
           Map<String, Object> result = UiThread.sync(ModalGuard::dismissBlockingDialogs, 3000);
           if (result.get("dismissed") instanceof List
               && !((List<?>) result.get("dismissed")).isEmpty()) {
             BridgeLog.info("El guardian de modales cerro: " + result.get("dismissed"));
           }
-          blockedRounds = 0;
         } catch (IllegalStateException e) {
-          // La interfaz esta ocupada: puede ser un dialogo nativo (que no
-          // se ve desde SWT) o un job largo. Tras varios intentos seguidos se
-          // pulsa Enter, que es como se cierran los avisos de Talend.
-          blockedRounds++;
-          if (blockedRounds >= NATIVE_DIALOG_ROUNDS) {
-            blockedRounds = 0;
-            if (closeNativeDialog()) {
-              BridgeLog.info("El guardian pulso Enter para cerrar un dialogo nativo");
-            }
-          }
+          // La interfaz esta ocupada (un job largo o un dialogo nativo que SWT
+          // no ve). No se fuerza nada: se vuelve a mirar en la ronda siguiente.
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           return;
@@ -212,24 +173,16 @@ public final class ModalGuard {
       dialog.put("class", shell.getClass().getName());
       found.add(dialog);
 
-      // Un dialogo de progreso es normal: se deja mientras avance.
-      if (isProgress(title) && !isStuck(shell)) {
-        continue;
-      }
-      // Un dialogo de modulos faltantes tambien: da tiempo a que el MCP pida
+      // Un dialogo de modulos faltantes: da tiempo a que el MCP pida
       // instalarlos (tool talend_studio_install_modules) antes de cerrarlo.
       if (isMissingModules(title) && !isStuck(shell)) {
         continue;
       }
 
+      // Solo se pulsa en dialogos conocidos. Cualquier otro modal se reporta en
+      // `dialogs` y se deja abierto: lo esta esperando una persona.
       String button = knownButtonFor(shell, title);
       if (button == null) {
-        // Dialogo desconocido: si tiene un boton seguro se pulsa, porque
-        // mientras siga abierto el IDE queda bloqueado.
-        button = safeButtonFor(shell);
-      }
-      if (button == null) {
-        // No hay nada que pulsar: se reporta y se deja abierto.
         continue;
       }
       if (pressButton(shell, button)) {
@@ -238,12 +191,6 @@ public final class ModalGuard {
         if (!content.isEmpty()) {
           dialog.put("content", content);
         }
-        dismissed.add(dialog);
-      } else {
-        // Sin boton conocido se cierra el dialogo: es mejor dejar el IDE
-        // usable que quedarse bloqueado.
-        shell.close();
-        dialog.put("pressed", "close");
         dismissed.add(dialog);
       }
     }
@@ -384,60 +331,7 @@ public final class ModalGuard {
   }
 
   /**
-   * Cierra un dialogo modal nativo pulsando Enter.
-   *
-   * Talend muestra algunos avisos (el "Jobname Error" y el de error de
-   * generacion) con el `MessageBox` nativo de Windows, no con un shell de
-   * SWT. Esos dialogos no aparecen en `Display.getShells()` y bloquean el
-   * hilo de la UI a nivel de sistema operativo, asi que no se pueden cerrar
-   * con la API de SWT.
-   *
-   * La unica forma de hacerlo desde Java es simular la tecla: se envia un
-   * Enter, que es el boton por defecto de esos avisos.
-   *
-   * @return true si se ha enviado la tecla.
-   */
-  public static boolean closeNativeDialog() {
-    try {
-      java.awt.Robot robot = new java.awt.Robot();
-      robot.delay(150);
-      robot.keyPress(java.awt.event.KeyEvent.VK_ENTER);
-      robot.keyRelease(java.awt.event.KeyEvent.VK_ENTER);
-      return true;
-    } catch (Exception e) {
-      BridgeLog.warn("No se pudo pulsar Enter en el dialogo nativo", e);
-      return false;
-    }
-  }
-
-  /**
-   * Primer boton seguro del dialogo, o null si no hay ninguno.
-   */
-  private static String safeButtonFor(Shell shell) {
-    for (String candidate : SAFE_BUTTONS) {
-      if (findButton(shell, candidate) != null) {
-        return candidate;
-      }
-    }
-    return null;
-  }
-
-  /** El dialogo es de progreso (compilacion, carga). */
-  private static boolean isProgress(String title) {
-    if (title == null) {
-      return false;
-    }
-    String normalized = title.trim().toLowerCase();
-    for (String pattern : PROGRESS_DIALOGS) {
-      if (normalized.contains(pattern)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * El dialogo lleva demasiado tiempo abierto: se ha quedado colgado.
+   * El dialogo lleva mas de {@link #PROGRESS_TIMEOUT_MS} abierto.
    */
   private static boolean isStuck(Shell shell) {
     long now = System.currentTimeMillis();

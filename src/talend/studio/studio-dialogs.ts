@@ -45,7 +45,7 @@ const KIND_PATTERNS: Array<{ kind: StudioDialogKind; titles: string[] }> = [
 const HINTS: Record<StudioDialogKind, string> = {
   progress: "Progreso normal: Studio sigue trabajando. No bloquea.",
   missing_modules:
-    "Faltan modulos de terceros. Llama a talend_studio_install_modules: el guardian cierra este dialogo a los 30 s.",
+    "Faltan modulos de terceros. Llama a talend_studio_install_modules para descargarlos, o cierra el dialogo en Studio.",
   job_name:
     "Ya existe un job con esa etiqueta. Cambia la etiqueta, o crea el job con replace:true. talend_studio_dismiss_dialogs responderia Yes y reemplazaria el job.",
   save_resource:

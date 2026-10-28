@@ -36,15 +36,18 @@ public final class BridgeConfig {
   public final boolean allowAllCommands;
   public final List<String> allowCommands;
   public final int timeoutMs;
+  /** Si el guardian de modales cierra solo los dialogos conocidos. Apagado por defecto. */
+  public final boolean autoDismissModals;
 
   private BridgeConfig(int port, boolean readOnly, boolean unsafeActions, boolean allowAllCommands,
-      List<String> allowCommands, int timeoutMs) {
+      List<String> allowCommands, int timeoutMs, boolean autoDismissModals) {
     this.port = port;
     this.readOnly = readOnly;
     this.unsafeActions = unsafeActions;
     this.allowAllCommands = allowAllCommands;
     this.allowCommands = Collections.unmodifiableList(allowCommands);
     this.timeoutMs = timeoutMs;
+    this.autoDismissModals = autoDismissModals;
   }
 
   public static BridgeConfig load() {
@@ -91,6 +94,7 @@ public final class BridgeConfig {
     }
     json.add("allowCommands", commands);
     json.addProperty("timeoutMs", timeoutMs);
+    json.addProperty("autoDismissModals", autoDismissModals);
     return json;
   }
 
@@ -148,15 +152,17 @@ public final class BridgeConfig {
     boolean unsafeActions = readBoolean(root, "unsafeActions", false);
     boolean allowAllCommands = readBoolean(root, "allowAllCommands", false);
     int timeoutMs = readInt(root, "timeoutMs", DEFAULT_TIMEOUT_MS);
+    boolean autoDismissModals = readBoolean(root, "autoDismissModals", false);
     List<String> allowCommands = readStringArray(root, "allowCommands");
     if (allowCommands.isEmpty()) {
       allowCommands = defaultAllowedCommands();
     }
-    return new BridgeConfig(port, readOnly, unsafeActions, allowAllCommands, allowCommands, timeoutMs);
+    return new BridgeConfig(port, readOnly, unsafeActions, allowAllCommands, allowCommands, timeoutMs,
+        autoDismissModals);
   }
 
   private static BridgeConfig defaults() {
-    return new BridgeConfig(DEFAULT_PORT, true, false, false, defaultAllowedCommands(), DEFAULT_TIMEOUT_MS);
+    return new BridgeConfig(DEFAULT_PORT, true, false, false, defaultAllowedCommands(), DEFAULT_TIMEOUT_MS, false);
   }
 
   private static List<String> defaultAllowedCommands() {
