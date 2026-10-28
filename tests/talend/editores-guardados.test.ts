@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { EDITOR_DE_JOB, planificarCierre } from "../../src/talend/studio/editores-guardados";
+import { EDITOR_DE_JOB, editoresAbiertosPor, planificarCierre } from "../../src/talend/studio/editores-guardados";
 
 const job = (title: string, dirty: boolean | undefined = false) => ({ title, id: EDITOR_DE_JOB, dirty });
 
@@ -59,5 +59,27 @@ describe("planificarCierre", () => {
     const plan = planificarCierre([job("*Job MCP_L5_Json 0.1", true)]);
     expect(plan.conservar).toHaveLength(1);
     expect(plan.cerrar).toEqual([]);
+  });
+});
+
+describe("editoresAbiertosPor", () => {
+  test("devuelve el editor del job que la operacion abrio", () => {
+    const antes = [job("Job otro_job 0.1")];
+    const despues = [job("Job otro_job 0.1"), job("Job job_nuevo 0.1")];
+    expect(editoresAbiertosPor("job_nuevo", antes, despues)).toEqual(["Job job_nuevo 0.1"]);
+  });
+
+  test("no cierra un editor que ya estaba abierto antes", () => {
+    const abierto = [job("Job job_nuevo 0.1")];
+    expect(editoresAbiertosPor("job_nuevo", abierto, abierto)).toEqual([]);
+  });
+
+  test("no toca editores de otros jobs ni los que tienen cambios sin guardar", () => {
+    expect(editoresAbiertosPor("job_nuevo", [], [job("Job otro 0.1")])).toEqual([]);
+    expect(editoresAbiertosPor("job_nuevo", [], [job("Job job_nuevo 0.1", true)])).toEqual([]);
+  });
+
+  test("distingue un job de otro cuyo nombre empieza igual", () => {
+    expect(editoresAbiertosPor("job_a", [], [job("Job job_ab 0.1")])).toEqual([]);
   });
 });

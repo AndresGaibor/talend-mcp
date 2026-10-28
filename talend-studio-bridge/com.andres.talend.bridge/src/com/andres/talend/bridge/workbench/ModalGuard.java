@@ -68,6 +68,18 @@ public final class ModalGuard {
       {"modulos de terceros", "Cerrar", "Close", "Cancel", "Cancelar"},
   };
 
+  /**
+   * Dialogos sin titulo que solo se reconocen por lo que dicen: {texto, boton...}.
+   *
+   * Al conectar un componente con otro que ya tiene esquema, Studio pregunta si el origen debe
+   * tomar el esquema del destino. Se contesta que no: cada componente conserva el suyo y el del
+   * origen se propaga al destino como siempre. Sin respuesta, el hilo de la interfaz queda en
+   * el bucle modal y todas las operaciones siguientes se cuelgan.
+   */
+  private static final String[][] KNOWN_TEXT_DIALOGS = {
+      {"get the schema of the target component", "No"},
+  };
+
   /** Botones que cierran un dialogo sin decidir nada. */
   private static final List<String> CLOSE_BUTTONS =
       Arrays.asList("OK", "Aceptar", "Close", "Cerrar", "Yes", "Si", "Sí", "No");
@@ -219,6 +231,10 @@ public final class ModalGuard {
    * Boton a pulsar para un dialogo conocido, o null si no se conoce.
    */
   private static String knownButtonFor(Shell shell, String title) {
+    String byText = knownButtonByText(shell);
+    if (byText != null) {
+      return byText;
+    }
     if (title == null) {
       return null;
     }
@@ -239,6 +255,25 @@ public final class ModalGuard {
         }
       }
       return null;
+    }
+    return null;
+  }
+
+  /** Boton a pulsar para un dialogo reconocido por su texto, o null. */
+  private static String knownButtonByText(Shell shell) {
+    String body = String.join(" ", textsOf(shell)).toLowerCase();
+    if (body.isEmpty()) {
+      return null;
+    }
+    for (String[] known : KNOWN_TEXT_DIALOGS) {
+      if (!body.contains(known[0])) {
+        continue;
+      }
+      for (int i = 1; i < known.length; i++) {
+        if (findButton(shell, known[i]) != null) {
+          return known[i];
+        }
+      }
     }
     return null;
   }
@@ -316,6 +351,11 @@ public final class ModalGuard {
     try {
       if (control instanceof org.eclipse.swt.widgets.Label) {
         String text = ((org.eclipse.swt.widgets.Label) control).getText();
+        if (text != null && !text.trim().isEmpty()) {
+          texts.add(text.trim());
+        }
+      } else if (control instanceof org.eclipse.swt.custom.CLabel) {
+        String text = ((org.eclipse.swt.custom.CLabel) control).getText();
         if (text != null && !text.trim().isEmpty()) {
           texts.add(text.trim());
         }

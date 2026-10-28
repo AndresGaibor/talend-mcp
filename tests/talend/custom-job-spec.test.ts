@@ -9,12 +9,14 @@ function studio() {
   const edges: Record<string, Array<Record<string, unknown>>> = {};
   const variables: Record<string, Array<Record<string, unknown>>> = {};
   const events: string[] = [];
+  const editors: string[] = [];
+  const openEditor = (name: string) => { const title = `Job ${name} 0.1`; if (!editors.includes(title)) editors.push(title); };
   let active = "";
   const bridge = {
     componentParameters: async () => ok({ parameters: [{ name: "HEADER", field: "TEXT" }] }),
     createJob: async (input: { name: string; folder: string; description: string; replace: boolean }) => {
       expect(input.replace).toBe(false);
-      active = input.name; events.push(`create:${active}`);
+      active = input.name; events.push(`create:${active}`); openEditor(active);
       jobs.push({ label: input.name, version: "0.1", folderPath: input.folder, description: input.description, itemPath: `workspace/process/${input.folder}/${input.name}_0.1.item`, propertiesPath: "properties" });
       nodes[active] = []; edges[active] = []; variables[active] = [];
       return ok({ jobName: input.name });
@@ -25,7 +27,9 @@ function studio() {
       events.push(`delete:${input.name}`);
       return ok({ deleted: true });
     },
-    openJob: async (input: { name: string }) => { active = input.name; events.push(`open:${active}`); return ok({ opened: true }); },
+    openJob: async (input: { name: string }) => { active = input.name; events.push(`open:${active}`); openEditor(active); return ok({ opened: true }); },
+    workbenchState: async () => ({ ok: true, source: "studio-bridge", confidence: "high", data: { windows: [{ openEditors: editors.map((title) => ({ title, id: "org.talend.designer.core.ui.MultiPageTalendEditor", dirty: false })) }] } }),
+    closeEditor: async (title: string) => { const i = editors.indexOf(title); if (i >= 0) editors.splice(i, 1); events.push(`close:${title}`); return { ok: true, source: "studio-bridge", confidence: "high", data: { closed: true } }; },
     listNodes: async () => ok(nodes[active] ?? []),
     activeJobModel: async () => ({ ok: true, data: { ok: true, components: nodes[active], connections: edges[active] } }),
     addNode: async (input: { type: string; label: string }) => {
@@ -40,7 +44,7 @@ function studio() {
     deleteJobContextParameter: async () => { throw new Error("Este escenario no debe borrar contextos"); },
     createJobContext: async () => ok({}),
   };
-  return { jobs, nodes, variables, events, dependencies: {
+  return { jobs, nodes, variables, events, editors, dependencies: {
     bridge: bridge as unknown as CustomSpecDependencies["bridge"], listJobs: async () => jobs,
     validateConnection: async () => ({ ok: true, errors: [], warnings: [] }),
   } satisfies CustomSpecDependencies };
@@ -254,4 +258,30 @@ test("si no puede borrar lo creado, avisa de que hay que revisarlo en Studio", a
     components: [{ uniqueName: "a_1", componentName: "tFileInputDelimited" }, { uniqueName: "b_2", componentName: "tLogRow" }],
     connections: [{ source: "a_1", target: "b_2", connectorName: "FLOW", label: "row1" }],
   }, fake.dependencies)).rejects.toThrow(/Studio rechazo la conexion.*revisarse en Studio.*job_huerfano/s);
+});
+
+test("cierra el editor que abrio la aplicacion: acumulados, saturan el hilo de interfaz de Studio", async () => {
+  const fake = studio();
+
+  await applyCustomJobSpec({
+    jobName: "job_cierra_editor",
+    folderPath: "Process/test",
+    components: [{ uniqueName: "a_1", componentName: "tLogRow" }],
+  }, fake.dependencies);
+
+  expect(fake.editors).toEqual([]);
+  expect(fake.events).toContain("close:Job job_cierra_editor 0.1");
+});
+
+test("no cierra un editor que la persona ya tenia abierto", async () => {
+  const fake = studio();
+  const spec: CustomJobSpec = { jobName: "job_abierto", folderPath: "Process/test", components: [{ uniqueName: "a_1", componentName: "tLogRow" }] };
+  await applyCustomJobSpec(spec, fake.dependencies);
+  fake.editors.push("Job job_abierto 0.1");
+  fake.events.length = 0;
+
+  await applyCustomJobSpec(spec, fake.dependencies);
+
+  expect(fake.editors).toEqual(["Job job_abierto 0.1"]);
+  expect(fake.events.filter((event) => event.startsWith("close:"))).toEqual([]);
 });

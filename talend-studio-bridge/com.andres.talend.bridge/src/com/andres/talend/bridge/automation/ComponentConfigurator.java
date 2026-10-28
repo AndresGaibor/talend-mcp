@@ -54,6 +54,7 @@ public final class ComponentConfigurator {
     applyNodeData(node, spec);
     ComponentParameterConfigurator.fixErrorTrigger(node);
     ComponentParameterConfigurator.fixMapLinkStyle(node);
+    ComponentParameterConfigurator.normalizeListDefaults(node);
   }
 
   /**

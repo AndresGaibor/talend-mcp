@@ -114,6 +114,39 @@ final class ComponentParameterConfigurator {
     }
   }
 
+  /**
+   * Deja las listas cerradas del nodo con el valor que Studio guarda, no con el nombre del elemento.
+   *
+   * Un nodo creado por API conserva el valor por defecto de cada lista como lo declara el XML del
+   * componente, que es el nombre del elemento (`AND`), mientras que la interfaz usa su valor (`&&`).
+   * Studio traduce al guardar, pero la vista Problemas valida antes y marca "has a value (AND) that
+   * doesn't exist". Solo se cambian las listas cuyo valor actual es un nombre y no un valor.
+   */
+  static void normalizeListDefaults(Object node) {
+    try {
+      Object parameters = node.getClass().getMethod("getElementParameters").invoke(node);
+      if (!(parameters instanceof Iterable)) {
+        return;
+      }
+      for (Object parameter : (Iterable<?>) parameters) {
+        Object fieldType = parameter.getClass().getMethod("getFieldType").invoke(parameter);
+        if (fieldType == null || !"CLOSED_LIST".equals(String.valueOf(fieldType))) {
+          continue;
+        }
+        Object current = parameter.getClass().getMethod("getValue").invoke(parameter);
+        if (current == null || String.valueOf(current).isEmpty()) {
+          continue;
+        }
+        String translated = listValueFor(parameter, String.valueOf(current));
+        if (!translated.equals(String.valueOf(current))) {
+          parameter.getClass().getMethod("setValue", Object.class).invoke(parameter, translated);
+        }
+      }
+    } catch (Exception e) {
+      // Si no se puede, los valores quedan como estaban.
+    }
+  }
+
   /** Nombre del componente del nodo (`tMap`, `tFileInputDelimited`...), o vacio si no se puede leer. */
   private static String componentNameOf(Object node) {
     try {
@@ -333,9 +366,42 @@ final class ComponentParameterConfigurator {
     // Lo mismo con la columna a normalizar del `tNormalize`
     // (`PREV_COLUMN_LIST`): con comillas sale `fila."columna"`.
     if (kind.endsWith("_LIST")) {
-      return value;
+      return listValueFor(parameter, value);
     }
     return ComponentConfigurator.asLiteral(value, literal);
+  }
+
+  /**
+   * Valor que Studio guarda para un elemento de una lista cerrada.
+   *
+   * Cada elemento tiene un nombre y un valor, y no siempre coinciden: el `tFilterRow` ofrece `AND`
+   * y `OR`, pero guarda `&&` y `||`. Si se escribe el nombre, la vista Problemas marca el
+   * parametro con "has a value (AND) that doesn't exist". Si el texto es el nombre de un elemento
+   * se devuelve su valor; si ya es un valor, o la lista no se puede leer, se deja tal cual.
+   */
+  private static String listValueFor(Object parameter, String value) {
+    try {
+      Object names = parameter.getClass().getMethod("getListItemsDisplayCodeName").invoke(parameter);
+      Object values = parameter.getClass().getMethod("getListItemsValue").invoke(parameter);
+      if (!(names instanceof Object[]) || !(values instanceof Object[])) {
+        return value;
+      }
+      Object[] codeNames = (Object[]) names;
+      Object[] itemValues = (Object[]) values;
+      for (int i = 0; i < codeNames.length && i < itemValues.length; i++) {
+        if (itemValues[i] != null && value.equals(String.valueOf(itemValues[i]))) {
+          return value;
+        }
+      }
+      for (int i = 0; i < codeNames.length && i < itemValues.length; i++) {
+        if (itemValues[i] != null && value.equals(String.valueOf(codeNames[i]))) {
+          return String.valueOf(itemValues[i]);
+        }
+      }
+    } catch (Exception e) {
+      // Sin acceso a los elementos de la lista se respeta el valor recibido.
+    }
+    return value;
   }
 
   /**

@@ -192,6 +192,30 @@ describe("Comprobacion de conexiones", () => {
     <PARAMETERS/>
   </COMPONENT>`;
 
+  /** Conectores reales del tFilterRow de Studio 8: FLOW solo entra, FILTER y REJECT solo salen. */
+  const FILTRO = `<COMPONENT>
+    <HEADER NAME="tFilterRow" VERSION="0.1" STARTABLE="false"/>
+    <FAMILIES><FAMILY>Processing</FAMILY></FAMILIES>
+    <CONNECTORS>
+      <CONNECTOR CTYPE="FLOW" MAX_OUTPUT="0" MAX_INPUT="1"/>
+      <CONNECTOR NAME="FILTER" CTYPE="FLOW" MAX_OUTPUT="1"/>
+      <CONNECTOR NAME="REJECT" CTYPE="FLOW" MAX_OUTPUT="1"/>
+      <CONNECTOR CTYPE="SUBJOB_OK" MAX_INPUT="1"/>
+    </CONNECTORS>
+    <PARAMETERS/>
+  </COMPONENT>`;
+
+  /** Un componente de entrada: su FLOW emite pero no recibe. */
+  const ENTRADA = `<COMPONENT>
+    <HEADER NAME="tFileInputDelimited" VERSION="0.1" STARTABLE="true"/>
+    <FAMILIES><FAMILY>File/Input</FAMILY></FAMILIES>
+    <CONNECTORS>
+      <CONNECTOR CTYPE="FLOW" MAX_OUTPUT="1" MAX_INPUT="0"/>
+      <CONNECTOR CTYPE="SUBJOB_OK" MAX_INPUT="1"/>
+    </CONNECTORS>
+    <PARAMETERS/>
+  </COMPONENT>`;
+
   const CIERRE = `<COMPONENT>
     <HEADER NAME="tClose" VERSION="0.1" STARTABLE="false"/>
     <FAMILIES><FAMILY>Orchestration</FAMILY></FAMILIES>
@@ -214,6 +238,8 @@ describe("Comprobacion de conexiones", () => {
     escribir("org.talend.designer.components.localprovider_1.0", "tLogRow", LOG);
     escribir("org.talend.designer.components.localprovider_1.0", "tMap", MAP);
     escribir("org.talend.designer.components.localprovider_1.0", "tClose", CIERRE);
+    escribir("org.talend.designer.components.localprovider_1.0", "tFilterRow", FILTRO);
+    escribir("org.talend.designer.components.localprovider_1.0", "tFileInputDelimited", ENTRADA);
     const repositorio = new DefinitionIndexRepository({
       pluginsDir: plugins,
       cacheDir: join(raiz, "cache"),
@@ -240,6 +266,21 @@ describe("Comprobacion de conexiones", () => {
     const check = await (await validador()).validate("tLogRow", "tClose", "FLOW");
     expect(check.ok).toBe(false);
     expect(check.errors.join(" ")).toContain("tClose");
+  });
+
+  test("encadena dos tFilterRow: FILTER sale del origen y el destino recibe por su entrada principal", async () => {
+    const check = await (await validador()).validate("tFilterRow", "tFilterRow", "FILTER");
+
+    expect(check.ok).toBe(true);
+    expect(check.errors).toEqual([]);
+    expect(check.warnings.join(" ")).toContain("conector principal");
+  });
+
+  test("sigue rechazando una conexion hacia un componente de entrada", async () => {
+    const check = await (await validador()).validate("tLogRow", "tFileInputDelimited", "FLOW");
+
+    expect(check.ok).toBe(false);
+    expect(check.errors.join(" ")).toContain("no admite entradas");
   });
 
   test("acepta FLOW de entrada y salida en tMap aunque sus tablas sean dinamicas", async () => {

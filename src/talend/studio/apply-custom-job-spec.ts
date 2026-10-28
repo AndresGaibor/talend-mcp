@@ -2,6 +2,8 @@ import type { TalendStudioBridgeClient } from "../../modules/studio-bridge/adapt
 import { createHash } from "node:crypto";
 import { clasificarProblemas, problemasDe } from "../diagnostics/output-findings";
 import { customJobSpecSchema, type CustomJobSpec } from "./custom-job-spec";
+import { conDialogosAtendidos } from "./dialogos-atendidos";
+import { cerrarEditoresAbiertosPor, editoresAbiertos } from "./editores-temporales";
 
 export type CustomSpecDependencies = {
   bridge: TalendStudioBridgeClient;
@@ -181,6 +183,7 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
     try {
       for (const job of forest) {
         const bridge = deps.bridge;
+        const editoresAntes = await editoresAbiertos(bridge);
         const previous = existingJobs.find((item) => item.label === job.jobName);
         if (previous) checked(await bridge.openJob({ name: job.jobName, version: job.version ?? "0.1" }));
         else { checked(await bridge.createJob({ name: job.jobName, version: job.version ?? "0.1", folder: folderOf(job), description: `${job.description ?? ""}\n${ownership(job)}`, replace: false })); created.push(job); }
@@ -215,7 +218,7 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
           const existing = model.connections.filter((item) => item.source === source && item.target === target);
           if (existing.some((item) => item.connectorName !== connector)) throw new Error(`CONFLICT: conexion ${edge.source} -> ${edge.target} modificada; no se sustituye`);
           if (existing.length) { result.reusedConnections++; continue; }
-          const connected = checked(await bridge.connectNodes({ job: job.jobName, source, target, type: connector, name: edge.label })) as { warnings?: string[] };
+          const connected = checked(await conDialogosAtendidos(bridge, () => bridge.connectNodes({ job: job.jobName, source, target, type: connector, name: edge.label }))) as { warnings?: string[] };
           result.warnings.push(...(connected?.warnings ?? [])); result.generatedConnections++;
           model.connections.push({ source, target, connectorName: connector });
         }
@@ -251,6 +254,8 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
         }
         result.problems = await problemsOf(bridge, job.jobName);
         results.set(job.jobName, result);
+        // El Job ya esta guardado: su editor sobra y, acumulado en un lote, satura Studio.
+        await cerrarEditoresAbiertosPor(bridge, job.jobName, editoresAntes);
       }
     } catch (error) {
       throw await rollbackCreated(deps.bridge, created, error);

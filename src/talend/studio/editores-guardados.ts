@@ -60,3 +60,23 @@ export function planificarCierre(editores: EditorAbierto[], prefijo?: string): P
   }
   return plan;
 }
+
+/**
+ * Editores que una operacion abrio para un job y que se pueden cerrar sin perder nada.
+ *
+ * Calcular los problemas o montar un job obliga a Studio a abrir su editor, y cada editor
+ * abierto consume memoria y hilo de interfaz: en un lote grande acaban saturando Studio.
+ * Un editor que ya estaba abierto antes (el de quien trabaja en Studio) nunca se cierra.
+ *
+ * @param job nombre del job, sin version.
+ * @param antes editores abiertos antes de la operacion.
+ * @param despues editores abiertos despues.
+ */
+export function editoresAbiertosPor(job: string, antes: EditorAbierto[], despues: EditorAbierto[]): string[] {
+  const yaAbiertos = new Set(antes.map((editor) => editor.title));
+  const nuevos = despues.filter((editor) => {
+    const nombre = nombreDelJob(editor.title)?.split(" ")[0];
+    return nombre === job && !yaAbiertos.has(editor.title);
+  });
+  return [...new Set(planificarCierre(nuevos).cerrar)];
+}

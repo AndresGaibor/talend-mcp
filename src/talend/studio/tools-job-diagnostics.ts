@@ -2,6 +2,7 @@ import * as z from "zod/v4";
 import { bridgeFail, bridgeOk, loadBridge } from "./tools-base";
 import { compileWithDependencies } from "./compile-with-dependencies";
 import { prepareStudioForJob } from "./studio-dialogs";
+import { cerrarEditoresAbiertosPor, editoresAbiertos } from "./editores-temporales";
 import { clasificarSalida } from "../diagnostics/output-findings";
 
 export const jobDiagnosticsTools = [
@@ -112,7 +113,10 @@ export const jobDiagnosticsTools = [
     }),
     handler: async ({ job }: { job?: string }) => {
       const bridge = await loadBridge();
+      // Calcular los problemas abre el editor del job; si no estaba abierto, se cierra al terminar.
+      const antes = job ? await editoresAbiertos(bridge) : null;
       const result = await bridge.jobProblems({ job });
+      if (job) await cerrarEditoresAbiertosPor(bridge, job, antes);
       return bridgeOk({
         ok: result.ok,
         source: result.source,

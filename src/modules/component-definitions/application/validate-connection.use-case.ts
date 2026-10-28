@@ -102,10 +102,15 @@ export class ValidateConnectionUseCase {
       check.ok = false;
     }
 
+    // Un conector del destino con el mismo nombre solo cuenta si puede recibir filas: el FILTER del
+    // tFilterRow es una salida, y un tFilterRow encadenado a otro entra por su FLOW principal.
+    const entradaPrincipal = entradas.find((item) => (item.maxInput ?? 0) >= 1);
+    const mismoNombreSoloSale = entrada !== undefined && (entrada.maxInput ?? 0) < 1 && entradaPrincipal !== undefined;
+
     if (entradas.length === 0) {
       check.errors.push(`el componente '${targetType}' no tiene conectores de entrada`);
       check.ok = false;
-    } else if (!entrada) {
+    } else if (!entrada || mismoNombreSoloSale) {
       // El conector es el del origen: el destino usa su entrada principal.
       check.warnings.push(
         `'${targetType}' no tiene un conector '${check.connector}': la conexion entrara por su conector principal` +
