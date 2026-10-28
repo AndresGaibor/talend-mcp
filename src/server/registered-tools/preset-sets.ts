@@ -133,6 +133,9 @@ export const PRESET_PORTAL = new Set([
   "talend_repo_sources",
   "talend_repo_status",
   "talend_analyze_tdboutput",
+  // Memoria de Studio y reinicio a peticion del portal.
+  "talend_studio_memory",
+  "talend_studio_restart",
 ]);
 
 /**

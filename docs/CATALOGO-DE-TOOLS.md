@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **241**.
+Tools registradas en el preset actual: **242**.
 
 ## Empezar
 
@@ -1967,6 +1967,18 @@ Dice cuanto heap de memoria lleva usado el JVM de Talend Studio. Las mediciones 
 Argumentos principales:
 
 - `gc` (boolean, opcional): Fuerza una recoleccion de basura antes de medir
+
+#### `talend_studio_restart`
+
+Reinicia Talend Studio: cierra la ventana principal, lo vuelve a abrir y espera a que el bridge responda (1-3 min). Es la unica forma de liberar la memoria que Studio retiene tras crear muchos Jobs. Con `onlyIfMemoryAbove` solo reinicia si el heap supera ese porcentaje. Cierra por su cuenta los dialogos abiertos (un modal impide salir) y, si Studio no sale en 2 minutos, termina el proceso (`force`, por defecto). Se rechaza solo si el bridge esta en solo lectura. Cierra el IDE del usuario: los editores sin guardar se pierden y puede pedirse volver a iniciar sesion en Talend Cloud, asi que no la llames sin que haga falta.
+
+**Uso:** escribe/ejecuta; requiere Studio + bridge.
+
+Argumentos principales:
+
+- `onlyIfMemoryAbove` (number, opcional): Solo reinicia si el heap usado supera este porcentaje (tras una recoleccion). El portal recomienda reiniciar a partir del 75
+- `force` (boolean, opcional): Si Studio no sale tras cerrar sus dialogos y pedir el cierre (2 min), termina el proceso. Con false se rinde sin tocarlo
+- `reinstallBridge` (boolean, opcional): Reinstala el plugin del bridge tras arrancar; solo hace falta si se publico en caliente una version nueva
 
 #### `talend_studio_run_code`
 

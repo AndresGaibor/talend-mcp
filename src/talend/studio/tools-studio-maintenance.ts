@@ -1,5 +1,8 @@
 import * as z from "zod/v4";
-import { bridgeOk, loadBridge } from "./tools-base";
+import { clearBridgeClientCache } from "../../modules/studio-bridge/adapters/http-studio-bridge.client";
+import { readTalendStudioBridgeConfig } from "../../modules/studio-bridge/adapters/bridge-config";
+import { decideRestart, restartStudio } from "./studio-restart";
+import { bridgeFail, bridgeOk, loadBridge } from "./tools-base";
 
 export const studioMaintenanceTools = [
   {
@@ -68,6 +71,43 @@ export const studioMaintenanceTools = [
         data: result.data,
         error: result.error,
       });
+    },
+  },
+  {
+    name: "talend_studio_restart",
+    description:
+      "Reinicia Talend Studio: cierra la ventana principal, lo vuelve a abrir y espera a que el bridge responda (1-3 min). Es la unica forma de liberar la memoria que Studio retiene tras crear muchos Jobs. Con `onlyIfMemoryAbove` solo reinicia si el heap supera ese porcentaje. Cierra por su cuenta los dialogos abiertos (un modal impide salir) y, si Studio no sale en 2 minutos, termina el proceso (`force`, por defecto). Se rechaza solo si el bridge esta en solo lectura. Cierra el IDE del usuario: los editores sin guardar se pierden y puede pedirse volver a iniciar sesion en Talend Cloud, asi que no la llames sin que haga falta.",
+    inputSchema: z.object({
+      onlyIfMemoryAbove: z.number().min(1).max(99).optional().describe("Solo reinicia si el heap usado supera este porcentaje (tras una recoleccion). El portal recomienda reiniciar a partir del 75"),
+      force: z.boolean().optional().default(true).describe("Si Studio no sale tras cerrar sus dialogos y pedir el cierre (2 min), termina el proceso. Con false se rinde sin tocarlo"),
+      reinstallBridge: z.boolean().optional().default(false).describe("Reinstala el plugin del bridge tras arrancar; solo hace falta si se publico en caliente una version nueva"),
+    }),
+    handler: async ({ onlyIfMemoryAbove, reinstallBridge, force }: { onlyIfMemoryAbove?: number; reinstallBridge?: boolean; force?: boolean }) => {
+      const endpoint = "studio-restart";
+      const fail = (code: string, message: string, data?: unknown) =>
+        bridgeFail({ ok: false, source: "studio-bridge", confidence: "high", endpoint, data, error: { code, message } });
+
+      const bridge = await loadBridge();
+      const config = await readTalendStudioBridgeConfig();
+      const memory = await bridge.memory({ gc: true });
+      const usedPercent = (memory.data as { usedPercent?: number } | undefined)?.usedPercent;
+
+      const decision = decideRestart({ platform: process.platform, readOnly: config.readOnly, usedPercent, onlyIfMemoryAbove });
+      if (!decision.proceed) {
+        // Que no haga falta reiniciar no es un fallo: la llamada cumplio su condicion.
+        if (decision.code === "STUDIO_RESTART_NOT_NEEDED") {
+          return bridgeOk({ ok: true, source: "studio-bridge", confidence: "high", endpoint, data: { restarted: false, usedPercent, reason: decision.message } });
+        }
+        return fail(decision.code, decision.message, { usedPercent });
+      }
+
+      try {
+        const result = await restartStudio({ reinstallBridge, force });
+        clearBridgeClientCache();
+        return bridgeOk({ ok: true, source: "studio-bridge", confidence: "high", endpoint, data: { restarted: true, usedPercentBefore: usedPercent, ...result } });
+      } catch (error) {
+        return fail("STUDIO_RESTART_FAILED", error instanceof Error ? error.message : String(error), { usedPercent });
+      }
     },
   },
 ];
