@@ -43,7 +43,7 @@ const templateSchema = z.object({
     })).optional().describe("Parametros TABLE (p. ej. CONDITIONS del tFilterRow). Los nombres de las listas (GREATER) se traducen a su valor (>)"),
     draftOnly: z.boolean().optional().describe("Borrador: si su componente no esta en el catalogo local, se omite con sus conexiones en vez de rechazar el lote"),
     draftReason: z.string().optional(),
-  })).min(1),
+  })),
   connections: z.array(z.object({
     source: z.string(),
     target: z.string(),
@@ -127,8 +127,8 @@ export function createJobsCreateBatchTool() {
         if (sinResolver.length) {
           return errorResult(tool, "UNKNOWN_COMPONENT", `Componente '${sinResolver[0]}' no encontrado en el catalogo`);
         }
-        if (plantilla.components.length === 0) {
-          return errorResult(tool, "NO_COMPONENTS", "Ningun componente de la plantilla esta en el catalogo local");
+        if (plantilla.components.length === 0 && !plantilla.contexts?.length) {
+          return errorResult(tool, "NO_COMPONENTS", "La plantilla no tiene componentes ni variables de contexto, o ninguno de sus componentes esta en el catalogo local");
         }
 
         const definiciones = new DefinitionIndexRepository();

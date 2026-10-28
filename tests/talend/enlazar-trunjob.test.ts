@@ -94,3 +94,17 @@ test("el contexto del hijo puede venir en la plantilla", async () => {
 
   expect(parametros["PROCESS:PROCESS_TYPE_CONTEXT"]!.value).toBe("Prod");
 });
+
+test("un proyecto recien creado, sin carpeta process/, no rompe: el hijo simplemente no existe", async () => {
+  const vacio = mkdtempSync(join(tmpdir(), "talend-vacio-"));
+  try {
+    const { plantilla, avisos } = await enlazarTRunJob(vacio, padre("job_hijo") as Plantilla);
+
+    expect(avisos.join(" ")).toContain("job_hijo");
+    expect(Object.keys((plantilla.components[0] as { parameters: Record<string, unknown> }).parameters)).not.toContain(
+      "PROCESS:PROCESS_TYPE_PROCESS",
+    );
+  } finally {
+    rmSync(vacio, { recursive: true, force: true });
+  }
+});

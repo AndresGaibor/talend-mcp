@@ -41,7 +41,9 @@ export async function enlazarTRunJob<T extends { components: ComponenteDePlantil
   if (!hayTRunJob) return { plantilla, avisos: [] };
 
   const avisos: string[] = [];
-  const hijos = new Map((await listTalendJobs(projectPath)).map((job) => [job.label, job]));
+  // Un proyecto recien creado todavia no tiene la carpeta process/: no hay hijos que enlazar.
+  const existentes = existsSync(join(projectPath, "process")) ? await listTalendJobs(projectPath) : [];
+  const hijos = new Map(existentes.map((job) => [job.label, job]));
   const proyecto = proyectoTecnico(projectPath);
 
   const components = plantilla.components.map((componente) => {

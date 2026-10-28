@@ -9,7 +9,9 @@ export function buildJobItemXml(spec: JobSpec): { xml: string; rootId: string } 
   const defaultContext = spec.defaultContext ?? "Default";
   const rootId = generateTalendId();
 
-  if (spec.components.length === 0) {
+  // Un job sin componentes y sin variables de contexto es un job vacio. Con variables (una libreria de macros SAS
+  // solo aporta contexto) se escriben igual: antes se descartaban en silencio.
+  if (spec.components.length === 0 && !spec.contexts?.length) {
     return { xml: createEmptyJobItemXml({ jobName: spec.jobName, version, defaultContext }), rootId };
   }
 
@@ -62,7 +64,7 @@ export function buildJobItemXml(spec: JobSpec): { xml: string; rootId: string } 
   };
 
   Object.assign(root, contextSection);
-  root.node = nodeSection;
+  if (nodes.length > 0) root.node = nodeSection;
   if (Array.isArray(connectionSection) ? connectionSection.length > 0 : connectionSection) {
     root.connection = connectionSection;
   }

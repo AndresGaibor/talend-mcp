@@ -173,3 +173,22 @@ describe("nombres de job unicos en el proyecto", () => {
     expect(resultados.map((r) => r.ok)).toEqual([true, true]);
   });
 });
+
+describe("jobs que solo llevan contextos", () => {
+  test("un job sin componentes conserva sus variables de contexto: son lo unico que migra de una libreria de macros", async () => {
+    const [resultado] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: {
+        jobName: "MIG_SOLO_CONTEXTOS",
+        components: [],
+        contexts: [{ name: "ruta_datos", type: "id_String", value: "/datos", comment: "SAS %let" }],
+      },
+      rows: [{}],
+    });
+
+    expect(resultado!.ok).toBe(true);
+    const xml = readFileSync(resultado!.itemPath!, "utf8");
+    expect(xml).toContain('name="ruta_datos"');
+    expect(xml).toContain('value="/datos"');
+  });
+});
