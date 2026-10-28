@@ -73,6 +73,12 @@ async function problemsOf(bridge: TalendStudioBridgeClient, job: string): Promis
 
 type SpecValidation = { warnings: string[]; unavailableDrafts: Set<string>; skippedEdges: Set<string> };
 
+const TRIGGERS = ["SUBJOB_OK", "SUBJOB_ERROR", "COMPONENT_OK", "COMPONENT_ERROR", "RUN_IF"];
+
+/** Studio solo acepta un trigger hacia un componente que inicia un subjob; el resto no impide crear el Job. */
+const isTriggerToNonStart = (connector: string, error: unknown) =>
+  TRIGGERS.includes(connector) && /no puede arrancar un subjob/i.test(error instanceof Error ? error.message : String(error));
+
 const edgeKey = (edge: { source: string; target: string }) => `${edge.source}->${edge.target}`;
 
 /** Un tMap/tXMLMap sin mapeo no tiene tabla de salida: Studio falla al conectar desde el. */
@@ -218,7 +224,14 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
           const existing = model.connections.filter((item) => item.source === source && item.target === target);
           if (existing.some((item) => item.connectorName !== connector)) throw new Error(`CONFLICT: conexion ${edge.source} -> ${edge.target} modificada; no se sustituye`);
           if (existing.length) { result.reusedConnections++; continue; }
-          const connected = checked(await conDialogosAtendidos(bridge, () => bridge.connectNodes({ job: job.jobName, source, target, type: connector, name: edge.label }))) as { warnings?: string[] };
+          let connected: { warnings?: string[] };
+          try {
+            connected = checked(await conDialogosAtendidos(bridge, () => bridge.connectNodes({ job: job.jobName, source, target, type: connector, name: edge.label }))) as { warnings?: string[] };
+          } catch (error) {
+            if (!isTriggerToNonStart(connector, error)) throw error;
+            result.warnings.push(`Conexión ${edge.source} → ${edge.target} no se creó: ${edge.target} no puede arrancar un subjob propio y Studio solo admite un ${connector} hacia un componente de inicio.`);
+            continue;
+          }
           result.warnings.push(...(connected?.warnings ?? [])); result.generatedConnections++;
           model.connections.push({ source, target, connectorName: connector });
         }

@@ -285,3 +285,47 @@ test("no cierra un editor que la persona ya tenia abierto", async () => {
   expect(fake.editors).toEqual(["Job job_abierto 0.1"]);
   expect(fake.events.filter((event) => event.startsWith("close:"))).toEqual([]);
 });
+
+test("omite un trigger hacia un componente que no puede arrancar un subjob y crea el resto del Job", async () => {
+  const fake = studio();
+  const original = fake.dependencies.bridge.connectNodes;
+  fake.dependencies.bridge.connectNodes = async (input: Parameters<typeof original>[0]) => {
+    if (input.type === "SUBJOB_OK") {
+      return { ok: false, error: { message: "Studio rechaza la conexion tAgg_1 -> tAgg_2 con el conector SUBJOB_OK: el destino no puede arrancar un subjob propio" } } as never;
+    }
+    return original(input);
+  };
+
+  const result = await applyCustomJobSpec({
+    jobName: "job_trigger_invalido",
+    folderPath: "Process/test",
+    components: [
+      { uniqueName: "a_1", componentName: "tAggregateRow", draftOnly: true, draftReason: "p" },
+      { uniqueName: "b_2", componentName: "tAggregateRow", draftOnly: true, draftReason: "p" },
+      { uniqueName: "c_3", componentName: "tLogRow" },
+    ],
+    connections: [
+      { source: "a_1", target: "b_2", connectorName: "SUBJOB_OK", label: "ok1" },
+      { source: "b_2", target: "c_3", connectorName: "FLOW", label: "row1" },
+    ],
+  }, fake.dependencies);
+
+  expect(result.generatedComponents).toBe(3);
+  expect(result.generatedConnections).toBe(1);
+  expect(result.warnings.join(" ")).toContain("a_1 → b_2");
+  expect(result.warnings.join(" ")).toContain("no se creó");
+  expect(fake.jobs.map((job) => job.label)).toEqual(["job_trigger_invalido"]);
+});
+
+test("un fallo al conectar que no es de trigger sigue abortando y revirtiendo", async () => {
+  const fake = studio();
+  fake.dependencies.bridge.connectNodes = async () => ({ ok: false, error: { message: "otro fallo de Studio" } }) as never;
+
+  await expect(applyCustomJobSpec({
+    jobName: "job_fallo_real",
+    folderPath: "Process/test",
+    components: [{ uniqueName: "a_1", componentName: "tFileInputDelimited" }, { uniqueName: "b_2", componentName: "tLogRow" }],
+    connections: [{ source: "a_1", target: "b_2", connectorName: "FLOW", label: "row1" }],
+  }, fake.dependencies)).rejects.toThrow(/otro fallo de Studio.*revirti/s);
+  expect(fake.jobs).toEqual([]);
+});
