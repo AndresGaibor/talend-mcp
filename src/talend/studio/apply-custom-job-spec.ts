@@ -128,6 +128,27 @@ async function validate(spec: CustomJobSpec, deps: CustomSpecDependencies): Prom
   return { warnings, unavailableDrafts, skippedEdges };
 }
 
+/** Si la aplicacion falla, deshace los Jobs que se crearon en esta llamada (nunca los que ya existian). */
+async function rollbackCreated(bridge: TalendStudioBridgeClient, created: CustomJobSpec[], cause: unknown): Promise<Error> {
+  const error = cause instanceof Error ? cause : new Error(String(cause));
+  if (!created.length) return error;
+  const undone: string[] = [];
+  const stuck: string[] = [];
+  for (const job of [...created].reverse()) {
+    try {
+      checked(await bridge.deleteJob({ name: job.jobName, version: job.version ?? "0.1" }));
+      undone.push(job.jobName);
+    } catch {
+      stuck.push(job.jobName);
+    }
+  }
+  const notes = [
+    undone.length ? `Se revirtió la creación de: ${undone.join(", ")}.` : "",
+    stuck.length ? `No se pudo borrar y debe revisarse en Studio: ${stuck.join(", ")}.` : "",
+  ].filter(Boolean).join(" ");
+  return new Error(`${error.message}. ${notes}`);
+}
+
 // Un montaje cambia el editor activo: no se intercalan dos montajes custom.
 let applying = false;
 export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecDependencies): Promise<Result> {
@@ -156,78 +177,83 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
       if (existing.length && (existing.length !== 1 || existing[0]!.version !== (job.version ?? "0.1") || existingFolderOf(existing[0]!) !== folderOf(job) || !existing[0]!.description?.includes(ownership(job)))) throw new Error(`CONFLICT: ya existe ${job.jobName} y no pertenece a esta especificacion; no se sobrescribe`);
     }
     const results = new Map<string, Result>();
-    for (const job of forest) {
-      const bridge = deps.bridge;
-      const previous = existingJobs.find((item) => item.label === job.jobName);
-      if (previous) checked(await bridge.openJob({ name: job.jobName, version: job.version ?? "0.1" }));
-      else checked(await bridge.createJob({ name: job.jobName, version: job.version ?? "0.1", folder: folderOf(job), description: `${job.description ?? ""}\n${ownership(job)}`, replace: false }));
-      const savedJob = (await deps.listJobs()).find((item) => item.label === job.jobName);
-      if (!savedJob || existingFolderOf(savedJob) !== folderOf(job)) throw new Error(`Studio no confirmo el destino de ${job.jobName}`);
-      const result: Result = { jobName: job.jobName, folderPath: job.folderPath ?? "Process", itemPath: savedJob.itemPath, propertiesPath: savedJob.propertiesPath,
-        generatedComponents: 0, reusedComponents: 0, totalComponents: job.components.length, generatedConnections: 0, reusedConnections: 0, connections: (job.connections ?? []).length,
-        generatedContexts: 0, updatedContexts: 0, reusedContexts: 0, removedContexts: 0, reusedExisting: Boolean(previous), componentAliases: {}, warnings: validations.get(job)?.warnings ?? [], childJobs: (job.childJobs ?? []).map((child) => results.get(child.jobName)!) };
-      const nodes = checked(await bridge.listNodes({ job: job.jobName })) as Array<{ uniqueName: string; label?: string; componentName?: string }>;
-      if (!Array.isArray(nodes)) throw new Error("Studio no devolvio la lista de nodos");
-      const newNodes = new Set<string>();
-      for (const component of job.components) {
-        if (validations.get(job)?.unavailableDrafts.has(component.uniqueName)) continue;
-        const marker = `[portal:${component.uniqueName}]`;
-        const matches = nodes.filter((node) => node.label?.endsWith(marker));
-        if (matches.length > 1 || (matches[0] && matches[0].componentName !== component.componentName)) throw new Error(`CONFLICT: nodo ${component.uniqueName} ambiguo o de otro componente`);
-        let actual = matches[0]?.uniqueName;
-        if (!actual) {
-          const added = checked(await bridge.addNode({ job: job.jobName, type: component.componentName, label: `${component.label ?? component.uniqueName} ${marker}`, position: { x: component.posX ?? 160, y: component.posY ?? 96 }, parameters: Object.fromEntries(Object.entries(component.parameters ?? {}).map(([name, value]) => [name, { value }])), schema: component.schema ? [{ ...component.schema }] : undefined })) as { uniqueName?: string; saved?: boolean };
-          if (!added?.uniqueName || added.saved === false) throw new Error(`Studio no confirmo el nodo ${component.uniqueName}`);
-          actual = added.uniqueName; result.generatedComponents++; newNodes.add(component.uniqueName);
-        } else result.reusedComponents++;
-        result.componentAliases[component.uniqueName] = actual;
-      }
-      const model = checked(await bridge.activeJobModel()) as { connections?: Array<{ source?: string; target?: string; connectorName?: string }> };
-      if (!Array.isArray(model?.connections)) throw new Error("Studio no permite comprobar las conexiones existentes");
-      for (const edge of job.connections ?? []) {
-        if (validations.get(job)?.unavailableDrafts.has(edge.source) || validations.get(job)?.unavailableDrafts.has(edge.target)) continue;
-        if (validations.get(job)?.skippedEdges.has(edgeKey(edge))) continue;
-        const source = result.componentAliases[edge.source]!, target = result.componentAliases[edge.target]!;
-        const connector = edge.connectorName ?? "FLOW";
-        const existing = model.connections.filter((item) => item.source === source && item.target === target);
-        if (existing.some((item) => item.connectorName !== connector)) throw new Error(`CONFLICT: conexion ${edge.source} -> ${edge.target} modificada; no se sustituye`);
-        if (existing.length) { result.reusedConnections++; continue; }
-        const connected = checked(await bridge.connectNodes({ job: job.jobName, source, target, type: connector, name: edge.label })) as { warnings?: string[] };
-        result.warnings.push(...(connected?.warnings ?? [])); result.generatedConnections++;
-        model.connections.push({ source, target, connectorName: connector });
-      }
-      // Studio propaga schemas al conectar. Se termina la configuracion despues,
-      // sin reconfigurar los nodos que una persona ya pudo haber corregido.
-      for (const component of [...job.components].reverse()) {
-        if (validations.get(job)?.unavailableDrafts.has(component.uniqueName)) continue;
-        if (!newNodes.has(component.uniqueName) || (!component.schema && !component.tables && !component.mapper)) continue;
-        checked(await bridge.configureNode({ job: job.jobName, uniqueName: result.componentAliases[component.uniqueName]!, schema: component.schema ? [{ ...component.schema }] : undefined, tables: component.tables, mapper: component.mapper }));
-      }
-      const contexts = checked(await bridge.jobContexts({ job: job.jobName })) as { contexts?: Array<{ name: string; parameters: Array<{ name: string; type?: string; value: string }> }> };
-      if (!Array.isArray(contexts?.contexts)) throw new Error("Studio no devolvio los contextos del Job");
-      const environment = job.defaultContext ?? "Default";
-      let context = contexts.contexts.find((item) => item.name === environment);
-      if (!context) {
-        checked(await bridge.createJobContext({ job: job.jobName, name: environment }));
-        const refreshed = checked(await bridge.jobContexts({ job: job.jobName })) as typeof contexts;
-        context = refreshed.contexts?.find((item) => item.name === environment);
-        if (!context) throw new Error(`Studio no confirmo el contexto ${environment}`);
-      }
-      const names = new Set((job.contexts ?? []).map((item) => item.name));
-      for (const variable of job.contexts ?? []) {
-        const current = context.parameters.find((item) => item.name === variable.name);
-        if (current?.value) { result.reusedContexts++; continue; }
-        if (current && current.value === variable.value) { result.reusedContexts++; continue; }
-        checked(await bridge.setJobContextParameter({ job: job.jobName, context: environment, ...variable }));
-        if (current) result.updatedContexts++; else result.generatedContexts++;
-      }
-      if (job.replaceManagedTodoContexts) for (const variable of context.parameters) {
-        if (/^migration_todo_[a-f0-9]{12}$/.test(variable.name) && !variable.value && !names.has(variable.name)) {
-          checked(await bridge.deleteJobContextParameter({ job: job.jobName, context: environment, name: variable.name })); result.removedContexts++;
+    const created: CustomJobSpec[] = [];
+    try {
+      for (const job of forest) {
+        const bridge = deps.bridge;
+        const previous = existingJobs.find((item) => item.label === job.jobName);
+        if (previous) checked(await bridge.openJob({ name: job.jobName, version: job.version ?? "0.1" }));
+        else { checked(await bridge.createJob({ name: job.jobName, version: job.version ?? "0.1", folder: folderOf(job), description: `${job.description ?? ""}\n${ownership(job)}`, replace: false })); created.push(job); }
+        const savedJob = (await deps.listJobs()).find((item) => item.label === job.jobName);
+        if (!savedJob || existingFolderOf(savedJob) !== folderOf(job)) throw new Error(`Studio no confirmo el destino de ${job.jobName}`);
+        const result: Result = { jobName: job.jobName, folderPath: job.folderPath ?? "Process", itemPath: savedJob.itemPath, propertiesPath: savedJob.propertiesPath,
+          generatedComponents: 0, reusedComponents: 0, totalComponents: job.components.length, generatedConnections: 0, reusedConnections: 0, connections: (job.connections ?? []).length,
+          generatedContexts: 0, updatedContexts: 0, reusedContexts: 0, removedContexts: 0, reusedExisting: Boolean(previous), componentAliases: {}, warnings: validations.get(job)?.warnings ?? [], childJobs: (job.childJobs ?? []).map((child) => results.get(child.jobName)!) };
+        const nodes = checked(await bridge.listNodes({ job: job.jobName })) as Array<{ uniqueName: string; label?: string; componentName?: string }>;
+        if (!Array.isArray(nodes)) throw new Error("Studio no devolvio la lista de nodos");
+        const newNodes = new Set<string>();
+        for (const component of job.components) {
+          if (validations.get(job)?.unavailableDrafts.has(component.uniqueName)) continue;
+          const marker = `[portal:${component.uniqueName}]`;
+          const matches = nodes.filter((node) => node.label?.endsWith(marker));
+          if (matches.length > 1 || (matches[0] && matches[0].componentName !== component.componentName)) throw new Error(`CONFLICT: nodo ${component.uniqueName} ambiguo o de otro componente`);
+          let actual = matches[0]?.uniqueName;
+          if (!actual) {
+            const added = checked(await bridge.addNode({ job: job.jobName, type: component.componentName, label: `${component.label ?? component.uniqueName} ${marker}`, position: { x: component.posX ?? 160, y: component.posY ?? 96 }, parameters: Object.fromEntries(Object.entries(component.parameters ?? {}).map(([name, value]) => [name, { value }])), schema: component.schema ? [{ ...component.schema }] : undefined })) as { uniqueName?: string; saved?: boolean };
+            if (!added?.uniqueName || added.saved === false) throw new Error(`Studio no confirmo el nodo ${component.uniqueName}`);
+            actual = added.uniqueName; result.generatedComponents++; newNodes.add(component.uniqueName);
+          } else result.reusedComponents++;
+          result.componentAliases[component.uniqueName] = actual;
         }
+        const model = checked(await bridge.activeJobModel()) as { connections?: Array<{ source?: string; target?: string; connectorName?: string }> };
+        if (!Array.isArray(model?.connections)) throw new Error("Studio no permite comprobar las conexiones existentes");
+        for (const edge of job.connections ?? []) {
+          if (validations.get(job)?.unavailableDrafts.has(edge.source) || validations.get(job)?.unavailableDrafts.has(edge.target)) continue;
+          if (validations.get(job)?.skippedEdges.has(edgeKey(edge))) continue;
+          const source = result.componentAliases[edge.source]!, target = result.componentAliases[edge.target]!;
+          const connector = edge.connectorName ?? "FLOW";
+          const existing = model.connections.filter((item) => item.source === source && item.target === target);
+          if (existing.some((item) => item.connectorName !== connector)) throw new Error(`CONFLICT: conexion ${edge.source} -> ${edge.target} modificada; no se sustituye`);
+          if (existing.length) { result.reusedConnections++; continue; }
+          const connected = checked(await bridge.connectNodes({ job: job.jobName, source, target, type: connector, name: edge.label })) as { warnings?: string[] };
+          result.warnings.push(...(connected?.warnings ?? [])); result.generatedConnections++;
+          model.connections.push({ source, target, connectorName: connector });
+        }
+        // Studio propaga schemas al conectar. Se termina la configuracion despues,
+        // sin reconfigurar los nodos que una persona ya pudo haber corregido.
+        for (const component of [...job.components].reverse()) {
+          if (validations.get(job)?.unavailableDrafts.has(component.uniqueName)) continue;
+          if (!newNodes.has(component.uniqueName) || (!component.schema && !component.tables && !component.mapper)) continue;
+          checked(await bridge.configureNode({ job: job.jobName, uniqueName: result.componentAliases[component.uniqueName]!, schema: component.schema ? [{ ...component.schema }] : undefined, tables: component.tables, mapper: component.mapper }));
+        }
+        const contexts = checked(await bridge.jobContexts({ job: job.jobName })) as { contexts?: Array<{ name: string; parameters: Array<{ name: string; type?: string; value: string }> }> };
+        if (!Array.isArray(contexts?.contexts)) throw new Error("Studio no devolvio los contextos del Job");
+        const environment = job.defaultContext ?? "Default";
+        let context = contexts.contexts.find((item) => item.name === environment);
+        if (!context) {
+          checked(await bridge.createJobContext({ job: job.jobName, name: environment }));
+          const refreshed = checked(await bridge.jobContexts({ job: job.jobName })) as typeof contexts;
+          context = refreshed.contexts?.find((item) => item.name === environment);
+          if (!context) throw new Error(`Studio no confirmo el contexto ${environment}`);
+        }
+        const names = new Set((job.contexts ?? []).map((item) => item.name));
+        for (const variable of job.contexts ?? []) {
+          const current = context.parameters.find((item) => item.name === variable.name);
+          if (current?.value) { result.reusedContexts++; continue; }
+          if (current && current.value === variable.value) { result.reusedContexts++; continue; }
+          checked(await bridge.setJobContextParameter({ job: job.jobName, context: environment, ...variable }));
+          if (current) result.updatedContexts++; else result.generatedContexts++;
+        }
+        if (job.replaceManagedTodoContexts) for (const variable of context.parameters) {
+          if (/^migration_todo_[a-f0-9]{12}$/.test(variable.name) && !variable.value && !names.has(variable.name)) {
+            checked(await bridge.deleteJobContextParameter({ job: job.jobName, context: environment, name: variable.name })); result.removedContexts++;
+          }
+        }
+        result.problems = await problemsOf(bridge, job.jobName);
+        results.set(job.jobName, result);
       }
-      result.problems = await problemsOf(bridge, job.jobName);
-      results.set(job.jobName, result);
+    } catch (error) {
+      throw await rollbackCreated(deps.bridge, created, error);
     }
     return results.get(spec.jobName)!;
   } finally { applying = false; }

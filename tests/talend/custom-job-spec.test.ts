@@ -19,6 +19,12 @@ function studio() {
       nodes[active] = []; edges[active] = []; variables[active] = [];
       return ok({ jobName: input.name });
     },
+    deleteJob: async (input: { name: string }) => {
+      const index = jobs.findIndex((job) => job.label === input.name);
+      if (index >= 0) jobs.splice(index, 1);
+      events.push(`delete:${input.name}`);
+      return ok({ deleted: true });
+    },
     openJob: async (input: { name: string }) => { active = input.name; events.push(`open:${active}`); return ok({ opened: true }); },
     listNodes: async () => ok(nodes[active] ?? []),
     activeJobModel: async () => ({ ok: true, data: { ok: true, components: nodes[active], connections: edges[active] } }),
@@ -200,4 +206,52 @@ test("un tMap con mapeo si se conecta", async () => {
   }, fake.dependencies);
 
   expect(result.generatedConnections).toBe(1);
+});
+
+test("si la aplicacion falla a mitad, revierte los Jobs que creo y lo dice en el error", async () => {
+  const fake = studio();
+  fake.dependencies.bridge.connectNodes = async () => { throw new Error("Studio rechazo la conexion"); };
+
+  const spec: CustomJobSpec = {
+    jobName: "job_padre",
+    folderPath: "Process/test",
+    components: [{ uniqueName: "a_1", componentName: "tFileInputDelimited" }, { uniqueName: "b_2", componentName: "tLogRow" }],
+    connections: [{ source: "a_1", target: "b_2", connectorName: "FLOW", label: "row1" }],
+    childJobs: [{ jobName: "job_hijo", folderPath: "Process/test", components: [{ uniqueName: "c_1", componentName: "tLogRow" }] }],
+  };
+
+  await expect(applyCustomJobSpec(spec, fake.dependencies)).rejects.toThrow(/Studio rechazo la conexion.*revirti.*job_padre.*job_hijo/s);
+  expect(fake.jobs).toEqual([]);
+  expect(fake.events.filter((event) => event.startsWith("delete:"))).toEqual(["delete:job_padre", "delete:job_hijo"]);
+});
+
+test("no borra un Job que ya existia antes de la llamada", async () => {
+  const fake = studio();
+  const child: CustomJobSpec = { jobName: "job_hijo", folderPath: "Process/test", components: [{ uniqueName: "c_1", componentName: "tLogRow" }] };
+  await applyCustomJobSpec(child, fake.dependencies);
+  fake.dependencies.bridge.connectNodes = async () => { throw new Error("Studio rechazo la conexion"); };
+
+  await expect(applyCustomJobSpec({
+    jobName: "job_padre",
+    folderPath: "Process/test",
+    components: [{ uniqueName: "a_1", componentName: "tFileInputDelimited" }, { uniqueName: "b_2", componentName: "tLogRow" }],
+    connections: [{ source: "a_1", target: "b_2", connectorName: "FLOW", label: "row1" }],
+    childJobs: [child],
+  }, fake.dependencies)).rejects.toThrow(/Studio rechazo la conexion.*revirti.*job_padre/s);
+
+  expect(fake.jobs.map((job) => job.label)).toEqual(["job_hijo"]);
+  expect(fake.events.filter((event) => event.startsWith("delete:"))).toEqual(["delete:job_padre"]);
+});
+
+test("si no puede borrar lo creado, avisa de que hay que revisarlo en Studio", async () => {
+  const fake = studio();
+  fake.dependencies.bridge.connectNodes = async () => { throw new Error("Studio rechazo la conexion"); };
+  fake.dependencies.bridge.deleteJob = async () => { throw new Error("Studio ocupado"); };
+
+  await expect(applyCustomJobSpec({
+    jobName: "job_huerfano",
+    folderPath: "Process/test",
+    components: [{ uniqueName: "a_1", componentName: "tFileInputDelimited" }, { uniqueName: "b_2", componentName: "tLogRow" }],
+    connections: [{ source: "a_1", target: "b_2", connectorName: "FLOW", label: "row1" }],
+  }, fake.dependencies)).rejects.toThrow(/Studio rechazo la conexion.*revisarse en Studio.*job_huerfano/s);
 });
