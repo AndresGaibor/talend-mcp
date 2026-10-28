@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { clasificarProblemas, problemasDe } from "../diagnostics/output-findings";
 import { customJobSpecSchema, type CustomJobSpec } from "./custom-job-spec";
 import { conDialogosAtendidos } from "./dialogos-atendidos";
+import { esperarInterfazLibre } from "./interfaz-libre";
 import { cerrarEditoresAbiertosPor, editoresAbiertos } from "./editores-temporales";
 
 export type CustomSpecDependencies = {
@@ -189,6 +190,8 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
     try {
       for (const job of forest) {
         const bridge = deps.bridge;
+        // Un Job deja trabajo en segundo plano en Studio; encadenar decenas sin esperar agota el hilo de interfaz.
+        await esperarInterfazLibre(bridge);
         const editoresAntes = await editoresAbiertos(bridge);
         const previous = existingJobs.find((item) => item.label === job.jobName);
         if (previous) checked(await bridge.openJob({ name: job.jobName, version: job.version ?? "0.1" }));

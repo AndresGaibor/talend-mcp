@@ -4,6 +4,7 @@ import { inspectComponent } from "../../../talend/components/component-catalog-b
 import { createJobsFromTemplate, editJobsBatch, type BatchItemResult } from "../../../talend/job-batch/batch";
 import { resolveProjectPath } from "../../../talend/workspace";
 import { jobsAbiertosEnStudio } from "../../../talend/job-batch/open-guard";
+import { sinBorradoresAusentes, type Omitido } from "../../../talend/job-batch/borradores-ausentes";
 import { okResult, errorResult } from "../common/result";
 
 const TRAMO_DE_CONSTRUCCION = 500;
@@ -33,6 +34,8 @@ const templateSchema = z.object({
     posY: z.number().optional(),
     parameters: z.record(z.string(), z.union([z.string(), z.object({ value: z.string(), field: z.string().optional() })])).optional(),
     schema: z.object({ name: z.string(), connector: z.string().optional(), columns: z.array(columnSchema) }).optional(),
+    draftOnly: z.boolean().optional().describe("Borrador: si su componente no esta en el catalogo local, se omite con sus conexiones en vez de rechazar el lote"),
+    draftReason: z.string().optional(),
   })).min(1),
   connections: z.array(z.object({
     source: z.string(),
@@ -65,7 +68,7 @@ async function construir(jobs: string[], parallelism: number): Promise<Record<st
   return todos;
 }
 
-function resumen(results: BatchItemResult[], compilacion?: Record<string, { ok: boolean; error?: unknown }>) {
+function resumen(results: BatchItemResult[], compilacion?: Record<string, { ok: boolean; error?: unknown }>, omitidos: Omitido[] = []) {
   const fallos = results.filter((r) => !r.ok).map((r) => ({ job: r.job, error: r.error }));
   const noCompilan = compilacion
     ? Object.entries(compilacion).filter(([, r]) => !r.ok).map(([job, r]) => ({ job, error: r.error }))
@@ -75,6 +78,8 @@ function resumen(results: BatchItemResult[], compilacion?: Record<string, { ok: 
     correctos: results.length - fallos.length,
     escritos: results.filter((r) => r.written).length,
     fallos: fallos.slice(0, 50),
+    jobs: results.slice(0, 500).map((r) => ({ job: r.job, ok: r.ok, written: r.written === true, ...(r.itemPath ? { itemPath: r.itemPath } : {}), ...(r.error ? { error: r.error } : {}) })),
+    ...(omitidos.length ? { omitidos } : {}),
     ...(compilacion
       ? { compilan: Object.values(compilacion).filter((r) => r.ok).length, noCompilan: noCompilan!.slice(0, 50) }
       : {}),
@@ -104,16 +109,24 @@ export function createJobsCreateBatchTool() {
         if (!projectPath) return errorResult(tool, "NO_PROJECT", "No se pudo detectar el proyecto Talend. Define TALEND_PROJECT.");
 
         const componentVersions: Record<string, string> = {};
+        const ausentes = new Set<string>();
         for (const nombre of new Set(input.template.components.map((c) => c.componentName))) {
           const entrada = await inspectComponent(nombre);
-          if (!entrada) return errorResult(tool, "UNKNOWN_COMPONENT", `Componente '${nombre}' no encontrado en el catalogo`);
-          if (entrada.version) componentVersions[nombre] = entrada.version;
+          if (!entrada) ausentes.add(nombre);
+          else if (entrada.version) componentVersions[nombre] = entrada.version;
+        }
+        const { plantilla, omitidos, sinResolver } = sinBorradoresAusentes(input.template, ausentes);
+        if (sinResolver.length) {
+          return errorResult(tool, "UNKNOWN_COMPONENT", `Componente '${sinResolver[0]}' no encontrado en el catalogo`);
+        }
+        if (plantilla.components.length === 0) {
+          return errorResult(tool, "NO_COMPONENTS", "Ningun componente de la plantilla esta en el catalogo local");
         }
 
         const inicio = Date.now();
         const results = await createJobsFromTemplate({
           projectPath,
-          template: input.template,
+          template: plantilla,
           rows: input.rows,
           overwrite: input.overwrite,
           dryRun: input.dryRun,
@@ -130,7 +143,7 @@ export function createJobsCreateBatchTool() {
             return errorResult(tool, "BUILD_UNAVAILABLE", `Jobs escritos, pero no se pudo compilar: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
-        return okResult({ ...resumen(results, compilacion), escrituraMs: escritosMs }, tool);
+        return okResult({ ...resumen(results, compilacion, omitidos), escrituraMs: escritosMs }, tool);
       } catch (error) {
         return errorResult(tool, "CREATE_BATCH_ERROR", error instanceof Error ? error.message : String(error));
       }

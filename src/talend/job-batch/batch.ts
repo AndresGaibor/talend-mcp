@@ -19,6 +19,8 @@ export type BatchItemResult = {
   /** Para editar: si el XML cambio. Para crear: siempre true cuando se escribio. */
   changed?: boolean;
   written?: boolean;
+  /** Ruta del `.item` (al crear, cuando el job es valido). */
+  itemPath?: string;
   error?: string;
 };
 
@@ -73,6 +75,17 @@ export type CreateBatchOptions = {
 };
 
 /** Crea un job por fila a partir de la plantilla. Escribe `.item` y `.properties` en `process/<carpeta>`. */
+/**
+ * Carpeta relativa a `process/`. Studio nombra las carpetas con `Process/...` (la raiz del repositorio) y
+ * quien llama con esa convencion no quiere `process/Process/...`: se quita el primer segmento.
+ */
+function carpetaRelativaAProcess(carpeta: string | undefined): string | undefined {
+  if (carpeta === undefined) return undefined;
+  const partes = carpeta.split(/[/\\]/).filter(Boolean);
+  if (partes[0]?.toLowerCase() === "process") partes.shift();
+  return partes.join("/");
+}
+
 export async function createJobsFromTemplate(options: CreateBatchOptions): Promise<BatchItemResult[]> {
   const { projectPath, template, rows, overwrite = false, dryRun = false, componentVersions = {} } = options;
   const names = new Set<string>();
@@ -99,17 +112,17 @@ export async function createJobsFromTemplate(options: CreateBatchOptions): Promi
     if (!validation.valid) return { job, ok: false, error: validation.errors.join("; ") };
 
     const version = spec.version ?? "0.1";
-    const folder = resolveFolderDir(projectPath, spec.folderPath);
+    const folder = resolveFolderDir(projectPath, carpetaRelativaAProcess(spec.folderPath));
     const itemPath = join(folder, `${job}_${version}.item`);
     if (existsSync(itemPath) && !overwrite) return { job, ok: false, error: "El job ya existe (usa overwrite)" };
-    if (dryRun) return { job, ok: true, changed: true, written: false };
+    if (dryRun) return { job, ok: true, changed: true, written: false, itemPath };
 
     try {
       const { xml, rootId } = buildJobItemXml(spec);
       mkdirSync(dirname(itemPath), { recursive: true });
       await Bun.write(itemPath, xml);
       await Bun.write(join(folder, `${job}_${version}.properties`), buildJobPropertiesXml(spec, rootId));
-      return { job, ok: true, changed: true, written: true };
+      return { job, ok: true, changed: true, written: true, itemPath };
     } catch (error) {
       return { job, ok: false, error: errorText(error) };
     }

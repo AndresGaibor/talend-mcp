@@ -83,3 +83,42 @@ describe("guarda de jobs abiertos", () => {
     expect(esEditorDelJob("Welcome", "MIG_A")).toBe(false);
   });
 });
+
+describe("ruta de los jobs creados", () => {
+  test("cada job escrito informa la ruta de su .item", async () => {
+    const [resultado] = await createJobsFromTemplate({ projectPath: proyecto, template: plantilla, rows: [{ tabla: "CON_RUTA" }] });
+
+    expect(resultado!.ok).toBe(true);
+    expect(resultado!.itemPath).toBe(join(proyecto, "process", "migracion", "MIG_CON_RUTA_0.1.item"));
+    expect(existsSync(resultado!.itemPath!)).toBe(true);
+  });
+});
+
+describe("carpeta con la convencion de Studio", () => {
+  test("una carpeta que empieza por Process/ cuelga de process/, no de process/Process/", async () => {
+    const [resultado] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: { ...plantilla, jobName: "MIG_CARPETA_STUDIO", folderPath: "Process/Portal/Cargas" },
+      rows: [{ tabla: "X" }],
+    });
+
+    expect(resultado!.ok).toBe(true);
+    expect(resultado!.itemPath).toBe(join(proyecto, "process", "Portal", "Cargas", "MIG_CARPETA_STUDIO_0.1.item"));
+  });
+
+  test("Process a secas es la raiz de process/ y una carpeta relativa se respeta", async () => {
+    const [raiz] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: { ...plantilla, jobName: "MIG_RAIZ", folderPath: "Process" },
+      rows: [{ tabla: "X" }],
+    });
+    const [relativa] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: { ...plantilla, jobName: "MIG_RELATIVA", folderPath: "otra/carpeta" },
+      rows: [{ tabla: "X" }],
+    });
+
+    expect(raiz!.itemPath).toBe(join(proyecto, "process", "MIG_RAIZ_0.1.item"));
+    expect(relativa!.itemPath).toBe(join(proyecto, "process", "otra", "carpeta", "MIG_RELATIVA_0.1.item"));
+  });
+});
