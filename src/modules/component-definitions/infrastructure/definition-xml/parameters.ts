@@ -25,6 +25,19 @@ export function parseItems(parameter: Bag): string[] | undefined {
   return values.length > 0 ? values : undefined;
 }
 
+/** Elementos de una lista cerrada, con nombre y valor (`<ITEM NAME="AND" VALUE="&amp;&amp;"/>`). */
+export function parseOptions(parameter: Bag): Array<{ name: string; value: string }> | undefined {
+  const items = asBag(parameter["ITEMS"] ?? parameter["items"]);
+  const options: Array<{ name: string; value: string }> = [];
+  for (const raw of asArray(items["ITEM"] ?? items["item"])) {
+    const item = asBag(raw);
+    const name = attr(item, "NAME");
+    if (!name) continue;
+    options.push({ name, value: attr(item, "VALUE") ?? name });
+  }
+  return options.length > 0 ? options : undefined;
+}
+
 /**
  * Estructura de la tabla de un parámetro de tipo TABLE.
  *
@@ -106,6 +119,10 @@ export function parseParameters(component: Bag): DefinitionParameter[] {
         defaultValue: defaultValueOf(parameter),
         repositoryValue: attr(parameter, "REPOSITORY_VALUE"),
         possibleValues: parseItems(parameter),
+        options: /LIST$/.test(attr(parameter, "FIELD") ?? "") ? parseOptions(parameter) : undefined,
+        defaultOption: /LIST$/.test(attr(parameter, "FIELD") ?? "")
+          ? attr(asBag(parameter["ITEMS"] ?? parameter["items"]), "DEFAULT")
+          : undefined,
         advanced: section.advanced,
         table: parseTable(parameter),
       });

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, normalize } from "node:path";
 import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec } from "../job-generator";
 import { applyJobEdits, type JobEditOperation } from "../editor/job-edit";
 import { resolveFolderDir } from "../job-crud/paths";
@@ -89,6 +89,11 @@ function carpetaRelativaAProcess(carpeta: string | undefined): string | undefine
 export async function createJobsFromTemplate(options: CreateBatchOptions): Promise<BatchItemResult[]> {
   const { projectPath, template, rows, overwrite = false, dryRun = false, componentVersions = {} } = options;
   const names = new Set<string>();
+  // Talend exige etiquetas de job unicas en todo el proyecto, y escribir en disco no lo comprueba: se mira antes.
+  const existentes = new Map<string, string[]>();
+  for (const existente of existsSync(join(projectPath, "process")) ? await listJobs(projectPath) : []) {
+    existentes.set(existente.label, [...(existentes.get(existente.label) ?? []), normalize(existente.itemPath).toLowerCase()]);
+  }
 
   return await enParalelo(rows, 32, async (row): Promise<BatchItemResult> => {
     let spec: JobSpec;
@@ -96,6 +101,8 @@ export async function createJobsFromTemplate(options: CreateBatchOptions): Promi
       spec = expandTemplate(template, row);
       spec = {
         ...spec,
+        // El ItemState.path es relativo a la raiz de los jobs: sin el `Process/` de la convencion de Studio.
+        folderPath: carpetaRelativaAProcess(spec.folderPath),
         components: spec.components.map((component) => ({
           ...component,
           componentVersion: component.componentVersion ?? componentVersions[component.componentName],
@@ -114,6 +121,10 @@ export async function createJobsFromTemplate(options: CreateBatchOptions): Promi
     const version = spec.version ?? "0.1";
     const folder = resolveFolderDir(projectPath, carpetaRelativaAProcess(spec.folderPath));
     const itemPath = join(folder, `${job}_${version}.item`);
+    const otrasRutas = (existentes.get(job) ?? []).filter((ruta) => ruta !== normalize(itemPath).toLowerCase());
+    if (otrasRutas.length) {
+      return { job, ok: false, error: `Ya existe un job llamado '${job}' en otra carpeta (${otrasRutas[0]}); Talend exige nombres unicos en el proyecto` };
+    }
     if (existsSync(itemPath) && !overwrite) return { job, ok: false, error: "El job ya existe (usa overwrite)" };
     if (dryRun) return { job, ok: true, changed: true, written: false, itemPath };
 

@@ -354,3 +354,24 @@ describe("Indice de definiciones de la instalacion de Studio", () => {
     }
   });
 });
+
+describe("elementos de las listas cerradas", () => {
+  test("una lista conserva el nombre y el valor de cada elemento", () => {
+    const definicion = parseDefinitionXml(`<COMPONENT>
+      <HEADER NAME="tFilterRow" VERSION="0.1"/>
+      <PARAMETERS>
+        <PARAMETER NAME="LOGICAL_OP" FIELD="CLOSED_LIST" REQUIRED="true">
+          <ITEMS DEFAULT="AND"><ITEM NAME="OR" VALUE="||"/><ITEM NAME="AND" VALUE="&amp;&amp;"/></ITEMS>
+        </PARAMETER>
+        <PARAMETER NAME="LABEL" FIELD="TEXT"/>
+      </PARAMETERS>
+    </COMPONENT>`, CONTEXTO);
+
+    const lista = definicion!.parameters.find((parametro) => parametro.name === "LOGICAL_OP")!;
+    expect(lista.options).toEqual([
+      { name: "OR", value: "||" },
+      { name: "AND", value: "&&" },
+    ]);
+    expect(definicion!.parameters.find((parametro) => parametro.name === "LABEL")!.options).toBeUndefined();
+  });
+});

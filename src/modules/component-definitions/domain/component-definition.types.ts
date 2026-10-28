@@ -33,6 +33,10 @@ export type DefinitionParameter = {
   repositoryValue?: string;
   /** Valores posibles de una lista (`<ITEMS>`). */
   possibleValues?: string[];
+  /** Elementos de una lista con su nombre (lo que se ve) y su valor (lo que se guarda en el `.item`). */
+  options?: Array<{ name: string; value: string }>;
+  /** Nombre del elemento por defecto de una lista (`<ITEMS DEFAULT="AND">`); vacio si no hay. */
+  defaultOption?: string;
   /** Viene de `<ADVANCED_PARAMETERS>` (pestaña de ajustes avanzados). */
   advanced: boolean;
   /** Estructura de la tabla, si el parámetro es de tipo TABLE. */

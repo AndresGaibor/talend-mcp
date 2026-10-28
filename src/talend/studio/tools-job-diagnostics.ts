@@ -3,6 +3,7 @@ import { bridgeFail, bridgeOk, loadBridge } from "./tools-base";
 import { compileWithDependencies } from "./compile-with-dependencies";
 import { prepareStudioForJob } from "./studio-dialogs";
 import { cerrarEditoresAbiertosPor, editoresAbiertos } from "./editores-temporales";
+import { jobAbierto } from "./editores-guardados";
 import { clasificarSalida } from "../diagnostics/output-findings";
 
 export const jobDiagnosticsTools = [
@@ -113,9 +114,11 @@ export const jobDiagnosticsTools = [
     }),
     handler: async ({ job }: { job?: string }) => {
       const bridge = await loadBridge();
-      // Calcular los problemas abre el editor del job; si no estaba abierto, se cierra al terminar.
+      // Calcular los problemas abre el editor del job; si no estaba abierto, se cierra al terminar. Cerrarlo no
+      // suelta sus problemas del almacen de Studio, asi que se piden liberar (si no, se acumulan al recrear el job).
       const antes = job ? await editoresAbiertos(bridge) : null;
-      const result = await bridge.jobProblems({ job });
+      const liberar = Boolean(job) && antes !== null && !jobAbierto(job!, antes);
+      const result = await bridge.jobProblems({ job, release: liberar });
       if (job) await cerrarEditoresAbiertosPor(bridge, job, antes);
       return bridgeOk({
         ok: result.ok,

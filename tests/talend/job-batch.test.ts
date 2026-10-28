@@ -122,3 +122,54 @@ describe("carpeta con la convencion de Studio", () => {
     expect(relativa!.itemPath).toBe(join(proyecto, "process", "otra", "carpeta", "MIG_RELATIVA_0.1.item"));
   });
 });
+
+describe("propiedades del job con carpeta de Studio", () => {
+  test("el ItemState.path no lleva el prefijo Process/: es relativo a la raiz de los jobs", async () => {
+    const [resultado] = await createJobsFromTemplate({
+      projectPath: proyecto,
+      template: { ...plantilla, jobName: "MIG_RUTA_PROPS", folderPath: "Process/Portal/Cargas" },
+      rows: [{ tabla: "X" }],
+    });
+
+    const propiedades = readFileSync(resultado!.itemPath!.replace(/\.item$/, ".properties"), "utf8");
+    expect(propiedades).toContain('path="Portal/Cargas"');
+    expect(propiedades).not.toContain('path="Process');
+  });
+});
+
+describe("nombres de job unicos en el proyecto", () => {
+  test("un job con el nombre de otro que vive en otra carpeta se rechaza: Talend no admite dos con la misma etiqueta", async () => {
+    const plantillaA = { ...plantilla, jobName: "MIG_UNICO", folderPath: "carpeta_a" };
+    const [primero] = await createJobsFromTemplate({ projectPath: proyecto, template: plantillaA, rows: [{ tabla: "X" }] });
+    expect(primero!.ok).toBe(true);
+
+    const [segundo] = await createJobsFromTemplate({
+      projectPath: proyecto, template: { ...plantillaA, folderPath: "carpeta_b" }, rows: [{ tabla: "X" }],
+    });
+
+    expect(segundo!.ok).toBe(false);
+    expect(segundo!.error).toContain("carpeta_a");
+    expect(existsSync(join(proyecto, "process", "carpeta_b", "MIG_UNICO_0.1.item"))).toBe(false);
+  });
+
+  test("overwrite solo sobrescribe el job de la misma ruta, no uno homonimo de otra carpeta", async () => {
+    const plantillaA = { ...plantilla, jobName: "MIG_UNICO2", folderPath: "carpeta_a" };
+    await createJobsFromTemplate({ projectPath: proyecto, template: plantillaA, rows: [{ tabla: "X" }] });
+
+    const [mismo] = await createJobsFromTemplate({ projectPath: proyecto, template: plantillaA, rows: [{ tabla: "X" }], overwrite: true });
+    const [otro] = await createJobsFromTemplate({
+      projectPath: proyecto, template: { ...plantillaA, folderPath: "carpeta_b" }, rows: [{ tabla: "X" }], overwrite: true,
+    });
+
+    expect(mismo!.ok).toBe(true);
+    expect(otro!.ok).toBe(false);
+  });
+
+  test("dos filas de un mismo lote con distinto nombre siguen funcionando", async () => {
+    const resultados = await createJobsFromTemplate({
+      projectPath: proyecto, template: { ...plantilla, jobName: "MIG_LOTE_{{tabla}}", folderPath: "lote" }, rows: [{ tabla: "A" }, { tabla: "B" }],
+    });
+
+    expect(resultados.map((r) => r.ok)).toEqual([true, true]);
+  });
+});

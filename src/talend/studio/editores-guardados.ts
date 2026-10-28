@@ -61,6 +61,11 @@ export function planificarCierre(editores: EditorAbierto[], prefijo?: string): P
   return plan;
 }
 
+/** Si Studio tiene el job (cualquier version) abierto en un editor, con o sin cambios sin guardar. */
+export function jobAbierto(job: string, editores: EditorAbierto[]): boolean {
+  return editores.some((editor) => nombreDelJob(editor.title)?.split(" ")[0] === job);
+}
+
 /**
  * Editores que una operacion abrio para un job y que se pueden cerrar sin perder nada.
  *

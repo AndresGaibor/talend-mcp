@@ -101,7 +101,7 @@ export class BridgeJobClient extends BridgeWorkbenchClient {
   }
 
   /** Errores y avisos de diseno de un job (la vista Problemas de Studio). */
-  async jobProblems(options?: { job?: string }): Promise<BridgeResult<Record<string, unknown>>> {
+  async jobProblems(options?: { job?: string; release?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/job/problems", {
       method: "POST",
       body: options ?? {},

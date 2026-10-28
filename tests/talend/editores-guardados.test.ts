@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { EDITOR_DE_JOB, editoresAbiertosPor, planificarCierre } from "../../src/talend/studio/editores-guardados";
+import { EDITOR_DE_JOB, editoresAbiertosPor, jobAbierto, planificarCierre } from "../../src/talend/studio/editores-guardados";
 
 const job = (title: string, dirty: boolean | undefined = false) => ({ title, id: EDITOR_DE_JOB, dirty });
 
@@ -81,5 +81,18 @@ describe("editoresAbiertosPor", () => {
 
   test("distingue un job de otro cuyo nombre empieza igual", () => {
     expect(editoresAbiertosPor("job_a", [], [job("Job job_ab 0.1")])).toEqual([]);
+  });
+});
+
+describe("jobAbierto", () => {
+  test("detecta el job abierto en cualquier version, con o sin cambios sin guardar", () => {
+    expect(jobAbierto("job_a", [job("Job job_a 0.1")])).toBe(true);
+    expect(jobAbierto("job_a", [job("*Job job_a 0.2", true)])).toBe(true);
+  });
+
+  test("no confunde jobs cuyo nombre empieza igual ni cuenta editores que no son de job", () => {
+    expect(jobAbierto("job_a", [job("Job job_ab 0.1")])).toBe(false);
+    expect(jobAbierto("job_a", [{ title: "Job job_a 0.1", id: "otro", dirty: false }, { title: "Readme" }])).toBe(true);
+    expect(jobAbierto("job_a", [])).toBe(false);
   });
 });
