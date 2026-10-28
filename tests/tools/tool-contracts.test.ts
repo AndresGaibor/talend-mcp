@@ -158,7 +158,12 @@ describe("schemas de salida enriquecidos por dominio", () => {
     }).success).toBe(true);
     expect(getEnrichedOutputSchema("talend_repo_status").safeParse({
       ok: true,
-      data: { branch: "main", commit: "abc", remote: "origin", project: null },
+      data: {
+        branch: "main",
+        lastCommit: "abc1234 mensaje",
+        hasRemote: true,
+        project: { projectName: "repo", jobCount: 0, hasMetadata: false },
+      },
     }).success).toBe(true);
   });
 

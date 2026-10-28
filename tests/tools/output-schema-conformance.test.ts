@@ -7,6 +7,10 @@ import { getAllRuntimeTools } from "../../src/server/registered-tools";
 import { createListJobsTool } from "../../src/presentation/tools/jobs/list-jobs.tool";
 import { createReadContextsTool } from "../../src/presentation/tools/jobs/read-contexts.tool";
 import { createRepoSourcesTool } from "../../src/presentation/tools/repo/repo-sources.tool";
+import { createRepoStatusTool } from "../../src/presentation/tools/repo/repo-status.tool";
+import { createShowFlowTool } from "../../src/presentation/tools/jobs/show-flow.tool";
+import { createListComponentsTool } from "../../src/presentation/tools/jobs/list-components.tool";
+import { createListProjectContextsTool } from "../../src/presentation/tools/contexts/list-project-contexts.tool";
 import { clearActiveRepo } from "../../src/talend/workspace";
 
 /**
@@ -176,6 +180,63 @@ describe("OutputSchema publicado contra la respuesta real", () => {
     const tool = createRepoSourcesTool();
     const resultado = await (tool.handler as () => Promise<unknown>)();
     expect(validar("talend_repo_sources", resultado)).toEqual([]);
+  });
+
+  // El cliente Python del portal valida la respuesta contra el outputSchema y
+  // rechaza la llamada entera si no coincide: cada tool de lectura del contrato
+  // se ejecuta de verdad y su respuesta se valida.
+  describe("tools de lectura del contrato: la respuesta real valida contra su schema", () => {
+    async function conProyecto(fn: (project: string) => Promise<void>): Promise<void> {
+      const project = crearProyectoDePrueba();
+      const anterior = process.env.TALEND_PROJECT;
+      clearActiveRepo();
+      process.env.TALEND_PROJECT = project;
+      try {
+        await fn(project);
+      } finally {
+        restoreEnv("TALEND_PROJECT", anterior);
+        rmSync(project, { recursive: true, force: true });
+      }
+    }
+
+    test("talend_show_flow", async () => {
+      await conProyecto(async () => {
+        const resultado = await createShowFlowTool().handler({ jobName: "lab04_olist_orders_to_staging" });
+        expect((resultado as { ok: boolean }).ok).toBe(true);
+        expect(validar("talend_show_flow", resultado)).toEqual([]);
+      });
+    });
+
+    test("talend_list_components", async () => {
+      await conProyecto(async () => {
+        const resultado = await createListComponentsTool().handler({ jobName: "lab04_olist_orders_to_staging" });
+        expect((resultado as { ok: boolean }).ok).toBe(true);
+        expect(validar("talend_list_components", resultado)).toEqual([]);
+      });
+    });
+
+    test("talend_list_project_contexts", async () => {
+      await conProyecto(async (project) => {
+        const resultado = await createListProjectContextsTool().handler({ projectPath: project });
+        expect((resultado as { ok: boolean }).ok).toBe(true);
+        expect(validar("talend_list_project_contexts", resultado)).toEqual([]);
+      });
+    });
+
+    test("talend_repo_status", async () => {
+      const resultado = await createRepoStatusTool().handler({ repoPath: process.cwd() });
+      expect((resultado as { ok: boolean }).ok).toBe(true);
+      expect(validar("talend_repo_status", resultado)).toEqual([]);
+    });
+
+    test("talend_repo_status y talend_list_project_contexts piden su ruta con un error claro", async () => {
+      const sinRepo = (await createRepoStatusTool().handler({} as { repoPath: string })) as { error?: { code: string } };
+      const sinProyecto = (await createListProjectContextsTool().handler({} as { projectPath: string })) as {
+        error?: { code: string };
+      };
+      expect(sinRepo.error?.code).toBe("INVALID_INPUT");
+      expect(sinProyecto.error?.code).toBe("INVALID_INPUT");
+    });
   });
 });
 
