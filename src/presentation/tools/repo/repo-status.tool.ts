@@ -14,6 +14,7 @@ export function createRepoStatusTool() {
     },
     handler: async (input: { repoPath: string }) => {
       const start = Date.now();
+      if (!input.repoPath) return fail("INVALID_INPUT", "Falta repoPath: la ruta al repositorio.", { startTime: start });
       try {
         const info = await getRepoInfo(input.repoPath);
         const project = await discoverTalendProject(input.repoPath);

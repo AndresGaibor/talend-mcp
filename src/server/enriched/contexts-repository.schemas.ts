@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { RepositoryContextSchema } from "./base-schemas";
+import { RepositoryContextSchema, TalendContextParameterSchema } from "./base-schemas";
 
 export const contextsRepositorySchemas: Record<string, z.ZodTypeAny> = {
   talend_create_repository_context: z.object({
@@ -16,7 +16,14 @@ export const contextsRepositorySchemas: Record<string, z.ZodTypeAny> = {
     parameterName: z.string(),
   }),
   talend_list_project_contexts: z.object({
-    contexts: z.array(z.string()),
+    contexts: z.array(z.object({
+      jobName: z.string(),
+      version: z.string(),
+      folderPath: z.string().optional(),
+      itemPath: z.string(),
+      contextName: z.string(),
+      parameters: z.array(TalendContextParameterSchema),
+    })),
   }),
   talend_list_repository_contexts: z.object({
     contexts: z.array(RepositoryContextSchema),
@@ -59,9 +66,13 @@ export const contextsRepositorySchemas: Record<string, z.ZodTypeAny> = {
   }),
   talend_repo_status: z.object({
     branch: z.string(),
-    commit: z.string(),
-    remote: z.string(),
-    project: z.string().nullable(),
+    lastCommit: z.string(),
+    hasRemote: z.boolean(),
+    project: z.object({
+      projectName: z.string(),
+      jobCount: z.number(),
+      hasMetadata: z.boolean(),
+    }),
   }),
   talend_repo_switch: z.object({
     switched: z.boolean(),

@@ -32,7 +32,12 @@ export const jobsAndComponentsSchemas: Record<string, z.ZodTypeAny> = {
     newJobPath: z.string(),
   }),
   talend_list_components: z.object({
-    components: z.array(z.string()),
+    jobName: z.string().optional(),
+    components: z.array(z.object({
+      uniqueName: z.string(),
+      componentName: z.string(),
+      label: z.string().optional(),
+    })),
     count: z.number(),
   }),
   talend_list_jobs: z.object({
@@ -72,7 +77,9 @@ export const jobsAndComponentsSchemas: Record<string, z.ZodTypeAny> = {
     newName: z.string(),
   }),
   talend_show_flow: z.object({
-    flow: z.string(),
+    jobName: z.string().optional(),
+    connections: z.array(TalendConnectionSchema),
+    count: z.number(),
   }),
   talend_add_connection: z.object({
     itemPath: z.string(),

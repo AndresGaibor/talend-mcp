@@ -14,6 +14,7 @@ export function createListProjectContextsTool() {
     },
     handler: async (input: { projectPath: string }) => {
       const start = Date.now();
+      if (!input.projectPath) return fail("INVALID_INPUT", "Falta projectPath: la ruta al proyecto Talend.", { startTime: start });
       try {
         const contexts = await listProjectContexts(input.projectPath);
         return ok({ contexts }, { startTime: start });
