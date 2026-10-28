@@ -69,12 +69,19 @@ async function problemsOf(bridge: TalendStudioBridgeClient, job: string): Promis
   }
 }
 
-type SpecValidation = { warnings: string[]; unavailableDrafts: Set<string> };
+type SpecValidation = { warnings: string[]; unavailableDrafts: Set<string>; skippedEdges: Set<string> };
+
+const edgeKey = (edge: { source: string; target: string }) => `${edge.source}->${edge.target}`;
+
+/** Un tMap/tXMLMap sin mapeo no tiene tabla de salida: Studio falla al conectar desde el. */
+const lacksOutputTable = (node: { componentName: string; mapper?: unknown }) =>
+  /^t(XML)?Map$/i.test(node.componentName) && !node.mapper;
 
 async function validate(spec: CustomJobSpec, deps: CustomSpecDependencies): Promise<SpecValidation> {
   folderOf(spec);
   const warnings: string[] = [];
   const unavailableDrafts = new Set<string>();
+  const skippedEdges = new Set<string>();
   const components = new Map(spec.components.map((node) => [node.uniqueName, node]));
   if (components.size !== spec.components.length) throw new Error("Nombres de componentes duplicados");
   if (new Set((spec.contexts ?? []).map((context) => context.name)).size !== (spec.contexts ?? []).length) throw new Error("Nombres de contexto duplicados");
@@ -108,12 +115,17 @@ async function validate(spec: CustomJobSpec, deps: CustomSpecDependencies): Prom
       continue;
     }
     if (["SUBJOB_OK", "SUBJOB_ERROR", "COMPONENT_OK", "COMPONENT_ERROR"].includes(edge.connectorName ?? "")) continue;
+    if (lacksOutputTable(source)) {
+      skippedEdges.add(edgeKey(edge));
+      warnings.push(`Conexión ${edge.source} → ${edge.target} no se creó porque ${edge.source} es un ${source.componentName} sin mapeo de salida; conéctalo en Studio al configurar el mapeo.`);
+      continue;
+    }
     if (edge.connectorName === "RUN_IF") throw new Error("RUN_IF necesita una condicion explicita; no se inventa una condicion");
     const check = await deps.validateConnection(source.componentName, target.componentName, edge.connectorName ?? "FLOW");
     if (!check.ok) throw new Error(check.errors.join(". "));
     warnings.push(...check.warnings);
   }
-  return { warnings, unavailableDrafts };
+  return { warnings, unavailableDrafts, skippedEdges };
 }
 
 // Un montaje cambia el editor activo: no se intercalan dos montajes custom.
@@ -174,6 +186,7 @@ export async function applyCustomJobSpec(input: CustomJobSpec, deps: CustomSpecD
       if (!Array.isArray(model?.connections)) throw new Error("Studio no permite comprobar las conexiones existentes");
       for (const edge of job.connections ?? []) {
         if (validations.get(job)?.unavailableDrafts.has(edge.source) || validations.get(job)?.unavailableDrafts.has(edge.target)) continue;
+        if (validations.get(job)?.skippedEdges.has(edgeKey(edge))) continue;
         const source = result.componentAliases[edge.source]!, target = result.componentAliases[edge.target]!;
         const connector = edge.connectorName ?? "FLOW";
         const existing = model.connections.filter((item) => item.source === source && item.target === target);

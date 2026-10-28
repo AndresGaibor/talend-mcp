@@ -164,3 +164,40 @@ test("omite un borrador ausente en Studio y conserva el pendiente en el contexto
   expect(result.warnings.join(" ")).toContain("no se creó");
   expect(fake.variables["job_with_unavailable_draft"]?.[0]?.comment).toContain("Confirmar mantenimiento SQL");
 });
+
+test("no conecta desde un tMap sin mapeo: Studio no tiene tabla de salida y la conexion fallaria a medias", async () => {
+  const fake = studio();
+
+  const result = await applyCustomJobSpec({
+    jobName: "job_with_mapperless_tmap",
+    folderPath: "Process/test",
+    components: [
+      { uniqueName: "map_1", componentName: "tMap", draftOnly: true, draftReason: "Falta el esquema de entrada" },
+      { uniqueName: "filter_2", componentName: "tFilterRow", draftOnly: true, draftReason: "Falta el filtro" },
+    ],
+    connections: [{ source: "map_1", target: "filter_2", connectorName: "FLOW", label: "row_3_1" }],
+  }, fake.dependencies);
+
+  expect(result.generatedComponents).toBe(2);
+  expect(result.generatedConnections).toBe(0);
+  expect(fake.events.filter((event) => event.startsWith("connect:"))).toHaveLength(0);
+  expect(result.warnings.join(" ")).toContain("map_1 → filter_2");
+  expect(result.warnings.join(" ")).toContain("no se creó");
+  expect(result.warnings.join(" ")).toContain("tMap");
+});
+
+test("un tMap con mapeo si se conecta", async () => {
+  const fake = studio();
+
+  const result = await applyCustomJobSpec({
+    jobName: "job_with_configured_tmap",
+    folderPath: "Process/test",
+    components: [
+      { uniqueName: "map_1", componentName: "tMap", mapper: { inputs: [], outputs: [{ name: "row_3_1", columns: [] }] } },
+      { uniqueName: "out_2", componentName: "tLogRow" },
+    ],
+    connections: [{ source: "map_1", target: "out_2", connectorName: "FLOW", label: "row_3_1" }],
+  }, fake.dependencies);
+
+  expect(result.generatedConnections).toBe(1);
+});
