@@ -1,6 +1,7 @@
 import { test, expect, describe } from "bun:test";
 import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const FORBIDDEN_PATTERNS = [
   { pattern: /\/Users\/andresgaibor/, reason: "ruta personal" },
@@ -42,7 +43,7 @@ async function checkFileForPatterns(filePath: string, patterns: typeof FORBIDDEN
 
 describe("no hardcoded local paths in src", () => {
   test("src no contiene rutas personales ni nombres de proyecto", async () => {
-    const srcDir = new URL("../../src", import.meta.url).pathname;
+    const srcDir = fileURLToPath(new URL("../../src", import.meta.url));
     const files = findFiles(srcDir, [".ts"]);
     const allOffenders: string[] = [];
     for (const file of files) {
@@ -52,11 +53,13 @@ describe("no hardcoded local paths in src", () => {
   });
 
   test("scripts no contiene rutas personales excepto en directorios permitidos", async () => {
-    const scriptsDir = new URL("../../scripts", import.meta.url).pathname;
+    const scriptsDir = fileURLToPath(new URL("../../scripts", import.meta.url));
     const files = findFiles(scriptsDir, [".ts"]);
+    // Si el barrido no encuentra archivos, el test pasaria en vacio (pasaba en Windows con `URL.pathname`).
+    expect(files.length).toBeGreaterThan(0);
     const allOffenders: string[] = [];
     for (const file of files) {
-      const relPath = file.replace(scriptsDir + "/", "");
+      const relPath = relative(scriptsDir, file).replaceAll("\\", "/");
       const isInAllowedDir = ALLOWED_DIRS_IN_SCRIPTS.some((d) => relPath.startsWith(d + "/"));
       if (!isInAllowedDir) {
         const content = await Bun.file(file).text();

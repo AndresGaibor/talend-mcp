@@ -61,7 +61,6 @@ export function studioHomeCandidates(
   } else if (os === "darwin") {
     candidates.push(
       "/Applications/Talend Studio/studio",
-      "/Applications/TalendStudio-8.0.1/studio",
       "/Applications/Talend Studio 8.0.1/studio",
     );
     for (const entry of safeReaddir("/Applications")) {

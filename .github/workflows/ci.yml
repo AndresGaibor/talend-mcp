@@ -48,8 +48,11 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Sin `maven-version` la accion instala Maven 3.5.4, y Tycho 4.x exige 3.9 o superior.
       - name: Setup Maven
         uses: stCarolas/setup-maven@v4
+        with:
+          maven-version: 3.9.9
 
       - name: Build plugin
         run: mvn -B clean verify -DskipTests
