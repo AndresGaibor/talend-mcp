@@ -128,6 +128,7 @@ export const PRESET_PORTAL = new Set([
   "talend_job_info",
   "talend_job_problems",
   "talend_list_components",
+  "talend_component_icon",
   "talend_preview_component_parameter",
   "talend_preview_schema_column",
   "talend_repo_sources",

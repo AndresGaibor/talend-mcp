@@ -138,7 +138,7 @@ export class BridgeNodeClient extends BridgeContextClient {
   }
 
   /** Lista los componentes del catalogo de Talend. */
-  async listComponents(options?: { filter?: string; limit?: number }): Promise<BridgeResult<Record<string, unknown>>> {
+  async listComponents(options?: { filter?: string; limit?: number; paletteType?: string }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/components", {
       method: "POST",
       body: options ?? {},

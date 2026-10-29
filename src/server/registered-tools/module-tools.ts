@@ -49,6 +49,7 @@ import { createSchemaSuggestionsTool } from "../../modules/component-knowledge/t
 import { createCatalogRebuildTool } from "../../modules/component-knowledge/tools/catalog-rebuild.tool";
 import { createJobQualityReportTool, createJobQualityIssuesTool } from "../../modules/component-knowledge/tools/job-quality.tool";
 import { createComponentDefinitionTool } from "../../modules/component-definitions/tools/component-definition.tool";
+import { createComponentIconTool } from "../../modules/component-definitions/tools/component-icon.tool";
 import { createAgentGuideTool } from "../../modules/guide/tools/agent-guide.tool";
 
 /**
@@ -99,6 +100,7 @@ export function getModuleTools(listTools: () => McpToolDefinition[]): RuntimeToo
     createJobQualityReportTool(),
     createJobQualityIssuesTool(),
     createComponentDefinitionTool(),
+    createComponentIconTool(),
     createAgentGuideTool({ listTools }),
   ];
 

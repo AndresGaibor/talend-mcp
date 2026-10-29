@@ -8,10 +8,11 @@ export const componentCatalogTools = [
     inputSchema: z.object({
       filter: z.string().optional().describe("Texto que tiene que aparecer en el nombre del componente"),
       limit: z.number().optional().describe("Maximo de componentes a devolver"),
+      paletteType: z.enum(["DI", "SPARK", "SPARKSTREAMING", "STRUCTUREDSTREAMING", "OTHER", "*"]).optional().describe("Paleta de Studio; * incluye todas las paletas"),
     }),
-    handler: async ({ filter, limit }: { filter?: string; limit?: number }) => {
+    handler: async ({ filter, limit, paletteType }: { filter?: string; limit?: number; paletteType?: string }) => {
       const bridge = await loadBridge();
-      const result = await bridge.listComponents({ filter, limit });
+      const result = await bridge.listComponents({ filter, limit, paletteType });
       return bridgeOk({
         ok: result.ok,
         source: result.source,
