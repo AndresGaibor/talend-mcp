@@ -274,3 +274,57 @@ entrecomillado, unidas con `and` y `or`, agrupadas con parentesis. Se pueden eva
 
 Un parametro cuya condicion no se puede decidir (porque depende de otro que no se conoce) se rellena con su
 valor por defecto: es inofensivo.
+
+## 31. Etiquetas, orden y grupos del panel de Studio
+
+El XML de la definicion dice que parametros hay y de que tipo son, pero no como se llaman en pantalla
+ni en que orden se pintan. Eso vive en el `<nombre>_messages.properties` que acompaña al XML, y en los
+atributos `NUM_ROW` y `GROUP` del propio XML. El indice de definiciones lee los dos.
+
+**Claves del properties (verificadas en la instalacion 8.0.x):**
+
+| Clave | Que etiqueta |
+|---|---|
+| `LONG_NAME` | nombre largo del componente (`ComponentDefinition.label`) |
+| `HELP` | clave de ayuda, p. ej. `org.talend.help.tFileInputDelimited` (`helpKey`) |
+| `<PARAM>.NAME` | etiqueta del parametro (`label`) |
+| `<PARAM>.HELP` | ayuda del parametro (`help`) |
+| `<PARAM>.ITEM.<VALOR>` | etiqueta de una opcion de lista (`options[].label`) |
+| `<PARAM>.ITEM.<COLUMNA>` | etiqueta de una columna de tabla (`table.columns[].label`) |
+| `<PARAM>.ITEM.<COLUMNA>.ITEM.<VALOR>` | etiqueta de una opcion de celda de tabla |
+
+Nota: las columnas de tabla no usan `<COLUMNA>.NAME`, como habia previsto el diseño inicial. Usan
+`<PARAM>.ITEM.<COLUMNA>`, igual que las opciones: `TRIMSELECT.ITEM.TRIM=Trim` en `tFileInputDelimited`.
+
+Si no existe el properties, las etiquetas quedan `undefined`. No se inventan.
+
+**Orden y grupo:** `NUM_ROW` da la fila del formulario (numero). Un parametro sin `NUM_ROW` va al final de
+su pestaña. `GROUP` dice el grupo; el nombre del grupo sale de `<GROUP>.NAME` (no se guarda en el modelo).
+
+**Pestañas:** `<PARAMETERS>` es Basic y `<ADVANCED_PARAMETERS>` es Advanced.
+
+**Snapshot para la web.** `bun run panels:build` escribe `rules/talend/component-panels.json` (raiz del
+portal) con los componentes del alcance del portal:
+
+```bash
+bun run panels:build                                  # usa TALEND_STUDIO_HOME o la deteccion habitual
+bun run panels:build -- --studio-home "<carpeta studio>"
+bun run panels:build -- --out <ruta> --scope <json> --scope <json>   # --scope es repetible
+```
+
+- `--out`: fichero de salida. Por defecto `rules/talend/component-panels.json`.
+- `--studio-home`: carpeta `studio` de Talend. Si falta, se usa el resolver de `talend-paths.ts`.
+- `--scope`: JSON de alcance, repetible. Por defecto `rules/talend/migration-candidate-scope.json` y
+  `rules/mappings/talend-components.json`. De ellos se toman los nombres `^t[A-Z]\w+$` que aparecen como
+  valores o claves. Además se incluye siempre la lista fija de `SIEMPRE_INCLUIDOS`
+  (`src/modules/component-definitions/application/component-panels.ts`).
+
+El formato es un contrato con la web (`version: 1`). Cada parametro trae `name`, `label`, `field`,
+`required`, `show`, `showIf`, `notShowIf`, `defaultValue`, `numRow`, `group`, `repositoryValue`,
+`options` y `table`. `defaultValue` es el literal Java, con sus comillas. Los parametros `LABEL` o `EMPTY`
+sin etiqueta se omiten: son texto decorativo de Studio.
+
+Los componentes que no tienen `<nombre>_java.xml` en la instalacion no entran en el snapshot y se listan
+en la salida del comando como no encontrados. En la 8.0.1 instalada son 8: `tDBClose`, `tDBConnection`,
+`tDBInput`, `tDBOutput` y `tDBRow` (no hay carpeta en ningun plugin), y `tS3Connection`, `tS3Get` y
+`tS3Put`, cuya carpeta solo trae los properties traducidos (`_fr`, `_zh_CN`), sin XML.

@@ -15,8 +15,18 @@ export type ComponentPalette =
   | "STRUCTUREDSTREAMING"
   | "OTHER";
 
+/** Elemento de una lista cerrada: nombre interno, valor guardado y etiqueta visible en Studio. */
+export type DefinitionOption = {
+  name: string;
+  value: string;
+  /** Etiqueta visible (`<PARAM>.ITEM.<NAME>` del properties). Ausente si no hay properties. */
+  label?: string;
+};
+
 export type DefinitionParameter = {
   name: string;
+  /** Etiqueta visible en Studio (`<PARAM>.NAME` del properties). */
+  label?: string;
   /** Tipo de campo de Studio: TEXT, FILE, CHECK, OPENED_LIST... */
   field: string;
   /** `REQUIRED="true"` en el XML. */
@@ -34,11 +44,17 @@ export type DefinitionParameter = {
   /** Valores posibles de una lista (`<ITEMS>`). */
   possibleValues?: string[];
   /** Elementos de una lista con su nombre (lo que se ve) y su valor (lo que se guarda en el `.item`). */
-  options?: Array<{ name: string; value: string }>;
+  options?: DefinitionOption[];
   /** Nombre del elemento por defecto de una lista (`<ITEMS DEFAULT="AND">`); vacio si no hay. */
   defaultOption?: string;
   /** Viene de `<ADVANCED_PARAMETERS>` (pestaña de ajustes avanzados). */
   advanced: boolean;
+  /** Fila del formulario (`NUM_ROW`): el orden en que Studio las pinta. */
+  numRow?: number;
+  /** Grupo al que pertenece (`GROUP`), si lo declara. */
+  group?: string;
+  /** Texto de ayuda del parámetro (`<PARAM>.HELP` del properties). */
+  help?: string;
   /** Estructura de la tabla, si el parámetro es de tipo TABLE. */
   table?: DefinitionTable;
 };
@@ -60,10 +76,12 @@ export type DefinitionTable = {
 
 export type DefinitionTableColumn = {
   name: string;
+  /** Etiqueta visible de la columna (`<PARAM>.ITEM.<COLUMN>` del properties). */
+  label?: string;
   /** Valor por defecto de la celda (ya es literal Java). */
   defaultValue?: string;
   /** Valores posibles, si la celda es una lista cerrada. */
-  options?: Array<{ name: string; value: string }>;
+  options?: DefinitionOption[];
 };
 
 export type DefinitionConnector = {
@@ -98,6 +116,10 @@ export type DefinitionReturn = {
 
 export type ComponentDefinition = {
   name: string;
+  /** Nombre largo que muestra Studio (`LONG_NAME` del properties). */
+  label?: string;
+  /** Clave de ayuda (`HELP` del properties), p. ej. `org.talend.help.tFileInputDelimited`. */
+  helpKey?: string;
   /** Familia principal (la primera que declara el XML). */
   family: string;
   /** Todas las familias: un componente puede estar en varias. */

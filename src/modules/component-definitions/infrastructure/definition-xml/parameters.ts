@@ -1,4 +1,5 @@
 import type {
+  DefinitionOption,
   DefinitionParameter,
   DefinitionTable,
   DefinitionTableColumn,
@@ -11,6 +12,14 @@ import {
   defaultValueOf,
   flag,
 } from "./xml-helpers";
+
+/** Etiquetas del properties del componente (vacio si no existe el fichero). */
+export type Messages = Record<string, string>;
+
+/** Etiqueta de una clave del properties, o undefined si no esta. */
+function labelOf(messages: Messages, key: string): string | undefined {
+  return messages[key];
+}
 
 export function parseItems(parameter: Bag): string[] | undefined {
   const items = asBag(parameter["ITEMS"] ?? parameter["items"]);
@@ -25,15 +34,25 @@ export function parseItems(parameter: Bag): string[] | undefined {
   return values.length > 0 ? values : undefined;
 }
 
-/** Elementos de una lista cerrada, con nombre y valor (`<ITEM NAME="AND" VALUE="&amp;&amp;"/>`). */
-export function parseOptions(parameter: Bag): Array<{ name: string; value: string }> | undefined {
+/**
+ * Elementos de una lista cerrada, con nombre y valor (`<ITEM NAME="AND" VALUE="&amp;&amp;"/>`).
+ * La etiqueta visible sale de `<PARAM>.ITEM.<NAME>` del properties.
+ */
+export function parseOptions(
+  parameter: Bag,
+  messages: Messages = {},
+  paramName = attr(parameter, "NAME") ?? "",
+): DefinitionOption[] | undefined {
   const items = asBag(parameter["ITEMS"] ?? parameter["items"]);
-  const options: Array<{ name: string; value: string }> = [];
+  const options: DefinitionOption[] = [];
   for (const raw of asArray(items["ITEM"] ?? items["item"])) {
     const item = asBag(raw);
     const name = attr(item, "NAME");
     if (!name) continue;
-    options.push({ name, value: attr(item, "VALUE") ?? name });
+    const option: DefinitionOption = { name, value: attr(item, "VALUE") ?? name };
+    const label = labelOf(messages, `${paramName}.ITEM.${name}`);
+    if (label !== undefined) option.label = label;
+    options.push(option);
   }
   return options.length > 0 ? options : undefined;
 }
@@ -43,9 +62,14 @@ export function parseOptions(parameter: Bag): Array<{ name: string; value: strin
  *
  * El XML declara las columnas con su valor por defecto. Una celda puede ser
  * una lista cerrada (`FIELD="CLOSED_LIST"`), y entonces su valor por defecto
- * es el del elemento que marca `DEFAULT`.
+ * es el del elemento que marca `DEFAULT`. Las etiquetas de columna y de sus
+ * opciones salen de `<PARAM>.ITEM.<COLUMN>` y `<PARAM>.ITEM.<COLUMN>.ITEM.<OPTION>`.
  */
-export function parseTable(parameter: Bag): DefinitionTable | undefined {
+export function parseTable(
+  parameter: Bag,
+  messages: Messages = {},
+  paramName = attr(parameter, "NAME") ?? "",
+): DefinitionTable | undefined {
   const items = asBag(parameter["ITEMS"] ?? parameter["items"]);
   const list = asArray(items["ITEM"] ?? items["item"]);
   if (list.length === 0) return undefined;
@@ -55,7 +79,10 @@ export function parseTable(parameter: Bag): DefinitionTable | undefined {
     const item = asBag(raw);
     const name = attr(item, "NAME");
     if (!name) continue;
+    const columnKey = `${paramName}.ITEM.${name}`;
     const column: DefinitionTableColumn = { name };
+    const label = labelOf(messages, columnKey);
+    if (label !== undefined) column.label = label;
     const value = attr(item, "VALUE");
     if (value !== undefined) {
       column.defaultValue = value;
@@ -63,13 +90,16 @@ export function parseTable(parameter: Bag): DefinitionTable | undefined {
     const inner = asBag(item["ITEMS"] ?? item["items"]);
     const options = asArray(inner["ITEM"] ?? inner["item"]);
     if (options.length > 0) {
-      const parsed: Array<{ name: string; value: string }> = [];
+      const parsed: DefinitionOption[] = [];
       for (const rawOption of options) {
         const option = asBag(rawOption);
         const optionName = attr(option, "NAME");
         const optionValue = attr(option, "VALUE");
         if (optionName && optionValue !== undefined) {
-          parsed.push({ name: optionName, value: optionValue });
+          const parsedOption: DefinitionOption = { name: optionName, value: optionValue };
+          const optionLabel = labelOf(messages, `${columnKey}.ITEM.${optionName}`);
+          if (optionLabel !== undefined) parsedOption.label = optionLabel;
+          parsed.push(parsedOption);
         }
       }
       if (parsed.length > 0) {
@@ -90,7 +120,15 @@ export function parseTable(parameter: Bag): DefinitionTable | undefined {
   };
 }
 
-export function parseParameters(component: Bag): DefinitionParameter[] {
+/** `NUM_ROW` como numero; undefined si no esta o no es numerico. */
+function numRowOf(parameter: Bag): number | undefined {
+  const raw = attr(parameter, "NUM_ROW");
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+export function parseParameters(component: Bag, messages: Messages = {}): DefinitionParameter[] {
   const parameters: DefinitionParameter[] = [];
   const seen = new Set<string>();
 
@@ -109,7 +147,8 @@ export function parseParameters(component: Bag): DefinitionParameter[] {
       if (!name || seen.has(name)) continue;
       seen.add(name);
 
-      parameters.push({
+      const isList = /LIST$/.test(attr(parameter, "FIELD") ?? "");
+      const definition: DefinitionParameter = {
         name,
         field: attr(parameter, "FIELD") ?? "TEXT",
         required: flag(parameter, "REQUIRED", false),
@@ -119,13 +158,22 @@ export function parseParameters(component: Bag): DefinitionParameter[] {
         defaultValue: defaultValueOf(parameter),
         repositoryValue: attr(parameter, "REPOSITORY_VALUE"),
         possibleValues: parseItems(parameter),
-        options: /LIST$/.test(attr(parameter, "FIELD") ?? "") ? parseOptions(parameter) : undefined,
-        defaultOption: /LIST$/.test(attr(parameter, "FIELD") ?? "")
+        options: isList ? parseOptions(parameter, messages, name) : undefined,
+        defaultOption: isList
           ? attr(asBag(parameter["ITEMS"] ?? parameter["items"]), "DEFAULT")
           : undefined,
         advanced: section.advanced,
-        table: parseTable(parameter),
-      });
+        table: parseTable(parameter, messages, name),
+      };
+      const label = labelOf(messages, `${name}.NAME`);
+      if (label !== undefined) definition.label = label;
+      const numRow = numRowOf(parameter);
+      if (numRow !== undefined) definition.numRow = numRow;
+      const group = attr(parameter, "GROUP");
+      if (group) definition.group = group;
+      const help = labelOf(messages, `${name}.HELP`);
+      if (help !== undefined) definition.help = help;
+      parameters.push(definition);
     }
   }
 

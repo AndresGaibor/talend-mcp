@@ -5,6 +5,7 @@ import type {
 import { parseConnectors } from "./connectors";
 import { parseFamilies, parseImports, parseReturns } from "./imports-returns";
 import { parseParameters } from "./parameters";
+import type { Messages } from "./parameters";
 import { type Bag, asBag, attr, flag, parseXmlBag } from "./xml-helpers";
 
 export type ParseContext = {
@@ -12,6 +13,8 @@ export type ParseContext = {
   pluginId: string;
   palette: ComponentPalette;
   definitionPath: string;
+  /** Etiquetas del `<nombre>_messages.properties`; vacio o ausente si no existe. */
+  messages?: Messages;
 };
 
 /**
@@ -38,11 +41,12 @@ export function parseDefinitionXml(xml: string, context: ParseContext): Componen
   const name = attr(header, "NAME") ?? context.name;
   if (!name) return null;
 
-  const parameters = parseParameters(component);
+  const messages = context.messages ?? {};
+  const parameters = parseParameters(component, messages);
   const connectors = parseConnectors(component);
   const families = parseFamilies(component);
 
-  return {
+  const definition: ComponentDefinition = {
     name,
     family: families[0] ?? "Unknown",
     families,
@@ -57,4 +61,7 @@ export function parseDefinitionXml(xml: string, context: ParseContext): Componen
     imports: parseImports(component),
     returns: parseReturns(component),
   };
+  if (messages.LONG_NAME !== undefined) definition.label = messages.LONG_NAME;
+  if (messages.HELP !== undefined) definition.helpKey = messages.HELP;
+  return definition;
 }

@@ -29,6 +29,7 @@
     "contexts": "bun run scripts/contexts.ts",
     "docs:tools": "bun run scripts/generate-tool-catalog.ts",
     "docs:componentes": "bun run scripts/catalogo-componentes.ts",
+    "panels:build": "bun run scripts/component-panels.ts",
     "mapa": "bun run scripts/mapa.ts",
     "benchmark:performance": "bun run scripts/performance-benchmark.ts",
     "test": "bun test",

@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { resolveTalendPluginsDir } from "../../../talend/components/talend-paths";
 import { parseDefinitionXml } from "./definition-xml.parser";
+import { parseMessagesProperties } from "./definition-xml/messages";
 import type {
   ComponentDefinition,
   ComponentPalette,
@@ -26,7 +27,7 @@ const CACHE_FILE = "component-definitions.json";
 /** La instalación de Studio cambia muy seldom; el caché aguanta un día. */
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 /** Si cambia el formato del índice, el caché viejo no sirve. */
-const INDEX_VERSION = 6;
+const INDEX_VERSION = 7;
 
 /** Del id del plugin se deduce a qué tipo de job pertenece el componente. */
 function paletteOf(pluginId: string): ComponentPalette {
@@ -41,6 +42,41 @@ function paletteOf(pluginId: string): ComponentPalette {
   if (id.includes("tdqprovider") || id.includes("tisprovider") || id.includes("ipaas")) return "DI";
   if (id.includes("publish.cloud")) return "DI";
   return "OTHER";
+}
+
+/**
+ * Etiquetas del `<nombre>_messages.properties` junto al XML. Si el fichero no
+ * existe o no se puede leer, devuelve un mapa vacio: no se inventan etiquetas.
+ */
+function readMessages(definitionPath: string, name: string): Record<string, string> {
+  const propertiesPath = join(dirname(definitionPath), `${name}_messages.properties`);
+  try {
+    if (!existsSync(propertiesPath)) return {};
+    return parseMessagesProperties(readFileSync(propertiesPath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Elige una definicion entre las que comparten nombre: la de la paleta pedida;
+ * si no hay, la Standard (DI); si no, la primera que no sea OTHER.
+ */
+export function elegirDefinicion(
+  candidates: ComponentDefinition[],
+  palette?: ComponentPalette,
+): ComponentDefinition | null {
+  if (candidates.length === 0) return null;
+  if (palette) {
+    const exact = candidates.find((component) => component.palette === palette);
+    if (exact) return exact;
+  }
+  return (
+    candidates.find((component) => component.palette === "DI") ??
+    candidates.find((component) => component.palette !== "OTHER") ??
+    candidates[0] ??
+    null
+  );
 }
 
 /** Carpetas donde un plugin puede llevar sus componentes. */
@@ -153,6 +189,7 @@ export class DefinitionIndexRepository {
             pluginId,
             palette,
             definitionPath,
+            messages: readMessages(definitionPath, name),
           });
           if (definition) components.push(definition);
         }
@@ -171,17 +208,7 @@ export class DefinitionIndexRepository {
   async find(name: string, palette?: ComponentPalette): Promise<ComponentDefinition | null> {
     const index = await this.load();
     const candidates = index.components.filter((component) => component.name === name);
-    if (candidates.length === 0) return null;
-    if (palette) {
-      const exact = candidates.find((component) => component.palette === palette);
-      if (exact) return exact;
-    }
-    return (
-      candidates.find((component) => component.palette === "DI") ??
-      candidates.find((component) => component.palette !== "OTHER") ??
-      candidates[0] ??
-      null
-    );
+    return elegirDefinicion(candidates, palette);
   }
 
   /** Definiciones que cuadran con un filtro de texto (nombre o familia). */
