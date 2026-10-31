@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { getRuntimeTools } from "../../../server/registered-tools";
 import { toCallToolResult } from "../call-tool-result";
-import { handleMcpRequest, jsonRpcError, jsonRpcOk, sendJson } from "../json-rpc";
+import { handleMcpRequest, jsonRpcError, jsonRpcOk, sendJson, sendJsonText } from "../json-rpc";
 import { createNewMcpServer } from "./common";
 import { handleEarlyRoute, PayloadTooLargeError, readBody } from "./http-routes";
 import type { NewServerHandle, NewServerOptions } from "./types";
@@ -19,6 +19,7 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
   const maxBodyBytes = options?.maxBodyBytes ?? env.TALEND_MCP_MAX_BODY_BYTES;
   const toolTimeoutMs = options?.toolTimeoutMs ?? env.TALEND_MCP_TOOL_TIMEOUT_MS;
   const maxConcurrentCalls = options?.maxConcurrentCalls ?? env.TALEND_MCP_MAX_CONCURRENT_CALLS;
+  const maxResponseBytes = options?.maxResponseBytes ?? env.TALEND_MCP_MAX_RESPONSE_BYTES;
   const path = "/mcp";
 
   // El catalogo de tools se arma una sola vez: `tools/list` y `tools/call`
@@ -138,7 +139,16 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
       }
       try {
         const result = await conTiempoLimite(toolName, toolTimeoutMs, () => tool.handler(p.arguments ?? {}));
-        sendJson(res, origin, jsonRpcOk(id, toCallToolResult(result)));
+        // Se serializa una sola vez y se mide antes de responder: una tool que
+        // devuelve el catalogo entero no debe mandar cientos de MB por el socket.
+        const texto = JSON.stringify(toCallToolResult(result));
+        const bytes = Buffer.byteLength(texto, "utf8");
+        if (bytes > maxResponseBytes) {
+          sendJson(res, origin, jsonRpcError(id, -32000,
+            `La respuesta de ${toolName} ocupa ${bytes} bytes y el tope es ${maxResponseBytes}. Pide menos datos (limit, offset o un job concreto).`));
+          return;
+        }
+        sendJsonText(res, origin, `{"jsonrpc":"2.0","id":${JSON.stringify(id ?? null)},"result":${texto}}`);
       } catch (err: unknown) {
         if (err instanceof ToolTimeoutError) {
           sendJson(res, origin, jsonRpcError(id, -32000, err.message));

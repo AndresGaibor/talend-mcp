@@ -42,6 +42,8 @@ export const TalendMcpEnvSchema = z.object({
   TALEND_MCP_TOOL_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
   /** Llamadas a tools que se atienden a la vez; el resto recibe error de servidor ocupado. */
   TALEND_MCP_MAX_CONCURRENT_CALLS: z.coerce.number().int().positive().default(4),
+  /** Tope de una respuesta de tool; por encima se responde error y se pide paginar. */
+  TALEND_MCP_MAX_RESPONSE_BYTES: z.coerce.number().int().positive().default(16 * 1024 * 1024),
 
   TALEND_BRIDGE_HOST: z.string().default("127.0.0.1"),
   TALEND_BRIDGE_PORT: z.coerce.number().default(3930),

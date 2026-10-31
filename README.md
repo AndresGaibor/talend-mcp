@@ -192,6 +192,7 @@ visibles:
 | `TALEND_MCP_RUNS_DIR` | Carpeta del historial de ejecuciones (por defecto `.talend-mcp/runs`). |
 | `TALEND_MCP_TOOL_TIMEOUT_MS` | Plazo de una llamada a una tool (por defecto `600000`). Al vencer responde que no termino. |
 | `TALEND_MCP_MAX_CONCURRENT_CALLS` | Llamadas a tools atendidas a la vez (por defecto `4`); el resto recibe servidor ocupado. |
+| `TALEND_MCP_MAX_RESPONSE_BYTES` | Tope de una respuesta de tool (por defecto `16777216`); por encima responde error y pide paginar. |
 | `TALEND_STUDIO_HOME` | Instalación de Studio (carpeta con `plugins/` y `features/`). |
 | `TALEND_BRIDGE_AUTO_INSTALL` | `0` desactiva la actualización automática del plugin al arrancar. |
 | `TALEND_MCP_LOG` | `quiet`, `normal` o `verbose` para los mensajes de los CLI. |

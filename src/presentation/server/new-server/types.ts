@@ -7,6 +7,8 @@ export interface NewServerOptions {
   toolTimeoutMs?: number;
   /** Tools simultaneas. Por defecto, `TALEND_MCP_MAX_CONCURRENT_CALLS`. */
   maxConcurrentCalls?: number;
+  /** Tope de una respuesta de tool. Por defecto, `TALEND_MCP_MAX_RESPONSE_BYTES`. */
+  maxResponseBytes?: number;
 }
 
 export interface NewServerHandle {
