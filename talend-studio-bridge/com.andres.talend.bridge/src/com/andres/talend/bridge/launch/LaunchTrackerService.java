@@ -659,6 +659,31 @@ public final class LaunchTrackerService {
    * Para los vigilantes. Se llama al detener el plugin, que tambien ocurre al
    * recargarlo en caliente: asi no quedan hilos del classloader anterior.
    */
+  /** Vigilantes en curso: cada uno espera al proceso de un lanzamiento. */
+  public static int activeObservers() {
+    return observers.size();
+  }
+
+  /**
+   * Espera a que no queden lanzamientos vigilados.
+   *
+   * La recarga en caliente suelta el servidor y el classloader; si hay un job
+   * corriendo, su vigilante quedaria huerfano. Se espera un tiempo acotado y,
+   * si no termina, se recarga igual avisando.
+   */
+  public static boolean waitForIdle(long maxMs) {
+    long deadline = System.currentTimeMillis() + maxMs;
+    while (!observers.isEmpty() && System.currentTimeMillis() < deadline) {
+      try {
+        Thread.sleep(500);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return observers.isEmpty();
+      }
+    }
+    return observers.isEmpty();
+  }
+
   public static void stopObservers() {
     for (Thread observer : observers.values()) {
       observer.interrupt();

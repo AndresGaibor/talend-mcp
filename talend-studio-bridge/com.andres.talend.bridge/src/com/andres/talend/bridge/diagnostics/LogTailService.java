@@ -48,6 +48,9 @@ public final class LogTailService {
       Tail tail = readTail(file, lines);
       payload.put("available", true);
       payload.put("file", file.getAbsolutePath());
+      // El tamano se informa aunque solo se lea la cola: un log de cientos de MB
+      // es la senal de que toca rotarlo.
+      payload.put("sizeBytes", file.length());
       payload.put("truncated", tail.truncated);
       payload.put("lines", tail.lines);
       return payload;

@@ -209,8 +209,21 @@ public final class CodeRunnerService {
     return true;
   }
 
+  /**
+   * Classpath ya resuelto.
+   *
+   * Recorrer todos los bundles en cada compilacion costaba y retenia
+   * referencias; los bundles no cambian mientras Studio este abierto, asi que
+   * se resuelve una vez por carga del plugin.
+   */
+  private static volatile List<String> cachedClasspath;
+
   /** Classpath con los jars de los bundles activos de Studio. */
   private static List<String> studioClasspath() {
+    List<String> cacheado = cachedClasspath;
+    if (cacheado != null) {
+      return cacheado;
+    }
     List<String> entries = new ArrayList<>();
     for (org.osgi.framework.Bundle bundle : org.eclipse.core.runtime.Platform.getBundle(
         "org.talend.core.runtime").getBundleContext().getBundles()) {
@@ -223,6 +236,7 @@ public final class CodeRunnerService {
         // Un bundle que no se puede localizar no aporta al classpath.
       }
     }
+    cachedClasspath = entries;
     return entries;
   }
 

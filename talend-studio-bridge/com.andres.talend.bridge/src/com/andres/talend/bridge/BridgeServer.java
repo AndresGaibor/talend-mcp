@@ -373,6 +373,14 @@ final class BridgeServer {
     payload.put("javaVersion", System.getProperty("java.version"));
     payload.put("startedAt", STARTED_AT);
     payload.put("uptimeMs", System.currentTimeMillis() - STARTED_AT);
+    // El heap de Studio se ve sin abrir la vista de memoria: es lo que crece
+    // con cada editor y cada launch que no se cierra.
+    Runtime runtime = Runtime.getRuntime();
+    long used = runtime.totalMemory() - runtime.freeMemory();
+    long max = runtime.maxMemory();
+    payload.put("heapUsedBytes", used);
+    payload.put("heapMaxBytes", max);
+    payload.put("heapUsedPercent", max <= 0 ? 0 : Math.round(used * 100.0 / max));
     return payload;
   }
 

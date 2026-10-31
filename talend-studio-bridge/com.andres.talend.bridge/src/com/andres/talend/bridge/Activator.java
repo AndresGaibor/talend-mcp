@@ -40,6 +40,12 @@ public final class Activator extends AbstractUIPlugin {
     // guardian: si siguen vivos, siguen usando el classloader descartado y
     // Eclipse falla con "Invalid class loader from a refreshed bundle".
     hotReloadService.setBeforeReload(() -> {
+      // Recargar en medio de una ejecucion deja el proceso y su vigilante
+      // apuntando al classloader viejo: se espera a que terminen.
+      if (!LaunchTrackerService.waitForIdle(30_000)) {
+        BridgeLog.warn("Se recarga el plugin con " + LaunchTrackerService.activeObservers()
+            + " lanzamiento(s) en curso");
+      }
       ModalGuard.stopWatchdog();
       if (bridgeServer != null) {
         bridgeServer.stop();
