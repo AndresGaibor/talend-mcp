@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.andres.talend.bridge.BridgeLog;
 import com.andres.talend.bridge.UiThread;
@@ -39,6 +40,17 @@ public final class JobExecutor {
 
   /** Tiempo maximo de la ejecucion, en milisegundos. */
   private static final long DEFAULT_TIMEOUT_MS = 300_000L;
+
+  /**
+   * Tope de caracteres por flujo.
+   *
+   * La salida se acumula en memoria mientras corre el job: un job verboso (o un
+   * bucle de log) puede generar cientos de MB y tumbar el bridge. Se conserva
+   * el final, que es donde aparecen los errores.
+   */
+  private static final int MAX_SALIDA_CHARS = 2_000_000;
+
+  private static final String AVISO_RECORTE = "...[salida recortada]...\n";
 
   /**
    * Ejecuta el job generado y devuelve su salida.
@@ -128,8 +140,10 @@ public final class JobExecutor {
 
     StringBuilder stdout = new StringBuilder();
     StringBuilder stderr = new StringBuilder();
-    Thread out = drain(process.getInputStream(), stdout);
-    Thread err = drain(process.getErrorStream(), stderr);
+    AtomicBoolean stdoutRecortado = new AtomicBoolean(false);
+    AtomicBoolean stderrRecortado = new AtomicBoolean(false);
+    Thread out = drain(process.getInputStream(), stdout, stdoutRecortado);
+    Thread err = drain(process.getErrorStream(), stderr, stderrRecortado);
 
     Integer exitCode = null;
     boolean finished = false;
@@ -139,10 +153,20 @@ public final class JobExecutor {
       Thread.currentThread().interrupt();
     }
     if (!finished) {
+      // `destroyForcibly` solo mata la JVM del job; los procesos que esta lanzo
+      // (comandos, otro java) quedan huerfanos y siguen consumiendo. Se matan
+      // primero los descendientes y despues el padre.
+      process.descendants().forEach(ProcessHandle::destroyForcibly);
       process.destroyForcibly();
     }
     out.join(2000);
     err.join(2000);
+    if (out.isAlive() || err.isAlive()) {
+      // Un drain que no termina se queda leyendo para siempre: se cierra el flujo
+      // y el hilo sale. Lo leido hasta aqui ya esta en el StringBuilder.
+      cerrarSilencioso(process.getInputStream());
+      cerrarSilencioso(process.getErrorStream());
+    }
     if (finished) {
       exitCode = process.exitValue();
     }
@@ -156,6 +180,7 @@ public final class JobExecutor {
     result.put("timedOut", !finished);
     result.put("stdout", stdout.toString());
     result.put("stderr", stderr.toString());
+    result.put("outputTruncated", stdoutRecortado.get() || stderrRecortado.get());
     result.put("lines", linesOf(stdout.toString()));
     return result;
   }
@@ -371,6 +396,15 @@ public final class JobExecutor {
     return lines;
   }
 
+  /** Cierra un flujo sin dejar que un fallo al cerrar tumbe la ejecucion. */
+  private static void cerrarSilencioso(java.io.Closeable flujo) {
+    try {
+      flujo.close();
+    } catch (Exception ignored) {
+      // El proceso ya termino: no hay nada que cerrar.
+    }
+  }
+
   /** El java del propio runtime de Studio. */
   private static String javaBinary() {
     String home = System.getProperty("java.home");
@@ -378,8 +412,8 @@ public final class JobExecutor {
     return home + separator + "bin" + separator + "java";
   }
 
-  /** Lee un flujo en un hilo aparte y lo acumula. */
-  private static Thread drain(java.io.InputStream stream, StringBuilder target) {
+  /** Lee un flujo en un hilo aparte y lo acumula, con un tope por el final. */
+  private static Thread drain(java.io.InputStream stream, StringBuilder target, AtomicBoolean recortado) {
     Thread thread = new Thread(() -> {
       try (BufferedReader reader = new BufferedReader(
           new InputStreamReader(stream, StandardCharsets.UTF_8))) {
@@ -387,6 +421,18 @@ public final class JobExecutor {
         while ((line = reader.readLine()) != null) {
           synchronized (target) {
             target.append(line).append(System.lineSeparator());
+            int sobran = target.length() - MAX_SALIDA_CHARS;
+            if (sobran > 0) {
+              if (!recortado.get()) {
+                recortado.set(true);
+                target.insert(0, AVISO_RECORTE);
+              }
+              // Se borra despues del aviso para que la marca no se pierda con
+              // los recortes siguientes.
+              int desde = AVISO_RECORTE.length();
+              int borrar = Math.min(sobran, target.length() - desde);
+              target.delete(desde, desde + borrar);
+            }
           }
         }
       } catch (Exception e) {

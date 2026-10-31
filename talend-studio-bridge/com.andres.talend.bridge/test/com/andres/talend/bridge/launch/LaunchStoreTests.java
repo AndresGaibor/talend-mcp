@@ -73,5 +73,38 @@ public final class LaunchStoreTests {
         "un lanzamiento huerfano se cierra como interrumpido al cargar, con su hora de fin");
     check(closed != null && closed.exitCode == null,
         "un lanzamiento interrumpido no inventa codigo de salida");
+
+    // Una salida larga se recorta por el final: los errores estan al final, no al principio.
+    Method limitar = LaunchTrackerService.class.getDeclaredMethod("limitarSalida", String.class);
+    limitar.setAccessible(true);
+    java.lang.reflect.Field maxSalida = LaunchTrackerService.class.getDeclaredField("MAX_SALIDA_CHARS");
+    maxSalida.setAccessible(true);
+    int tope = (Integer) maxSalida.get(null);
+    String recortada = (String) limitar.invoke(null, "x".repeat(tope) + "FINAL");
+    check(recortada.endsWith("FINAL"), "la salida recortada conserva el final");
+    check(recortada.length() <= tope + 40, "la salida recortada respeta el tope (mide " + recortada.length() + ")");
+
+    // El historial en memoria tambien se recorta en caliente, no solo al cargar.
+    java.lang.reflect.Field campoLaunches = LaunchTrackerService.class.getDeclaredField("launches");
+    campoLaunches.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    java.util.Map<String, LaunchRunInfo> enMemoria = (java.util.Map<String, LaunchRunInfo>) campoLaunches.get(null);
+    enMemoria.clear();
+    int extra = 5;
+    for (int i = 0; i < LaunchTrackerService.MAX_STORED_RUNS + extra; i++) {
+      LaunchRunInfo info = new LaunchRunInfo();
+      info.launchId = "launch_cap_" + i;
+      info.launchConfigName = "MCP_Cap_" + i;
+      info.startedAt = i;
+      info.terminatedAt = (long) i + 1;
+      info.status = "success";
+      enMemoria.put(info.launchId, info);
+    }
+    Method cap = LaunchTrackerService.class.getDeclaredMethod("enforceRuntimeCap");
+    cap.setAccessible(true);
+    cap.invoke(null);
+    check(enMemoria.size() == LaunchTrackerService.MAX_STORED_RUNS,
+        "el historial en memoria no pasa del tope (hay " + enMemoria.size() + ")");
+    check(enMemoria.get("launch_cap_0") == null, "el lanzamiento mas antiguo sale del historial en memoria");
   }
 }

@@ -38,6 +38,23 @@ export function mensajeDeConexion(error: unknown, baseUrl: string, timeoutMs: nu
   return detalle;
 }
 
+/** Tope si la configuracion no lo trae (configuraciones viejas de ~/.talend-bridge). */
+const MAX_RESPUESTA_POR_DEFECTO = 16 * 1024 * 1024;
+
+/**
+ * El bridge devolvio mas bytes de los permitidos.
+ *
+ * `response.text()` materializa la respuesta entera: un log de Studio o un
+ * catalogo de cientos de MB entra completo en el heap del MCP antes de que
+ * nadie lo mire. Se lee por trozos y se corta al pasar del tope.
+ */
+export class RespuestaDelBridgeDemasiadoGrande extends Error {
+  constructor(readonly maxBytes: number, readonly recibidos: number) {
+    super(`El bridge devolvio ${recibidos} bytes y el tope es ${maxBytes}. No se lee la respuesta entera para no agotar la memoria del MCP.`);
+    this.name = "RespuestaDelBridgeDemasiadoGrande";
+  }
+}
+
 export class BridgeTransportClient {
   private readonly baseUrl: string;
 
@@ -93,7 +110,7 @@ export class BridgeTransportClient {
         body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
       });
 
-      const rawText = await response.text();
+      const rawText = await this.leerCuerpo(response, this.config.maxResponseBytes ?? MAX_RESPUESTA_POR_DEFECTO);
       const parsed = rawText.length > 0 ? this.safeParseJson<T>(rawText) : undefined;
 
       if (!response.ok) {
@@ -121,6 +138,15 @@ export class BridgeTransportClient {
         rawText,
       };
     } catch (error) {
+      if (error instanceof RespuestaDelBridgeDemasiadoGrande) {
+        return {
+          ok: false,
+          source: "studio-bridge",
+          confidence: "low",
+          endpoint,
+          error: { code: "BRIDGE_RESPONSE_TOO_LARGE", message: error.message },
+        };
+      }
       return {
         ok: false,
         source: "unavailable",
@@ -134,6 +160,39 @@ export class BridgeTransportClient {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /** Lee el cuerpo por trozos, cortando en cuanto pasa del tope. */
+  private async leerCuerpo(response: Response, maxBytes: number): Promise<string> {
+    const declarado = Number(response.headers.get("content-length") ?? "");
+    if (Number.isFinite(declarado) && declarado > maxBytes) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new RespuestaDelBridgeDemasiadoGrande(maxBytes, declarado);
+    }
+    if (!response.body) {
+      return await response.text();
+    }
+
+    const reader = response.body.getReader();
+    const trozos: Buffer[] = [];
+    let total = 0;
+    let excedido = false;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          excedido = true;
+          throw new RespuestaDelBridgeDemasiadoGrande(maxBytes, total);
+        }
+        trozos.push(Buffer.from(value));
+      }
+    } finally {
+      if (excedido) await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
+    return Buffer.concat(trozos).toString("utf8");
   }
 
   private safeParseJson<T>(value: string): T | undefined {

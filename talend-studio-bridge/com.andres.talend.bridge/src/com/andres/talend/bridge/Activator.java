@@ -17,10 +17,14 @@ public final class Activator extends AbstractUIPlugin {
   public void start(BundleContext context) throws Exception {
     super.start(context);
     LaunchTrackerService.loadPersistedRuns();
-    EventsService.start();
 
     bridgeServer = new BridgeServer(context);
     bridgeServer.start();
+
+    // Los listeners se registran despues de que el servidor este arriba: si el
+    // servidor falla al arrancar, no quedan listeners de un plugin a medias
+    // que nadie desregistra.
+    EventsService.start();
 
     // El guardian cierra solo los dialogos conocidos (por ejemplo el
     // "Jobname Error" al reusar la etiqueta de un job), y solo si la

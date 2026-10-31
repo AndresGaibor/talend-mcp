@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
-import { mensajeDeConexion } from "../../src/modules/studio-bridge/adapters/bridge-transport";
+import { afterAll, describe, expect, test } from "bun:test";
+import { BridgeTransportClient, mensajeDeConexion } from "../../src/modules/studio-bridge/adapters/bridge-transport";
+import type { BridgeConfig } from "../../src/modules/studio-bridge/adapters/bridge-config";
 
 const baseUrl = "http://127.0.0.1:3930";
 
@@ -39,5 +40,51 @@ describe("mensajeDeConexion", () => {
 
   test("algo que no es un Error se convierte a texto", () => {
     expect(mensajeDeConexion("boom", baseUrl, 1_000)).toBe("boom");
+  });
+});
+
+/** Respuesta grande de un bridge de mentira, para comprobar el tope de lectura. */
+const relleno = JSON.stringify({ ok: true, data: { relleno: "x".repeat(20_000) } });
+const servidor = Bun.serve({
+  hostname: "127.0.0.1",
+  port: 0,
+  fetch: () => new Response(relleno, { headers: { "content-type": "application/json" } }),
+});
+
+afterAll(() => {
+  servidor.stop(true);
+});
+
+function configDelServidor(maxResponseBytes: number): BridgeConfig {
+  return {
+    host: "127.0.0.1",
+    port: servidor.port!,
+    readOnly: true,
+    unsafeActions: false,
+    allowAllCommands: false,
+    allowCommands: [],
+    timeoutMs: 5_000,
+    maxResponseBytes,
+  };
+}
+
+describe("tope de respuesta del bridge", () => {
+  test("corta una respuesta que pasa del tope sin materializarla entera", async () => {
+    const cliente = new BridgeTransportClient(configDelServidor(1_024));
+
+    const resultado = await cliente.ping();
+
+    expect(resultado.ok).toBe(false);
+    expect(resultado.error?.code).toBe("BRIDGE_RESPONSE_TOO_LARGE");
+    expect(resultado.error?.message).toContain("tope es 1024");
+  });
+
+  test("lee la respuesta cuando cabe en el tope", async () => {
+    const cliente = new BridgeTransportClient(configDelServidor(64 * 1024));
+
+    const resultado = await cliente.ping();
+
+    expect(resultado.ok).toBe(true);
+    expect((resultado.data as { ok?: boolean } | undefined)?.ok).toBe(true);
   });
 });

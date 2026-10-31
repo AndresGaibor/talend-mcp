@@ -33,10 +33,32 @@ import org.eclipse.core.resources.ResourcesPlugin;
 public final class EventsService implements IDebugEventSetListener, IPartListener2, ISelectionListener, IResourceChangeListener {
 
   private static final int MAX_EVENTS = 100;
-  private static final List<Map<String, Object>> recentEvents = new CopyOnWriteArrayList<>();
+
+  /** Tope del texto de una seleccion: seleccionar miles de filas no debe llenar el historial. */
+  private static final int MAX_TEXTO_SELECCION = 500;
+
+  /**
+   * Eventos recientes, del mas nuevo al mas viejo.
+   *
+   * Antes era una `CopyOnWriteArrayList` con `add(0, ...)`: cada seleccion o
+   * cambio de editor copiaba el array entero. Con una cola y un candado el
+   * coste es constante y el tope sigue siendo el mismo.
+   */
+  private static final java.util.ArrayDeque<Map<String, Object>> recentEvents = new java.util.ArrayDeque<>();
   private static final Map<String, Long> activeLaunches = new ConcurrentHashMap<>();
 
   private static EventsService instance;
+
+  /**
+   * Lo que se registro al arrancar, para poder desregistrarlo.
+   *
+   * Sin estas referencias `stop()` solo quitaba el listener de debug y el de
+   * partes: la seleccion y los cambios de recursos seguian llamando a una
+   * instancia muerta, y al recargar el plugin se sumaba otro juego de listeners.
+   */
+  private IWorkbenchPage attachedPage;
+  private ISelectionService attachedSelection;
+  private boolean attachedResourceListener;
 
   public static void start() {
     if (instance != null) return;
@@ -47,29 +69,49 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
       IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
       if (page != null) {
         page.addPartListener(instance);
+        instance.attachedPage = page;
         ISelectionService ss = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getSelectionService();
-        ss.addSelectionListener(instance);
+        if (ss != null) {
+          ss.addSelectionListener(instance);
+          instance.attachedSelection = ss;
+        }
       }
     } catch (Exception ignored) {
     }
 
     try {
       ResourcesPlugin.getWorkspace().addResourceChangeListener(instance, IResourceChangeEvent.POST_CHANGE);
+      instance.attachedResourceListener = true;
     } catch (Exception ignored) {
     }
   }
 
   public static void stop() {
     if (instance == null) return;
-    DebugPlugin.getDefault().removeDebugEventListener(instance);
+    EventsService current = instance;
+    instance = null;
+    DebugPlugin.getDefault().removeDebugEventListener(current);
     try {
-      IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
-      if (page != null) {
-        page.removePartListener(instance);
+      if (current.attachedPage != null) {
+        current.attachedPage.removePartListener(current);
       }
     } catch (Exception ignored) {
     }
-    instance = null;
+    try {
+      if (current.attachedSelection != null) {
+        current.attachedSelection.removeSelectionListener(current);
+      }
+    } catch (Exception ignored) {
+    }
+    try {
+      if (current.attachedResourceListener) {
+        ResourcesPlugin.getWorkspace().removeResourceChangeListener(current);
+      }
+    } catch (Exception ignored) {
+    }
+    current.attachedPage = null;
+    current.attachedSelection = null;
+    current.attachedResourceListener = false;
   }
 
   public static Map<String, Object> recent() {
@@ -79,12 +121,16 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
     payload.put("confidence", "high");
     payload.put("endpoint", "/events/recent");
     payload.put("activeLaunches", activeLaunches.size());
-    payload.put("events", new ArrayList<>(recentEvents));
+    synchronized (recentEvents) {
+      payload.put("events", new ArrayList<>(recentEvents));
+    }
     return payload;
   }
 
   public static Map<String, Object> clear() {
-    recentEvents.clear();
+    synchronized (recentEvents) {
+      recentEvents.clear();
+    }
     activeLaunches.clear();
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ok", true);
@@ -100,9 +146,11 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
     event.put("type", type);
     event.put("timestamp", System.currentTimeMillis());
     event.put("data", data);
-    recentEvents.add(0, event);
-    if (recentEvents.size() > MAX_EVENTS) {
-      recentEvents.remove(recentEvents.size() - 1);
+    synchronized (recentEvents) {
+      recentEvents.addFirst(event);
+      while (recentEvents.size() > MAX_EVENTS) {
+        recentEvents.removeLast();
+      }
     }
   }
 
@@ -226,10 +274,21 @@ public final class EventsService implements IDebugEventSetListener, IPartListene
   @Override
   public void selectionChanged(IWorkbenchPart part, org.eclipse.jface.viewers.ISelection selection) {
     Map<String, Object> info = new LinkedHashMap<>();
-    info.put("partId", part.getSite().getId());
-    info.put("partTitle", part.getTitle());
+    try {
+      if (part.getSite() != null) {
+        info.put("partId", part.getSite().getId());
+      }
+      info.put("partTitle", part.getTitle());
+    } catch (Exception e) {
+      info.put("error", e.toString());
+    }
     info.put("selectionClass", selection.getClass().getName());
-    info.put("selectionText", selection.toString());
+    // El texto de una seleccion puede ser enorme (miles de filas); se guarda
+    // solo el principio, que es lo que se consulta al depurar.
+    String texto = selection.toString();
+    info.put("selectionText", texto.length() > MAX_TEXTO_SELECCION
+        ? texto.substring(0, MAX_TEXTO_SELECCION) + "..."
+        : texto);
     addEvent("selection.changed", info);
   }
 

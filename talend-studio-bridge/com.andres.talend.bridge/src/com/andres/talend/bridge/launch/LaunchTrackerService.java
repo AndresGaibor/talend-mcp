@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -52,6 +53,9 @@ public final class LaunchTrackerService {
    */
   static final int MAX_STORED_RUNS = 5000;
 
+  /** Vigilantes simultaneos: cada uno es un hilo que espera a un proceso. */
+  private static final int MAX_OBSERVERS = 8;
+
   /**
    * Cada cuanto se busca el proceso del job de un lanzamiento vigilado. En
    * Windows cada busqueda lanza PowerShell (~1 s), asi que no conviene mas rapido.
@@ -83,6 +87,20 @@ public final class LaunchTrackerService {
   /** Salida recogida al terminar, {stdout, stderr}, hasta que alguien la entrega. */
   private static final Map<String, String[]> salidas = new ConcurrentHashMap<>();
 
+  /** Cuando se guardo cada salida, para no retenerla si nadie la recoge. */
+  private static final Map<String, Long> salidaCreadaEn = new ConcurrentHashMap<>();
+
+  /** Tope de caracteres por flujo: un job verboso no puede llenar el heap de Studio. */
+  private static final int MAX_SALIDA_CHARS = 1_000_000;
+
+  /** Una salida que nadie recoge en este tiempo se descarta. */
+  private static final long SALIDA_TTL_MS = 30L * 60L * 1000L;
+
+  /** Lineas del store a partir de las cuales se compacta en caliente. */
+  private static final int MAX_STORE_LINES = 20_000;
+
+  private static int lineasPersistidas = 0;
+
   /** Tope de espera a que la salida de un proceso termine de llegar. */
   private static final long SALIDA_ESPERA_MS = 5_000L;
 
@@ -107,7 +125,31 @@ public final class LaunchTrackerService {
   /** Salida capturada del lanzamiento, {stdout, stderr}, o null si no se capturo. Se entrega una vez. */
   public static String[] recogerSalida(String launchId) {
     capturando.remove(launchId);
+    salidaCreadaEn.remove(launchId);
     return salidas.remove(launchId);
+  }
+
+  /** Recorta una salida larga conservando el final, que es donde estan los errores. */
+  private static String limitarSalida(String texto) {
+    if (texto == null) {
+      return "";
+    }
+    if (texto.length() <= MAX_SALIDA_CHARS) {
+      return texto;
+    }
+    return "...[salida recortada]...\n" + texto.substring(texto.length() - MAX_SALIDA_CHARS);
+  }
+
+  /** Descarta las salidas que nadie recogio: sin esto se quedan hasta reiniciar Studio. */
+  private static void pruneSalidas() {
+    long limite = System.currentTimeMillis() - SALIDA_TTL_MS;
+    for (Map.Entry<String, Long> entry : salidaCreadaEn.entrySet()) {
+      if (entry.getValue() < limite) {
+        salidas.remove(entry.getKey());
+        capturando.remove(entry.getKey());
+        salidaCreadaEn.remove(entry.getKey());
+      }
+    }
   }
 
   /** Texto de una salida cuando deja de crecer, o al agotar la espera. */
@@ -189,6 +231,7 @@ public final class LaunchTrackerService {
     } catch (IOException e) {
       System.err.println("Failed to compact persisted runs: " + e.getMessage());
     }
+    lineasPersistidas = launches.size();
   }
 
   /**
@@ -232,7 +275,7 @@ public final class LaunchTrackerService {
     }
   }
 
-  public static String registerLaunch(String launchConfigName, String mode) {
+  public static synchronized String registerLaunch(String launchConfigName, String mode) {
     String safeName = launchConfigName.replaceAll("[^a-zA-Z0-9_.-]+", "_");
     String launchId = "launch_" + System.currentTimeMillis() + "_" + safeName;
     LaunchRunInfo info = new LaunchRunInfo();
@@ -243,9 +286,38 @@ public final class LaunchTrackerService {
     info.status = "started";
     launches.put(launchId, info);
     launchNameToLatestId.put(launchConfigName, launchId);
+    pruneSalidas();
+    enforceRuntimeCap();
     persist(info);
     observe(launchId, launchConfigName, info.startedAt);
     return launchId;
+  }
+
+  /**
+   * Recorta el historial en memoria cuando se pasa del tope.
+   *
+   * `compactStore` solo corre al cargar el plugin; sin esto una sesion larga
+   * acumulaba lanzamientos hasta reiniciar Studio. Nunca se descarta uno en
+   * curso: solo los que ya terminaron.
+   */
+  private static void enforceRuntimeCap() {
+    int sobran = launches.size() - MAX_STORED_RUNS;
+    if (sobran <= 0) {
+      return;
+    }
+    List<LaunchRunInfo> ordenados = new ArrayList<>(launches.values());
+    ordenados.sort(Comparator.comparingLong((LaunchRunInfo info) -> info.startedAt));
+    for (LaunchRunInfo viejo : ordenados) {
+      if (sobran <= 0) {
+        break;
+      }
+      if (viejo.terminatedAt == null) {
+        continue;
+      }
+      launches.remove(viejo.launchId);
+      launchNameToLatestId.remove(viejo.launchConfigName, viejo.launchId);
+      sobran--;
+    }
   }
 
   /**
@@ -334,7 +406,9 @@ public final class LaunchTrackerService {
               IStreamsProxy proxy = process.getStreamsProxy();
               IStreamMonitor salida = proxy == null ? null : proxy.getOutputStreamMonitor();
               IStreamMonitor errores = proxy == null ? null : proxy.getErrorStreamMonitor();
-              salidas.put(launchId, new String[] {salidaCompleta(salida), salidaCompleta(errores)});
+              salidas.put(launchId, new String[] {
+                  limitarSalida(salidaCompleta(salida)), limitarSalida(salidaCompleta(errores))});
+              salidaCreadaEn.put(launchId, System.currentTimeMillis());
             }
             return process.getExitValue();
           }
@@ -446,9 +520,19 @@ public final class LaunchTrackerService {
       info.durationMs = info.terminatedAt - info.startedAt;
       persist(info);
     }
+    // Nadie va a recoger una salida de un launch que no se pudo vigilar.
+    capturando.remove(launchId);
+    salidas.remove(launchId);
+    salidaCreadaEn.remove(launchId);
   }
 
   private static void observe(String launchId, String launchConfigName, long startedAt) {
+    // Cada vigilante es un hilo que puede vivir hasta 15 minutos. Un lote de
+    // 50 jobs dejaba 50 hilos; por encima del tope, el lanzamiento se queda sin
+    // vigilar y se informa como `unobserved` en vez de apilar hilos.
+    if (observers.size() >= MAX_OBSERVERS) {
+      return;
+    }
     Thread observer = new Thread(() -> {
       ProcessHandle job = null;
       try {
@@ -490,22 +574,29 @@ public final class LaunchTrackerService {
     long ultimoWmi = 0L;
     // Hijos de Studio ya descartados como ajenos al job: no se vuelven a consultar.
     Set<Long> descartados = new HashSet<>();
+    // Ultima lista de procesos del job traida por WMI; se reutiliza entre sondeos
+    // porque en Windows cada consulta lanza PowerShell (~0,8 s).
+    List<ProcessHandle> delJob = Collections.emptyList();
     while (System.currentTimeMillis() < deadline) {
       // Studio lanza la JVM del job como proceso hijo suyo: se busca entre los hijos,
       // sin PowerShell, cada 200 ms. Asi un job de 1 s tambien se ve.
       List<ProcessHandle> candidatos = javaHijosDesde(startedAt, descartados);
+      long ahora = System.currentTimeMillis();
+      boolean refrescarWmi = ahora - ultimoWmi >= OBSERVE_POLL_MS;
+      if (refrescarWmi) {
+        ultimoWmi = ahora;
+        delJob = processesOfJob(launchConfigName);
+      }
       if (!candidatos.isEmpty()) {
-        ProcessHandle job = elegirJob(candidatos, launchConfigName, descartados);
+        ProcessHandle job = elegirJob(candidatos, delJob, descartados);
         if (job != null) {
           return job;
         }
       }
-      // La busqueda por linea de comandos sigue como respaldo, pero cada sondeo en
-      // Windows lanza PowerShell (~0,8 s): se hace solo cada pocos segundos.
-      long ahora = System.currentTimeMillis();
-      if (ahora - ultimoWmi >= OBSERVE_POLL_MS) {
-        ultimoWmi = ahora;
-        for (ProcessHandle handle : processesOfJob(launchConfigName)) {
+      // La busqueda por linea de comandos sigue como respaldo, con la lista ya
+      // traida: no se vuelve a consultar WMI en este sondeo.
+      if (refrescarWmi) {
+        for (ProcessHandle handle : delJob) {
           if (startedAfter(handle, startedAt) && claimedPids.add(handle.pid())) {
             return handle;
           }
@@ -540,9 +631,10 @@ public final class LaunchTrackerService {
    * consulta una vez por tanda de candidatos: los que no llevan el nombre del job se
    * descartan. Si WMI no devuelve ningun proceso del job, se toma el primero.
    */
-  private static ProcessHandle elegirJob(List<ProcessHandle> candidatos, String launchConfigName, Set<Long> descartados) {
+  private static ProcessHandle elegirJob(List<ProcessHandle> candidatos, List<ProcessHandle> procesosDelJob,
+      Set<Long> descartados) {
     Set<Long> delJob = new HashSet<>();
-    for (ProcessHandle handle : processesOfJob(launchConfigName)) {
+    for (ProcessHandle handle : procesosDelJob) {
       delJob.add(handle.pid());
     }
     for (ProcessHandle candidato : candidatos) {
@@ -573,6 +665,10 @@ public final class LaunchTrackerService {
     }
     observers.clear();
     claimedPids.clear();
+    launchOf.clear();
+    salidas.clear();
+    salidaCreadaEn.clear();
+    capturando.clear();
   }
 
   /**
@@ -586,11 +682,17 @@ public final class LaunchTrackerService {
     return info.status;
   }
 
-  private static void persist(LaunchRunInfo info) {
+  private static synchronized void persist(LaunchRunInfo info) {
     try {
       File file = getStoreFile();
       try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(file, true), StandardCharsets.UTF_8)) {
         writer.write(serialize(info) + "\n");
+      }
+      lineasPersistidas++;
+      // El store es append-only: sin compactar en caliente crece durante toda la sesion.
+      if (lineasPersistidas > MAX_STORE_LINES) {
+        compactStore(lineasPersistidas);
+        lineasPersistidas = launches.size();
       }
     } catch (Exception e) {
       System.err.println("Failed to persist launch run: " + e.getMessage());

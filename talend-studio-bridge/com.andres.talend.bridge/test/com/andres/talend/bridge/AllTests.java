@@ -1,7 +1,9 @@
 package com.andres.talend.bridge;
 
+import com.andres.talend.bridge.automation.JobExecutorTests;
 import com.andres.talend.bridge.automation.TalendApiTests;
 import com.andres.talend.bridge.diagnostics.LogTailTests;
+import com.andres.talend.bridge.events.EventsServiceTests;
 import com.andres.talend.bridge.launch.LaunchStoreTests;
 
 /**
@@ -19,6 +21,8 @@ public final class AllTests {
     LogTailTests.run();
     TalendApiTests.run();
     LaunchStoreTests.run();
+    EventsServiceTests.run();
+    JobExecutorTests.run();
     System.out.println("RESULT passed=" + TestSupport.passed() + " failed=" + TestSupport.failed());
     System.exit(TestSupport.failed() == 0 ? 0 : 1);
   }

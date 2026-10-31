@@ -10,6 +10,8 @@ export type BridgeConfig = {
   allowAllCommands: boolean;
   allowCommands: string[];
   timeoutMs: number;
+  /** Tope de bytes que se aceptan del bridge en una respuesta (16 MiB por defecto). */
+  maxResponseBytes?: number;
 };
 
 const DEFAULT_CONFIG: BridgeConfig = {
@@ -20,6 +22,9 @@ const DEFAULT_CONFIG: BridgeConfig = {
   allowAllCommands: false,
   allowCommands: ["org.eclipse.ui.file.save", "org.eclipse.ui.file.saveAll"],
   timeoutMs: 2_500,
+  // 16 MiB: por encima de eso la respuesta ya no es un resultado, es un log o
+  // un catalogo que el cliente no va a poder usar.
+  maxResponseBytes: 16 * 1024 * 1024,
 };
 
 function getHomeDir(): string {
@@ -29,7 +34,7 @@ function getHomeDir(): string {
 function getWindowsHomeDir(): string | undefined {
   if (!isWsl()) return undefined;
   try {
-    const result = Bun.spawnSync(["cmd.exe", "/C", "echo", "%USERPROFILE%"]);
+    const result = Bun.spawnSync(["cmd.exe", "/C", "echo", "%USERPROFILE%"], { timeout: 10_000 });
     const rawPath = result.stdout?.toString().trim();
     return rawPath ? wslPathToMcp(rawPath) : undefined;
   } catch {
