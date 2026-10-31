@@ -10,6 +10,40 @@ export function createHealthPayload(toolCount: number) {
   };
 }
 
+/**
+ * Estado del proceso para vigilar fugas sin abrir Studio.
+ *
+ * `/healthz` solo dice "estoy vivo"; esto dice cuanto ocupa y cuantas
+ * peticiones hay en vuelo, que es lo que hace falta para ver si la memoria
+ * crece con el uso.
+ */
+export function createMetricsPayload(ctx: {
+  toolCount: number;
+  startedAt: number;
+  maxBodyBytes: number;
+  activeRequests: number;
+}) {
+  const memory = process.memoryUsage();
+  return {
+    ok: true,
+    service: "talend-mcp",
+    version: "1.0.0",
+    pid: process.pid,
+    node: process.version,
+    uptimeSeconds: Math.round((Date.now() - ctx.startedAt) / 1000),
+    toolCount: ctx.toolCount,
+    activeRequests: ctx.activeRequests,
+    maxBodyBytes: ctx.maxBodyBytes,
+    memory: {
+      rssBytes: memory.rss,
+      heapTotalBytes: memory.heapTotal,
+      heapUsedBytes: memory.heapUsed,
+      externalBytes: memory.external,
+      arrayBuffersBytes: memory.arrayBuffers,
+    },
+  };
+}
+
 function isLocalOrigin(origin: string): boolean {
   return origin.startsWith("http://127.0.0.1:") || origin.startsWith("http://localhost:");
 }
@@ -23,12 +57,40 @@ function isAllowedOrigin(origin: string | undefined, allowOrigins: string[] = []
 
 // ─── Lectura del cuerpo HTTP ──────────────────────────────────────────────────
 
-export function readBody(req: IncomingMessage): Promise<string> {
+/** El cuerpo de la peticion supera el tope configurado. */
+export class PayloadTooLargeError extends Error {
+  constructor(readonly maxBytes: number) {
+    super(`El cuerpo de la peticion excede ${maxBytes} bytes`);
+    this.name = "PayloadTooLargeError";
+  }
+}
+
+/**
+ * Lee el cuerpo de la peticion con un tope duro.
+ *
+ * Sin tope, `body += chunk` acumula lo que mande el cliente: un POST grande
+ * agota el heap del servidor antes de que JSON.parse pueda rechazarlo. Al
+ * pasarse se corta la conexion y se lanza {@link PayloadTooLargeError}.
+ */
+export function readBody(req: IncomingMessage, maxBytes = 1_048_576): Promise<string> {
   return new Promise((resolve, reject) => {
     let body = "";
+    let bytes = 0;
+    let exceeded = false;
     req.setEncoding("utf8");
-    req.on("data", (chunk: string) => { body += chunk; });
-    req.on("end", () => resolve(body));
+    req.on("data", (chunk: string) => {
+      if (exceeded) return; // Se descarta el resto: la memoria ya no crece.
+      bytes += Buffer.byteLength(chunk, "utf8");
+      if (bytes > maxBytes) {
+        exceeded = true;
+        body = "";
+        return;
+      }
+      body += chunk;
+    });
+    // Se espera al final del cuerpo para poder responder 413 sin cortar el socket
+    // a mitad: destruirlo antes provoca ECONNRESET en el cliente.
+    req.on("end", () => (exceeded ? reject(new PayloadTooLargeError(maxBytes)) : resolve(body)));
     req.on("error", reject);
   });
 }
@@ -40,6 +102,9 @@ export interface EarlyRouteContext {
   port: number;
   path: string;
   toolCount: number;
+  startedAt: number;
+  maxBodyBytes: number;
+  activeRequests: () => number;
   streamingTransport: () => Promise<NodeStreamableHTTPServerTransport>;
 }
 
@@ -69,6 +134,19 @@ export async function handleEarlyRoute(
   // ── Health endpoint ──
   if (requestUrl.pathname === "/healthz") {
     const payload = createHealthPayload(ctx.toolCount);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(payload));
+    return true;
+  }
+
+  // ── Metrics endpoint ──
+  if (requestUrl.pathname === "/metrics") {
+    const payload = createMetricsPayload({
+      toolCount: ctx.toolCount,
+      startedAt: ctx.startedAt,
+      maxBodyBytes: ctx.maxBodyBytes,
+      activeRequests: ctx.activeRequests(),
+    });
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify(payload));
     return true;

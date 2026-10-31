@@ -32,6 +32,16 @@ export const TalendMcpEnvSchema = z.object({
   TALEND_MCP_HOST: z.string().default("127.0.0.1"),
   TALEND_MCP_FILTER: z.string().optional(),
   TALEND_MCP_LOG: z.enum(["quiet", "normal", "verbose"]).default("normal"),
+  /** Tope del cuerpo JSON-RPC. Sin tope, un POST grande tumba el proceso. */
+  TALEND_MCP_MAX_BODY_BYTES: z.coerce.number().int().positive().default(1_048_576),
+  /** Ejecuciones que se conservan en `.talend-mcp/runs`; las mas viejas se borran. */
+  TALEND_MCP_MAX_RUNS: z.coerce.number().int().positive().default(200),
+  /** Carpeta del historial de ejecuciones (por defecto `.talend-mcp/runs`). */
+  TALEND_MCP_RUNS_DIR: z.string().optional(),
+  /** Plazo de una tool antes de responder que no termino (por defecto 10 minutos). */
+  TALEND_MCP_TOOL_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
+  /** Llamadas a tools que se atienden a la vez; el resto recibe error de servidor ocupado. */
+  TALEND_MCP_MAX_CONCURRENT_CALLS: z.coerce.number().int().positive().default(4),
 
   TALEND_BRIDGE_HOST: z.string().default("127.0.0.1"),
   TALEND_BRIDGE_PORT: z.coerce.number().default(3930),

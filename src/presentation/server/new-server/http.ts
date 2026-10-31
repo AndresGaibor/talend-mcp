@@ -5,14 +5,20 @@ import { getRuntimeTools } from "../../../server/registered-tools";
 import { toCallToolResult } from "../call-tool-result";
 import { handleMcpRequest, jsonRpcError, jsonRpcOk, sendJson } from "../json-rpc";
 import { createNewMcpServer } from "./common";
-import { handleEarlyRoute, readBody } from "./http-routes";
+import { handleEarlyRoute, PayloadTooLargeError, readBody } from "./http-routes";
 import type { NewServerHandle, NewServerOptions } from "./types";
+import { getTalendMcpEnv } from "../../../config/env";
+import { conTiempoLimite, CupoDeLlamadas, ToolTimeoutError } from "./tool-guard";
 
 // ─── Main HTTP server factory ─────────────────────────────────────────────────
 
 export async function runNewHttpServer(options?: NewServerOptions): Promise<NewServerHandle> {
   const host = options?.host ?? "127.0.0.1";
   const port = options?.port ?? 3927;
+  const env = getTalendMcpEnv();
+  const maxBodyBytes = options?.maxBodyBytes ?? env.TALEND_MCP_MAX_BODY_BYTES;
+  const toolTimeoutMs = options?.toolTimeoutMs ?? env.TALEND_MCP_TOOL_TIMEOUT_MS;
+  const maxConcurrentCalls = options?.maxConcurrentCalls ?? env.TALEND_MCP_MAX_CONCURRENT_CALLS;
   const path = "/mcp";
 
   // El catalogo de tools se arma una sola vez: `tools/list` y `tools/call`
@@ -31,6 +37,9 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
 
   let mcpServer: McpServer | null = null;
   let sseTransport: NodeStreamableHTTPServerTransport | null = null;
+  let activeRequests = 0;
+  const cupo = new CupoDeLlamadas(maxConcurrentCalls);
+  const startedAt = Date.now();
 
   async function streamingTransport(): Promise<NodeStreamableHTTPServerTransport> {
     if (sseTransport) return sseTransport;
@@ -41,11 +50,17 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
   }
 
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    activeRequests++;
+    res.once("close", () => { activeRequests--; });
+
     const earlyHandled = await handleEarlyRoute(req, res, {
       host,
       port,
       path,
       toolCount: runtimeTools.length,
+      startedAt,
+      maxBodyBytes,
+      activeRequests: () => activeRequests,
       streamingTransport,
     });
     if (earlyHandled) return;
@@ -63,8 +78,13 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     // Se lee el cuerpo antes de decidir que metodo atender.
     let body: string;
     try {
-      body = await readBody(req);
-    } catch {
+      body = await readBody(req, maxBodyBytes);
+    } catch (error) {
+      if (error instanceof PayloadTooLargeError) {
+        res.writeHead(413, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "payload_too_large", maxBytes: maxBodyBytes }));
+        return;
+      }
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: "bad_request" }));
       return;
@@ -111,15 +131,26 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
         sendJson(res, origin, jsonRpcError(id, -32602, `Tool not found: ${toolName}`));
         return;
       }
+      if (!cupo.intentarEntrar()) {
+        sendJson(res, origin, jsonRpcError(id, -32000,
+          `El servidor ya tiene ${cupo.activas} llamadas en curso (maximo ${maxConcurrentCalls}): reintenta cuando alguna termine.`));
+        return;
+      }
       try {
-        const result = await tool.handler(p.arguments ?? {});
+        const result = await conTiempoLimite(toolName, toolTimeoutMs, () => tool.handler(p.arguments ?? {}));
         sendJson(res, origin, jsonRpcOk(id, toCallToolResult(result)));
       } catch (err: unknown) {
+        if (err instanceof ToolTimeoutError) {
+          sendJson(res, origin, jsonRpcError(id, -32000, err.message));
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         sendJson(res, origin, jsonRpcOk(id, {
           content: [{ type: "text", text: `Error: ${msg}` }],
           isError: true,
         }));
+      } finally {
+        cupo.salir();
       }
       return;
     }
@@ -132,7 +163,12 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     const listen = (p: number): void => {
       const onError = (error: NodeJS.ErrnoException): void => {
         httpServer.off("error", onError);
-        if (error.code === "EADDRINUSE" && p !== 0) { listen(0); return; }
+        if (error.code === "EADDRINUSE" && p !== 0) {
+          // Arrancar en un puerto al azar deja al cliente llamando al puerto de
+          // siempre sin saber por que no contesta. Mejor fallar y decirlo.
+          reject(new Error(`El puerto ${p} de ${host} ya esta ocupado: cierra el proceso que lo usa o arranca en otro con TALEND_MCP_PORT.`));
+          return;
+        }
         reject(error);
       };
       httpServer.once("error", onError);
@@ -151,6 +187,10 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
   return {
     localUrl,
     async close() {
+      // `close()` solo deja de aceptar; las conexiones keep-alive abiertas lo
+      // dejarian esperando. Se cortan antes de esperar el cierre.
+      const withConnections = httpServer as typeof httpServer & { closeAllConnections?: () => void };
+      withConnections.closeAllConnections?.();
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
       if (mcpServer) await mcpServer.close();
     },
