@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 
@@ -32,6 +32,37 @@ export async function writeTextFile(
 
   mkdirSync(dirname(rutaArchivo), { recursive: true });
   await Bun.write(rutaArchivo, contenido);
+}
+
+/**
+ * Escribe un archivo sin dejarlo a medias.
+ *
+ * `Bun.write` trunca el destino antes de escribir. Si el proceso muere en
+ * medio (o Studio lo lee en ese instante), queda un `.item` corrupto que
+ * Studio ya no puede abrir. Escribiendo en un temporal y renombrando, el
+ * destino pasa de la version vieja a la nueva de una vez.
+ */
+export function writeTextFileAtomically(
+  rutaArchivo: string,
+  contenido: string,
+  rutaBasePermitida?: string,
+): void {
+  if (rutaBasePermitida && !isPathInside(rutaArchivo, rutaBasePermitida)) {
+    throw new Error(`Ruta fuera del workspace permitido: ${rutaArchivo}`);
+  }
+  mkdirSync(dirname(rutaArchivo), { recursive: true });
+  const temporal = `${rutaArchivo}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    writeFileSync(temporal, contenido, "utf8");
+    renameSync(temporal, rutaArchivo);
+  } catch (error) {
+    try {
+      unlinkSync(temporal);
+    } catch {
+      // El temporal puede no haberse creado.
+    }
+    throw error;
+  }
 }
 
 export async function listFilesRecursive(

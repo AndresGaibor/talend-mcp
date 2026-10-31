@@ -58,6 +58,8 @@ async function detectPosix(): Promise<ProcessEvidence> {
   const result = spawnSync("ps", ["-axo", "pid=,comm=,args="], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    // Sin tope, un `ps` atascado congela el bucle de eventos del MCP.
+    timeout: 10_000,
   });
   if (result.error) {
     return {
@@ -117,6 +119,7 @@ ConvertTo-Json
   const result = spawnSync("powershell.exe", ["-NoProfile", "-Command", psScript], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    timeout: 10_000,
   });
   if (result.error) {
     return {

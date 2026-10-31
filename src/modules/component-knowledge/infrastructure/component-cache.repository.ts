@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
+import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { TalendComponentDefinition } from '../domain/component-definition';
 
@@ -56,10 +57,19 @@ export class ComponentCacheRepository {
       components,
     };
 
+    // El catalogo completo puede ser de varios MB: se escribe sin bloquear el
+    // bucle de eventos y en un temporal, para que Studio no lea un JSON a medias.
+    const temporal = `${fullPath}.tmp-${process.pid}-${Date.now()}`;
     try {
-      writeFileSync(fullPath, JSON.stringify(cacheData, null, 2), 'utf8');
+      await writeFile(temporal, JSON.stringify(cacheData, null, 2), 'utf8');
+      await rename(temporal, fullPath);
       this.cachePath = fullPath;
     } catch (e) {
+      try {
+        await unlink(temporal);
+      } catch {
+        // El temporal puede no haberse creado.
+      }
       errors.push('Error writing cache: ' + (e instanceof Error ? e.message : String(e)));
     }
 
@@ -78,7 +88,7 @@ export class ComponentCacheRepository {
     }
 
     try {
-      const content = readFileSync(this.cachePath, 'utf8');
+      const content = await readFile(this.cachePath, 'utf8');
       const data = JSON.parse(content) as { components: TalendComponentDefinition[] };
       return data.components ?? [];
     } catch {
@@ -98,7 +108,7 @@ export class ComponentCacheRepository {
     }
 
     try {
-      const content = readFileSync(this.cachePath, 'utf8');
+      const content = await readFile(this.cachePath, 'utf8');
       const data = JSON.parse(content) as { metadata: ComponentCacheMetadata };
       return {
         ok: true,

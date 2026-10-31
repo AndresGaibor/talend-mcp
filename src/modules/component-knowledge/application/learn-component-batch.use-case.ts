@@ -15,11 +15,36 @@ export type BatchSession = {
 
 const BATCH_SIZE = 25;
 
+/** Sesiones de aprendizaje que se conservan a la vez. */
+const MAX_SESIONES = 100;
+
+/** Una sesion que nadie retoma en una hora ya no sirve para nada. */
+const TTL_SESION_MS = 60 * 60 * 1000;
+
 export class LearnComponentBatchUseCase {
   private batchSize = BATCH_SIZE;
   private sessions: Map<string, BatchSession> = new Map();
 
+  /**
+   * Descarta sesiones vencidas y, si aun sobran, las mas antiguas.
+   *
+   * El Map solo crecia: cada `start` dejaba una sesion para siempre, y el
+   * proceso del MCP vive dias.
+   */
+  private podarSesiones(): void {
+    const limite = Date.now() - TTL_SESION_MS;
+    for (const [id, sesion] of this.sessions) {
+      if (sesion.startedAt < limite) this.sessions.delete(id);
+    }
+    while (this.sessions.size > MAX_SESIONES) {
+      const masAntigua = this.sessions.keys().next().value;
+      if (masAntigua === undefined) break;
+      this.sessions.delete(masAntigua);
+    }
+  }
+
   async start(sessionId: string): Promise<{ batchToken: string; components: string[]; total: number }> {
+    this.podarSesiones();
     const allComponents = await this.getAllComponents();
     const batchToken = crypto.randomUUID();
     const batch = allComponents.slice(0, this.batchSize);
@@ -43,6 +68,7 @@ export class LearnComponentBatchUseCase {
   }
 
   async continue(sessionId: string, batchToken: string, fromIndex: number): Promise<{ components: string[]; hasMore: boolean; progress: number }> {
+    this.podarSesiones();
     const session = this.sessions.get(sessionId);
     if (!session || session.batchToken !== batchToken) {
       return { components: [], hasMore: false, progress: 0 };
@@ -62,6 +88,7 @@ export class LearnComponentBatchUseCase {
   }
 
   async markProcessed(sessionId: string, componentName: string): Promise<void> {
+    this.podarSesiones();
     const session = this.sessions.get(sessionId);
     if (session) {
       session.processedCount++;
@@ -69,12 +96,14 @@ export class LearnComponentBatchUseCase {
   }
 
   async isSessionComplete(sessionId: string): Promise<boolean> {
+    this.podarSesiones();
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     return session.currentIndex >= session.totalComponents;
   }
 
   async getSessionProgress(sessionId: string): Promise<{ processed: number; total: number; progress: number } | null> {
+    this.podarSesiones();
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     return {

@@ -1,11 +1,13 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { writeTextFileAtomically } from "../../files";
 import type { TalendStudioBridgeClient } from "../../studio/bridge-client";
 import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec } from "../../job-generator";
 import { inspectComponent } from "../../components/component-catalog-builder";
 import { createSnapshot } from "../../sync/snapshot-manager";
 import { createPlatformContext } from "../../../platform";
 import { toTalendHostPath } from "../../../platform/path-bridge";
+import { cerrarEditoresAbiertosPor, editoresAbiertos } from "../../studio/editores-temporales";
 import { inheritSchemaFromSource } from "./schema-inheritance";
 import type { CreateJobFromSpecResult, TalendJobSpec } from "./types";
 
@@ -104,16 +106,20 @@ export async function createJobFromSpec(
       await createSnapshot(projectPath, itemPath, propertiesPath, "create_job_from_spec");
     }
 
-    writeFileSync(itemPath, itemXml, "utf8");
-    writeFileSync(propertiesPath, propsXml, "utf8");
+    writeTextFileAtomically(itemPath, itemXml);
+    writeTextFileAtomically(propertiesPath, propsXml);
 
     if (bridge) {
+      const antes = await editoresAbiertos(bridge);
       try {
         const ctx = createPlatformContext();
         const studioPath = toTalendHostPath(itemPath, ctx);
         await bridge.openResource(studioPath);
         await bridge.refreshWorkspace();
       } catch {
+      } finally {
+        // Studio retiene ~13 MB por editor de job: el que abrio esta creacion no se queda.
+        await cerrarEditoresAbiertosPor(bridge, spec.name, antes).catch(() => []);
       }
     }
 

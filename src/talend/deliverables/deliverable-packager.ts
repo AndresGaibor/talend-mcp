@@ -121,7 +121,9 @@ export async function createPackage(jobName: string, files: DeliverableFile[], d
       }
     }
 
-    const proc = Bun.spawnSync(["zip", "-r", zipPath, "."], { cwd: tempDir });
+    // `zip` puede colgarse con una carpeta grande o un archivo bloqueado en
+    // Windows: se corta a los dos minutos en vez de congelar el servidor.
+    const proc = Bun.spawnSync(["zip", "-r", zipPath, "."], { cwd: tempDir, timeout: 120_000 });
     void proc;
 
     try {

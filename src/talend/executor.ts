@@ -5,6 +5,7 @@ import { listJobs } from "./repository";
 import { readTextFile } from "./files";
 import { createPlatformContext, detectJobRunnerStrategy, buildScriptExecutionArgs } from "../platform";
 import { getBaseNamePortable } from "../platform/path-bridge";
+import { SalidaAcotada } from "../shared/output-buffer";
 
 export interface RunResult {
   ok: boolean;
@@ -65,34 +66,34 @@ export async function runJob(options: RunJobOptions): Promise<RunResult> {
     const args = buildScriptExecutionArgs(fullScriptPath, strategy, ctx);
     const child = spawn(strategy.shell, args, { cwd: dirname(fullScriptPath), env, stdio: ["ignore", "pipe", "pipe"] });
 
-    let stdout = "";
-    let stderr = "";
+    const stdout = new SalidaAcotada();
+    const stderr = new SalidaAcotada();
     let settled = false;
 
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
         killProcess(child, "SIGKILL");
-        resolve({ ok: false, stdout, stderr, exitCode: null, durationMs: Date.now() - startMs, error: `Timeout exceeded: ${timeoutMs}ms` });
+        resolve({ ok: false, stdout: stdout.value, stderr: stderr.value, exitCode: null, durationMs: Date.now() - startMs, error: `Timeout exceeded: ${timeoutMs}ms` });
       }
     }, timeoutMs);
 
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => (stdout += chunk));
-    child.stderr.on("data", (chunk) => (stderr += chunk));
+    child.stdout.on("data", (chunk) => stdout.append(chunk));
+    child.stderr.on("data", (chunk) => stderr.append(chunk));
     child.on("close", (exitCode) => {
       if (!settled) {
         settled = true;
         clearTimeout(timer);
-        resolve({ ok: exitCode === 0, stdout, stderr, exitCode, durationMs: Date.now() - startMs });
+        resolve({ ok: exitCode === 0, stdout: stdout.value, stderr: stderr.value, exitCode, durationMs: Date.now() - startMs });
       }
     });
     child.on("error", (err) => {
       if (!settled) {
         settled = true;
         clearTimeout(timer);
-        resolve({ ok: false, stdout, stderr, exitCode: null, durationMs: Date.now() - startMs, error: err.message });
+        resolve({ ok: false, stdout: stdout.value, stderr: stderr.value, exitCode: null, durationMs: Date.now() - startMs, error: err.message });
       }
     });
   });

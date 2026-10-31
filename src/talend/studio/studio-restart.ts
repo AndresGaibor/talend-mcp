@@ -26,12 +26,28 @@ export const RESTART_RECOMMENDED_PERCENT = 75;
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 
-async function powershell(command: string): Promise<{ output: string; code: number }> {
+/** Tope por defecto de un comando de PowerShell suelto. */
+const POWERSHELL_TIMEOUT_MS = 60_000;
+
+async function powershell(command: string, timeoutMs = POWERSHELL_TIMEOUT_MS): Promise<{ output: string; code: number }> {
   const process = Bun.spawn(["powershell", "-NoProfile", "-NonInteractive", "-Command", command], {
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [output, code] = await Promise.all([new Response(process.stdout).text(), process.exited]);
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), timeoutMs);
+  });
+  const [output, code] = await Promise.all([new Response(process.stdout).text(), Promise.race([process.exited, timeout])]);
+  if (timer) clearTimeout(timer);
+
+  if (code === "timeout") {
+    // Sin esto, un PowerShell atascado deja la tool esperando para siempre.
+    process.kill();
+    await process.exited;
+    throw new Error(`PowerShell no respondio en ${timeoutMs} ms.`);
+  }
   return { output: output.trim(), code };
 }
 
@@ -153,7 +169,8 @@ export async function restartStudio(options: { reinstallBridge?: boolean; force?
   ).output;
   if (!executable) throw new Error(`No se pudo leer el ejecutable de Studio (pid ${previousPid})`);
 
-  const closing = await powershell(closeScript(previousPid, CLOSE_WAIT_MS, options.force !== false));
+  // El script de cierre espera dentro hasta CLOSE_WAIT_MS: el tope es mayor.
+  const closing = await powershell(closeScript(previousPid, CLOSE_WAIT_MS, options.force !== false), CLOSE_WAIT_MS + 60_000);
   if (closing.code !== 0) {
     throw new Error("Studio no se cerro a tiempo y no se forzo el cierre (force: false).");
   }
@@ -173,7 +190,11 @@ export async function restartStudio(options: { reinstallBridge?: boolean; force?
 
   if (options.reinstallBridge) {
     const install = Bun.spawn(["bun", "run", "bridge:install"], { cwd: ROOT, stdout: "ignore", stderr: "ignore" });
-    if ((await install.exited) !== 0) throw new Error("No se pudo reinstalar el plugin del bridge");
+    // Maven/Tycho puede tardar minutos, pero no puede quedarse indefinidamente.
+    const installTimer = setTimeout(() => install.kill(), 600_000);
+    const installCode = await install.exited;
+    clearTimeout(installTimer);
+    if (installCode !== 0) throw new Error("No se pudo reinstalar el plugin del bridge");
     await sleep(5_000);
   }
 

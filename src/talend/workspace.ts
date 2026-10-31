@@ -93,7 +93,7 @@ export function extractProjectPathFromLsofOutput(output: string): string | undef
 }
 
 function runProcess(command: string, args: string[]): string {
-  const result = spawnSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const result = spawnSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 10_000 });
   return typeof result.stdout === "string" ? result.stdout : typeof result.stderr === "string" ? result.stderr : "";
 }
 

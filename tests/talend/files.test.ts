@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { isPathInside, listFilesRecursive, normalizePath } from "../../src/talend/files";
+import { isPathInside, listFilesRecursive, normalizePath, writeTextFileAtomically } from "../../src/talend/files";
 
 const root = mkdtempSync(join(tmpdir(), "talend-files-"));
 
@@ -36,5 +36,28 @@ describe("files", () => {
   test("detecta rutas contenidas", () => {
     expect(isPathInside("/tmp/workspace/project/file.item", "/tmp/workspace")).toBe(true);
     expect(isPathInside("/tmp/other/file.item", "/tmp/workspace")).toBe(false);
+  });
+});
+
+describe("escritura atomica", () => {
+  test("reemplaza el contenido sin dejar temporales", () => {
+    const destino = join(root, "job_0.1.item");
+    writeTextFileAtomically(destino, "version vieja");
+    writeTextFileAtomically(destino, "version nueva");
+
+    expect(readFileSync(destino, "utf8")).toBe("version nueva");
+    const temporales = readdirSync(root).filter((nombre) => nombre.includes(".tmp-"));
+    expect(temporales).toEqual([]);
+  });
+
+  test("crea las carpetas que falten", () => {
+    const destino = join(root, "a", "b", "job.item");
+    writeTextFileAtomically(destino, "<item/>");
+    expect(existsSync(destino)).toBe(true);
+  });
+
+  test("no escribe fuera de la carpeta permitida", () => {
+    expect(() => writeTextFileAtomically(join(root, "..", "fuera.item"), "x", root))
+      .toThrow(/fuera del workspace/);
   });
 });

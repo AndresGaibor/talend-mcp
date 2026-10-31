@@ -3,6 +3,7 @@ import { dirname, join, normalize } from "node:path";
 import { buildJobItemXml, buildJobPropertiesXml, validateJobSpec, type JobSpec } from "../job-generator";
 import { applyJobEdits, type JobEditOperation } from "../editor/job-edit";
 import { resolveFolderDir } from "../job-crud/paths";
+import { writeTextFileAtomically } from "../files";
 import { listJobs } from "../repository";
 import { jobsAbiertosEnStudio } from "./open-guard";
 import { prefijosSinDeclarar } from "./xml-valido";
@@ -150,8 +151,9 @@ export async function createJobsFromTemplate(options: CreateBatchOptions): Promi
 
       mkdirSync(dirname(itemPath), { recursive: true });
       if (overwrite) {
-        await Bun.write(itemPath, xml);
-        await Bun.write(propertiesPath, propiedades);
+        // Atomico: si algo falla a medias, el job anterior sigue intacto.
+        writeTextFileAtomically(itemPath, xml);
+        writeTextFileAtomically(propertiesPath, propiedades);
       } else {
         const created: string[] = [];
         try {

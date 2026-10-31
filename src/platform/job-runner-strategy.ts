@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { PlatformContext } from "./runtime";
 import { toTalendHostPath, toMcpPath } from "./path-bridge";
+import { SalidaAcotada } from "../shared/output-buffer";
 
 export type ScriptPlatform = "posix" | "windows";
 
@@ -86,32 +87,44 @@ export async function executeJob(
   options?: { timeoutMs?: number },
 ): Promise<RunResult> {
   const args = buildScriptExecutionArgs(jobPath, strategy, ctx);
+  const timeoutMs = options?.timeoutMs ?? 300_000;
 
   return new Promise<RunResult>((resolve) => {
-    let stdout = "";
-    let stderr = "";
+    const stdout = new SalidaAcotada();
+    const stderr = new SalidaAcotada();
 
     const child = spawn(strategy.shell, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let settled = false;
 
-    const timeoutMs = options?.timeoutMs ?? 300_000;
+    const terminar = (resultado: RunResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(resultado);
+    };
+
     const timer = setTimeout(() => {
-      child.kill();
-      resolve({ ok: false, exitCode: null, stdout, stderr, error: "timeout" });
+      // En Windows `child.kill()` no mata el arbol de procesos del script: el
+      // job seguiria escribiendo en las tuberias y gastando memoria.
+      if (child.pid !== undefined && (ctx.runtimeOs === "windows" || process.platform === "win32")) {
+        spawn("taskkill", ["/F", "/T", "/PID", String(child.pid)]);
+      } else {
+        child.kill("SIGKILL");
+      }
+      terminar({ ok: false, exitCode: null, stdout: stdout.value, stderr: stderr.value, error: `Timeout: ${timeoutMs}ms` });
     }, timeoutMs);
 
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk: string) => (stdout += chunk));
-    child.stderr?.on("data", (chunk: string) => (stderr += chunk));
+    child.stdout?.on("data", (chunk: string) => stdout.append(chunk));
+    child.stderr?.on("data", (chunk: string) => stderr.append(chunk));
 
     child.on("close", (exitCode) => {
-      clearTimeout(timer);
-      resolve({ ok: exitCode === 0, exitCode, stdout, stderr });
+      terminar({ ok: exitCode === 0, exitCode, stdout: stdout.value, stderr: stderr.value });
     });
 
     child.on("error", (err) => {
-      clearTimeout(timer);
-      resolve({ ok: false, exitCode: null, stdout, stderr, error: err.message });
+      terminar({ ok: false, exitCode: null, stdout: stdout.value, stderr: stderr.value, error: err.message });
     });
   });
 }

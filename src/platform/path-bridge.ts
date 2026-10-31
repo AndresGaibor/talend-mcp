@@ -4,7 +4,7 @@ import type { PlatformContext } from "./runtime";
 
 function tryWslpathToWindows(posixPath: string): string | undefined {
   try {
-    const result = spawnSync("wslpath", ["-w", posixPath], { encoding: "utf8" });
+    const result = spawnSync("wslpath", ["-w", posixPath], { encoding: "utf8", timeout: 10_000 });
     if (result.status === 0) return result.stdout.trim();
   } catch {}
   return undefined;
@@ -12,7 +12,7 @@ function tryWslpathToWindows(posixPath: string): string | undefined {
 
 function tryWslpathToPosix(windowsPath: string): string | undefined {
   try {
-    const result = spawnSync("wslpath", ["-u", windowsPath], { encoding: "utf8" });
+    const result = spawnSync("wslpath", ["-u", windowsPath], { encoding: "utf8", timeout: 10_000 });
     if (result.status === 0) return result.stdout.trim();
   } catch {}
   return undefined;

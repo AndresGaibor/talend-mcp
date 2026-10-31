@@ -1,7 +1,14 @@
 import { join } from "node:path";
 
+/**
+ * Carpeta del historial de ejecuciones.
+ *
+ * `TALEND_MCP_RUNS_DIR` la mueve. El indice de ejecuciones usa esta misma
+ * funcion, para que la retencion borre justo los archivos que se escriben.
+ */
 export function getRunsDir(): string {
-  return join(process.cwd(), ".talend-mcp", "runs");
+  const configurada = process.env.TALEND_MCP_RUNS_DIR?.trim();
+  return configurada ? configurada : join(process.cwd(), ".talend-mcp", "runs");
 }
 
 export function generateRunId(): string {

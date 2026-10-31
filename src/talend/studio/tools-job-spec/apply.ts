@@ -7,11 +7,12 @@ import { bridgeFail, bridgeOk, loadBridge } from "../tools-base";
 import { generateJobSpec } from "../../jobs/pipeline-patterns";
 import { toGeneratorSpec, validateGeneratorSpec } from "../../jobs/job-spec-generator";
 import { buildJobItemXml, buildJobPropertiesXml } from "../../job-generator";
-import { readTextFile, writeTextFile } from "../../files";
+import { readTextFile, writeTextFile, writeTextFileAtomically } from "../../files";
 import { resolveProjectPath } from "../../workspace";
 import { listJobs } from "../../repository";
 import { createPlatformContext } from "../../../platform";
 import { toTalendHostPath } from "../../../platform/path-bridge";
+import { cerrarEditoresAbiertosPor, editoresAbiertos } from "../editores-temporales";
 import type { PatrónTalend } from "../../task/task-types";
 
 async function findExistingJob(projectPath: string, jobName: string): Promise<{ itemPath: string; propertiesPath: string } | null> {
@@ -104,8 +105,9 @@ export const jobSpecApplyTools = [
         const { xml: itemXml, rootId } = buildJobItemXml(genSpec);
         const propertiesXml = buildJobPropertiesXml(genSpec, rootId);
 
-        await writeTextFile(itemPath, itemXml, projectPath);
-        await writeTextFile(propertiesPath, propertiesXml, projectPath);
+        // Escritura atomica: Studio no debe ver un .item a medio escribir.
+        writeTextFileAtomically(itemPath, itemXml, projectPath);
+        writeTextFileAtomically(propertiesPath, propertiesXml, projectPath);
 
         let bridgeRefreshed = false;
         let bridgeOpened = false;
@@ -116,15 +118,21 @@ export const jobSpecApplyTools = [
           const bridge = await loadBridge();
           await bridge.refreshWorkspace();
 
-          const studioPath = toTalendHostPath(itemPath, ctx);
-          const openResult = await bridge.openResource(studioPath);
-          bridgeOpened = openResult.ok;
+          const antes = await editoresAbiertos(bridge);
+          try {
+            const studioPath = toTalendHostPath(itemPath, ctx);
+            const openResult = await bridge.openResource(studioPath);
+            bridgeOpened = openResult.ok;
 
-          const problemsResult = await bridge.problemsMarkers();
-          if (problemsResult.ok && problemsResult.data) {
-            problemsData = problemsResult.data;
+            const problemsResult = await bridge.problemsMarkers();
+            if (problemsResult.ok && problemsResult.data) {
+              problemsData = problemsResult.data;
+            }
+            bridgeRefreshed = true;
+          } finally {
+            // El editor que abrio la aplicacion del spec no se queda consumiendo heap.
+            await cerrarEditoresAbiertosPor(bridge, input.name, antes).catch(() => []);
           }
-          bridgeRefreshed = true;
         } catch {
         }
 

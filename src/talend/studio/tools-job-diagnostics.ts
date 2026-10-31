@@ -4,6 +4,7 @@ import { compileWithDependencies } from "./compile-with-dependencies";
 import { prepareStudioForJob } from "./studio-dialogs";
 import { cerrarEditoresAbiertosPor, editoresAbiertos } from "./editores-temporales";
 import { jobAbierto } from "./editores-guardados";
+import { conCandadoDeJob } from "./job-lock";
 import { clasificarSalida } from "../diagnostics/output-findings";
 
 export const jobDiagnosticsTools = [
@@ -23,20 +24,22 @@ export const jobDiagnosticsTools = [
       timeoutMs?: number;
     }) => {
       const bridge = await loadBridge();
-      const result = await bridge.executeJob({ name, version, context, timeoutMs });
-      // Los avisos se revisan siempre, para que no dependan de que el agente los busque.
-      const body = ((result.data as { result?: Record<string, unknown> } | undefined)?.result ?? result.data ?? {}) as Record<string, unknown>;
-      const lines = Array.isArray(body.lines) ? body.lines.map(String) : String(body.stdout ?? "").split(/\r?\n/);
-      const found = clasificarSalida([...lines, ...String(body.stderr ?? "").split(/\r?\n/)]);
-      return bridgeOk({
-        ok: result.ok,
-        source: result.source,
-        confidence: result.confidence,
-        endpoint: "/automation/job/execute",
-        data: result.data && typeof result.data === "object"
-          ? { ...result.data, findings: { errors: found.errores, warnings: found.avisos } }
-          : result.data,
-        error: result.error,
+      return conCandadoDeJob(name, async () => {
+        const result = await bridge.executeJob({ name, version, context, timeoutMs });
+        // Los avisos se revisan siempre, para que no dependan de que el agente los busque.
+        const body = ((result.data as { result?: Record<string, unknown> } | undefined)?.result ?? result.data ?? {}) as Record<string, unknown>;
+        const lines = Array.isArray(body.lines) ? body.lines.map(String) : String(body.stdout ?? "").split(/\r?\n/);
+        const found = clasificarSalida([...lines, ...String(body.stderr ?? "").split(/\r?\n/)]);
+        return bridgeOk({
+          ok: result.ok,
+          source: result.source,
+          confidence: result.confidence,
+          endpoint: "/automation/job/execute",
+          data: result.data && typeof result.data === "object"
+            ? { ...result.data, findings: { errors: found.errores, warnings: found.avisos } }
+            : result.data,
+          error: result.error,
+        });
       });
     },
   },
@@ -50,59 +53,63 @@ export const jobDiagnosticsTools = [
     }),
     handler: async ({ job, installMissing, ignoreDialogs }: { job?: string; installMissing?: boolean; ignoreDialogs?: boolean }) => {
       const bridge = await loadBridge();
+      // Compilar abre y genera el job en Studio: no se solapa con otra
+      // operacion sobre el mismo job.
+      return conCandadoDeJob(job, async () => {
 
-      // Un dialogo modal abierto (por ejemplo los modulos de terceros) bloquea la generacion.
-      const prepared = await prepareStudioForJob(bridge, {
-        ignoreDialogs: ignoreDialogs ?? false,
-        installMissing: installMissing ?? false,
-      });
-      const dialogCheck = prepared.check;
-      const autoInstalledModules = prepared.autoInstalledModules;
-      if (dialogCheck.status === "unavailable" && !ignoreDialogs) {
-        return bridgeFail({
-          ok: false,
-          source: "studio-bridge",
-          confidence: "medium",
-          endpoint: "/automation/job/compile",
-          error: {
-            code: "STUDIO_DIALOG_CHECK_FAILED",
-            message: `No se pudo comprobar si Studio tiene dialogos abiertos (${dialogCheck.reason}). No se compila sin esa comprobacion: revisa Studio o usa ignoreDialogs:true.`,
-          },
+        // Un dialogo modal abierto (por ejemplo los modulos de terceros) bloquea la generacion.
+        const prepared = await prepareStudioForJob(bridge, {
+          ignoreDialogs: ignoreDialogs ?? false,
+          installMissing: installMissing ?? false,
         });
-      }
-      if (dialogCheck.status === "blocked") {
-        return bridgeFail({
-          ok: false,
-          source: "studio-bridge",
-          confidence: "high",
+        const dialogCheck = prepared.check;
+        const autoInstalledModules = prepared.autoInstalledModules;
+        if (dialogCheck.status === "unavailable" && !ignoreDialogs) {
+          return bridgeFail({
+            ok: false,
+            source: "studio-bridge",
+            confidence: "medium",
+            endpoint: "/automation/job/compile",
+            error: {
+              code: "STUDIO_DIALOG_CHECK_FAILED",
+              message: `No se pudo comprobar si Studio tiene dialogos abiertos (${dialogCheck.reason}). No se compila sin esa comprobacion: revisa Studio o usa ignoreDialogs:true.`,
+            },
+          });
+        }
+        if (dialogCheck.status === "blocked") {
+          return bridgeFail({
+            ok: false,
+            source: "studio-bridge",
+            confidence: "high",
+            endpoint: "/automation/job/compile",
+            data: { blocking: dialogCheck.blocking, autoInstalledModules },
+            error: {
+              code: "STUDIO_DIALOG_OPEN",
+              message: `Studio tiene ${dialogCheck.blocking.length} dialogo(s) que bloquean el IDE: ${dialogCheck.blocking.map((dialog) => `"${dialog.title}"`).join(", ")}. Resuelvelos antes de compilar (talend_studio_ui_dialogs muestra la accion sugerida).`,
+            },
+          });
+        }
+
+        const outcome = await compileWithDependencies(bridge, job, installMissing ?? false);
+        const dialogWarning = dialogCheck.status === "unavailable"
+          ? `No se pudo comprobar si Studio tiene dialogos abiertos: ${dialogCheck.reason}`
+          : undefined;
+
+        return bridgeOk({
+          ok: outcome.ok,
+          source: outcome.source,
+          confidence: outcome.confidence,
           endpoint: "/automation/job/compile",
-          data: { blocking: dialogCheck.blocking, autoInstalledModules },
-          error: {
-            code: "STUDIO_DIALOG_OPEN",
-            message: `Studio tiene ${dialogCheck.blocking.length} dialogo(s) que bloquean el IDE: ${dialogCheck.blocking.map((dialog) => `"${dialog.title}"`).join(", ")}. Resuelvelos antes de compilar (talend_studio_ui_dialogs muestra la accion sugerida).`,
+          warning: dialogWarning,
+          data: {
+            ...outcome.data,
+            autoInstalledModules,
+            missingArtifacts: outcome.missingArtifacts,
+            ...(outcome.autoInstalled.length > 0 ? { autoInstalled: outcome.autoInstalled } : {}),
+            ...(outcome.hint ? { hint: outcome.hint } : {}),
           },
+          error: outcome.error,
         });
-      }
-
-      const outcome = await compileWithDependencies(bridge, job, installMissing ?? false);
-      const dialogWarning = dialogCheck.status === "unavailable"
-        ? `No se pudo comprobar si Studio tiene dialogos abiertos: ${dialogCheck.reason}`
-        : undefined;
-
-      return bridgeOk({
-        ok: outcome.ok,
-        source: outcome.source,
-        confidence: outcome.confidence,
-        endpoint: "/automation/job/compile",
-        warning: dialogWarning,
-        data: {
-          ...outcome.data,
-          autoInstalledModules,
-          missingArtifacts: outcome.missingArtifacts,
-          ...(outcome.autoInstalled.length > 0 ? { autoInstalled: outcome.autoInstalled } : {}),
-          ...(outcome.hint ? { hint: outcome.hint } : {}),
-        },
-        error: outcome.error,
       });
     },
   },
@@ -114,19 +121,21 @@ export const jobDiagnosticsTools = [
     }),
     handler: async ({ job }: { job?: string }) => {
       const bridge = await loadBridge();
-      // Calcular los problemas abre el editor del job; si no estaba abierto, se cierra al terminar. Cerrarlo no
-      // suelta sus problemas del almacen de Studio, asi que se piden liberar (si no, se acumulan al recrear el job).
-      const antes = job ? await editoresAbiertos(bridge) : null;
-      const liberar = Boolean(job) && antes !== null && !jobAbierto(job!, antes);
-      const result = await bridge.jobProblems({ job, release: liberar });
-      if (job) await cerrarEditoresAbiertosPor(bridge, job, antes);
-      return bridgeOk({
-        ok: result.ok,
-        source: result.source,
-        confidence: result.confidence,
-        endpoint: "/automation/job/problems",
-        data: result.data,
-        error: result.error,
+      return conCandadoDeJob(job, async () => {
+        // Calcular los problemas abre el editor del job; si no estaba abierto, se cierra al terminar. Cerrarlo no
+        // suelta sus problemas del almacen de Studio, asi que se piden liberar (si no, se acumulan al recrear el job).
+        const antes = job ? await editoresAbiertos(bridge) : null;
+        const liberar = Boolean(job) && antes !== null && !jobAbierto(job!, antes);
+        const result = await bridge.jobProblems({ job, release: liberar });
+        if (job) await cerrarEditoresAbiertosPor(bridge, job, antes);
+        return bridgeOk({
+          ok: result.ok,
+          source: result.source,
+          confidence: result.confidence,
+          endpoint: "/automation/job/problems",
+          data: result.data,
+          error: result.error,
+        });
       });
     },
   },

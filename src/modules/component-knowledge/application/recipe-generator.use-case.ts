@@ -9,8 +9,27 @@ export type { PipelineSpec, Recipe } from "./recipe-generator/types";
  * Genera recetas de componentes a partir de un objetivo y las conserva en
  * memoria para que `talend_recipe_get` pueda recuperarlas.
  */
+/**
+ * Recetas que se conservan en memoria.
+ *
+ * Cada receta es pequeña, pero el proceso vive dias y `generateRecipe` no
+ * borraba ninguna: el Map crecia con cada llamada. Se descartan las mas
+ * antiguas; las recientes, que son las que se consultan, se quedan.
+ */
+const MAX_RECETAS = 200;
+
 export class RecipeGeneratorUseCase {
   private recipes: Map<string, Recipe> = new Map();
+
+  private guardar(recipe: Recipe): Recipe {
+    this.recipes.set(recipe.id, recipe);
+    while (this.recipes.size > MAX_RECETAS) {
+      const masAntigua = this.recipes.keys().next().value;
+      if (masAntigua === undefined) break;
+      this.recipes.delete(masAntigua);
+    }
+    return recipe;
+  }
 
   generateRecipe(objective: string): Recipe {
     const normalizedObjective = objective.toLowerCase().trim();
@@ -25,13 +44,10 @@ export class RecipeGeneratorUseCase {
         explanation: matchedPattern.explanation,
         confidence: matchedPattern.confidence,
       };
-      this.recipes.set(recipe.id, recipe);
-      return recipe;
+      return this.guardar(recipe);
     }
 
-    const fallbackRecipe = generateFallbackRecipe(objective, normalizedObjective);
-    this.recipes.set(fallbackRecipe.id, fallbackRecipe);
-    return fallbackRecipe;
+    return this.guardar(generateFallbackRecipe(objective, normalizedObjective));
   }
 
   explainRecipe(recipe: Recipe): string {

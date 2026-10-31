@@ -6,6 +6,7 @@ import { createPlatformContext, detectJobRunnerStrategy, buildScriptExecutionArg
 import { toMcpPath } from "../../../platform/path-bridge";
 import { buildLauncherArgs } from "./launcher-args";
 import { generateRunId, getRunsDir } from "./run-paths";
+import { SalidaAcotada } from "../../../shared/output-buffer";
 import { finalizeRun, finalizeRunWithError } from "./finalize";
 import type { RunResult } from "./types";
 
@@ -103,15 +104,15 @@ export async function runExportedJob(options: {
     const args = buildScriptExecutionArgs(mcpScriptPath, strategy, ctx, launcherArgs);
     const child = spawn(strategy.shell, args, { cwd: dirname(mcpScriptPath), env, stdio: ["ignore", "pipe", "pipe"] });
 
-    let stdout = "";
-    let stderr = "";
+    const stdout = new SalidaAcotada();
+    const stderr = new SalidaAcotada();
     let settled = false;
 
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
         killProcess(child, "SIGKILL", ctx.runtimeOs);
-        finalizeRun(runsDir, runId, stdout, stderr, startMs, null, "timeout", options.jobName, scriptPath!, stdoutPath, stderrPath).then(
+        finalizeRun(runsDir, runId, stdout.value, stderr.value, startMs, null, "timeout", options.jobName, scriptPath!, stdoutPath, stderrPath).then(
           (result) => resolvePromise(result),
         );
       }
@@ -119,8 +120,8 @@ export async function runExportedJob(options: {
 
     child.stdout!.setEncoding("utf8");
     child.stderr!.setEncoding("utf8");
-    child.stdout!.on("data", (chunk: string) => (stdout += chunk));
-    child.stderr!.on("data", (chunk: string) => (stderr += chunk));
+    child.stdout!.on("data", (chunk: string) => stdout.append(chunk));
+    child.stderr!.on("data", (chunk: string) => stderr.append(chunk));
     child.on("close", async (exitCode) => {
       if (!settled) {
         settled = true;
@@ -129,8 +130,8 @@ export async function runExportedJob(options: {
         const result = await finalizeRun(
           runsDir,
           runId,
-          stdout,
-          stderr,
+          stdout.value,
+          stderr.value,
           startMs,
           exitCode,
           status,
@@ -149,8 +150,8 @@ export async function runExportedJob(options: {
         const result = await finalizeRunWithError(
           runsDir,
           runId,
-          stdout,
-          stderr,
+          stdout.value,
+          stderr.value,
           startMs,
           options.jobName,
           scriptPath!,
