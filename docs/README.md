@@ -17,6 +17,7 @@
 | **Preparar o revisar una prueba L5** (jobs con salida esperada) | [plan-de-pruebas/03-ejecucion-l5.md](plan-de-pruebas/03-ejecucion-l5.md) | [plan-de-pruebas/04-reglas-de-componentes.md](plan-de-pruebas/04-reglas-de-componentes.md) |
 | **Saber qué componentes están probados** | [COBERTURA-POR-FAMILIA.md](COBERTURA-POR-FAMILIA.md) | [plan-de-pruebas/02-cobertura-del-catalogo.md](plan-de-pruebas/02-cobertura-del-catalogo.md) |
 | **Ver el rumbo del proyecto** | [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md) | [REFACTOR-PENDIENTE.md](REFACTOR-PENDIENTE.md) |
+| **Studio no abre, vuelve al login o el bridge no responde** | [SOLUCION-DE-PROBLEMAS.md](SOLUCION-DE-PROBLEMAS.md) | `talend_diagnose_environment` |
 | **Instalar en Windows o WSL** | [windows-wsl.md](windows-wsl.md) | [README.md](../README.md) |
 
 ## Estado de cada documento
