@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { readTalendStudioBridgeConfig, readTalendStudioBridgeToken } from "../../../talend/studio/bridge-client";
 import { toMcpPath, toTalendHostPath } from "../../../platform/path-bridge";
+import { explainBridgeState, readStudioLogTail, type StudioLogAnalysis } from "../../../talend/studio/log-analysis";
 
 interface Evidence<T = unknown> {
   ok: boolean;
@@ -41,6 +42,8 @@ interface TalendEnvironmentReport {
   metadata: Evidence<{ metadataPath: string; logPath: string | null; workbenchPluginPath: string | null; launchConfigPath: string | null; }>;
   studioProcess: Evidence<{ running: boolean; pid?: number; command?: string; }>;
   bridgeStatus: Evidence<{ connected: boolean; host: string; port: number; configPath?: string; tokenPath?: string; }>;
+  /** Solo si Studio esta abierto y el bridge no responde: lo que dice su log. */
+  studioLog?: Evidence<StudioLogAnalysis>;
 }
 
 function resolvePathTriple(raw: string | undefined): { raw?: string; mcp?: string; talendHost?: string } {
@@ -187,6 +190,25 @@ async function diagnoseTalendEnvironment(): Promise<TalendEnvironmentReport> {
     };
   }
 
+  // Con Studio abierto y el bridge caido, el motivo suele estar en el log de Studio (token SSO vencido,
+  // login en bucle...). Sin esto el diagnostico solo decia "no se pudo conectar".
+  const logPath = metadata.data?.logPath ?? null;
+  const explanation = explainBridgeState({
+    studioRunning: studioProcess.data?.running === true,
+    bridgeConnected: bridgeStatus.ok,
+    logTail: logPath ? readStudioLogTail(logPath) : "",
+  });
+  if (explanation.nextSteps.length > 0) bridgeStatus.nextSteps = explanation.nextSteps;
+  const studioLog: Evidence<StudioLogAnalysis> | undefined = explanation.analysis
+    ? {
+        ok: explanation.analysis.findings.length === 0,
+        source: "metadata-log",
+        confidence: logPath ? "medium" : "low",
+        data: explanation.analysis,
+        checkedPaths: logPath ? [logPath] : [],
+      }
+    : undefined;
+
   return {
     platform,
     env,
@@ -196,6 +218,7 @@ async function diagnoseTalendEnvironment(): Promise<TalendEnvironmentReport> {
     metadata,
     studioProcess,
     bridgeStatus,
+    ...(studioLog ? { studioLog } : {}),
   };
 }
 

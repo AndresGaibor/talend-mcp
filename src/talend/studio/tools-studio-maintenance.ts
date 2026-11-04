@@ -1,7 +1,7 @@
 import * as z from "zod/v4";
 import { clearBridgeClientCache } from "../../modules/studio-bridge/adapters/http-studio-bridge.client";
 import { readTalendStudioBridgeConfig } from "../../modules/studio-bridge/adapters/bridge-config";
-import { decideRestart, restartStudio } from "./studio-restart";
+import { decideRestart, restartStudio, StudioStartError } from "./studio-restart";
 import { bridgeFail, bridgeOk, loadBridge } from "./tools-base";
 
 export const studioMaintenanceTools = [
@@ -106,7 +106,9 @@ export const studioMaintenanceTools = [
         clearBridgeClientCache();
         return bridgeOk({ ok: true, source: "studio-bridge", confidence: "high", endpoint, data: { restarted: true, usedPercentBefore: usedPercent, ...result } });
       } catch (error) {
-        return fail("STUDIO_RESTART_FAILED", error instanceof Error ? error.message : String(error), { usedPercent });
+        // Si Studio quedo esperando el login o se cerro al arrancar, el codigo lo distingue de un fallo generico.
+        const code = error instanceof StudioStartError ? error.code : "STUDIO_RESTART_FAILED";
+        return fail(code, error instanceof Error ? error.message : String(error), { usedPercent });
       }
     },
   },

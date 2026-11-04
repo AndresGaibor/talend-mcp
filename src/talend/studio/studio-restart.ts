@@ -54,10 +54,10 @@ async function powershell(command: string, timeoutMs = POWERSHELL_TIMEOUT_MS): P
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** El pid de Studio segun el bridge, o undefined si no responde. */
-export async function studioPid(attempts = 3): Promise<number | undefined> {
+export async function studioPid(attempts = 3, timeoutMs = 15_000): Promise<number | undefined> {
   // Studio ocupado (compilando, con un dialogo) tarda en contestar: no se da por caido a la primera.
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const bridge = await createBridgeClient({ config: { timeoutMs: 15_000 } });
+    const bridge = await createBridgeClient({ config: { timeoutMs } });
     const heartbeat = await bridge.ping().catch(() => undefined);
     const pid = (heartbeat?.data as { pid?: number } | undefined)?.pid;
     if (heartbeat?.ok && pid !== undefined) return pid;
@@ -111,6 +111,58 @@ if (-not $p.HasExited -and ${force ? "$true" : "$false"}) { Stop-Process -Id ${p
 "forced=$forced"
 if ($p.HasExited) { exit 0 } else { exit 2 }
 `;
+
+export class StudioStartError extends Error {
+  constructor(
+    readonly code: "STUDIO_WAITING_LOGIN" | "STUDIO_EXITED",
+    message: string,
+  ) {
+    super(message);
+    this.name = "StudioStartError";
+  }
+}
+
+/**
+ * Espera a que el bridge responda tras abrir Studio.
+ *
+ * El bridge arranca con el workbench, o sea despues del login. Si Studio queda esperando en la pantalla de
+ * login (token SSO vencido, o simplemente nadie ha entrado), el bridge no aparece nunca: el error lo dice
+ * en vez de un generico "no arranco a tiempo". Si el proceso desaparece, falla enseguida en lugar de agotar
+ * el plazo. Una sola deteccion fallida del proceso no cuenta como caida.
+ */
+export async function waitForStudioBridge(options: {
+  timeoutMs: number;
+  intervalMs: number;
+  checkBridge: () => Promise<number | undefined>;
+  isStudioRunning: () => Promise<boolean>;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+}): Promise<number> {
+  const now = options.now ?? Date.now;
+  const wait = options.sleep ?? sleep;
+  const deadline = now() + options.timeoutMs;
+  let misses = 0;
+  for (;;) {
+    const pid = await options.checkBridge();
+    if (pid !== undefined) return pid;
+
+    if (await options.isStudioRunning()) {
+      misses = 0;
+    } else if (++misses >= 2) {
+      throw new StudioStartError("STUDIO_EXITED", "Studio se cerro mientras arrancaba: el proceso ya no existe.");
+    }
+
+    if (now() >= deadline) {
+      throw new StudioStartError(
+        "STUDIO_WAITING_LOGIN",
+        `Studio esta abierto pero el bridge no respondio en ${Math.round(options.timeoutMs / 1000)} s. El bridge arranca ` +
+          "despues del login, asi que lo mas probable es que Studio espere en la pantalla de login (o vuelva a ella si el " +
+          "token SSO esta vencido). Inicia sesion en su ventana; si no avanza, ejecuta talend_diagnose_environment para ver el motivo en su log.",
+      );
+    }
+    await wait(options.intervalMs);
+  }
+}
 
 export type RestartDecision = { proceed: true } | { proceed: false; code: string; message: string };
 
@@ -180,13 +232,14 @@ export async function restartStudio(options: { reinstallBridge?: boolean; force?
   const folder = executable.replace(/[\\/][^\\/]+$/, "");
   await powershell(`Start-Process -FilePath '${executable}' -WorkingDirectory '${folder}'`);
 
-  const deadline = Date.now() + START_WAIT_MS;
-  let pid = await studioPid();
-  while (pid === undefined) {
-    if (Date.now() > deadline) throw new Error("Studio no arranco a tiempo");
-    await sleep(5_000);
-    pid = await studioPid();
-  }
+  // Una comprobacion corta por vuelta: con el timeout de 15 s y 3 intentos de antes, una sola vuelta podia
+  // tardar 45 s y el plazo se pasaba.
+  const pid = await waitForStudioBridge({
+    timeoutMs: START_WAIT_MS,
+    intervalMs: 5_000,
+    checkBridge: () => studioPid(1, 3_000),
+    isStudioRunning: async () => (await studioPidByName()) !== undefined,
+  });
 
   if (options.reinstallBridge) {
     const install = Bun.spawn(["bun", "run", "bridge:install"], { cwd: ROOT, stdout: "ignore", stderr: "ignore" });

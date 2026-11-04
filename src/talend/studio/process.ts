@@ -28,6 +28,24 @@ function isTalendProcess(name: string, commandLine?: string): string[] {
   return matched;
 }
 
+/**
+ * Si un proceso es Talend Studio.
+ *
+ * Antes bastaba con que "Talend", "TOS" o "eclipse" apareciera en cualquier parte de la linea de
+ * comandos, sin distinguir mayusculas en Windows: el `crashpad_handler.exe` de Google Drive (por
+ * "Photos") y hasta el propio servidor MCP (por la ruta `talend-mcp`) se tomaban por Studio. Ahora
+ * se mira el nombre del ejecutable y, solo para un JVM, que lo lance el launcher de Equinox de Talend.
+ */
+export function isStudioProcess(name: string, commandLine?: string): boolean {
+  const exe = name.toLowerCase().replace(/\.exe$/, "");
+  if (exe.startsWith("talend-studio") || exe.startsWith("talendstudio") || exe.startsWith("tos_")) return true;
+  if (exe === "java" || exe === "javaw") {
+    const line = commandLine ?? "";
+    return /org\.eclipse\.equinox\.launcher/i.test(line) && /talend/i.test(line);
+  }
+  return false;
+}
+
 function parsePsLine(line: string): { pid: number; name: string; commandLine: string } | null {
   const trimmed = line.trim();
   if (!trimmed || /^PID/i.test(trimmed)) return null;
@@ -75,8 +93,8 @@ async function detectPosix(): Promise<ProcessEvidence> {
   for (const line of lines) {
     const parsed = parsePsLine(line);
     if (!parsed) continue;
+    if (!isStudioProcess(parsed.name, parsed.commandLine)) continue;
     const matchedBy = isTalendProcess(parsed.name, parsed.commandLine);
-    if (matchedBy.length === 0) continue;
     processes.push({ ...parsed, matchedBy });
   }
   if (processes.length === 0) {
@@ -112,7 +130,7 @@ async function detectPosix(): Promise<ProcessEvidence> {
 async function detectWindows(): Promise<ProcessEvidence> {
   const psScript = `
 Get-CimInstance Win32_Process |
-Where-Object { $_.Name -match 'Talend|TOS|eclipse' -or $_.CommandLine -match 'Talend|TOS|eclipse' } |
+Where-Object { $_.Name -like 'Talend-Studio*' -or $_.Name -like 'TalendStudio*' -or $_.Name -like 'TOS_*' -or $_.Name -in 'java.exe','javaw.exe' } |
 Select-Object ProcessId,Name,CommandLine |
 ConvertTo-Json
   `;
@@ -141,12 +159,14 @@ ConvertTo-Json
   try {
     const parsed = JSON.parse(output);
     const items = Array.isArray(parsed) ? parsed : [parsed];
-    const processes: TalendStudioProcess[] = items.map((item: Record<string, unknown>) => ({
-      pid: Number(item.ProcessId) || 0,
-      name: String(item.Name ?? ""),
-      commandLine: String(item.CommandLine ?? ""),
-      matchedBy: isTalendProcess(String(item.Name ?? ""), String(item.CommandLine ?? "")),
-    }));
+    const processes: TalendStudioProcess[] = items
+      .map((item: Record<string, unknown>) => ({
+        pid: Number(item.ProcessId) || 0,
+        name: String(item.Name ?? ""),
+        commandLine: String(item.CommandLine ?? ""),
+      }))
+      .filter((item) => isStudioProcess(item.name, item.commandLine))
+      .map((item) => ({ ...item, matchedBy: isTalendProcess(item.name, item.commandLine) }));
     if (processes.length === 0) {
       return { ok: false, source: "process", confidence: "none", error: "No se detectó proceso de Talend Studio." };
     }
