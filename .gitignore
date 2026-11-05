@@ -93,3 +93,10 @@ testdata/drivers/
 
 # Ficheros que generan las pruebas L5 (entrada y salida de los escenarios).
 testdata/l5_*
+
+# Estado local de herramientas de agentes: ajustes y preferencias de la maquina.
+/.commandcode/
+# Configuracion local de Claude Code; la skill de .claude/skills/ si se versiona.
+/.claude/settings.local.json
+# Archivo suelto de prueba manual, no forma parte del proyecto.
+/prueba.txt
