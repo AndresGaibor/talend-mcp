@@ -179,6 +179,22 @@ export const jobVerifyTools = [
     }),
     handler: async ({ job, run, installMissing, timeoutMs }: EntradaVerify, signal?: AbortSignal) => {
       const bridge = await loadBridge();
+      // Presupuesto de memoria: rehusar RESTART_RECOMMENDED_PERCENT (75).
+      const { RESTART_RECOMMENDED_PERCENT } = await import("./studio-restart");
+      const memory = await bridge.memory({ gc: true }).catch(() => undefined);
+      const usedPercent = (memory?.data as { usedPercent?: number } | undefined)?.usedPercent;
+      if (usedPercent !== undefined && usedPercent >= RESTART_RECOMMENDED_PERCENT) {
+        return bridgeFail({
+          ok: false,
+          source: "studio-bridge",
+          confidence: "high",
+          endpoint: ENDPOINT,
+          error: {
+            code: "STUDIO_MEMORY_BUDGET",
+            message: `Studio usa el ${usedPercent}% del heap (umbral ${RESTART_RECOMMENDED_PERCENT}%): pide GC o reinicia con talend_studio_restart antes de verificar.`,
+          },
+        });
+      }
       // Dos verificaciones del mismo job a la vez se pisan en Studio: van en fila.
       return conCandadoDeJob(job, async () => {
         // Se mira que habia antes: un editor que ya estaba abierto (el de quien

@@ -129,6 +129,30 @@ public final class NodeOperations {
     return onUi(() -> configureOnUi(spec));
   }
 
+  /**
+   * Asigna el schema del repositorio a un nodo (propiedad SCHEMA tipo "Repository").
+   *
+   * `spec`: `uniqueName`, `connectionName`, `schemaName`. Solo schemas de
+   * archivo; DB compartida no tiene modelo en Talend 8 (ver Roadmap).
+   */
+  public static void setRepositorySchema(Object node, String connectionName, String schemaName) throws Exception {
+    // El nodo guarda un parametro SCHEMA que referencia al repositorio por
+    // nombre. El tipo "Repository" lo resuelve Studio contra el modelo al
+    // compilar; no se copian columnas al `.item`.
+    Object params = node.getClass().getMethod("getElementParameters").invoke(node);
+    if (params instanceof List) {
+      for (Object parameter : (List<?>) params) {
+        if ("SCHEMA".equals(RepositoryConnections.invokeName(parameter, "getName"))) {
+          try {
+            parameter.getClass().getMethod("setValue", String.class).invoke(parameter, connectionName + "/" + schemaName);
+          } catch (Exception ignored) { /* best effort */ }
+        }
+      }
+    }
+    // Marcar dirty para que el guardado no salte el cambio.
+    TalendApi.markModified(node);
+  }
+
   private static Map<String, Object> configureOnUi(JsonObject spec) throws Exception {
     Object editor = TalendApi.designerEditor(spec);
     Object process = TalendApi.processOf(editor);

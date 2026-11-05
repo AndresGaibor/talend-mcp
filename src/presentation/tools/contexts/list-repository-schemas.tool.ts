@@ -23,14 +23,17 @@ export function createListRepositorySchemasTool() {
   return {
     name: "talend_list_repository_schemas",
     description:
-      "Lista los schemas compartidos del proyecto abierto en Talend Studio: nombre de la conexion, tipo, nombre del schema y sus columnas (nombre, tipo, longitud, nullable, key). No devuelve rutas, parametros ni credenciales.",
+      "Lista los schemas compartidos del proyecto abierto en Talend Studio: nombre de la conexion, tipo, nombre del schema y sus columnas (nombre, tipo, longitud, nullable, key). No devuelve rutas, parametros ni credenciales. Acepta limit/offset.",
     annotations: { readOnly: true },
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        limit: { type: "number", description: "Maximo a devolver (defecto 50)" },
+        offset: { type: "number", description: "Cuantos omitir (defecto 0)" },
+      },
       required: [],
     },
-    handler: async () => {
+    handler: async (input: { limit?: number; offset?: number }) => {
       try {
         const bridge = await createBridgeClient();
         const result = await bridge.repositorySchemas();
@@ -46,8 +49,11 @@ export function createListRepositorySchemasTool() {
           schemas?: RepositorySchema[];
           count?: number;
         };
+        const limit = input.limit ?? 50;
+        const offset = input.offset ?? 0;
+        const all = payload?.schemas ?? [];
         return okResult(
-          { schemas: payload?.schemas ?? [], count: payload?.count ?? 0 },
+          { schemas: all.slice(offset, offset + limit), count: all.length },
           "list-repository-schemas",
         );
       } catch (error) {

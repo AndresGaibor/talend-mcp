@@ -1,0 +1,30 @@
+name: Studio en vivo (L5)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  studio-live:
+    name: L5 con Talend Studio vivo
+    runs-on: windows-latest
+    if: ${{ vars.STUDIO_ENABLED == 'true' }}
+    # Sin runner con Studio oficial, este job queda como pending (no rojo).
+    # Para activarlo: runner self-hosted con Talend Studio instalado y
+    # variables.STUDIO_ENABLED=true + secret STUDIO_TOKEN si aplica.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+      - run: bun install
+      - name: Instalar bridge
+        run: bun run bridge:install
+      - name: Humo L5 en vivo
+        run: bun run scripts/execution-check.ts --suite humo
+      - name: Cobertura L4 (muestra)
+        run: bun run scripts/coverage.ts --compile --max 20 --out testdata/cobertura-l4-ci.csv
+      - name: Subir resultados
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-l4-ci
+          path: testdata/cobertura-l4-ci.csv

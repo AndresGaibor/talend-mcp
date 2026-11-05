@@ -13,14 +13,17 @@ export function createListRepositoryConnectionsTool() {
   return {
     name: "talend_list_repository_connections",
     description:
-      "Lista las conexiones compartidas del proyecto abierto en Talend Studio. Devuelve nombres y tipos, pero no rutas, parametros ni credenciales.",
+      "Lista las conexiones compartidas del proyecto abierto en Talend Studio. Devuelve nombres y tipos, pero no rutas, parametros ni credenciales. Acepta limit/offset para paginar.",
     annotations: { readOnly: true },
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        limit: { type: "number", description: "Maximo a devolver (defecto 50)" },
+        offset: { type: "number", description: "Cuantos omitir (defecto 0)" },
+      },
       required: [],
     },
-    handler: async () => {
+    handler: async (input: { limit?: number; offset?: number }) => {
       try {
         const bridge = await createBridgeClient();
         const result = await bridge.repositoryConnections();
@@ -36,8 +39,11 @@ export function createListRepositoryConnectionsTool() {
           connections?: RepositoryConnection[];
           count?: number;
         };
+        const limit = input.limit ?? 50;
+        const offset = input.offset ?? 0;
+        const all = payload?.connections ?? [];
         return okResult(
-          { connections: payload?.connections ?? [], count: payload?.count ?? 0 },
+          { connections: all.slice(offset, offset + limit), count: all.length },
           "list-repository-connections",
         );
       } catch (error) {

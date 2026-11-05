@@ -96,6 +96,14 @@ export class BridgeContextClient extends BridgeJobClient {
     });
   }
 
+  /** Asigna un schema del repositorio a un nodo (schemas de archivo). */
+  async assignRepositorySchema(options: { job: string; uniqueName: string; connectionName: string; schemaName: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/repository/schemas/assign", {
+      method: "POST",
+      body: options,
+    });
+  }
+
   /** Crea un contexto del proyecto. */
   async createRepositoryContext(options: {
     name: string;

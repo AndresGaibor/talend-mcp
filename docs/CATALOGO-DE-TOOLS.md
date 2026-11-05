@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **257**.
+Tools registradas en el preset actual: **258**.
 
 ## Empezar
 
@@ -2360,6 +2360,20 @@ Argumentos principales:
 - `instructions` (object, opcional)
 - `replaceManagedTodoContexts` (boolean, opcional)
 
+#### `talend_job_assign_repository_schema`
+
+Asigna un schema compartido del repositorio a un nodo. Falla en codigo (Zod, fail-fast) si falta algo; no escribe si la asignacion no es valida.
+
+**Uso:** riesgo write; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_job_assign_repository_schema
+
+Argumentos principales:
+
+- `job` (string, obligatorio): Nombre del job abierto en Studio
+- `uniqueName` (string, obligatorio): Unique name del nodo
+- `connectionName` (string, obligatorio): Nombre de la conexion compartida del repositorio
+- `schemaName` (string, obligatorio): Nombre del schema/tabla dentro de la conexion
+- `confirm` (boolean, opcional): Confirmar la asignacion (escritura)
+
 #### `talend_job_build_batch`
 
 Genera el codigo y compila MUCHOS jobs del repositorio sin abrir su editor, en paralelo (unos 0,2 s por job). Pensada para migraciones masivas: devuelve por cada job si compila y el error de javac si no. No ejecuta los jobs; para uno concreto usa talend_job_verify. Los jobs deben existir ya en el repositorio de Studio (si los has escrito por fichero, refresca el workspace antes).
@@ -3005,15 +3019,25 @@ Lista los editores abiertos desde los archivos workbench XMI del workspace.
 
 #### `talend_list_repository_connections`
 
-Lista las conexiones compartidas del proyecto abierto en Talend Studio. Devuelve nombres y tipos, pero no rutas, parametros ni credenciales.
+Lista las conexiones compartidas del proyecto abierto en Talend Studio. Devuelve nombres y tipos, pero no rutas, parametros ni credenciales. Acepta limit/offset para paginar.
 
 **Uso:** riesgo write; solo lectura; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_list_repository_connections
 
+Argumentos principales:
+
+- `limit` (number, opcional): Maximo a devolver (defecto 50)
+- `offset` (number, opcional): Cuantos omitir (defecto 0)
+
 #### `talend_list_repository_schemas`
 
-Lista los schemas compartidos del proyecto abierto en Talend Studio: nombre de la conexion, tipo, nombre del schema y sus columnas (nombre, tipo, longitud, nullable, key). No devuelve rutas, parametros ni credenciales.
+Lista los schemas compartidos del proyecto abierto en Talend Studio: nombre de la conexion, tipo, nombre del schema y sus columnas (nombre, tipo, longitud, nullable, key). No devuelve rutas, parametros ni credenciales. Acepta limit/offset.
 
 **Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_list_repository_schemas
+
+Argumentos principales:
+
+- `limit` (number, opcional): Maximo a devolver (defecto 50)
+- `offset` (number, opcional): Cuantos omitir (defecto 0)
 
 #### `talend_move_component`
 

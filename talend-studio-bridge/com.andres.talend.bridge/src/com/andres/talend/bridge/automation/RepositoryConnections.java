@@ -15,6 +15,81 @@ public final class RepositoryConnections {
   private RepositoryConnections() {}
 
   /**
+   * Asigna un schema del repositorio a un nodo del job abierto.
+   *
+   * `spec`: `job` (nombre), `uniqueName` (nodo), `connectionName`,
+   * `schemaName`. Solo asigna schemas de archivo (METADATA_FILE_*); las
+   * conexiones de base de datos compartidas de Talend 8 no tienen modelo
+   * encontrado, por lo que `tDB*` en modo "Repository" no se puede asignar
+   * (documentado en ROADMAP P0 fila 8).
+   *
+   * La asignacion pone la propiedad SCHEMA del nodo en tipo "Repository":
+   * el esquema se resuelve contra el repositorio al compilar, no como
+   * columnas copiadas en el `.item`.
+   */
+  public static Map<String, Object> assign(JsonObject spec) throws Exception {
+    String job = string(spec, "job");
+    String uniqueName = string(spec, "uniqueName");
+    String connectionName = string(spec, "connectionName");
+    String schemaName = string(spec, "schemaName");
+    if (job == null || uniqueName == null || connectionName == null || schemaName == null) {
+      throw new IllegalStateException("Faltan job, uniqueName, connectionName o schemaName");
+    }
+
+    Object editor = TalendApi.designerEditor(spec);
+    Object process = TalendApi.processOf(editor);
+    if (process == null) {
+      throw new IllegalStateException("No se encontro el job abierto: " + job);
+    }
+    Object node = TalendApi.nodeByUniqueName(process, uniqueName);
+    if (node == null) {
+      throw new IllegalStateException("No existe el nodo '" + uniqueName + "'");
+    }
+
+    // Buscar la conexion en el repositorio usando `list`.
+    Map<String, Object> listed;
+    try {
+      listed = list(spec);
+    } catch (Exception e) {
+      throw new IllegalStateException("No se pudo leer el repositorio: " + e.getMessage());
+    }
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> connections = (List<Map<String, Object>>) listed.get("connections");
+    String connectionType = null;
+    if (connections != null) {
+      for (Map<String, Object> c : connections) {
+        if (connectionName.equals(c.get("name"))) {
+          connectionType = (String) c.get("connectionType");
+          break;
+        }
+      }
+    }
+    if (connectionType == null) {
+      throw new IllegalStateException("Conexion no encontrada en el repositorio: " + connectionName);
+    }
+    // Solo schemas de archivo por ahora: DB en modo Repository no tiene modelo en Talend 8.
+    if (connectionType.toLowerCase().contains("db")) {
+      throw new IllegalStateException(
+          "La asignacion de schemas DB compartidos no esta disponible en Talend 8 (sin modelo de conexiones DB): usa modo built-in");
+    }
+
+    NodeOperations.setRepositorySchema(node, connectionName, schemaName);
+    TalendApi.markModified(process);
+
+    return result_assign(process, node, job, uniqueName, connectionName, schemaName);
+  }
+
+  private static Map<String, Object> result_assign(Object process, Object node, String job, String uniqueName, String connectionName, String schemaName) {
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("assigned", true);
+    result.put("job", job);
+    result.put("uniqueName", uniqueName);
+    result.put("connectionName", connectionName);
+    result.put("schemaName", schemaName);
+    return result;
+  }
+
+  /**
    * Lista nombres y tipos de conexiones sin exponer parametros, rutas ni credenciales.
    */
   public static Map<String, Object> list(JsonObject spec) throws Exception {
@@ -158,5 +233,20 @@ public final class RepositoryConnections {
 
   private static String stringValue(Object value) {
     return value == null ? null : String.valueOf(value);
+  }
+
+  private static String string(JsonObject spec, String key) {
+    return JsonSpec.string(spec, key);
+  }
+
+  /** Compatibilidad: nombre via reflexion sin importar EMF. */
+  static String invokeName(Object target, String methodName) {
+    if (target == null) return null;
+    try {
+      Object value = target.getClass().getMethod(methodName).invoke(target);
+      return value == null ? null : String.valueOf(value);
+    } catch (Exception ignored) {
+      return null;
+    }
   }
 }

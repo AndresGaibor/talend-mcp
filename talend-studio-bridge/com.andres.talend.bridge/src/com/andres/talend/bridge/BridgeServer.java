@@ -318,6 +318,7 @@ final class BridgeServer {
     uiBody("/automation/repository/contexts", body -> JobOperationsService.repositoryContexts(body));
     uiBody("/automation/repository/connections", body -> JobOperationsService.repositoryConnections(body));
     uiBody("/automation/repository/schemas", body -> JobOperationsService.repositorySchemas(body));
+    uiBody("/automation/repository/schemas/assign", body -> JobOperationsService.assignRepositorySchema(body));
     uiBody("/automation/repository/contexts/create", body -> JobOperationsService.createRepositoryContext(body));
     uiBody("/automation/repository/contexts/parameter", body -> JobOperationsService.setRepositoryContextParameter(body));
     uiBody("/automation/repository/contexts/parameter/delete", body -> JobOperationsService.deleteRepositoryContextParameter(body));

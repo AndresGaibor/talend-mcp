@@ -324,6 +324,16 @@ public final class JobOperationsService {
   }
 
   /**
+   * Asigna un schema del repositorio a un nodo (schemas de archivo; DB
+   * compartida bloqueada en Talend 8).
+   *
+   * @param spec `job`, `uniqueName`, `connectionName`, `schemaName`.
+   */
+  public static Map<String, Object> assignRepositorySchema(JsonObject spec) {
+    return run("assign-repository-schema", () -> RepositoryConnections.assign(spec));
+  }
+
+  /**
    * Crea un contexto del proyecto.
    *
    * @param spec `name`, `version`, `context` y `parameters`.
