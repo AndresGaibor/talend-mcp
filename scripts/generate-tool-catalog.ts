@@ -1,6 +1,7 @@
 import { getAllRuntimeTools } from "../src/server/registered-tools";
 import { GUIDE_TASKS } from "../src/modules/guide/domain/task-catalog";
 import { areaForTool, areaName, GUIDE_AREAS, requiresStudio } from "../src/modules/guide/domain/areas";
+import { getToolRisk } from "../src/presentation/server/tool-safety";
 
 type JsonSchema = {
   properties?: Record<string, { description?: string; type?: string; enum?: string[]; default?: unknown }>;
@@ -56,12 +57,15 @@ for (const area of GUIDE_AREAS) {
   lines.push(`### ${area.name}`, "", area.useFor, "");
   for (const tool of entries) {
     const annotations = tool.annotations;
+    const risk = getToolRisk(tool.name);
     const labels = [
+      `riesgo ${risk}`,
       annotations?.readOnlyHint ? "solo lectura" : "escribe/ejecuta",
       annotations?.requiresConfirmation ? "requiere confirmacion" : undefined,
       requiresStudio(tool.name) ? "requiere Studio + bridge" : "funciona sin Studio",
     ].filter(Boolean);
-    lines.push(`#### \`${tool.name}\``, "", tool.description, "", `**Uso:** ${labels.join("; ")}.`, "");
+    const meta = (tool as { _meta?: Record<string, unknown> })._meta?.talend as { docsUrl?: string; version?: string } | undefined;
+    lines.push(`#### \`${tool.name}\``, "", tool.description, "", `**Uso:** ${labels.join("; ")}. **Version:** ${meta?.version ?? "1.0.0"}. **Docs:** ${meta?.docsUrl ?? ""}`, "");
 
     const schema = tool.inputSchema as JsonSchema;
     const properties = Object.entries(schema?.properties ?? {});

@@ -9,12 +9,15 @@
  * `tests/tools/tool-conformance.test.ts`.
  */
 
+export type ToolRisk = "read" | "write" | "execute" | "destructive";
+
 type ToolSafetyAnnotation = {
   readOnlyHint: boolean;
   idempotentHint: boolean;
   destructiveHint: boolean;
   openWorldHint: boolean;
   requiresConfirmation?: boolean;
+  risk?: ToolRisk;
 };
 
 const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
@@ -134,6 +137,7 @@ const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_components_parameters: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
 
   talend_list_repository_contexts: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_list_repository_schemas: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_read_contexts: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
 
   talend_task_analyze_requirements: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
@@ -169,6 +173,34 @@ const TOOL_REQUIRES_WORKSPACE = new Set([
   "talend_detect_open_jobs", "talend_read_latest_run_log", "talend_read_job_errors",
   "talend_summarize_open_job", "talend_view_logs", "talend_analyze_logs",
 ]);
+
+export function getToolRisk(name: string): "read" | "write" | "execute" | "destructive" {
+  const canonical = (CANONICAL_RISKS as Record<string, "read" | "write" | "execute" | "destructive">)[name];
+  if (canonical) return canonical;
+  const safety = TOOL_SAFETY[name];
+  if (safety) return safety.risk ?? deriveRisk(safety);
+  return deriveRisk(getToolAnnotations(name));
+}
+
+function deriveRisk(safety: ToolSafetyAnnotation): "read" | "write" | "execute" | "destructive" {
+  if (safety.destructiveHint) return "destructive";
+  if (safety.readOnlyHint) return "read";
+  if (safety.openWorldHint) return "execute";
+  return "write";
+}
+
+const CANONICAL_RISKS: Record<string, "read" | "write" | "execute" | "destructive"> = {
+  talend_job_inspect: "read",
+  talend_component_describe: "read",
+  talend_job_plan: "read",
+  talend_job_edit: "write",
+  talend_job_assign_repository_schema: "write",
+  talend_job_run: "execute",
+  talend_run_status: "read",
+  talend_search: "read",
+  talend_describe: "read",
+  talend_execute: "write",
+}; 
 
 export function getToolAnnotations(name: string): ToolSafetyAnnotation & { requiresWorkspace: boolean } {
   const safety = TOOL_SAFETY[name];

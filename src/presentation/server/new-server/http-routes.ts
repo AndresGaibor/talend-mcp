@@ -45,14 +45,32 @@ export function createMetricsPayload(ctx: {
 }
 
 function isLocalOrigin(origin: string): boolean {
-  return origin.startsWith("http://127.0.0.1:") || origin.startsWith("http://localhost:");
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "http:") return false;
+    const hostname = url.hostname.toLowerCase();
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+  } catch {
+    return false;
+  }
 }
 
 function isAllowedOrigin(origin: string | undefined, allowOrigins: string[] = []): boolean {
   if (!origin) return true;
-  if (allowOrigins.includes("*")) return true;
+  if (allowOrigins.includes("*")) return false;
   if (allowOrigins.includes(origin)) return true;
   return isLocalOrigin(origin);
+}
+
+export function validateHostHeader(hostHeader: string | undefined, bindHost: string): boolean {
+  if (!hostHeader) return false;
+  try {
+    const url = new URL(`http://${hostHeader}`);
+    const hostname = url.hostname.toLowerCase();
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === bindHost.toLowerCase();
+  } catch {
+    return false;
+  }
 }
 
 // ─── Lectura del cuerpo HTTP ──────────────────────────────────────────────────
@@ -121,8 +139,14 @@ export async function handleEarlyRoute(
 
   // ── CORS preflight ──
   if (req.method === "OPTIONS") {
+    const origin = req.headers.origin;
+    if (origin !== undefined && !isAllowedOrigin(origin, [])) {
+      res.writeHead(403, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "origin_denied" }));
+      return true;
+    }
     res.writeHead(204, {
-      "access-control-allow-origin": req.headers.origin ?? "*",
+      "access-control-allow-origin": origin ?? "",
       "access-control-allow-methods": "GET, POST, OPTIONS",
       "access-control-allow-headers": "content-type, accept, authorization",
       "access-control-max-age": "86400",
@@ -159,9 +183,15 @@ export async function handleEarlyRoute(
   }
 
   const origin = req.headers.origin;
-  if (!isAllowedOrigin(origin, [])) {
+  if (origin !== undefined && !isAllowedOrigin(origin, [])) {
     res.writeHead(403, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: "origin_denied" }));
+    return true;
+  }
+
+  if (!validateHostHeader(req.headers.host, ctx.host)) {
+    res.writeHead(403, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: false, error: "host_denied" }));
     return true;
   }
 
@@ -179,5 +209,12 @@ export async function handleEarlyRoute(
     return true;
   }
 
+  // POST sin initialize es invalido para Streamable HTTP: el SDK responde 400
+  // sin sesion inicializada. Se deja que el SDK decida (406/400) para que el
+  // cliente use el handshake correcto.
+  // Compatibilidad: los tests historicos llaman tools/call directo sin
+  // initialize; se acepta y se encamina al SDK, que responde 406 si falta la
+  // sesion. Para clientes de produccion eso es el comportamiento correcto
+  // del protocolo Streamable HTTP.
   return false;
 }

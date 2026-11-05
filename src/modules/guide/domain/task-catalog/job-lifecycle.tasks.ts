@@ -16,7 +16,7 @@ export const JOB_LIFECYCLE_TASKS: GuideTask[] = [
         input: { filter: "Delimited" },
       },
       {
-        tool: "talend_components_definition",
+        tool: "talend_component_describe",
         purpose: "Leer del disco que parametros exige el componente y que conexiones admite. No adivines.",
         input: { name: "tFileInputDelimited" },
       },
@@ -82,9 +82,9 @@ export const JOB_LIFECYCLE_TASKS: GuideTask[] = [
     aliases: ["cambiar job", "retocar", "parametro", "conexion", "schema", "modificar"],
     steps: [
       {
-        tool: "talend_jobs_read",
+        tool: "talend_job_inspect",
         purpose: "Ver el job en disco antes de tocarlo (componentes, conexiones y XML).",
-        input: { jobName: "MI_JOB" },
+        input: { job: "MI_JOB" },
       },
       {
         tool: "talend_job_open_in_studio",
@@ -97,12 +97,14 @@ export const JOB_LIFECYCLE_TASKS: GuideTask[] = [
         input: { job: "MI_JOB" },
       },
       {
-        tool: "talend_job_configure_node",
-        purpose: "Cambiar parametros, tablas, schema o el modelo del tMap de un nodo.",
-        input: {
-          uniqueName: "tFileInputDelimited_1",
-          parameters: { FILENAME: { value: "\"C:/datos/entrada.csv\"" } },
-        },
+        tool: "talend_job_plan",
+        purpose: "Previsualizar los cambios declarativos antes de aplicarlos (dryRun, con diff).",
+        input: { job: "MI_JOB", operations: [{ op: "set_params", uniqueName: "tFileInputDelimited_1", parameters: { FILENAME: "\"C:/datos/entrada.csv\"" } }], dryRun: true },
+      },
+      {
+        tool: "talend_job_edit",
+        purpose: "Aplicar los cambios declarativos de forma atómica (mode auto: offline salvo job abierto).",
+        input: { job: "MI_JOB", operations: [{ op: "set_params", uniqueName: "tFileInputDelimited_1", parameters: { FILENAME: "\"C:/datos/entrada.csv\"" } }] },
       },
       {
         tool: "talend_job_update_node",

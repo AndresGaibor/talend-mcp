@@ -27,6 +27,8 @@
     "dq:analyses": "bun run scripts/list-dq-analyses.ts",
     "jobs": "bun run scripts/jobs.ts",
     "contexts": "bun run scripts/contexts.ts",
+    "cli": "bun run src/cli/main.ts",
+    "cli:build": "bun build --compile src/cli/main.ts --outfile dist/talend",
     "docs:tools": "bun run scripts/generate-tool-catalog.ts",
     "docs:componentes": "bun run scripts/catalogo-componentes.ts",
     "panels:build": "bun run scripts/component-panels.ts",

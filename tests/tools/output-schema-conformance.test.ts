@@ -253,7 +253,7 @@ describe("talend_delete_job: la respuesta real valida contra su outputSchema pub
     clearActiveRepo();
     process.env.TALEND_PROJECT = project;
     try {
-      const resultado = await createDeleteJobTool().handler({ jobName: "lab04_olist_orders_to_staging" });
+      const resultado = await createDeleteJobTool().handler({ jobName: "lab04_olist_orders_to_staging", dryRun: false, confirm: true });
 
       expect((resultado as { ok: boolean }).ok).toBe(true);
       expect(validar("talend_delete_job", resultado)).toEqual([]);

@@ -1,6 +1,5 @@
 import { allTools as presentationTools } from "../tools/registry";
 import { createStudioBridgeTools } from "../../talend/studio/bridge-tools";
-import { secretTools } from "../../talend/studio/tools-secrets";
 import { fromJsonSchema } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 import { getToolAnnotations } from "./tool-safety";
@@ -51,7 +50,8 @@ function dedupeTools(tools: ToolDef[]): ToolDef[] {
 const registeredTools = dedupeTools([
   ...presentationTools,
   ...createStudioBridgeTools(),
-  ...secretTools,
+  // secretos: ya vienen como modulo canonico en runtime-cache; legacy no los
+  // duplica aqui para no colisionar (ver AGENTS.md seccion 6).
 ]);
 
 function isPlainJsonSchema(schema: unknown): schema is Record<string, unknown> {

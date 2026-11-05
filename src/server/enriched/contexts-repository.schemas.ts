@@ -37,6 +37,23 @@ export const contextsRepositorySchemas: Record<string, z.ZodTypeAny> = {
       connectionType: z.string().nullable(),
     })),
   }),
+  talend_list_repository_schemas: z.object({
+    count: z.number(),
+    schemas: z.array(z.object({
+      connectionName: z.string().nullable(),
+      connectionType: z.string().nullable(),
+      name: z.string().nullable(),
+      columns: z.array(z.object({
+        name: z.string().nullable(),
+        type: z.unknown().optional(),
+        sourceType: z.unknown().optional(),
+        length: z.unknown().optional(),
+        precision: z.unknown().optional(),
+        nullable: z.unknown().optional(),
+        key: z.unknown().optional(),
+      })),
+    })),
+  }),
   talend_read_repository_context: z.object({
     context: RepositoryContextSchema,
   }),

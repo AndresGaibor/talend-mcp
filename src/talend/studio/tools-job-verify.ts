@@ -34,7 +34,14 @@ function veredictoDe(hallazgos: Hallazgos, falloGrave: boolean): Veredicto {
   return hallazgos.avisos.length > 0 ? "ok_con_avisos" : "ok";
 }
 
-async function ejecutarVerify(bridge: Bridge, { job, run, installMissing, timeoutMs }: EntradaVerify) {
+async function ejecutarVerify(
+  bridge: Bridge,
+  { job, run, installMissing, timeoutMs }: EntradaVerify,
+  signal?: AbortSignal,
+) {
+  if (signal?.aborted) {
+    throw new Error("Verificación cancelada por timeout");
+  }
   const prepared = await prepareStudioForJob(bridge, {
     ignoreDialogs: false,
     installMissing: installMissing ?? false,
@@ -56,7 +63,8 @@ async function ejecutarVerify(bridge: Bridge, { job, run, installMissing, timeou
   const problemsResult = await bridge.jobProblems({ job });
   const design = clasificarProblemas(problemasDe(problemsResult.data));
 
-  // 2. Compilacion.
+  // 2. Compilacion (cancelacion cooperativa antes de trabajo largo).
+  if (signal?.aborted) throw new Error("Verificación cancelada por timeout");
   const compiled = await compileWithDependencies(bridge, job, installMissing ?? false);
   const compiles = compiled.data.compiles === true;
   const base = {
@@ -79,6 +87,7 @@ async function ejecutarVerify(bridge: Bridge, { job, run, installMissing, timeou
     });
   }
 
+  if (signal?.aborted) throw new Error("Verificación cancelada por timeout");
   // 3. Ejecucion con un solo Run de Studio: compila, ejecuta y devuelve la salida.
   const opened = await bridge.openJob({ name: job });
   if (!opened.ok) {
@@ -164,11 +173,11 @@ export const jobVerifyTools = [
     description: "Comprueba un job de principio a fin en UNA llamada: (1) errores y avisos de diseno (vista Problemas), (2) que compila, (3) lo ejecuta y revisa su salida buscando [WARN], [ERROR], [FATAL] y excepciones aunque el codigo de salida sea 0. Devuelve 'verdict' (ok | ok_con_avisos | error) con 'problems', 'compiles', 'exitCode', 'lines' y 'findings'. Es la tool que hay que usar tras crear o cambiar un job; informa al usuario de cada aviso. Con run:false solo comprueba diseno y compilacion, sin ejecutar.",
     inputSchema: z.object({
       job: z.string().describe("Nombre del job"),
-      run: z.boolean().optional().default(true).describe("Ejecutar el job (false = solo diseno y compilacion)"),
+      run: z.boolean().optional().default(false).describe("Ejecutar el job (por defecto false: solo diseno y compilacion)"),
       installMissing: z.boolean().optional().default(false).describe("Descargar las dependencias que falten al compilar"),
       timeoutMs: z.number().optional().describe("Tiempo maximo de la ejecucion en milisegundos (por defecto 120000)"),
     }),
-    handler: async ({ job, run, installMissing, timeoutMs }: EntradaVerify) => {
+    handler: async ({ job, run, installMissing, timeoutMs }: EntradaVerify, signal?: AbortSignal) => {
       const bridge = await loadBridge();
       // Dos verificaciones del mismo job a la vez se pisan en Studio: van en fila.
       return conCandadoDeJob(job, async () => {
@@ -176,7 +185,7 @@ export const jobVerifyTools = [
         // trabaja en Studio) no se cierra nunca.
         const antes = await editoresAbiertos(bridge);
         try {
-          return await ejecutarVerify(bridge, { job, run, installMissing, timeoutMs });
+          return await ejecutarVerify(bridge, { job, run, installMissing, timeoutMs }, signal);
         } finally {
           await cerrarEditoresAbiertosPor(bridge, job, antes).catch(() => []);
         }

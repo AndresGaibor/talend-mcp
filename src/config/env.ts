@@ -32,6 +32,14 @@ export const TalendMcpEnvSchema = z.object({
   TALEND_MCP_HOST: z.string().default("127.0.0.1"),
   TALEND_MCP_FILTER: z.string().optional(),
   TALEND_MCP_LOG: z.enum(["quiet", "normal", "verbose"]).default("normal"),
+  /** Permiso efectivo para tools de escritura (no solo anotacion). */
+  TALEND_MCP_ALLOW_WRITE: z.enum(["0", "1", "true", "false"]).optional(),
+  /** Permiso efectivo para tools de ejecucion. */
+  TALEND_MCP_ALLOW_EXECUTE: z.enum(["0", "1", "true", "false"]).optional(),
+  /** Permiso efectivo para tools destructivas. */
+  TALEND_MCP_ALLOW_DESTRUCTIVE: z.enum(["0", "1", "true", "false"]).optional(),
+  /** Token Bearer obligatorio cuando el servidor no escucha solo en loopback. */
+  TALEND_MCP_TOKEN: z.string().optional(),
   /** Tope del cuerpo JSON-RPC. Sin tope, un POST grande tumba el proceso. */
   TALEND_MCP_MAX_BODY_BYTES: z.coerce.number().int().positive().default(1_048_576),
   /** Ejecuciones que se conservan en `.talend-mcp/runs`; las mas viejas se borran. */

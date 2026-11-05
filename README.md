@@ -76,6 +76,30 @@ y pídele al asistente que use **`talend_guide`**.
 `start` actualiza el plugin automáticamente si Studio está abierto y el bridge no responde. Para que no
 lo toque, usa `bun run start --skip-bridge` o `bun run start:server`.
 
+### CLI local (MVP)
+
+La CLI puede ejecutar un conjunto pequeño de operaciones desde el registro local, sin iniciar el
+servidor MCP:
+
+```bash
+bun run cli help
+bun run cli jobs list --project "C:/ruta/al/proyecto" --json
+bun run cli jobs show CARGA_CLIENTES
+bun run cli tools list --json
+bun run cli tools describe talend_jobs_create
+bun run cli tools call talend_guide --input @entrada.json
+bun run cli mcp serve
+```
+
+`entrada.json` debe contener `{"mode":"overview"}`. La opción `--input` también acepta JSON directo
+o `-` para leerlo desde stdin.
+
+Este MVP clasifica explícitamente solo lectura, listado, inspección y creación básica; las demás
+operaciones se bloquean hasta revisar su riesgo. La creación modifica el proyecto, requiere Studio y
+confirmación explícita (`--yes` en automatizaciones). Este permiso local no cambia la autorización de
+MCP: la unificación de los despachadores CLI, HTTP y stdio queda pendiente. Para consultar el estado
+del entorno, sigue disponible `bun run doctor`.
+
 ### Trabajo en vivo con Studio
 
 Para operar sobre jobs abiertos hace falta el plugin incluido en este repositorio:
@@ -90,6 +114,11 @@ entorno. Si no detecta Studio, define `TALEND_STUDIO_HOME` con la carpeta que co
 `features/`. Para revisar el estado completo, ejecuta `bun run doctor`.
 
 ### Otros clientes MCP
+
+Con **Claude Code** no hace falta configurar nada a mano: el repositorio trae
+[.mcp.json](.mcp.json) (stdio, preset `agent`) y la skill
+[.claude/skills/talend-mcp/SKILL.md](.claude/skills/talend-mcp/SKILL.md) con el flujo de uso.
+Acepta el servidor del proyecto con `/mcp` la primera vez.
 
 Si tu cliente usa `stdio`:
 

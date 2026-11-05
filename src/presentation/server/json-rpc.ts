@@ -8,6 +8,13 @@ import { buildServerInstructions } from "../../modules/guide/domain/server-instr
  * La mayoria de los clientes solo necesita `initialize`, `tools/list` y
  * `tools/call`; se responden como JSON normal, sin abrir un stream SSE. El
  * transporte SSE se reserva para quien lo pide explicitamente.
+ *
+ * NOTA (auditoria Fase 1): este modulo era el despacho manual que divergia
+ * del SDK (protocolVersion 2024-11-05 hardcodeado, sin validacion). El
+ * despacho unico vive en `new-server/common.ts` + `dispatch.ts` via
+ * `NodeStreamableHTTPServerTransport`. Se conserva por compatibilidad de
+ * tests (`tests/presentation/json-rpc.test.ts`); el servidor HTTP ya no lo
+ * usa para tools/call.
  */
 
 export function jsonRpcOk(id: unknown, result: unknown) {

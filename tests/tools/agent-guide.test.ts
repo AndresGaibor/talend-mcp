@@ -132,6 +132,6 @@ describe("Guia para agentes", () => {
     const instructions = buildServerInstructions();
     expect(instructions).toContain("talend_guide { mode: \"overview\" }");
     expect(instructions).toContain("ESTRATEGIA MIXTA");
-    expect(instructions).toContain("talend_job_execute");
+    expect(instructions).toContain("talend_job_verify");
   });
 });

@@ -34,11 +34,13 @@ export function buildRuntimeToolCache(): void {
   }
 
   // 2. Herramientas de modulo (Canónicas)
-  // Estas tienen prioridad y sobrescriben a las legacy si hay colision de nombres
   const modules = getModuleTools(() => getAllRuntimeTools());
   for (const tool of modules) {
     if (!tool.definition.outputSchema) {
       (tool.definition as any).outputSchema = GENERIC_TOOL_OUTPUT_SCHEMA;
+    }
+    if (cache.has(tool.definition.name)) {
+      throw new Error(`Tool duplicada detectada: "${tool.definition.name}". Una herramienta de modulo sobrescribe una legacy: declara el alias explicito o renombra.`);
     }
     cache.set(tool.definition.name, tool);
   }

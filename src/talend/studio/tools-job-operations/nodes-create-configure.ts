@@ -1,7 +1,7 @@
 ﻿/** Tools de jobOperationsTools: nodes-create-configure. */
 import * as z from "zod/v4";
 
-import { bridgeOk, loadBridge } from "../tools-base";
+import { bridgeFail, bridgeOk, loadBridge } from "../tools-base";
 
 import { columnSchema, componentSpecShape, parameterSchema } from "../tools-job-operation-schemas";
 
@@ -36,6 +36,18 @@ export const nodesCreateConfigure = [
       job?: string;
     }) => {
       const bridge = await loadBridge();
+      if (job) {
+        const opened = await bridge.openJob({ name: job });
+        if (!opened.ok) {
+          return bridgeFail({
+            ok: false,
+            source: opened.source,
+            confidence: opened.confidence,
+            endpoint: "/automation/nodes/add",
+            error: { code: "JOB_OPEN_FAILED", message: `No se pudo abrir el job ${job}: ${opened.error?.message ?? "error desconocido"}` },
+          });
+        }
+      }
       const result = await bridge.addNode({ type, label, position, parameters, tables, schema, mapper });
       return bridgeOk({
         ok: result.ok,

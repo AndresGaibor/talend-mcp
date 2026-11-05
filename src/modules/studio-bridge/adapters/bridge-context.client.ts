@@ -88,6 +88,14 @@ export class BridgeContextClient extends BridgeJobClient {
     });
   }
 
+  /** Lista schemas y columnas compartidos del proyecto, sin valores de configuracion. */
+  async repositorySchemas(): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/repository/schemas", {
+      method: "POST",
+      body: {},
+    });
+  }
+
   /** Crea un contexto del proyecto. */
   async createRepositoryContext(options: {
     name: string;

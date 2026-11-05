@@ -51,6 +51,11 @@ import { createJobQualityReportTool, createJobQualityIssuesTool } from "../../mo
 import { createComponentDefinitionTool } from "../../modules/component-definitions/tools/component-definition.tool";
 import { createComponentIconTool } from "../../modules/component-definitions/tools/component-icon.tool";
 import { createAgentGuideTool } from "../../modules/guide/tools/agent-guide.tool";
+import { createJobInspectTool } from "../../modules/jobs/tools/job-inspect.tool";
+import { createComponentDescribeTool } from "../../modules/component-definitions/tools/component-describe.tool";
+import { createJobPlanTool, createJobEditTool, createAssignRepositorySchemaTool } from "../../modules/jobs/tools/job-plan-edit.tool";
+import { createJobRunTool, createRunStatusTool } from "../../modules/runs/tools/job-run.tool";
+import { createCodeModeTools, setCodeModeRegistry } from "../../modules/jobs/tools/code-mode.tool";
 
 /**
  * Construye las tools de modulo (canonicas) en orden de registro.
@@ -102,10 +107,24 @@ export function getModuleTools(listTools: () => McpToolDefinition[]): RuntimeToo
     createComponentDefinitionTool(),
     createComponentIconTool(),
     createAgentGuideTool({ listTools }),
+    createJobInspectTool(),
+    createComponentDescribeTool(),
+    createJobPlanTool(),
+    createJobEditTool(),
+    createAssignRepositorySchemaTool(),
+    createJobRunTool(),
+    createRunStatusTool(),
+    ...createCodeModeTools(),
   ];
 
-  return rawTools.map((tool) => ({
+  const runtimeTools = rawTools.map((tool) => ({
     definition: adaptToolToMcp(tool),
     handler: tool.handler as (input: unknown) => Promise<unknown>,
   }));
+
+  // Code Mode: el registro solo contiene operaciones registradas; execute
+  // no puede saltar la validacion/autorizacion del despacho.
+  setCodeModeRegistry(new Map(runtimeTools.map((t) => [t.definition.name, { description: t.definition.description, handler: t.handler }])));
+
+  return runtimeTools;
 }

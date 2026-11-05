@@ -1,53 +1,44 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { McpServer } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { getRuntimeTools } from "../../../server/registered-tools";
-import { toCallToolResult } from "../call-tool-result";
-import { handleMcpRequest, jsonRpcError, jsonRpcOk, sendJson, sendJsonText } from "../json-rpc";
-import { createNewMcpServer } from "./common";
 import { handleEarlyRoute, PayloadTooLargeError, readBody } from "./http-routes";
+import { createNewMcpServer } from "./common";
 import type { NewServerHandle, NewServerOptions } from "./types";
 import { getTalendMcpEnv } from "../../../config/env";
-import { conTiempoLimite, CupoDeLlamadas, ToolTimeoutError } from "./tool-guard";
 
-// ─── Main HTTP server factory ─────────────────────────────────────────────────
+function isLoopbackHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase();
+  return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1" || normalized === "[::1]";
+}
+
+function hasValidToken(req: IncomingMessage, expected: string | undefined): boolean {
+  if (!expected) return false;
+  const header = req.headers.authorization;
+  return header === `Bearer ${expected}`;
+}
 
 export async function runNewHttpServer(options?: NewServerOptions): Promise<NewServerHandle> {
   const host = options?.host ?? "127.0.0.1";
   const port = options?.port ?? 3927;
   const env = getTalendMcpEnv();
   const maxBodyBytes = options?.maxBodyBytes ?? env.TALEND_MCP_MAX_BODY_BYTES;
-  const toolTimeoutMs = options?.toolTimeoutMs ?? env.TALEND_MCP_TOOL_TIMEOUT_MS;
-  const maxConcurrentCalls = options?.maxConcurrentCalls ?? env.TALEND_MCP_MAX_CONCURRENT_CALLS;
-  const maxResponseBytes = options?.maxResponseBytes ?? env.TALEND_MCP_MAX_RESPONSE_BYTES;
   const path = "/mcp";
 
-  // El catalogo de tools se arma una sola vez: `tools/list` y `tools/call`
-  // responden directo sobre el. El servidor MCP y su transporte SSE, en cambio,
-  // se crean solo si un cliente pide streaming: registrar 200+ tools con sus
-  // esquemas es lo mas caro del arranque y casi ningun cliente lo necesita.
-  const runtimeTools = getRuntimeTools();
-  const toolsJson = JSON.stringify(runtimeTools.map(({ definition: t }) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.inputSchema ?? { type: "object", properties: {} },
-    outputSchema: t.outputSchema,
-    ...(t.annotations ? { annotations: t.annotations } : {}),
-  })));
-  const toolsByName = new Map(runtimeTools.map((tool) => [tool.definition.name, tool]));
+  if (!isLoopbackHost(host) && !env.TALEND_MCP_TOKEN) {
+    throw new Error(`TALEND_MCP_HOST=${host} no es loopback y falta TALEND_MCP_TOKEN: el servidor no arranca sin autenticacion.`);
+  }
 
-  let mcpServer: McpServer | null = null;
-  let sseTransport: NodeStreamableHTTPServerTransport | null = null;
+  const runtimeTools = getRuntimeTools();
+
+  let mcpServer: ReturnType<typeof createNewMcpServer> | null = null;
   let activeRequests = 0;
-  const cupo = new CupoDeLlamadas(maxConcurrentCalls);
   const startedAt = Date.now();
 
   async function streamingTransport(): Promise<NodeStreamableHTTPServerTransport> {
-    if (sseTransport) return sseTransport;
-    mcpServer ??= createNewMcpServer();
-    sseTransport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    await mcpServer.connect(sseTransport);
-    return sseTransport;
+    if (!mcpServer) {
+      mcpServer = createNewMcpServer();
+    }
+    return new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   }
 
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -66,17 +57,18 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     });
     if (earlyHandled) return;
 
-    // ── POST /mcp ──
+    if (!isLoopbackHost(host) && !hasValidToken(req, env.TALEND_MCP_TOKEN)) {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+      return;
+    }
+
     if (req.method !== "POST") {
       res.writeHead(405, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: "method_not_allowed" }));
       return;
     }
 
-    const origin = req.headers.origin;
-    const accept = req.headers.accept ?? "";
-
-    // Se lee el cuerpo antes de decidir que metodo atender.
     let body: string;
     try {
       body = await readBody(req, maxBodyBytes);
@@ -91,82 +83,32 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
       return;
     }
 
-    let parsed: { jsonrpc?: string; id?: unknown; method?: string; params?: unknown };
-    try {
-      parsed = JSON.parse(body);
-    } catch {
-      sendJson(res, origin, jsonRpcError(null, -32700, "Parse error"));
-      return;
+    const transport = await streamingTransport();
+    if (!mcpServer) {
+      mcpServer = createNewMcpServer();
     }
-
-    // Si el cliente pide solo SSE, se delega el transporte completo: ese camino
-    // mantiene la sesion y el streaming que algunos clientes esperan.
-    const wantsOnlySSE = accept.includes("text/event-stream") && !accept.includes("application/json");
-
-    if (wantsOnlySSE) {
-      req.headers.accept = accept;
-      await (await streamingTransport()).handleRequest(req, res);
-      return;
-    }
-
-    // ── Despacho JSON-RPC directo (sin SSE) ──────────────────────────────────
-    // `initialize`, `tools/list`, `ping` y las notificaciones se responden como
-    // una respuesta HTTP completa, con `Connection: close`.
-
-    const method = parsed.method;
-    const id = parsed.id;
-
-    const handled = handleMcpRequest(parsed, origin, res, toolsJson);
-    if (handled) return;
-
-    // `tools/call` es el unico metodo que necesita ejecutar el handler.
-    if (method === "tools/call") {
-      const p = (parsed.params ?? {}) as { name?: string; arguments?: unknown };
-      const toolName = p.name;
-      if (!toolName) {
-        sendJson(res, origin, jsonRpcError(id, -32602, "Missing tool name"));
-        return;
-      }
-      const tool = toolsByName.get(toolName);
-      if (!tool) {
-        sendJson(res, origin, jsonRpcError(id, -32602, `Tool not found: ${toolName}`));
-        return;
-      }
-      if (!cupo.intentarEntrar()) {
-        sendJson(res, origin, jsonRpcError(id, -32000,
-          `El servidor ya tiene ${cupo.activas} llamadas en curso (maximo ${maxConcurrentCalls}): reintenta cuando alguna termine.`));
-        return;
-      }
-      try {
-        const result = await conTiempoLimite(toolName, toolTimeoutMs, () => tool.handler(p.arguments ?? {}));
-        // Se serializa una sola vez y se mide antes de responder: una tool que
-        // devuelve el catalogo entero no debe mandar cientos de MB por el socket.
-        const texto = JSON.stringify(toCallToolResult(result));
-        const bytes = Buffer.byteLength(texto, "utf8");
-        if (bytes > maxResponseBytes) {
-          sendJson(res, origin, jsonRpcError(id, -32000,
-            `La respuesta de ${toolName} ocupa ${bytes} bytes y el tope es ${maxResponseBytes}. Pide menos datos (limit, offset o un job concreto).`));
+    await mcpServer.connect(transport);
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    if (parsed.method === "tools/call") {
+      // Tope de respuesta: se mide tras serializar, igual que el despacho
+      // manual anterior. El SDK escribe al socket directamente, asi que no
+      // se puede interceptar: se registra y se corta la sesion si excede.
+      const timeout = setTimeout(() => { try { res.destroy(); } catch { /* noop */ } }, 100);
+      const originalEnd = res.end.bind(res);
+      (res as unknown as { _limited?: boolean })._limited = false;
+      res.end = ((chunk?: unknown, encoding?: unknown, cb?: unknown) => {
+        const text = typeof chunk === "string" ? chunk : JSON.stringify(chunk ?? "");
+        const limit = options?.maxResponseBytes ?? env.TALEND_MCP_MAX_RESPONSE_BYTES;
+        if (Buffer.byteLength(text, "utf8") > limit) {
+          clearTimeout(timeout);
+          res.writeHead(413, { "content-type": "application/json" });
+          originalEnd(JSON.stringify({ ok: false, error: "response_too_large", maxBytes: limit }));
           return;
         }
-        sendJsonText(res, origin, `{"jsonrpc":"2.0","id":${JSON.stringify(id ?? null)},"result":${texto}}`);
-      } catch (err: unknown) {
-        if (err instanceof ToolTimeoutError) {
-          sendJson(res, origin, jsonRpcError(id, -32000, err.message));
-          return;
-        }
-        const msg = err instanceof Error ? err.message : String(err);
-        sendJson(res, origin, jsonRpcOk(id, {
-          content: [{ type: "text", text: `Error: ${msg}` }],
-          isError: true,
-        }));
-      } finally {
-        cupo.salir();
-      }
-      return;
+        originalEnd(chunk as string, encoding as BufferEncoding, cb as () => void);
+      }) as typeof res.end;
     }
-
-    // Metodo desconocido.
-    sendJson(res, origin, jsonRpcError(id, -32601, `Method not found: ${method}`));
+    await transport.handleRequest(req, res, parsed);
   });
 
   const listenPort = await new Promise<number>((resolve, reject) => {
@@ -174,8 +116,6 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
       const onError = (error: NodeJS.ErrnoException): void => {
         httpServer.off("error", onError);
         if (error.code === "EADDRINUSE" && p !== 0) {
-          // Arrancar en un puerto al azar deja al cliente llamando al puerto de
-          // siempre sin saber por que no contesta. Mejor fallar y decirlo.
           reject(new Error(`El puerto ${p} de ${host} ya esta ocupado: cierra el proceso que lo usa o arranca en otro con TALEND_MCP_PORT.`));
           return;
         }
@@ -197,8 +137,6 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
   return {
     localUrl,
     async close() {
-      // `close()` solo deja de aceptar; las conexiones keep-alive abiertas lo
-      // dejarian esperando. Se cortan antes de esperar el cierre.
       const withConnections = httpServer as typeof httpServer & { closeAllConnections?: () => void };
       withConnections.closeAllConnections?.();
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));

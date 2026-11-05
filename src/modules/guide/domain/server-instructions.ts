@@ -11,24 +11,15 @@ export function buildServerInstructions(): string {
   const tasks = GUIDE_TASKS.map((task) => task.id).join(", ");
 
   return [
-    "Servidor MCP de Qlik Talend Studio: lee, crea, edita, ejecuta y verifica jobs de un proyecto Talend (.item/.properties).",
+    "MCP de Qlik Talend Studio: lee, crea, edita, ejecuta y verifica jobs (.item/.properties).",
     "",
-    "EMPIEZA AQUI: llama talend_guide { mode: \"overview\" }. Devuelve el proyecto configurado, las tareas disponibles y las tools expuestas.",
-    `Tareas: ${tasks}.`,
-    "Para una tarea concreta: talend_guide { mode: \"task\", task: \"crear-job\" }.",
-    "Antes de configurar un componente: talend_guide { mode: \"rules\" }.",
-    "Para encontrar una tool: talend_guide { mode: \"search\", query: \"contexto\" }.",
-    "Para comprobar proyecto, Studio y bridge: talend_guide { mode: \"environment\" }.",
+    "EMPIEZA: talend_guide { mode: \"overview\" }. Tareas: " + tasks + ".",
+    "Tarea: talend_guide { mode: \"task\", task: \"crear-job\" }. Reglas: { mode: \"rules\" }. Buscar: { mode: \"search\", query: \"...\" }. Entorno: { mode: \"environment\" }.",
     "",
-    "ESTRATEGIA MIXTA: elige el camino por el trabajo. OFFLINE (por defecto en migraciones, lotes y jobs que no estan abiertos): escribe y edita el .item en disco con talend_jobs_create_from_spec, talend_jobs_create_batch (plantilla + filas), talend_job_edit_offline y talend_jobs_edit_batch; son atomicas, validan la integridad y no necesitan Studio (~1 ms por job). Luego comprueba con talend_job_build_batch (compila ~0,2 s por job sin abrir editor) o talend_job_verify (ejecuta). STUDIO EN VIVO (talend_job_create_in_studio, talend_job_add_node, talend_job_configure_node, talend_job_connect_nodes): para un job que esta abierto en un editor, para componentes cuya configuracion resuelve Studio (tMap, esquemas dinamicos) y para ver el resultado en el lienzo. Nunca edites en disco un job abierto en un editor: Studio pisaria el cambio al guardar (las tools offline lo detectan y se niegan, salvo force).",
+    "CANONICAS (preset agent): talend_job_inspect, talend_component_describe, talend_job_plan (dryRun+diff), talend_job_edit (mode auto), talend_job_run (confirm), talend_run_status, talend_search/describe/execute (Code Mode), talend_job_verify, talend_jobs_list. Resto en `all` vía Code Mode.",
     "",
-    "Flujo canonico en Studio en vivo para crear un job: talend_studio_list_components -> talend_components_definition -> talend_job_create_in_studio -> talend_job_add_node -> talend_job_set_schema -> talend_job_connect_nodes -> talend_job_verify.",
-    "El schema del origen es obligatorio antes de conectar; en tMap, tAggregateRow, tNormalize y tJavaRow el schema y el modelo se aplican despues de conectar.",
-    "Conecta con el conector real del componente (FLOW, UNIQUE, REJECT, ITERATE): con el equivocado el job compila pero no pasa nada.",
-    "",
-    "VERIFICAR: tras crear o cambiar un job, llama SIEMPRE talend_job_verify { job }. En una sola llamada revisa el diseno (vista Problemas), compila, ejecuta y busca [WARN], [ERROR], [FATAL] y excepciones en la salida aunque el codigo de salida sea 0. Devuelve verdict (ok | ok_con_avisos | error) y findings: informa de cada aviso al usuario, no los des por ruido. Un ok: true o un job que termina bien NO significa que no haya avisos. Para mas detalle: talend_job_execute (tambien devuelve findings), talend_tail_run_output, talend_analyze_logs y talend_bridge_log_tail (Error Log de Studio).",
-    "",
-    "Dos familias de tools: las de disco (talend_jobs_list/read, talend_read_contexts, talend_validation_*, talend_secrets_*) funcionan sin Studio; las de Studio en vivo (talend_job_*, talend_studio_*, talend_bridge_*) requieren Talend Studio abierto con el plugin bridge en 127.0.0.1:3930.",
-    "Toda tool devuelve el envelope { ok, source, confidence, data, warnings, errors, nextActions }. Si `ok` es false, lee `errors`; si trae `nextActions`, sigue esa secuencia.",
+    "ESTRATEGIA MIXTA: OFFLINE para lotes/jobs cerrados (talend_jobs_create_from_spec, talend_jobs_create_batch, talend_job_edit_offline, talend_jobs_edit_batch, talend_job_build_batch, talend_job_verify run:false). STUDIO EN VIVO para jobs abiertos y tMap (talend_job_create_in_studio, add_node, configure_node, connect_nodes). Nunca edites en disco un job abierto: Studio lo pisa al guardar.",
+    "VERIFICAR: talend_job_verify { job, run: false } siempre tras cambios; run:true solo con efectos externos aceptados. Informa de cada aviso (findings), no solo del verdict.",
+    "Envelope: { ok, source, confidence, data, errors, nextActions }. SEGURIDAD: validación+autorización en dispatchValidated (TALEND_MCP_ALLOW_*, confirm, auditoría .talend-mcp/audit.jsonl).",
   ].join("\n");
 }

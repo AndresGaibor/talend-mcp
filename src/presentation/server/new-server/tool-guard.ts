@@ -24,14 +24,18 @@ export class ToolTimeoutError extends Error {
 export async function conTiempoLimite<T>(
   toolName: string,
   timeoutMs: number,
-  fn: () => Promise<T>,
+  fn: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
-  const ejecucion = fn();
+  const controller = new AbortController();
+  const ejecucion = fn(controller.signal);
   ejecucion.catch(() => undefined);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const plazo = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new ToolTimeoutError(toolName, timeoutMs)), timeoutMs);
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new ToolTimeoutError(toolName, timeoutMs));
+    }, timeoutMs);
   });
 
   try {

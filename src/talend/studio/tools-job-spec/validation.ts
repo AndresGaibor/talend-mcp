@@ -8,7 +8,7 @@ import type { PatrónTalend } from "../../task/task-types";
 
 export const jobSpecValidationTools = [
   {
-    name: "talend_jobs_validate_pipeline_spec",
+    name: "talend_job_validate_pipeline_spec",
     description: "Valida una especificación de pipeline antes de generar el job.",
     inputSchema: z.object({
       spec: z.record(z.string(), z.unknown()).describe("Especificación del pipeline"),
@@ -35,7 +35,7 @@ export const jobSpecValidationTools = [
     },
   },
   {
-    name: "talend_jobs_preview_pipeline_spec",
+    name: "talend_job_preview_pipeline_spec",
     description: "Previsualiza cómo quedaría un pipeline.sin generar el job en Talend.",
     inputSchema: z.object({
       pattern: z.enum(["multi_csv_raw_loader", "csv_to_db_with_audit_columns", "sql_orchestration_job", "db_to_db_copy", "api_to_db_loader", "file_watcher_pipeline"]).describe("Patrón del pipeline"),

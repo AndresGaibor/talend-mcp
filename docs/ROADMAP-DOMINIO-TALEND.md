@@ -105,10 +105,11 @@ Hoy se crean nodos, conexiones FLOW, schema y parametros. Falta lo que hace un j
   reutilizacion de conexiones y schemas compartidos del repositorio, y validar `tContextLoad` con
   valores del entorno.
 - **Metadata del repositorio**: ya se pueden enumerar las conexiones compartidas con
-  `talend_list_repository_connections` (solo devuelve nombre y tipo). Pendiente: leer schemas de
-  archivo (delimitado, Excel, JSON, XML), schemas genericos y **asignarlos a nodos** mediante la
-  propiedad "Repository". El uso de conexiones de base de datos compartidas en `tDB*` sigue pendiente
-  (P0, fila 8); por ahora se usa el modo "built-in" (HOST, PORT, USER y PASS en el componente).
+  `talend_list_repository_connections` (solo devuelve nombre y tipo) y **leer sus schemas** con
+  `talend_list_repository_schemas` (nombre de la conexión, tipo, nombre del schema y columnas, sin valores de
+  configuración). Pendiente: **asignarlos a nodos** mediante la propiedad "Repository". El uso de conexiones
+  de base de datos compartidas en `tDB*` sigue pendiente (P0, fila 8); por ahora se usa el modo "built-in"
+  (HOST, PORT, USER y PASS en el componente).
 - **Joblets, rutinas y librerias**: crear y usar joblets; rutinas Java propias; jars de terceros;
   test cases.
 - **Gestion de jobs**: versiones nuevas, carpetas, renombrar, mover, duplicar, dependencias

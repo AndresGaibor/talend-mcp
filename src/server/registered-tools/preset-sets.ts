@@ -54,64 +54,38 @@ export const PRESET_CORE = new Set([
  * avanzadas, `talend_guide` avisa si el preset no expone los pasos necesarios.
  */
 export const PRESET_AGENT = new Set([
-  // Verificacion: `talend_job_verify` agrupa problems + compile + run; esas tools
-  // sueltas siguen en `all` pero no se exponen al agente para no multiplicar decisiones.
+  // Interfaz canónica (Fase 2, ~20 tools): la experiencia pública del
+  // agente. El resto queda en `all` a través de Code Mode
+  // (talend_search/describe/execute).
   "talend_guide",
-  "talend_diagnose_environment",
-  "talend_bridge_ping",
-  "talend_detect_open_jobs",
-  "talend_summarize_open_job",
+  "talend_job_inspect",
+  "talend_component_describe",
+  "talend_job_plan",
+  "talend_job_edit",
+  "talend_job_run",
+  "talend_run_status",
+  "talend_search",
+  "talend_describe",
+  "talend_execute",
   "talend_jobs_list",
-  "talend_jobs_read",
-  "talend_show_flow",
+  "talend_job_verify",
   "talend_read_contexts",
-  "talend_list_project_contexts",
-  "talend_list_repository_contexts",
-  "talend_read_repository_context",
-  "talend_studio_list_components",
-  "talend_studio_component_parameters",
-  "talend_studio_ui_inventory",
-  "talend_studio_ui_dialogs",
-  "talend_components_definition",
-  "talend_components_search",
-  "talend_components_parameters",
-  "talend_components_connectors",
-  "talend_components_get_mapping_suggestions",
-  "talend_recipe_generate",
+  "talend_job_quality_report",
+  "talend_snapshots_list",
+  "talend_job_build_batch",
   "talend_job_create_in_studio",
-  "talend_job_open_in_studio",
+  "talend_bridge_ping",
+  "talend_diagnose_environment",
+  // Compatibilidad: las legacy que el portal/automación aún invocan
+  // directamente siguen expuestas, pero fuera de las canónicas.
   "talend_job_add_node",
   "talend_job_configure_node",
-  "talend_job_update_node",
-  "talend_job_set_schema",
   "talend_job_connect_nodes",
-  "talend_job_list_nodes",
-  "talend_job_contexts_list",
-  "talend_job_context_create",
-  "talend_job_context_set",
-  "talend_job_verify",
-  "talend_job_build_batch",
-  "talend_job_edit_offline",
-  "talend_jobs_create_batch",
-  "talend_jobs_edit_batch",
-  "talend_jobs_create_from_spec",
-  "talend_job_apply_custom_spec",
   "talend_job_execute",
-  "talend_runs_list",
-  "talend_runs_read",
   "talend_tail_run_output",
-  "talend_read_run_log",
-  "talend_analyze_logs",
-  "talend_bridge_log_tail",
-  "talend_bridge_problems_markers",
-  "talend_errors_explain",
-  "talend_errors_suggest_fix",
-  "talend_secrets_scan_project",
-  "talend_secrets_scan_job",
-  "talend_validation_validate_design",
-  "talend_validation_validate_context_usage",
-  "talend_job_quality_report",
-  "talend_job_quality_issues",
+  "talend_jobs_create_from_spec",
+  "talend_jobs_create_batch",
+  "talend_job_edit_offline",
 ]);
 
 /**
@@ -146,6 +120,13 @@ export const PRESET_PORTAL = new Set([
  */
 export const LEGACY_TALEND_ALIASES = new Set([
   "talend_report_generate_snippets",          // → talend_report_snippets_generate
+  // Nombres antiguos de las tools renombradas para evitar colisión
+  // modulo↔legacy (Fase 1): el alias se mantiene en `all`, fuera de
+  // `canonical`, para compatibilidad.
+  "talend_task_analyze_requirements",        // → talend_requirements_analyze_project
+  "talend_task_build_execution_plan",        // → talend_requirements_build_checklist
+  "talend_jobs_validate_pipeline_spec",       // → talend_job_validate_pipeline_spec (legacy Studio)
+  "talend_jobs_preview_pipeline_spec",        // → talend_job_preview_pipeline_spec (legacy Studio)
 ]);
 
 /** Tools de ejecucion que el preset `runs` agrupa ademas del prefijo `talend_runs_`. */

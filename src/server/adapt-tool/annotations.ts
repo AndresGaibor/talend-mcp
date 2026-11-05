@@ -31,6 +31,9 @@ export function extractAnnotations(tool: unknown): McpToolAnnotation | undefined
     requiresConfirmation: isVerbDestructive,
   };
 
+  // La inferencia por verbos es solo hint visual: la fuente de verdad es
+  // tool-safety.ts / safety explicito. No se usa para autorizar.
+
   if (isTalendToolDef(tool)) {
     return {
       readOnlyHint: tool.safety.readOnlyHint,

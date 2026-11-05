@@ -14,6 +14,12 @@ export type McpToolDefinition = {
   inputSchema: unknown;
   outputSchema?: unknown;
   annotations?: McpToolAnnotation;
+  /** URL de documentacion de la tool para agentes externos. */
+  docsUrl?: string;
+  /** Version del contrato de la tool. */
+  version?: string;
+  /** Herramienta canonica recomendada, si esta es una alias legacy. */
+  aliasOf?: string;
   _meta?: Record<string, unknown>;
 };
 

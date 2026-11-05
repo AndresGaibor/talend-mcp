@@ -498,6 +498,16 @@ El item expone `getConnection()`. Los modelos de conexión pueden contener valor
 `getPassword()` y `getFilePath()`. `talend_list_repository_connections` solo devuelve etiqueta, versión, clase del
 item y tipo de conexión; no serializar el objeto de conexión completo ni sus parámetros.
 
+### Schemas compartidos
+
+`RepositoryConnections.listSchemas()` (ruta `/automation/repository/schemas`, tool
+`talend_list_repository_schemas`) recorre cada conexión (`getDataPackage`, acotado a profundidad 5 con
+identidad de objeto) y recoge cada `MetadataTable` con sus columnas (`getLabel`/`getName`/`getTalendType`/
+`getSourceType`/`getLength`/`getPrecision`/`isNullable`/`isKey`). EObject de EMF se comprueba por nombre de clase
+porque el bundle no importa `org.eclipse.emf.ecore.EObject`. Solo se devuelven nombre de la conexión, tipo,
+nombre del schema y columnas; nunca rutas ni credenciales. No se ha validado contra un proyecto con conexiones DB
+reales; para eso hace falta ese estado del repositorio (ROADMAP P0 fila 8).
+
 La prueba en el workspace disponible encontró una conexión de archivo delimitado y ninguna conexión de base de
 datos. Por eso el listado quedó validado en vivo para ese tipo; la presencia y lectura de conexiones DB debe
 probarse en un proyecto que contenga esos items.
