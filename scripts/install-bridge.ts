@@ -98,7 +98,10 @@ export async function installBridge(options: InstallBridgeOptions = {}): Promise
   const studioRunning = await isStudioRunning(studio);
 
   if (auto && !studioRunning) {
-    ui.debug(`Plugin: Studio cerrado; se omite la instalacion en ${studio.studioDir}.`);
+    warn(
+      "Talend Studio esta cerrado: el plugin no se actualiza. Abrelo y arranca el MCP de nuevo, " +
+        "o instala el plugin con Studio cerrado con `bun run start --install-bridge`.",
+    );
     return;
   }
 

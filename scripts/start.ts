@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { platform } from "node:os";
 
 import { installBridge } from "./install-bridge";
-import { runningBridgeVersion } from "./lib/bridge-hot-reload";
 import { runBridgeStatus } from "./lib/bridge-status";
 import { runBridgeWatch } from "./lib/bridge-watch";
 import { detectStudio } from "./lib/studio-detect";
@@ -21,10 +20,13 @@ const PROJECT_ROOT = join(import.meta.dir, "..");
  *   bun run start --watch-bridge       -> recompila y recarga el plugin en cada cambio (Studio abierto)
  *   bun run start --skip-bridge        -> no toca el plugin (arranque minimo)
  *
- * La actualizacion automatica solo actua cuando el bridge no responde y Talend
- * Studio esta abierto: compila con javac y publica el jar para carga en
- * caliente. Nunca lanza Maven ni p2 en el arranque. Se desactiva con
- * `TALEND_BRIDGE_AUTO_INSTALL=0` o `--skip-bridge`.
+ * Al arrancar, el plugin se mantiene solo: si Talend Studio esta abierto, compara
+ * la version del bridge que sirve con la de las fuentes y, si no coinciden,
+ * compila con javac y publica el jar para carga en caliente (sin reiniciar
+ * Studio). Con Studio cerrado avisa de que el plugin no esta al dia; instalarlo
+ * con p2 requiere Maven y se hace con `--install-bridge`. Nunca lanza Maven ni
+ * p2 en el arranque. Se desactiva con `TALEND_BRIDGE_AUTO_INSTALL=0` o
+ * `--skip-bridge`.
  */
 
 const IS_WIN = platform() === "win32";
@@ -34,18 +36,13 @@ async function ensureBridge(): Promise<void> {
   const disabled = process.env.TALEND_BRIDGE_AUTO_INSTALL;
   if (disabled === "0" || disabled === "false") return;
 
-  const version = await runningBridgeVersion();
-  if (version) {
-    ui.debug(`Bridge activo (version ${version}).`);
-    return;
-  }
-
   if (!detectStudio()) {
-    ui.debug("Bridge sin respuesta y sin Talend Studio detectable: se arranca sin bridge.");
+    ui.warn("Talend Studio no encontrado: el bridge no estara disponible. Define TALEND_STUDIO_HOME si esta instalado.");
     return;
   }
 
-  ui.info("Bridge sin respuesta: actualizando el plugin en Talend Studio...");
+  // Siempre se comprueba la version, aunque el bridge ya responda: un bundle
+  // viejo en Studio abierto tambien se actualiza aqui.
   await installBridge({ auto: true });
 }
 
