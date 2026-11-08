@@ -93,7 +93,13 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
       // Tope de respuesta: se mide tras serializar, igual que el despacho
       // manual anterior. El SDK escribe al socket directamente, asi que no
       // se puede interceptar: se registra y se corta la sesion si excede.
-      const timeout = setTimeout(() => { try { res.destroy(); } catch { /* noop */ } }, 100);
+      // El plazo es el de la tool, no 100 ms: una compilacion tarda cientos de milisegundos y
+      // cortar la respuesta antes dejaba al cliente con un stream vacio.
+      const timeout = setTimeout(
+        () => { try { res.destroy(); } catch { /* noop */ } },
+        options?.toolTimeoutMs ?? env.TALEND_MCP_TOOL_TIMEOUT_MS,
+      );
+      res.once("close", () => clearTimeout(timeout));
       const originalEnd = res.end.bind(res);
       (res as unknown as { _limited?: boolean })._limited = false;
       res.end = ((chunk?: unknown, encoding?: unknown, cb?: unknown) => {
