@@ -626,11 +626,15 @@ El `EXPRESSION` de `tAssert` es código Java tal cual, sin comillas. Con comilla
 
 Verificado con dos escenarios: `control de flujo: tAssert valida el conteo de filas` (Ok) y `control de flujo: tAssert marca fallo cuando el conteo no coincide` (Fail).
 
-## 70. `tHashInput` no recibe filas de `tHashOutput` (pendiente)
+## 70. `tHashInput` lee lo que escribe `tHashOutput` en el mismo Job (resuelto)
 
-`tHashInput` tiene `LINK_WITH` activo por defecto, y su `LIST` debe ser el `uniqueName` del `tHashOutput`. Con esa configuración el código generado sí contiene el bucle de lectura (`tHashFile_<job>_<pid>_tHashOutput_2.iterator()`), con la misma clave que escribe el output.
+Configuración que funciona: `tHashOutput` sin `LINK_WITH` (su valor por defecto es `false`, con `DATA_WRITE_MODEL=MEMORY`, `KEYS_MANAGEMENT=KEEP_ALL` y `APPEND=true`) y `tHashInput` con `LINK_WITH=true` y `LIST` igual al `uniqueName` del output. El enlace entre subjobs tiene que salir del componente de arranque del primero (`tFixedFlowInput`), no del `tHashOutput`: `guarda --SUBJOB_OK-- lee` es un diseño inválido y Studio lo dice en la vista Problemas con «A component that is not a sub process start can not have any link on sub job ok / on sub job error in input».
 
-Aun así el bucle no produce filas en la topología probada: `tFixedFlowInput -> tHashOutput`, `SUBJOB_OK`, `tHashInput -> tLogRow`. El job termina con código 0 y sin salida. No se ha identificado la causa. El escenario `transformaciones/hash-memoria-entre-subjobs` queda marcado como pendiente.
+Segundo detalle, el que dejaba el escenario «sin filas»: al conectar ese `SUBJOB_OK`, Talend vuelve a propagar esquemas y borra los valores del `tFixedFlowInput` de arranque. El Job compila y ejecuta con código 0 y 0 filas, sin error visible. Por eso el nodo de arranque lleva `schemaDespuesDeConectar: true` en el escenario, que reaplica su esquema y sus valores después de conectar.
+
+Escenario `transformaciones/hash-memoria-entre-subjobs`: **OK**, las tres filas esperadas (`1|Ana`, `2|Jose`, `3|Lucia`) tras montaje, compilación y ejecución en Studio.
+
+El código generado no necesitó cambios: `tHashInput` ya recorría el hash con la clave del output.
 
 ## 71. `tHDFSPut` en Windows: HDFS real en Docker, no el sistema de ficheros local
 
