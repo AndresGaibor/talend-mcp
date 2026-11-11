@@ -2,6 +2,7 @@ import * as z from "zod/v4";
 import { clearBridgeClientCache } from "../../modules/studio-bridge/adapters/http-studio-bridge.client";
 import { readTalendStudioBridgeConfig } from "../../modules/studio-bridge/adapters/bridge-config";
 import { decideRestart, restartStudio, StudioStartError } from "./studio-restart";
+import { handleModals } from "./modals/modal-handler";
 import { bridgeFail, bridgeOk, loadBridge } from "./tools-base";
 
 export const studioMaintenanceTools = [
@@ -50,6 +51,24 @@ export const studioMaintenanceTools = [
         endpoint: "/automation/artifacts/install",
         data: result.data,
         error: result.error,
+      });
+    },
+  },
+  {
+    name: "talend_studio_handle_modals",
+    description:
+      "Lee los dialogos abiertos de Talend Studio (por UI Automation de Windows, sin pasar por el bridge), decide y los contesta: licencias y modulos se aceptan, errores y avisos se registran y se cierran, y una pregunta desconocida contesta lo que no cambia nada. Lo que pide contrasena, campos editables o sobrescribir un archivo se deja para una persona. Cada dialogo queda en logs/modales.jsonl. Con `dryRun` solo lee y dice que haria. Ojo: un dialogo modal bloquea el bridge, asi que esta tool es la forma de destrabarlo.",
+    inputSchema: z.object({
+      dryRun: z.boolean().optional().describe("Solo lee y decide; no pulsa ningun boton"),
+    }),
+    handler: async ({ dryRun }: { dryRun?: boolean }) => {
+      const dialogs = await handleModals({ dryRun });
+      return bridgeOk({
+        ok: true,
+        source: "studio-ui",
+        confidence: "high",
+        endpoint: "studio-modals",
+        data: { dialogs, dryRun: dryRun === true },
       });
     },
   },

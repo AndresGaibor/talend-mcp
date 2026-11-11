@@ -24,6 +24,8 @@ const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_bridge_ping: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_studio_ui_inventory: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_studio_ui_dialogs: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  // Pulsa botones en Studio: no es lectura, pero la politica no borra datos del usuario.
+  talend_studio_handle_modals: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
   talend_bridge_commands: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_bridge_launch_configs: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_bridge_events_recent: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
