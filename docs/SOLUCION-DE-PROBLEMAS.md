@@ -11,9 +11,28 @@ servidor MCP.
 
 Solución permanente: el supervisor. `bun run supervisor` mide cada 10 s el MCP (`/healthz`) y el bridge
 (`/ping`), relanza el MCP si no responde tres muestras seguidas o si el proceso termina (espera de 1 a 30 s
-entre reinicios) y escribe el estado en `out/supervisor.json`. No reinicia Studio. Para que arranque solo al
+entre reinicios) y escribe el estado en `logs/supervisor.json`. No reinicia Studio. Para que arranque solo al
 iniciar sesión: `bun run scripts/supervisor-install.ts` (`--status` y `--remove` lo consultan y lo quitan;
 es una tarea del usuario, sin permisos de administrador).
+
+## Diálogos de Studio que bloquean (lectura y respuesta autónomas)
+
+El supervisor (`bun run supervisor`) revisa cada 5 s los diálogos de Studio con accesibilidad de Windows
+(UI Automation), sin pasar por el bridge: sigue funcionando con el bridge caído o con la interfaz atascada.
+Lee el título, los mensajes (etiquetas y campos de solo lectura) y los botones, decide con
+`src/talend/studio/modals/modal-policy.ts` y pulsa. Cada diálogo queda en `logs/modales.jsonl` con su texto
+completo, la regla y el resultado.
+
+| Tipo | Qué hace |
+|---|---|
+| El Job ya existe, guardar recursos, esquema del componente destino | Respuesta fija de la regla (Yes, Save, No) |
+| Licencias y módulos de terceros | Acepta y descarga (decisión del usuario del 11 de noviembre de 2026; se apaga con `TALEND_MODALS_AUTO=0`) |
+| Error, aviso o información sin regla propia | Registra el mensaje y pulsa Aceptar, OK o Cerrar |
+| Pregunta sin regla (Yes/No) | Contesta la opción que no cambia nada (No, Cancelar) |
+| Contraseña, campos editables, o que habla de borrar o sobrescribir | No toca: lo decide una persona; queda registrado |
+
+A mano: `bun run modales -- --dry-run` (solo lee y dice qué haría) o `bun run modales` (pulsa).
+Reglas nuevas: se añaden a `RULES` en `modal-policy.ts` con su prueba en `tests/talend/modal-policy.test.ts`.
 
 ## El bridge no responde pero Studio está abierto
 

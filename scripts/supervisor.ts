@@ -2,21 +2,23 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
+import { handleModals } from "../src/talend/studio/modals/modal-handler";
 import { FAILURES_BEFORE_RESTART, backoffMs, decideMcpAction, type HealthSample } from "./lib/supervisor-policy";
 
 /**
  * Supervisor del servidor MCP (proceso de fondo).
  *
- *   bun run supervisor           -> mantiene vivo el MCP y escribe out/supervisor.json
+ *   bun run supervisor           -> mantiene vivo el MCP y escribe logs/supervisor.json
  *
  * Cada 10 s mide el MCP (`/healthz`) y el bridge de Studio (`/ping`).
  * - MCP caido tres muestras seguidas, o proceso terminado: lo relanza con espera creciente.
  * - Studio y su bridge solo se observan y se anotan en el latido; no se reinicia Studio.
+ * - Los dialogos de Studio se leen y contestan solos (ver startModalLoop).
  * Si ya hay un MCP sano al arrancar, lo adopta y solo lo vigila.
  */
 
 const ROOT = join(import.meta.dir, "..");
-const OUT = join(ROOT, "out");
+const OUT = join(ROOT, "logs");
 const HEARTBEAT = join(OUT, "supervisor.json");
 const LOCK = join(OUT, "supervisor.lock");
 const MCP_PORT = Number(process.env.TALEND_MCP_PORT) || 3927;
@@ -69,11 +71,35 @@ function writeHeartbeat(data: Record<string, unknown>): void {
   renameSync(tmp, HEARTBEAT);
 }
 
+/**
+ * Dialogos de Studio: cada 5 s se leen por accesibilidad y se contestan segun la politica.
+ * Cada uno queda en logs/modales.jsonl. Se apaga con TALEND_MODALS_AUTO=0.
+ */
+function startModalLoop(): void {
+  if (process.env.TALEND_MODALS_AUTO === "0") return;
+  let busy = false;
+  setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      for (const m of await handleModals()) {
+        const how = m.press?.ok ? `pulso "${m.decision.button}"` : m.decision.action === "leave" ? "lo dejo para una persona" : `no pudo pulsar (${m.press?.error ?? "?"})`;
+        log(`Dialogo "${m.title}" (${m.decision.kind}, regla ${m.decision.rule}): ${how}. ${m.texts.join(" | ").slice(0, 300)}`);
+      }
+    } catch (error) {
+      log(`Fallo al revisar dialogos: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      busy = false;
+    }
+  }, 5000);
+}
+
 async function main(): Promise<void> {
   if (!takeLock()) {
     log("Ya hay un supervisor en marcha; no se inicia otro.");
     return;
   }
+  startModalLoop();
   const history: HealthSample[] = [];
   // El cast evita que TypeScript estreche `child` a `null`: se reasigna dentro de una funcion.
   let child = null as ReturnType<typeof Bun.spawn> | null;
