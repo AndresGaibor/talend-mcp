@@ -1,7 +1,7 @@
 # Compilar sin la ventana de Studio
 
-**Estado: reconocimiento hecho, medición pendiente.** Fecha: 11 de noviembre de 2026 (tarea A-7 del
-Plan A).
+**Estado: reconocimiento cerrado; en este equipo solo es medible la opción del bridge.** Fecha: 11 de
+noviembre de 2026 (tarea A-7 del Plan A).
 
 ## Lo que se comprobó (paso 1)
 
@@ -18,20 +18,26 @@ org.eclipse.wst.command.env_1.1.0.v202308010354.jar
 ```
 
 **No existe `org.talend.commandline*` en esta instalación.** La opción (2) del plan —el modo
-`-application org.talend.commandline.CommandLine`— no está disponible aquí; no se puede medir ni
-adoptar. Los plugins que aparecen son de Eclipse y del entorno WST, no el lanzador por lotes de Talend.
+`-application org.talend.commandline.CommandLine`— no está disponible aquí. Los plugins que aparecen
+son de Eclipse y del entorno WST, no el lanzador por lotes de Talend.
 
-## Lo que queda (pasos 2 y 3)
+## Opción (3), Maven/JDK: no hay Maven que ejecutar
 
-Medir, sobre los mismos 20 Jobs de L0 a L1, la opción (1) actual (`talend_job_build_batch`) contra la
-opción (3) —`Build Job` de un Job y compilación con Maven/JDK— y aplicar la regla de adopción del
-plan: se adopta solo si compila 20 Jobs en menos de 3 min con el mismo resultado que la opción 1.
+- `mvn` no está en el PATH (`which mvn` no encuentra nada).
+- No hay `mvn.cmd`, `mvn.bat` ni `mvnw*` en ningún punto de `C:\Talend\8.0.1` (búsqueda hasta seis
+  niveles).
+- Lo que sí trae Studio es `org.eclipse.m2e.maven.runtime_3.9.1600.20260522-0510` (un Maven embebido
+  en jars, para que el IDE compile) y la caché `studio/configuration/.m2/repository`. Los dos existen,
+  pero son piezas de la interfaz, no una línea de comandos con su `bin`.
+- Los `poms` de los Jobs ya construidos están en `poms/jobs/process/<job>`, así que el material para
+  compilar por Maven existe; lo que falta es el ejecutable.
 
-Mientras eso no se mida, el proyecto sigue dependiendo del bridge para compilar y no se escribe la
-tool `talend_job_build_headless`.
+## Decisión
 
-## Por qué no se cierra aquí
+Con la opción (2) ausente y la (3) sin ejecutable, la única forma medible de compilar aquí es la
+opción (1), el bridge, y se mantiene. La regla de adopción del plan no se puede aplicar porque las
+alternativas no existen en este equipo: **no se escribe `talend_job_build_headless`**.
 
-La medición necesita Studio sano, compilar 20 Jobs reales y comparar el resultado del bridge con el
-de Maven. Es trabajo de una corrida con Studio libre y auditoría de los `.jar` generados, no de una
-edición de código; queda anotado como pendiente con este motivo.
+Si más adelante se instala Maven 3.9 apuntando a la caché de Studio, la medición es la del plan: los
+primeros 20 Jobs de L0 a L1 con las tres opciones, y solo se adopta si compila en menos de 3 minutos
+con el mismo resultado que el bridge.

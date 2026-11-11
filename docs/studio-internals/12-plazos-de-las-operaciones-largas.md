@@ -54,3 +54,12 @@ quedaron sin estado. Lo fija `tests/talend/build-batch-resultado.test.ts`.
 
 Los 40 archivos de prueba se borraron del proyecto; no quedo nada en el repositorio del usuario.
 
+
+## Segundo intento, sin pasar por la interfaz al crear los Jobs
+
+Los 20 Jobs se duplicaron en disco en 0,9 s, pero el refresco del workspace fallo 20 veces seguidas
+(300 s) con el hilo de la interfaz ocupado, mientras `sgm studio salud` seguia dando `READY`: el ping
+del bridge responde y no dice nada del hilo de la interfaz, que es justo lo que se toma una
+compilacion larga. Sin refresco, el repositorio no ve los Jobs nuevos y no hay lote que medir. Los 40
+archivos de prueba se borraron.
+
