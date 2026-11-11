@@ -63,3 +63,16 @@ del bridge responde y no dice nada del hilo de la interfaz, que es justo lo que 
 compilacion larga. Sin refresco, el repositorio no ve los Jobs nuevos y no hay lote que medir. Los 40
 archivos de prueba se borraron.
 
+
+## Tercer intento, con la interfaz libre y la salud ya arreglada
+
+Con `sgm studio salud` dando `READY` (la sonda nueva confirma que el hilo de la interfaz contesta),
+el lote se intento otra vez: los 20 Jobs se duplicaron en 0,1 s y el refresco del workspace se colgo
+500 s sin devolver ni resultado ni error. Los 40 archivos de prueba se borraron.
+
+Queda un dato util para el puente: el refresco tiene dos formas de fallar, y solo una es rapida. Con
+el hilo de la interfaz tomado responde en segundos con
+`java.lang.IllegalStateException: El hilo de la interfaz de Studio esta ocupado`; con el workspace a
+medio cargar se queda esperando sin plazo. De ahi que `sgm studio salud` distinga `BUSY` (hilo
+tomado, se detecta en segundos) de una espera sin respuesta, que no es lo mismo.
+
