@@ -3,6 +3,18 @@
 Casos que ya ocurrieron y cómo se reconocen. Antes de nada, ejecuta `talend_diagnose_environment`
 (o `bun run doctor`): con Studio abierto y el bridge caído, lee el log de Studio y propone el siguiente paso.
 
+## El servidor MCP (puerto 3927) está apagado y Studio sano
+
+Síntoma: `connection refused` en `http://127.0.0.1:3927/mcp` mientras `http://127.0.0.1:3930/ping` contesta.
+Es el caso más frecuente desde el cliente `sgm`: el bridge de Studio no falla, lo que murió es el proceso del
+servidor MCP.
+
+Solución permanente: el supervisor. `bun run supervisor` mide cada 10 s el MCP (`/healthz`) y el bridge
+(`/ping`), relanza el MCP si no responde tres muestras seguidas o si el proceso termina (espera de 1 a 30 s
+entre reinicios) y escribe el estado en `out/supervisor.json`. No reinicia Studio. Para que arranque solo al
+iniciar sesión: `bun run scripts/supervisor-install.ts` (`--status` y `--remove` lo consultan y lo quitan;
+es una tarea del usuario, sin permisos de administrador).
+
 ## El bridge no responde pero Studio está abierto
 
 El bridge arranca con el workbench, **después del login**. Si `http://127.0.0.1:3930/ping` no contesta y la

@@ -17,6 +17,7 @@
     "bridge:install": "bun run scripts/start.ts --install-bridge",
     "bridge:status": "bun run scripts/start.ts --bridge-status",
     "bridge:watch": "bun run scripts/start.ts --watch-bridge",
+    "supervisor": "bun run scripts/supervisor.ts",
     "talend:api": "bun run scripts/talend-api.ts",
     "talend:drift": "bun run scripts/talend-api.ts drift",
     "verify": "bun run typecheck && bun test && bun run l5:validar",
