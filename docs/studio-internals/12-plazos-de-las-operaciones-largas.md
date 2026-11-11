@@ -36,3 +36,21 @@ de mentira que tarda 1 200 ms.
 Medir un lote real de mas de 20 s con Studio libre para confirmar que 300 000 ms alcanza con el
 paralelismo que usa el migrador (4). Si un lote de 5 000 Jobs se acerca al limite, hay que partirlo
 en tramos por el lado del cliente, que es la opcion (b) del plan.
+
+
+## Medicion del 11 de noviembre de 2026 (intento)
+
+Se duplicaron 20 Jobs en disco (0,9 s, sin pasar por la interfaz) y se intento compilar el lote con
+`jobBuildBatch`. El refresco del workspace fallo seis veces seguidas con
+`java.lang.IllegalStateException: El hilo de la interfaz de Studio esta ocupado (se acabo el tiempo de
+espera)`: otra sesion estaba compilando en el mismo Studio. Sin refresco, los Jobs no existen para el
+repositorio y la medicion del tiempo real no se pudo hacer.
+
+**Hallazgo del intento:** el lote contesto `ok: true` con el mapa `jobs` VACIO. Un exito falso: los 20
+Jobs pedidos no compilaron, simplemente no llegaron al bridge. Corregido en
+`src/talend/studio/build-batch-resultado.ts`: cada Job pedido sin estado en la respuesta se agrega con
+`ok: false` y el codigo `JOB_SIN_ESTADO_EN_LA_RESPUESTA`, y la respuesta lleva un aviso con cuantos
+quedaron sin estado. Lo fija `tests/talend/build-batch-resultado.test.ts`.
+
+Los 40 archivos de prueba se borraron del proyecto; no quedo nada en el repositorio del usuario.
+
