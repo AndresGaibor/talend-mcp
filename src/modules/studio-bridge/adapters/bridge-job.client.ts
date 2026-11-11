@@ -8,6 +8,19 @@
 import { BridgeWorkbenchClient } from "./bridge-workbench.client";
 import type { BridgeActiveJobModel, BridgeResult } from "./bridge-types";
 
+/**
+ * Plazo de una construccion, en milisegundos.
+ *
+ * El plazo de la configuracion (2,5 s) es para lecturas: generar el codigo de un
+ * Job abre el modelo, lo genera y lo compila, y eso tarda minutos en un Job
+ * grande. Con el plazo corto la peticion se abortaba a mitad y parecia que el
+ * bridge estaba caido.
+ */
+export const BUILD_TIMEOUT_MS = 180_000;
+
+/** Plazo de un lote: cubre miles de Jobs a los 0,2 s por Job que da el bridge. */
+export const BUILD_BATCH_TIMEOUT_MS = 300_000;
+
 export class BridgeJobClient extends BridgeWorkbenchClient {
   async activeJobModel(): Promise<BridgeResult<BridgeActiveJobModel>> {
     return await this.request<BridgeActiveJobModel>("/talend/active-job/model");
@@ -82,10 +95,15 @@ export class BridgeJobClient extends BridgeWorkbenchClient {
    * Construye el job sin ejecutarlo: genera el codigo, lo compila y hace el build de Maven
    * (deja `target/classpath.jar`). Un error de compilacion vuelve en `result.error`.
    */
-  async jobBuild(options?: { job?: string; instalar?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
+  async jobBuild(options?: {
+    job?: string;
+    instalar?: boolean;
+    timeoutMs?: number;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/job/build", {
       method: "POST",
       body: options ?? {},
+      timeoutMs: options?.timeoutMs ?? BUILD_TIMEOUT_MS,
     });
   }
 
@@ -93,10 +111,15 @@ export class BridgeJobClient extends BridgeWorkbenchClient {
    * Construye muchos jobs del repositorio sin abrir su editor: genera el codigo desde el item y lo compila
    * en paralelo. Devuelve el resultado de cada job en `result.jobs`.
    */
-  async jobBuildBatch(options: { jobs: string[]; parallelism?: number }): Promise<BridgeResult<Record<string, unknown>>> {
+  async jobBuildBatch(options: {
+    jobs: string[];
+    parallelism?: number;
+    timeoutMs?: number;
+  }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/job/build-batch", {
       method: "POST",
-      body: options,
+      body: { jobs: options.jobs, parallelism: options.parallelism },
+      timeoutMs: options.timeoutMs ?? BUILD_BATCH_TIMEOUT_MS,
     });
   }
 
