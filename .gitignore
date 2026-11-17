@@ -100,3 +100,6 @@ testdata/l5_*
 /.claude/settings.local.json
 # Archivo suelto de prueba manual, no forma parte del proyecto.
 /prueba.txt
+
+# Medicion puntual de lote (salida local, no se versiona)
+out-medicion-lote.log
