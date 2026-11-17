@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 
 import { getTalendMcpEnv } from "../../config/env";
 import { getToolRisk, type ToolRisk } from "./tool-safety";
@@ -17,7 +18,13 @@ export function isRiskAllowed(risk: ToolRisk): boolean {
   return envFlag(env.TALEND_MCP_ALLOW_DESTRUCTIVE) === true;
 }
 
-export function auditToolCall(toolName: string, risk: ToolRisk, ok: boolean, detail?: string): void {
+export function auditToolCall(
+  toolName: string,
+  risk: ToolRisk,
+  ok: boolean,
+  detail?: string,
+  metadata: { durationMs?: number; correlationId?: string; operationId?: string } = {},
+): void {
   const env = getTalendMcpEnv();
   if (env.TALEND_MCP_LOG === "quiet") return;
   const entry = {
@@ -26,6 +33,11 @@ export function auditToolCall(toolName: string, risk: ToolRisk, ok: boolean, det
     risk,
     ok,
     ...(detail ? { detail } : {}),
+    correlationId: safeId(metadata.correlationId) ?? randomUUID(),
+    ...(safeId(metadata.operationId) ? { operationId: safeId(metadata.operationId) } : {}),
+    ...(typeof metadata.durationMs === "number" && Number.isFinite(metadata.durationMs)
+      ? { durationMs: Math.max(0, Math.round(metadata.durationMs)) }
+      : {}),
   };
   try {
     const dir = join(process.cwd(), ".talend-mcp");
@@ -35,10 +47,18 @@ export function auditToolCall(toolName: string, risk: ToolRisk, ok: boolean, det
   }
 }
 
-export function authorizeTool(toolName: string, input: unknown): { ok: true } | { ok: false; code: string; message: string } {
+function safeId(value: unknown): string | undefined {
+  return typeof value === "string" && /^[\w-]{8,80}$/.test(value) ? value : undefined;
+}
+
+export function authorizeTool(
+  toolName: string,
+  input: unknown,
+  metadata: { correlationId?: string; operationId?: string } = {},
+): { ok: true } | { ok: false; code: string; message: string } {
   const risk = getToolRisk(toolName);
   if (!isRiskAllowed(risk)) {
-    auditToolCall(toolName, risk, false, "RISK_NOT_ALLOWED");
+    auditToolCall(toolName, risk, false, "RISK_NOT_ALLOWED", metadata);
     return {
       ok: false,
       code: "RISK_NOT_ALLOWED",
@@ -48,7 +68,7 @@ export function authorizeTool(toolName: string, input: unknown): { ok: true } | 
   if (risk === "destructive") {
     const confirm = (input as Record<string, unknown> | null | undefined)?.confirm;
     if (confirm !== true) {
-      auditToolCall(toolName, risk, false, "CONFIRMATION_REQUIRED");
+      auditToolCall(toolName, risk, false, "CONFIRMATION_REQUIRED", metadata);
       return {
         ok: false,
         code: "CONFIRMATION_REQUIRED",

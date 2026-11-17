@@ -36,23 +36,34 @@ async function callTool(base: string, session: string, id: number, name: string,
 }
 
 describe("tope de respuesta", () => {
-  test("responde error cuando la tool devuelve mas que el tope", async () => {
+  test("responde un error JSON-RPC accionable cuando la tool devuelve mas que el tope", async () => {
     const server = await runNewHttpServer({ port: 0, maxResponseBytes: 100 });
     try {
       const session = await initialize(server.localUrl);
       const response = await callTool(server.localUrl, session, 2, "talend_guide", { mode: "overview" });
-      expect([200, 406]).toContain(response.status);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("application/json");
+      const body = (await response.json()) as {
+        id?: number;
+        error?: { message?: string; data?: { code?: string; tool?: string; maxBytes?: number } };
+      };
+      expect(body.id).toBe(2);
+      expect(body.error?.data).toMatchObject({ code: "RESPONSE_TOO_LARGE", tool: "talend_guide", maxBytes: 100 });
+      expect(body.error?.message).toContain("TALEND_MCP_MAX_RESPONSE_BYTES");
     } finally {
       await server.close();
     }
   });
 
-  test("responde la tool cuando cabe en el tope", async () => {
+  test("envia la tool intacta cuando cabe en el tope", async () => {
     const server = await runNewHttpServer({ port: 0, maxResponseBytes: 4 * 1024 * 1024 });
     try {
       const session = await initialize(server.localUrl);
       const response = await callTool(server.localUrl, session, 2, "talend_guide", { mode: "overview" });
-      expect([200, 406]).toContain(response.status);
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).toContain('"result"');
+      expect(body).not.toContain("RESPONSE_TOO_LARGE");
     } finally {
       await server.close();
     }

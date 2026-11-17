@@ -75,6 +75,7 @@ export async function executeOperation(
     allowDestructive?: boolean;
     confirm?: boolean;
     timeoutMs?: number;
+    idempotencyKey?: string;
   } = {},
 ): Promise<unknown> {
   const operation = getRuntimeTools().find(({ definition }) => definition.name === name);
@@ -128,7 +129,11 @@ export async function executeOperation(
     input,
     schema,
     operation.handler as (input: unknown, signal: AbortSignal) => Promise<unknown>,
-    { timeoutMs: options.timeoutMs ?? env.TALEND_MCP_TOOL_TIMEOUT_MS, cupo },
+    {
+      timeoutMs: options.timeoutMs ?? env.TALEND_MCP_TOOL_TIMEOUT_MS,
+      cupo,
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
+    },
   ).catch((error: unknown) => {
     if (error instanceof ToolTimeoutError) {
       throw new CliOperationError(`La operacion ${name} supero el timeout.`, "TIMEOUT");

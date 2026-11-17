@@ -108,6 +108,32 @@ describe("cliente HTTP del bridge", () => {
     expect(llamadas[0]?.headers?.["Content-Type"]).toBe("application/json");
   });
 
+  test("inicia, consulta y cancela builds batch por los endpoints de operaciones", async () => {
+    interceptar();
+    const clienteHttp = cliente();
+
+    await clienteHttp.jobBuildBatchStart({
+      jobs: ["A", "B"],
+      parallelism: 2,
+      operationId: "de305d54-75b4-431b-adb2-eb6b9e546014",
+    });
+    await clienteHttp.jobBuildBatchStatus("operation-1");
+    await clienteHttp.jobBuildBatchCancel("operation-1");
+
+    expect(llamadas.map((llamada) => `${llamada.method} ${new URL(llamada.url).pathname}`)).toEqual([
+      "POST /automation/job/build-batch/start",
+      "POST /automation/job/build-batch/status",
+      "POST /automation/job/build-batch/cancel",
+    ]);
+    expect(JSON.parse(llamadas[0]!.body!)).toEqual({
+      jobs: ["A", "B"],
+      parallelism: 2,
+      operationId: "de305d54-75b4-431b-adb2-eb6b9e546014",
+    });
+    expect(JSON.parse(llamadas[1]!.body!)).toEqual({ operationId: "operation-1" });
+    expect(JSON.parse(llamadas[2]!.body!)).toEqual({ operationId: "operation-1" });
+  });
+
   test("convierte un error HTTP en un resultado con el mensaje del bridge", async () => {
     interceptar();
     responder = () => ({ status: 500, statusText: "Server Error", body: JSON.stringify({ error: { message: "boom" } }) });

@@ -34,6 +34,26 @@ completo, la regla y el resultado.
 A mano: `bun run modales -- --dry-run` (solo lee y dice qué haría) o `bun run modales` (pulsa).
 Reglas nuevas: se añaden a `RULES` en `modal-policy.ts` con su prueba en `tests/talend/modal-policy.test.ts`.
 
+El cliente MCP usa la misma lectura cuando el bridge deja de contestar: ante un timeout o un corte de
+conexión, `src/talend/studio/recuperacion-de-bridge.ts` lee los diálogos, pulsa solo los conocidos y
+**reintenta una vez las lecturas (GET)**. No reintenta escrituras (POST), porque una operación que expiró
+pudo aplicarse igual y repetirla duplicaría nodos o contextos; la respuesta lo dice con
+`recovery.reintentado: false` y el detalle en `error.message`. Se apaga con `TALEND_MODALS_AUTO=0`.
+
+## La respuesta es demasiado grande
+
+Dos topes distintos, cada uno con su error:
+
+| Dónde | Variable | Error |
+|---|---|---|
+| Respuesta del bridge de Studio | `TALEND_BRIDGE_MAX_RESPONSE_BYTES` (64 MiB) | `BRIDGE_RESPONSE_TOO_LARGE`, con `endpoint`, `maxBytes` y `recibidos` |
+| Respuesta de una tool en el servidor MCP | `TALEND_MCP_MAX_RESPONSE_BYTES` (64 MiB) | JSON-RPC `RESPONSE_TOO_LARGE`, con `tool` y `maxBytes` |
+
+Antes de subir el tope, pide menos datos: `limit`/`offset` en catálogos, `lines` en logs, filtro por job,
+o usa la tool paginada. El bridge lee el cuerpo por trozos y corta al pasar del tope, así que una respuesta
+enorme no se materializa entera en memoria. El servidor MCP retiene la salida de `tools/call` hasta saber
+su tamaño; si no cabe, descarta el cuerpo y responde el error JSON-RPC en vez de un stream a medias.
+
 ## El bridge no responde pero Studio está abierto
 
 El bridge arranca con el workbench, **después del login**. Si `http://127.0.0.1:3930/ping` no contesta y la

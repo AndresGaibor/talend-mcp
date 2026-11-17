@@ -7,6 +7,17 @@ function restaurar(nombre: string, valor: string | undefined): void {
 }
 
 describe("Talend executor", () => {
+  test("runJob no inicia procesos si ya recibió cancelación", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const { runJob } = await import("../../src/talend/executor");
+    const result = await runJob({ jobName: "cualquiera", signal: controller.signal });
+
+    expect(result.ok).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.error).toBe("Execution cancelled");
+  });
+
   test("runJob devuelve error si no hay job activo (sin TALEND_PROJECT)", async () => {
     const originalDisableAutodetect = process.env.TALEND_DISABLE_AUTODETECT;
     process.env.TALEND_DISABLE_AUTODETECT = "1";

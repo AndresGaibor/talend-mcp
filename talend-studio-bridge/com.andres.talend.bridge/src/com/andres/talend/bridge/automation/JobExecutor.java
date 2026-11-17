@@ -267,17 +267,18 @@ public final class JobExecutor {
   }
 
   /** Busca una carpeta por nombre, con una profundidad maxima. */
-  private static Path search(Path root, String folderName, int depth) {
+  static Path search(Path root, String folderName, int depth) {
     if (depth < 0 || !Files.isDirectory(root)) {
       return null;
     }
     try (java.util.stream.Stream<Path> entries = Files.list(root)) {
-      for (Path entry : entries.toArray(Path[]::new)) {
+      Path[] children = entries.toArray(Path[]::new);
+      for (Path entry : children) {
         if (Files.isDirectory(entry) && entry.getFileName().toString().equals(folderName)) {
           return entry;
         }
       }
-      for (Path entry : entries.toArray(Path[]::new)) {
+      for (Path entry : children) {
         if (Files.isDirectory(entry)) {
           Path found = search(entry, folderName, depth - 1);
           if (found != null) {

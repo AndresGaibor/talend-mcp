@@ -14,6 +14,7 @@ export interface RunResult {
   exitCode: number | null;
   durationMs: number;
   error?: string;
+  cancelled?: boolean;
 }
 
 export interface RunJobOptions {
@@ -21,6 +22,7 @@ export interface RunJobOptions {
   contextName?: string;
   timeoutMs?: number;
   params?: Record<string, string>;
+  signal?: AbortSignal;
 }
 
 function killProcess(child: ReturnType<typeof spawn>, signal: string): void {
@@ -33,6 +35,9 @@ function killProcess(child: ReturnType<typeof spawn>, signal: string): void {
 }
 
 export async function runJob(options: RunJobOptions): Promise<RunResult> {
+  if (options.signal?.aborted) {
+    return { ok: false, stdout: "", stderr: "", exitCode: null, durationMs: 0, error: "Execution cancelled", cancelled: true };
+  }
   const projectPath = getConfiguredProjectPath();
   if (!projectPath) {
     return { ok: false, stdout: "", stderr: "", exitCode: null, durationMs: 0, error: "No se detectó TALEND_PROJECT." };
@@ -70,13 +75,25 @@ export async function runJob(options: RunJobOptions): Promise<RunResult> {
     const stderr = new SalidaAcotada();
     let settled = false;
 
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      options.signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = (): void => {
+      if (settled) return;
+      killProcess(child, "SIGKILL");
+    };
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
         killProcess(child, "SIGKILL");
+        cleanup();
         resolve({ ok: false, stdout: stdout.value, stderr: stderr.value, exitCode: null, durationMs: Date.now() - startMs, error: `Timeout exceeded: ${timeoutMs}ms` });
       }
     }, timeoutMs);
+    if (options.signal?.aborted) onAbort();
 
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -85,14 +102,15 @@ export async function runJob(options: RunJobOptions): Promise<RunResult> {
     child.on("close", (exitCode) => {
       if (!settled) {
         settled = true;
-        clearTimeout(timer);
-        resolve({ ok: exitCode === 0, stdout: stdout.value, stderr: stderr.value, exitCode, durationMs: Date.now() - startMs });
+        cleanup();
+        const cancelled = options.signal?.aborted === true;
+        resolve({ ok: exitCode === 0 && !cancelled, stdout: stdout.value, stderr: stderr.value, exitCode, durationMs: Date.now() - startMs, ...(cancelled ? { error: "Execution cancelled", cancelled: true } : {}) });
       }
     });
     child.on("error", (err) => {
       if (!settled) {
         settled = true;
-        clearTimeout(timer);
+        cleanup();
         resolve({ ok: false, stdout: stdout.value, stderr: stderr.value, exitCode: null, durationMs: Date.now() - startMs, error: err.message });
       }
     });

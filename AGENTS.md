@@ -59,6 +59,9 @@ terminado hace fallar el escenario, y los avisos salen en el informe. Lo esperad
    no lo ejecutes mientras hay jobs o dialogos en curso. Las acciones con `unsafeActions`
    (ejecutar codigo Java, borrar, escribir en el workspace) pueden ser irreversibles.
 3. **Antes de commitear:** `bun run verify`. No commitees carpetas generadas (seccion 10).
+   El gancho `pre-commit` rechaza el commit si el arbol cambio despues del cierre o si algun paso
+   quedo en rojo; `--no-verify` tambien esta bloqueado desde Claude. Activa el gancho una vez por
+   copia con `bun run ganchos:instalar`. El estado y el historial quedan en `.talend-mcp/validacion/`.
 
 ## 1. Que es el repo
 
@@ -75,7 +78,10 @@ Regla de fondo para quien usa el MCP: estrategia mixta, offline para lotes y job
 | `bun install` | Instala dependencias. **Nunca** uses npm, yarn o pnpm. |
 | `bun test` | Suite completa, en segundos. Solo corre `tests/` (lo fija `bunfig.toml`). |
 | `bun run typecheck` | `tsc --noEmit`. Debe terminar sin errores. |
-| `bun run verify` | `typecheck` + `bun test` + `l5:validar`. Es el comando antes de commitear. |
+| `bun run verify` | `typecheck` + `bun test` + `l5:validar` y deja el estado que exige el gancho `pre-commit`. Es el comando antes de commitear. |
+| `bun run verify:directo` | Lo mismo sin dejar estado, solo para depurar un paso. No autoriza el commit. |
+| `bun run ganchos:instalar` | Activa `core.hooksPath=.githooks` en esta copia del repositorio. |
+| `bun run scripts/validacion.ts estado` | Que se valido, que pasos estan en verde y si el commit pasaria. `historial` muestra los ultimos eventos. |
 | `bun run test:ci` | `bun test --bail`: corta en el primer fallo. |
 | `bun run l5:validar` | Valida los escenarios L5 sin abrir Studio ni cargar el bridge. Acepta `--suite <nombre>`. |
 | `bun run mapa` | Mapa del repo: carpetas, tools por preset, comandos y estado del bridge. `--json` para scripts. |
@@ -122,6 +128,15 @@ Reglas de Bun (proyecto, no Node):
   operacion con su tool, para que quien clone el repo la tenga.
 - **Documenta lo que aprendas.** Cada trampa de Studio descubierta va a
   `docs/TALEND-STUDIO-INTERNALS.md`; cada limite o estado de fase, a `docs/plan-de-pruebas/`.
+- **Los topes de respuesta son parte del contrato.** Bridge y servidor MCP cortan a 64 MiB por
+  defecto (`TALEND_BRIDGE_MAX_RESPONSE_BYTES`, `TALEND_MCP_MAX_RESPONSE_BYTES`). Al superarlo no se
+  trunca en silencio: `BRIDGE_RESPONSE_TOO_LARGE` o JSON-RPC `RESPONSE_TOO_LARGE` con la tool, el
+  tope y como paginar. No bajes el tope del servidor por debajo de lo que devuelven las tools
+  normales, y no envuelvas respuestas grandes en otra capa que las materialice enteras.
+- **La recuperacion de modales no reintenta escrituras.** Ante un timeout o corte de conexion, el
+  cliente lee los dialogos por UI Automation, pulsa solo los conocidos y reintenta una vez los GET.
+  Un POST que expiro pudo aplicarse: solo se repite con `reintentarTrasModal: true`. Se apaga con
+  `TALEND_MODALS_AUTO=0`. El detalle queda en `result.recovery` y en el mensaje del error.
 
 ## 4. Reglas de oro
 

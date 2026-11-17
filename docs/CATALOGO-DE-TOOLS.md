@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **258**.
+Tools registradas en el preset actual: **263**.
 
 ## Empezar
 
@@ -106,7 +106,7 @@ Decenas o miles de jobs creados o cambiados en disco y comprobados que compilan,
    - Ejemplo: `{"namePattern":"^MIG_","operations":[{"op":"set_params","uniqueName":"tLogRow_1","parameters":{"TABLE_PRINT":"true"}}],"dryRun":true}`
 3. `talend_job_edit_offline` (opcional): Retocar un solo job en disco con el mismo motor, con diff previo (dryRun).
    - Ejemplo: `{"job":"MIG_CLIENTES","operations":[{"op":"move","uniqueName":"tLogRow_1","posX":400,"posY":96}]}`
-4. `talend_job_build_batch`: Generar y compilar los jobs sin abrir su editor (~0,2 s por job, en paralelo). Devuelve cuales no compilan.
+4. `talend_job_build_batch`: Generar y compilar un lote pequeño sin abrir los editores. Para un lote largo usa talend_job_build_batch_start y consulta/cancela con talend_operations_status/talend_operations_cancel.
    - Ejemplo: `{"jobs":["MIG_CLIENTES","MIG_CUENTAS"],"parallelism":4}`
 5. `talend_job_verify`: Ejecutar de verdad uno o unos pocos jobs representativos y revisar sus avisos. La compilacion masiva no ejecuta.
    - Ejemplo: `{"job":"MIG_CLIENTES"}`
@@ -1134,6 +1134,20 @@ Argumentos principales:
 - `timeoutMs` (number, opcional): Timeout en ms (default: 300000)
 - `params` (object, opcional): Parámetros como TALEND_PARAM_<key>
 
+#### `talend_runs_start_async`
+
+Inicia una ejecución en segundo plano y devuelve un operationId para consultar estado o cancelarla. Requiere confirm:true.
+
+**Uso:** riesgo execute; escribe/ejecuta; requiere confirmacion; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_runs_start_async
+
+Argumentos principales:
+
+- `job` (string, obligatorio)
+- `context` (string, opcional)
+- `timeoutMs` (integer, opcional)
+- `params` (object, opcional)
+- `confirm` (boolean, obligatorio)
+
 #### `talend_runs_start_exported`
 
 Ejecuta un job exportado (compilado) desde el directorio de builds.
@@ -1940,6 +1954,16 @@ Cierra a peticion los dialogos modales CONOCIDOS que bloquean Talend Studio PULS
 
 **Uso:** riesgo write; escribe/ejecuta; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_studio_dismiss_dialogs
 
+#### `talend_studio_handle_modals`
+
+Lee los dialogos abiertos de Talend Studio (por UI Automation de Windows, sin pasar por el bridge), decide y los contesta: licencias y modulos se aceptan, errores y avisos se registran y se cierran, y una pregunta desconocida contesta lo que no cambia nada. Lo que pide contrasena, campos editables o sobrescribir un archivo se deja para una persona. Cada dialogo queda en logs/modales.jsonl. Con `dryRun` solo lee y dice que haria. Ojo: un dialogo modal bloquea el bridge, asi que esta tool es la forma de destrabarlo.
+
+**Uso:** riesgo write; escribe/ejecuta; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_studio_handle_modals
+
+Argumentos principales:
+
+- `dryRun` (boolean, opcional): Solo lee y decide; no pulsa ningun boton
+
 #### `talend_studio_install_artifact`
 
 Descarga un artefacto de Maven Central al repositorio local de Talend Studio. Necesario para los componentes cuyo runtime no viene con Studio (por ejemplo el tFileInputJSON, que necesita com.jayway.jsonpath:json-path). Con `file` se instala un jar que ya este en el equipo: los componentes de Talend Exchange (el tMap necesita talend-tmap-dataset) no estan en Maven Central y su dominio no se resuelve desde todas las redes.
@@ -2376,7 +2400,7 @@ Argumentos principales:
 
 #### `talend_job_build_batch`
 
-Genera el codigo y compila MUCHOS jobs del repositorio sin abrir su editor, en paralelo (unos 0,2 s por job). Pensada para migraciones masivas: devuelve por cada job si compila y el error de javac si no. No ejecuta los jobs; para uno concreto usa talend_job_verify. Los jobs deben existir ya en el repositorio de Studio (si los has escrito por fichero, refresca el workspace antes).
+Genera el codigo y compila muchos Jobs del repositorio sin abrir editores. Devuelve el resultado de cada Job; no los ejecuta. Para lotes largos usa talend_job_build_batch_start y consulta talend_operations_status. Los Jobs escritos por fichero deben existir en el repositorio de Studio.
 
 **Uso:** riesgo write; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_job_build_batch
 
@@ -2384,6 +2408,17 @@ Argumentos principales:
 
 - `jobs` (array, obligatorio): Nombres de los jobs a construir (maximo 5000 por llamada)
 - `parallelism` (integer, opcional): Hilos de compilacion (por defecto 4; mas de 4 no suele mejorar)
+
+#### `talend_job_build_batch_start`
+
+Inicia la generación/compilación de varios Jobs en segundo plano y devuelve operationId. Consulta talend_operations_status; talend_operations_cancel detiene el lote entre Jobs y deja terminar las compilaciones ya activas. El estado remoto se puede recuperar tras reiniciar MCP mientras el bridge siga activo.
+
+**Uso:** riesgo write; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_job_build_batch_start
+
+Argumentos principales:
+
+- `jobs` (array, obligatorio): Nombres de los Jobs que se van a construir
+- `parallelism` (integer, opcional)
 
 #### `talend_job_compile`
 
@@ -2724,12 +2759,13 @@ Argumentos principales:
 
 #### `talend_jobs_create_batch`
 
-Crea MUCHOS jobs a la vez, sin Studio, a partir de una plantilla con {{variables}} y una fila de valores por job (hasta 20000). Escribe los .item y .properties en disco en milisegundos. Con verify:true refresca Studio y compila cada job sin abrir su editor (~0,2 s por job), y devuelve cuales no compilan. Pensada para migraciones masivas.
+Crea MUCHOS jobs a la vez, sin Studio, a partir de una plantilla con {{variables}} y una fila de valores por job (hasta 20000). Requiere confirm:true y autorización destructiva. Escribe los .item y .properties en disco en milisegundos. Con verify:true refresca Studio y compila cada job sin abrir su editor (~0,2 s por job), y devuelve cuales no compilan. Pensada para migraciones masivas.
 
 **Uso:** riesgo destructive; escribe/ejecuta; requiere confirmacion; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_jobs_create_batch
 
 Argumentos principales:
 
+- `confirm` (boolean, opcional): Confirma la creación del lote cuando se autoriza como operación destructiva
 - `template` (object, obligatorio): Plantilla del job. Los textos admiten {{variable}}
 - `rows` (array, obligatorio): Una fila por job: valores de las variables de la plantilla
 - `overwrite` (boolean, opcional): Sobrescribir los jobs que ya existen
@@ -2767,12 +2803,13 @@ Argumentos principales:
 
 #### `talend_jobs_edit_batch`
 
-Aplica el MISMO lote de operaciones (add_node, set_params, set_schema, connect...) a muchos jobs a la vez, directamente en disco y sin Studio. Eliges los jobs por lista de nombres o por expresion regular. Cada job es atomico por separado: el que falle la integridad no se toca y se informa, los demas se escriben. Con verify:true compila los modificados.
+Aplica el MISMO lote de operaciones (add_node, set_params, set_schema, connect...) a muchos jobs a la vez, directamente en disco y sin Studio. Requiere confirm:true y autorización destructiva. Eliges los jobs por lista de nombres o por expresion regular. Cada job es atomico por separado: el que falle la integridad no se toca y se informa, los demas se escriben. Con verify:true compila los modificados.
 
 **Uso:** riesgo destructive; escribe/ejecuta; requiere confirmacion; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_jobs_edit_batch
 
 Argumentos principales:
 
+- `confirm` (boolean, opcional): Confirma la edición del lote cuando se autoriza como operación destructiva
 - `jobs` (array, opcional): Nombres exactos de los jobs
 - `namePattern` (string, opcional): Expresion regular sobre el nombre del job, p. ej. ^MIG_
 - `force` (boolean, opcional): Editar tambien los jobs abiertos en un editor de Studio
@@ -3052,6 +3089,26 @@ Argumentos principales:
 - `uniqueName` (string, obligatorio): Nombre único del componente
 - `posX` (number, obligatorio): Nueva posición X
 - `posY` (number, obligatorio): Nueva posición Y
+
+#### `talend_operations_cancel`
+
+Solicita la cancelación de una operación asíncrona cuando el backend lo permite; consulta el estado para confirmar el resultado.
+
+**Uso:** riesgo write; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_operations_cancel
+
+Argumentos principales:
+
+- `operationId` (string, obligatorio)
+
+#### `talend_operations_status`
+
+Consulta el estado de una operación asíncrona por operationId, incluido su resultado terminal.
+
+**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_operations_status
+
+Argumentos principales:
+
+- `operationId` (string, obligatorio)
 
 #### `talend_preview_component_parameter`
 

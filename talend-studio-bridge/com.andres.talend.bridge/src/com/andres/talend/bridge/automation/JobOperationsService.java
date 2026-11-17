@@ -231,6 +231,21 @@ public final class JobOperationsService {
     return run("build-batch", () -> JobBuilder.buildBatch(spec));
   }
 
+  /** Encola un build por lote y devuelve su identificador sin esperar la compilacion. */
+  public static Map<String, Object> startBuildBatch(JsonObject spec) {
+    return run("job/build-batch/start", () -> JobBuildBatchOperations.start(spec));
+  }
+
+  /** Consulta progreso o resultado de un build por lote asincrono. */
+  public static Map<String, Object> buildBatchStatus(JsonObject spec) {
+    return run("job/build-batch/status", () -> JobBuildBatchOperations.status(spec));
+  }
+
+  /** Solicita detener un lote despues de completar los Jobs que ya estan compilando. */
+  public static Map<String, Object> cancelBuildBatch(JsonObject spec) {
+    return run("job/build-batch/cancel", () -> JobBuildBatchOperations.cancel(spec));
+  }
+
   /**
    * Memoria del JVM de Studio.
    *

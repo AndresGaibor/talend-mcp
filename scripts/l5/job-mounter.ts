@@ -68,6 +68,81 @@ export function borradoTolerable(mensaje: string): boolean {
 }
 
 /**
+ * Nombres de los nodos que Studio ve en un job.
+ *
+ * `listNodes` devuelve la lista directamente (o bajo `nodes`, segun la
+ * version del bridge); se aceptan las dos formas. Devuelve `undefined` si la
+ * lista no se pudo leer: quien llama decide si eso es un fallo.
+ */
+export async function nodosVisibles(bridge: Bridge, job: string): Promise<string[] | undefined> {
+  const listado = await bridge.listNodes({ job });
+  if (!listado.ok) {
+    return undefined;
+  }
+  const datos = listado.data as unknown;
+  const crudos = Array.isArray(datos)
+    ? datos
+    : Array.isArray((datos as { nodes?: unknown } | undefined)?.nodes)
+      ? ((datos as { nodes: unknown[] }).nodes)
+      : [];
+  return crudos.map((nodo) => {
+    const valor = (nodo ?? {}) as Record<string, unknown>;
+    if (typeof valor.uniqueName === "string" && valor.uniqueName) return valor.uniqueName;
+    if (typeof valor.componentName === "string" && valor.componentName) return valor.componentName;
+    return "nodo";
+  });
+}
+
+/**
+ * Deja el job recien creado vacio.
+ *
+ * Studio puede conservar el modelo del intento anterior si su editor no se
+ * cerro al borrarlo: el job nuevo nace con los nodos viejos y el montaje
+ * acaba mezclando los dos. Si aparece algun nodo, se borra el job (el borrado
+ * publico cierra los editores) y se crea otra vez, una sola vez. Si sigue
+ * con nodos, se falla con el detalle en vez de montar sobre basura.
+ */
+export async function asegurarJobVacio(bridge: Bridge, job: string): Promise<Paso> {
+  const primera = await nodosVisibles(bridge, job);
+  if (primera === undefined) {
+    return { ok: false, mensaje: "no se pudieron listar los nodos del job recien creado" };
+  }
+  if (primera.length === 0) {
+    return { ok: true };
+  }
+
+  const recreado = await medir("recrear job con nodos obsoletos", async () => {
+    const borrado = await reintentar(() => bridge.deleteJob({ name: job }), transitorioDeStudio);
+    if (!borrado.ok && !borradoTolerable(errorDe(borrado))) {
+      return borrado;
+    }
+    const creado = await reintentar(() => bridge.createJob({ name: job, replace: true }), transitorioDeStudio);
+    if (!creado.ok) {
+      return creado;
+    }
+    return await reintentar(() => bridge.openJob({ name: job }), transitorioDeStudio);
+  });
+  if (!recreado.ok) {
+    return {
+      ok: false,
+      mensaje: `el job '${job}' nacio con nodos del intento anterior (${primera.join(", ")}) y no se pudo recrear: ${errorDe(recreado)}`,
+    };
+  }
+
+  const segunda = await nodosVisibles(bridge, job);
+  if (segunda === undefined) {
+    return { ok: false, mensaje: `no se pudieron listar los nodos de '${job}' tras recrearlo` };
+  }
+  if (segunda.length > 0) {
+    return {
+      ok: false,
+      mensaje: `el job '${job}' conserva nodos del intento anterior (${segunda.join(", ")}) incluso tras recrearlo: Studio no cerro el editor del Job. Cierra el Job en Studio (o reinicia Studio) y repite el montaje.`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Monta un job: lo borra, lo crea, anade los nodos con su configuracion y
  * los conecta.
  */
@@ -96,13 +171,6 @@ export async function montarJob(
     return { ok: false, mensaje: `no se pudo crear: ${errorDe(creado)}` };
   }
 
-  // Los contextos (entornos) del job, con sus variables.
-  const contextsOk = await medir("contextos", () => crearContextos(bridge, spec.job, spec.contextos));
-  if (!contextsOk.ok) return contextsOk;
-
-  // El job tiene que estar abierto en el editor antes de anadir nodos. Studio
-  // a veces contesta "No se pudo abrir el job ... en el editor" (le pasa
-  // tambien con jobs del usuario): es transitorio y se reintenta.
   // El job tiene que estar abierto en el editor antes de anadir nodos. Studio
   // a veces contesta "No se pudo abrir el job ... en el editor" (le pasa
   // tambien con jobs del usuario): es transitorio y se reintenta.
@@ -114,6 +182,15 @@ export async function montarJob(
   if (!abierto.ok) {
     return { ok: false, mensaje: `no se pudo abrir el job: ${errorDe(abierto)}` };
   }
+
+  // El job nuevo tiene que estar vacio: si Studio reutilizo el modelo del
+  // intento anterior, aqui se ve y se corrige antes de montar nada.
+  const vacio = await medir("comprobar job vacio", () => asegurarJobVacio(bridge, spec.job));
+  if (!vacio.ok) return vacio;
+
+  // Los contextos (entornos) del job, con sus variables.
+  const contextsOk = await medir("contextos", () => crearContextos(bridge, spec.job, spec.contextos));
+  if (!contextsOk.ok) return contextsOk;
 
   // 2. Nodos, con sus parametros y su schema.
   const nombres = new Map<string, string>();

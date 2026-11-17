@@ -10,9 +10,21 @@ export type BridgeConfig = {
   allowAllCommands: boolean;
   allowCommands: string[];
   timeoutMs: number;
-  /** Tope de bytes que se aceptan del bridge en una respuesta (16 MiB por defecto). */
+  /** Tope de bytes que se aceptan del bridge en una respuesta (64 MiB por defecto). */
   maxResponseBytes?: number;
 };
+
+/**
+ * Tope de respuesta del bridge.
+ *
+ * 64 MiB cubre el modelo de un job grande y las respuestas del catalogo; por
+ * encima de eso ya no es un resultado utilizable, es un volcado que agota la
+ * memoria del MCP. Se puede subir con `TALEND_BRIDGE_MAX_RESPONSE_BYTES`.
+ */
+export const MAX_RESPONSE_BYTES_POR_DEFECTO = 64 * 1024 * 1024;
+
+/** Por debajo de este tope no cabe ni el modelo de un job pequeno. */
+export const MAX_RESPONSE_BYTES_MINIMO = 64 * 1024;
 
 const DEFAULT_CONFIG: BridgeConfig = {
   host: "127.0.0.1",
@@ -22,10 +34,16 @@ const DEFAULT_CONFIG: BridgeConfig = {
   allowAllCommands: false,
   allowCommands: ["org.eclipse.ui.file.save", "org.eclipse.ui.file.saveAll"],
   timeoutMs: 2_500,
-  // 16 MiB: por encima de eso la respuesta ya no es un resultado, es un log o
-  // un catalogo que el cliente no va a poder usar.
-  maxResponseBytes: 16 * 1024 * 1024,
+  maxResponseBytes: MAX_RESPONSE_BYTES_POR_DEFECTO,
 };
+
+/** Tope configurado por entorno; ignora valores invalidos en vez de romper el arranque. */
+export function maxResponseBytesDelEntorno(): number | undefined {
+  const raw = process.env.TALEND_BRIDGE_MAX_RESPONSE_BYTES;
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= MAX_RESPONSE_BYTES_MINIMO ? Math.trunc(value) : undefined;
+}
 
 function getHomeDir(): string {
   return process.env.HOME ?? process.env.USERPROFILE ?? ".";
@@ -83,6 +101,7 @@ function applyEnvOverrides(config: BridgeConfig): BridgeConfig {
     ...config,
     host: process.env.TALEND_BRIDGE_HOST ?? config.host,
     port: process.env.TALEND_BRIDGE_PORT ? Number(process.env.TALEND_BRIDGE_PORT) : config.port,
+    maxResponseBytes: maxResponseBytesDelEntorno() ?? config.maxResponseBytes ?? MAX_RESPONSE_BYTES_POR_DEFECTO,
   };
 }
 

@@ -5,8 +5,11 @@ import static com.andres.talend.bridge.TestSupport.check;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Comparator;
 
 /**
  * La salida de un job se acumula en memoria mientras corre. Sin tope, un job
@@ -16,6 +19,8 @@ public final class JobExecutorTests {
   private JobExecutorTests() {}
 
   public static void run() throws Exception {
+    verifiesRecursiveGeneratedFolderSearch();
+
     Method drain = JobExecutor.class.getDeclaredMethod(
         "drain", InputStream.class, StringBuilder.class, AtomicBoolean.class);
     drain.setAccessible(true);
@@ -45,6 +50,21 @@ public final class JobExecutorTests {
     check(larga.indexOf("salida recortada") >= 0, "la salida recortada lo dice al principio");
     check(larga.toString().contains("linea 79999 "), "la salida recortada conserva el final");
     check(!larga.toString().contains("linea 0 "), "la salida recortada suelta el principio");
+  }
+
+  private static void verifiesRecursiveGeneratedFolderSearch() throws Exception {
+    Path root = Files.createTempDirectory("talend-generated-folder-test-");
+    try {
+      Path expected = Files.createDirectories(root.resolve("Azure_Talend").resolve("poc_azure_job_0.1"));
+      Path found = JobExecutor.search(root, "poc_azure_job_0.1", 3);
+      check(expected.equals(found), "la busqueda recursiva encuentra un proyecto generado bajo su carpeta de repositorio");
+    } finally {
+      try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
+        for (Path path : paths.sorted(Comparator.reverseOrder()).toArray(Path[]::new)) {
+          Files.deleteIfExists(path);
+        }
+      }
+    }
   }
 
   private static InputStream flujo(String texto) {

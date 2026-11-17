@@ -96,6 +96,7 @@ function resumen(results: BatchItemResult[], compilacion?: Record<string, { ok: 
 }
 
 const CreateBatchSchema = z.object({
+  confirm: z.boolean().optional().default(false).describe("Confirma la creación del lote cuando se autoriza como operación destructiva"),
   template: templateSchema.describe("Plantilla del job. Los textos admiten {{variable}}"),
   rows: z.array(rowSchema).min(1).max(20000).describe("Una fila por job: valores de las variables de la plantilla"),
   overwrite: z.boolean().optional().default(false).describe("Sobrescribir los jobs que ya existen"),
@@ -108,7 +109,7 @@ export function createJobsCreateBatchTool() {
   return {
     name: "talend_jobs_create_batch",
     description:
-      "Crea MUCHOS jobs a la vez, sin Studio, a partir de una plantilla con {{variables}} y una fila de valores por job (hasta 20000). Escribe los .item y .properties en disco en milisegundos. Con verify:true refresca Studio y compila cada job sin abrir su editor (~0,2 s por job), y devuelve cuales no compilan. Pensada para migraciones masivas.",
+      "Crea MUCHOS jobs a la vez, sin Studio, a partir de una plantilla con {{variables}} y una fila de valores por job (hasta 20000). Requiere confirm:true y autorización destructiva. Escribe los .item y .properties en disco en milisegundos. Con verify:true refresca Studio y compila cada job sin abrir su editor (~0,2 s por job), y devuelve cuales no compilan. Pensada para migraciones masivas.",
     inputSchema: CreateBatchSchema,
     annotations: { readOnly: false, requiresConfirmation: true },
     handler: async (input: z.infer<typeof CreateBatchSchema>) => {
@@ -172,6 +173,7 @@ export function createJobsCreateBatchTool() {
 }
 
 const EditBatchSchema = z.object({
+  confirm: z.boolean().optional().default(false).describe("Confirma la edición del lote cuando se autoriza como operación destructiva"),
   jobs: z.array(z.string().min(1)).max(20000).optional().describe("Nombres exactos de los jobs"),
   namePattern: z.string().optional().describe("Expresion regular sobre el nombre del job, p. ej. ^MIG_"),
   force: z.boolean().optional().default(false).describe("Editar tambien los jobs abiertos en un editor de Studio"),
@@ -186,7 +188,7 @@ export function createJobsEditBatchTool() {
   return {
     name: "talend_jobs_edit_batch",
     description:
-      "Aplica el MISMO lote de operaciones (add_node, set_params, set_schema, connect...) a muchos jobs a la vez, directamente en disco y sin Studio. Eliges los jobs por lista de nombres o por expresion regular. Cada job es atomico por separado: el que falle la integridad no se toca y se informa, los demas se escriben. Con verify:true compila los modificados.",
+      "Aplica el MISMO lote de operaciones (add_node, set_params, set_schema, connect...) a muchos jobs a la vez, directamente en disco y sin Studio. Requiere confirm:true y autorización destructiva. Eliges los jobs por lista de nombres o por expresion regular. Cada job es atomico por separado: el que falle la integridad no se toca y se informa, los demas se escriben. Con verify:true compila los modificados.",
     inputSchema: EditBatchSchema,
     annotations: { readOnly: false, requiresConfirmation: true },
     handler: async (input: z.infer<typeof EditBatchSchema>) => {

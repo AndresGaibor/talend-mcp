@@ -60,7 +60,18 @@ public final class JobRepository {
         throw new IllegalStateException(
             "Ya existe un job con la etiqueta '" + name + "'. Usa replace=true para reemplazarlo.");
       }
+      // Reemplazar no es solo borrar el item. El editor abierto del intento
+      // anterior sigue vivo con su modelo EMF, y al recrear el job con la
+      // misma etiqueta Studio reutiliza ese modelo: el job nuevo hereda los
+      // nodos del anterior. Se limpia igual que en el borrado publico (cerrar
+      // editores y quitar los proyectos generados) antes de borrar el item.
+      int editorsClosed = TalendApi.closeEditorsOfJob(name);
+      boolean generatedProjectRemoved = deleteGeneratedProject(name, version);
+      boolean staleProjectRemoved = deleteStaleProject(name, version);
       delete(repositoryFactory, project, existing);
+      BridgeLog.info("Reemplazo del job '" + name + "': " + editorsClosed
+          + " editor(es) cerrado(s), proyecto generado borrado=" + generatedProjectRemoved
+          + ", proyecto sin carpeta borrado=" + staleProjectRemoved);
     }
 
     Object processItem = buildItem(spec, name, version);

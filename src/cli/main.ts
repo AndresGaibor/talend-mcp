@@ -27,6 +27,7 @@ Opciones comunes:
   --offset <n>                Offset para jobs list
   --folder <carpeta>          Carpeta para jobs show/create
   --yes                       Autorizar escritura interactiva/preaprobada
+  --idempotency-key <clave>   Evitar repetir una escritura reenviada desde CLI
   --port <n>                  Puerto para mcp serve
   --help                      Mostrar esta ayuda
 `;
@@ -38,6 +39,7 @@ const { values, positionals } = parseArgs({
     filter: { type: "string" }, input: { type: "string" },
     limit: { type: "string" }, offset: { type: "string" },
     folder: { type: "string" }, yes: { type: "boolean" },
+    "idempotency-key": { type: "string" },
     port: { type: "string" }, help: { type: "boolean", short: "h" },
   },
   strict: true,
@@ -189,6 +191,7 @@ async function main(): Promise<void> {
       allowExecute: risk === "execute" && (values.yes || process.env.TALEND_MCP_ALLOW_EXECUTE === "1" || process.env.TALEND_MCP_ALLOW_EXECUTE === "true"),
       allowDestructive: risk === "destructive" && (values.yes || process.env.TALEND_MCP_ALLOW_DESTRUCTIVE === "1" || process.env.TALEND_MCP_ALLOW_DESTRUCTIVE === "true"),
       confirm: (input as { confirm?: unknown }).confirm === true,
+      idempotencyKey: values["idempotency-key"],
     });
     printResult(result);
     return;

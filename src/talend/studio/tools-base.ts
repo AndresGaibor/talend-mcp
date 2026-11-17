@@ -8,6 +8,11 @@ import { parseOpenJobsFromWorkbench } from "../open-job";
 import { getConfiguredProjectPath, resolveWorkspaceFromProject } from "../workspace";
 import { TalendStudioBridgeClient } from "./bridge-client";
 import type { BridgeConfidence } from "./bridge-client";
+import { registrarRecuperacionDeModales } from "./recuperacion-de-bridge";
+
+// El cliente se crea desde varios modulos; registrar el hook aqui garantiza
+// que este instalado antes de la primera llamada al bridge.
+registrarRecuperacionDeModales();
 
 export type BridgeToolDef = {
   name: string;
@@ -64,7 +69,7 @@ export function setBridgeOutdatedState(outdated: boolean): void {
   bridgeOutdatedFlag = outdated;
 }
 
-export function bridgeResultToEnvelope<T>(result: { ok: boolean; source: string; confidence: BridgeConfidence; data?: T; error?: { code: string; message: string }; status?: number }, endpoint: string): ToolEnvelope {
+export function bridgeResultToEnvelope<T>(result: { ok: boolean; source: string; confidence: BridgeConfidence; data?: T; error?: { code: string; message: string; details?: Record<string, unknown> }; status?: number; warning?: string }, endpoint: string): ToolEnvelope {
   if (result.ok) {
     return {
       ok: true,
@@ -72,6 +77,7 @@ export function bridgeResultToEnvelope<T>(result: { ok: boolean; source: string;
       confidence: result.confidence,
       endpoint,
       data: result.data,
+      warning: result.warning,
     };
   }
 
@@ -86,7 +92,7 @@ export function bridgeResultToEnvelope<T>(result: { ok: boolean; source: string;
     confidence: result.confidence,
     endpoint,
     error: result.error,
-    warning: result.error?.message,
+    warning: result.warning ?? result.error?.message,
     limitations: outdated ? ["Bridge plugin is outdated. Please reinstall the Talend Studio bridge plugin to access this endpoint."] : undefined,
   };
 }
@@ -103,6 +109,7 @@ export function buildUnavailableEnvelope(endpoint: string, warning: string, data
 }
 
 export async function loadBridge(): Promise<TalendStudioBridgeClient> {
+  registrarRecuperacionDeModales();
   return await TalendStudioBridgeClient.create();
 }
 

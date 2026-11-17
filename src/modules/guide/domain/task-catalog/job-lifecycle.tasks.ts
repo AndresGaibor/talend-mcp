@@ -170,7 +170,7 @@ export const JOB_LIFECYCLE_TASKS: GuideTask[] = [
       },
       {
         tool: "talend_job_build_batch",
-        purpose: "Generar y compilar los jobs sin abrir su editor (~0,2 s por job, en paralelo). Devuelve cuales no compilan.",
+        purpose: "Generar y compilar un lote pequeño sin abrir los editores. Para un lote largo usa talend_job_build_batch_start y consulta/cancela con talend_operations_status/talend_operations_cancel.",
         input: { jobs: ["MIG_CLIENTES", "MIG_CUENTAS"], parallelism: 4 },
       },
       {

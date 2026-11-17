@@ -450,6 +450,16 @@ public final class JobBuilder {
    * @param spec `jobs` (nombres) y `parallelism` opcional (por defecto, la mitad de los nucleos).
    */
   public static Map<String, Object> buildBatch(JsonObject spec) throws Exception {
+    return buildBatch(spec, null);
+  }
+
+  /** Progreso y cancelacion cooperativa; las compilaciones ya lanzadas se dejan terminar. */
+  public interface BatchControl {
+    boolean cancelRequested();
+    void progress(String job, int completed, int total);
+  }
+
+  public static Map<String, Object> buildBatch(JsonObject spec, BatchControl control) throws Exception {
     List<String> nombres = new ArrayList<>();
     for (com.google.gson.JsonElement nombre : spec.getAsJsonArray("jobs")) {
       nombres.add(nombre.getAsString());
@@ -484,6 +494,7 @@ public final class JobBuilder {
 
     long inicio = System.currentTimeMillis();
     java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(hilos);
+    int[] completed = new int[] {0};
     Map<String, Map<String, Object>> resultados = new java.util.LinkedHashMap<>();
     Map<String, java.util.concurrent.Future<Map<String, Object>>> pendientes = new java.util.LinkedHashMap<>();
     try {
@@ -494,12 +505,16 @@ public final class JobBuilder {
       org.eclipse.core.resources.IWorkspace workspace = org.eclipse.core.resources.ResourcesPlugin.getWorkspace();
       workspace.run(monitor -> {
       for (String nombre : nombres) {
+        if (control != null && control.cancelRequested()) break;
+        if (control != null) control.progress(nombre, completed[0], nombres.size());
         Map<String, Object> fila = new LinkedHashMap<>();
         resultados.put(nombre, fila);
         Object[] encontrado = items.get(nombre);
         if (encontrado == null) {
           fila.put("ok", false);
           fila.put("error", "El job no existe en el repositorio");
+          completed[0]++;
+          if (control != null) control.progress(nombre, completed[0], nombres.size());
           continue;
         }
         long t = System.currentTimeMillis();
@@ -511,6 +526,8 @@ public final class JobBuilder {
         } catch (ReflectiveOperationException e) {
           fila.put("ok", false);
           fila.put("error", JobCompiler.describe(JobCompiler.rootMessage(e)));
+          completed[0]++;
+          if (control != null) control.progress(nombre, completed[0], nombres.size());
           continue;
         }
         fila.put("generateMs", System.currentTimeMillis() - t);
@@ -540,6 +557,8 @@ public final class JobBuilder {
           fila.put("ok", false);
           fila.put("error", JobCompiler.describe(JobCompiler.rootMessage(e)));
         }
+        completed[0]++;
+        if (control != null) control.progress(entrada.getKey(), completed[0], nombres.size());
       }
     } finally {
       pool.shutdown();
@@ -555,6 +574,8 @@ public final class JobBuilder {
     resultado.put("total", nombres.size());
     resultado.put("correctos", correctos);
     resultado.put("parallelism", hilos);
+    resultado.put("completed", completed[0]);
+    resultado.put("cancelled", control != null && control.cancelRequested() && completed[0] < nombres.size());
     resultado.put("totalMs", System.currentTimeMillis() - inicio);
     resultado.put("jobs", resultados);
     return resultado;

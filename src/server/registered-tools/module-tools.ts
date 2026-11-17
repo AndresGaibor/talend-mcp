@@ -25,6 +25,7 @@ import { talendJobsListPatternsTool } from "../../modules/jobs/tools/jobs-list-p
 import { createListRunsTool } from "../../modules/runs/tools/list-runs.tool";
 import { createReadRunTool } from "../../modules/runs/tools/read-run.tool";
 import { createRunJobTool } from "../../modules/runs/tools/run-job.tool";
+import { createAsyncRunCancelTool, createAsyncRunStartTool, createAsyncRunStatusTool } from "../../modules/runs/tools/async-run-tools";
 import { createRunExportedJobTool } from "../../modules/runs/tools/run-exported-job.tool";
 
 import { createErrorsExplainTool } from "../../modules/errors/tools/errors-explain.tool";
@@ -85,6 +86,9 @@ export function getModuleTools(listTools: () => McpToolDefinition[]): RuntimeToo
     createListRunsTool(),
     createReadRunTool(),
     createRunJobTool(),
+    createAsyncRunStartTool(),
+    createAsyncRunStatusTool(),
+    createAsyncRunCancelTool(),
     createRunExportedJobTool(),
     createErrorsExplainTool(),
     createErrorsSuggestFixTool(),

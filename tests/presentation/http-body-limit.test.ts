@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import type { IncomingMessage } from "node:http";
 import { PayloadTooLargeError, readBody } from "../../src/presentation/server/new-server/http-routes";
 import { runNewHttpServer } from "../../src/presentation/server/new-server";
+import { requiresRequestAuthentication } from "../../src/presentation/server/new-server/http";
 
 function peticion(...chunks: string[]): IncomingMessage {
   return Readable.from(chunks.map((chunk) => Buffer.from(chunk, "utf8"))) as unknown as IncomingMessage;
@@ -26,6 +27,14 @@ describe("readBody", () => {
 });
 
 describe("servidor HTTP", () => {
+  test("protege las rutas previas al despacho cuando el servidor no es loopback", () => {
+    expect(requiresRequestAuthentication("0.0.0.0", "GET", "/metrics")).toBe(true);
+    expect(requiresRequestAuthentication("0.0.0.0", "POST", "/mcp")).toBe(true);
+    expect(requiresRequestAuthentication("0.0.0.0", "GET", "/healthz")).toBe(false);
+    expect(requiresRequestAuthentication("0.0.0.0", "OPTIONS", "/metrics")).toBe(false);
+    expect(requiresRequestAuthentication("127.0.0.1", "GET", "/metrics")).toBe(false);
+  });
+
   test("responde 413 a un cuerpo que supera el tope", async () => {
     const server = await runNewHttpServer({ port: 0, maxBodyBytes: 64 });
     try {

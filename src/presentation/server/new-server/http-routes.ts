@@ -148,7 +148,7 @@ export async function handleEarlyRoute(
     res.writeHead(204, {
       "access-control-allow-origin": origin ?? "",
       "access-control-allow-methods": "GET, POST, OPTIONS",
-      "access-control-allow-headers": "content-type, accept, authorization",
+      "access-control-allow-headers": "content-type, accept, authorization, idempotency-key",
       "access-control-max-age": "86400",
     });
     res.end();

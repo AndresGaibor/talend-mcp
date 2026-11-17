@@ -51,13 +51,22 @@ export const TalendMcpEnvSchema = z.object({
   /** Llamadas a tools que se atienden a la vez; el resto recibe error de servidor ocupado. */
   TALEND_MCP_MAX_CONCURRENT_CALLS: z.coerce.number().int().positive().default(4),
   /** Tope de una respuesta de tool; por encima se responde error y se pide paginar. */
-  TALEND_MCP_MAX_RESPONSE_BYTES: z.coerce.number().int().positive().default(16 * 1024 * 1024),
+  TALEND_MCP_MAX_RESPONSE_BYTES: z.coerce.number().int().positive().default(64 * 1024 * 1024),
+  /** Carpeta local donde se guardan claves/resultados de idempotencia (por defecto `.talend-mcp`). */
+  TALEND_MCP_IDEMPOTENCY_DIR: z.string().optional(),
+  /**
+   * Si el cliente atiende dialogos conocidos de Studio y reintenta una lectura
+   * cuando el bridge no contesta. Se apaga con `0`, igual que el supervisor.
+   */
+  TALEND_MODALS_AUTO: flag,
 
   TALEND_BRIDGE_HOST: z.string().default("127.0.0.1"),
   TALEND_BRIDGE_PORT: z.coerce.number().default(3930),
   TALEND_BRIDGE_CONFIG: z.string().optional(),
   TALEND_BRIDGE_TOKEN: z.string().optional(),
   TALEND_BRIDGE_HOT_DIR: z.string().optional(),
+  /** Tope de una respuesta del bridge; por encima se responde error accionable. */
+  TALEND_BRIDGE_MAX_RESPONSE_BYTES: z.coerce.number().int().positive().optional(),
   TALEND_BRIDGE_AUTO_INSTALL: flag,
 
   TALEND_BUILDS_DIR: z.string().optional(),

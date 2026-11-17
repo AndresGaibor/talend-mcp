@@ -77,3 +77,13 @@ estandar y la salida de error, con las lineas de la salida ya separadas.
 **Ojo**: el proceso se relanza, no se intercepta. El job ya se ha ejecutado
 una vez con `talend_job_run_by_name` (que compila y lanza); `talend_job_execute` lo
 ejecuta otra vez para poder leer su salida.
+
+## 24. Buscar carpetas generadas bajo subcarpetas
+
+Los proyectos Maven del Job no siempre están directamente bajo
+`poms/jobs/process/<nombre-del-job>`; algunos quedan bajo la carpeta del
+repositorio, por ejemplo `poms/jobs/process/<carpeta>/<job>_<version>`. Al
+recorrer el árbol con `Files.list`, materializa sus hijos una sola vez antes de
+buscar y recursar: un `Stream` de Java no se puede consumir dos veces. Reutilizar
+el mismo stream para la segunda pasada lanza `IllegalStateException` y puede
+hacer que el bridge informe que no encuentra una carpeta que sí existe.

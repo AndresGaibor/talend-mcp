@@ -297,6 +297,9 @@ final class BridgeServer {
     // Construye el job (genera y compila en la UI; el build de Maven va en el hilo de la peticion).
     route("/automation/job/build", exchange -> respond(exchange, 200, JobOperationsService.build(readJsonBody(exchange))));
     route("/automation/job/build-batch", exchange -> respond(exchange, 200, JobOperationsService.buildBatch(readJsonBody(exchange))));
+    workerBody("/automation/job/build-batch/start", body -> JobOperationsService.startBuildBatch(body));
+    workerBody("/automation/job/build-batch/status", body -> JobOperationsService.buildBatchStatus(body));
+    workerBody("/automation/job/build-batch/cancel", body -> JobOperationsService.cancelBuildBatch(body));
     uiBody("/automation/job/problems", body -> JobOperationsService.problems(body));
     uiBody("/automation/job/contexts", body -> JobOperationsService.contexts(body));
     uiBody("/automation/job/contexts/parameters", body -> JobOperationsService.addContextParameters(body));

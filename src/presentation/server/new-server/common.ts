@@ -5,6 +5,7 @@ import { buildServerInstructions } from "../../../modules/guide/domain/server-in
 import { getTalendMcpEnv } from "../../../config/env";
 import { CupoDeLlamadas } from "./tool-guard";
 import { dispatchValidated } from "./dispatch";
+import { getRequestMetadata, idempotencyKeyFromMcpContext } from "./request-context";
 
 function toStandardSchema(schema: unknown) {
   return schema && typeof schema === "object" && "~standard" in schema
@@ -32,13 +33,18 @@ export function createNewMcpServer() {
         _meta: tool.definition._meta as Record<string, unknown>,
         title: tool.definition.name,
       },
-      (async (input: unknown) => {
+      (async (input: unknown, requestContext: unknown) => {
+        const requestMetadata = getRequestMetadata();
         return dispatchValidated(
           tool.definition.name,
           input,
           tool.definition.inputSchema,
           tool.handler,
-          { timeoutMs: env.TALEND_MCP_TOOL_TIMEOUT_MS, cupo },
+          {
+            timeoutMs: env.TALEND_MCP_TOOL_TIMEOUT_MS,
+            cupo,
+            idempotencyKey: requestMetadata.idempotencyKey ?? idempotencyKeyFromMcpContext(requestContext),
+          },
         ) as never;
       }) as never,
     );

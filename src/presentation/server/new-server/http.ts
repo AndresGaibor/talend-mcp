@@ -3,8 +3,10 @@ import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { getRuntimeTools } from "../../../server/registered-tools";
 import { handleEarlyRoute, PayloadTooLargeError, readBody } from "./http-routes";
 import { createNewMcpServer } from "./common";
+import { aplicarTopeDeRespuesta } from "./response-limit";
 import type { NewServerHandle, NewServerOptions } from "./types";
 import { getTalendMcpEnv } from "../../../config/env";
+import { withRequestMetadata } from "./request-context";
 
 function isLoopbackHost(host: string): boolean {
   const normalized = host.trim().toLowerCase();
@@ -15,6 +17,11 @@ function hasValidToken(req: IncomingMessage, expected: string | undefined): bool
   if (!expected) return false;
   const header = req.headers.authorization;
   return header === `Bearer ${expected}`;
+}
+
+/** Las rutas de diagnóstico también quedan protegidas al escuchar fuera de loopback. */
+export function requiresRequestAuthentication(host: string, method: string, pathname: string): boolean {
+  return !isLoopbackHost(host) && method !== "OPTIONS" && pathname !== "/healthz";
 }
 
 export async function runNewHttpServer(options?: NewServerOptions): Promise<NewServerHandle> {
@@ -45,6 +52,14 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     activeRequests++;
     res.once("close", () => { activeRequests--; });
 
+    const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
+    if (requiresRequestAuthentication(host, req.method ?? "GET", requestUrl.pathname)
+      && !hasValidToken(req, env.TALEND_MCP_TOKEN)) {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+      return;
+    }
+
     const earlyHandled = await handleEarlyRoute(req, res, {
       host,
       port,
@@ -56,12 +71,6 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
       streamingTransport,
     });
     if (earlyHandled) return;
-
-    if (!isLoopbackHost(host) && !hasValidToken(req, env.TALEND_MCP_TOKEN)) {
-      res.writeHead(401, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
-      return;
-    }
 
     if (req.method !== "POST") {
       res.writeHead(405, { "content-type": "application/json" });
@@ -90,31 +99,24 @@ export async function runNewHttpServer(options?: NewServerOptions): Promise<NewS
     await mcpServer.connect(transport);
     const parsed = JSON.parse(body) as Record<string, unknown>;
     if (parsed.method === "tools/call") {
-      // Tope de respuesta: se mide tras serializar, igual que el despacho
-      // manual anterior. El SDK escribe al socket directamente, asi que no
-      // se puede interceptar: se registra y se corta la sesion si excede.
-      // El plazo es el de la tool, no 100 ms: una compilacion tarda cientos de milisegundos y
-      // cortar la respuesta antes dejaba al cliente con un stream vacio.
+      // El SDK escribe la respuesta en streaming, asi que el tope se aplica a
+      // `write` y `end` (no solo al final). Si la respuesta no cabe, se
+      // descarta y se devuelve un error JSON-RPC con la tool y el tope.
       const timeout = setTimeout(
         () => { try { res.destroy(); } catch { /* noop */ } },
         options?.toolTimeoutMs ?? env.TALEND_MCP_TOOL_TIMEOUT_MS,
       );
       res.once("close", () => clearTimeout(timeout));
-      const originalEnd = res.end.bind(res);
-      (res as unknown as { _limited?: boolean })._limited = false;
-      res.end = ((chunk?: unknown, encoding?: unknown, cb?: unknown) => {
-        const text = typeof chunk === "string" ? chunk : JSON.stringify(chunk ?? "");
-        const limit = options?.maxResponseBytes ?? env.TALEND_MCP_MAX_RESPONSE_BYTES;
-        if (Buffer.byteLength(text, "utf8") > limit) {
-          clearTimeout(timeout);
-          res.writeHead(413, { "content-type": "application/json" });
-          originalEnd(JSON.stringify({ ok: false, error: "response_too_large", maxBytes: limit }));
-          return;
-        }
-        originalEnd(chunk as string, encoding as BufferEncoding, cb as () => void);
-      }) as typeof res.end;
+      const params = (parsed.params ?? {}) as { name?: unknown };
+      aplicarTopeDeRespuesta(res, {
+        maxBytes: options?.maxResponseBytes ?? env.TALEND_MCP_MAX_RESPONSE_BYTES,
+        tool: typeof params.name === "string" ? params.name : "la tool",
+        id: parsed.id,
+      });
     }
-    await transport.handleRequest(req, res, parsed);
+    const rawIdempotencyKey = req.headers["idempotency-key"];
+    const idempotencyKey = typeof rawIdempotencyKey === "string" ? rawIdempotencyKey : undefined;
+    await withRequestMetadata({ idempotencyKey }, () => transport.handleRequest(req, res, parsed));
   });
 
   const listenPort = await new Promise<number>((resolve, reject) => {

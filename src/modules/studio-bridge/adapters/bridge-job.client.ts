@@ -123,6 +123,30 @@ export class BridgeJobClient extends BridgeWorkbenchClient {
     });
   }
 
+  /** Inicia un build batch en segundo plano y devuelve su operationId. */
+  async jobBuildBatchStart(options: { jobs: string[]; parallelism?: number; operationId?: string }): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/build-batch/start", {
+      method: "POST",
+      body: options,
+    });
+  }
+
+  /** Consulta progreso o resultado terminal de un build batch. */
+  async jobBuildBatchStatus(operationId: string): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/build-batch/status", {
+      method: "POST",
+      body: { operationId },
+    });
+  }
+
+  /** Solicita cancelacion cooperativa del build batch. */
+  async jobBuildBatchCancel(operationId: string): Promise<BridgeResult<Record<string, unknown>>> {
+    return await this.request<Record<string, unknown>>("/automation/job/build-batch/cancel", {
+      method: "POST",
+      body: { operationId },
+    });
+  }
+
   /** Errores y avisos de diseno de un job (la vista Problemas de Studio). */
   async jobProblems(options?: { job?: string; release?: boolean }): Promise<BridgeResult<Record<string, unknown>>> {
     return await this.request<Record<string, unknown>>("/automation/job/problems", {

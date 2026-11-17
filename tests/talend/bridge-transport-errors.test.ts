@@ -77,6 +77,13 @@ describe("tope de respuesta del bridge", () => {
     expect(resultado.ok).toBe(false);
     expect(resultado.error?.code).toBe("BRIDGE_RESPONSE_TOO_LARGE");
     expect(resultado.error?.message).toContain("tope es 1024");
+    expect(resultado.error?.message).toContain("TALEND_BRIDGE_MAX_RESPONSE_BYTES");
+    expect(resultado.error?.details).toMatchObject({
+      endpoint: "/ping",
+      maxBytes: 1_024,
+      variable: "TALEND_BRIDGE_MAX_RESPONSE_BYTES",
+    });
+    expect(Number(resultado.error?.details?.recibidos)).toBeGreaterThan(1_024);
   });
 
   test("lee la respuesta cuando cabe en el tope", async () => {
@@ -86,5 +93,13 @@ describe("tope de respuesta del bridge", () => {
 
     expect(resultado.ok).toBe(true);
     expect((resultado.data as { ok?: boolean } | undefined)?.ok).toBe(true);
+  });
+
+  test("un tope invalido no deja al cliente sin limite", async () => {
+    const cliente = new BridgeTransportClient(configDelServidor(Number.NaN));
+
+    const resultado = await cliente.ping();
+
+    expect(resultado.ok).toBe(true);
   });
 });

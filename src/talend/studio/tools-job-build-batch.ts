@@ -50,21 +50,25 @@ export const jobBuildBatchTools = [
   },
   {
     name: "talend_job_build_batch_start",
-    description: "Inicia la generación/compilación de varios Jobs en segundo plano y devuelve operationId. Consulta talend_operations_status; talend_operations_cancel detiene el lote entre Jobs y deja terminar las compilaciones ya activas.",
+    description: "Inicia la generación/compilación de varios Jobs en segundo plano y devuelve operationId. Consulta talend_operations_status; talend_operations_cancel detiene el lote entre Jobs y deja terminar las compilaciones ya activas. El estado remoto se puede recuperar tras reiniciar MCP mientras el bridge siga activo.",
     inputSchema: z.object({
       jobs: z.array(z.string().min(1)).min(1).max(5000).describe("Nombres de los Jobs que se van a construir"),
       parallelism: z.number().int().min(1).max(16).optional().default(4),
     }),
     handler: async ({ jobs, parallelism }: { jobs: string[]; parallelism?: number }) => {
-      const operation = operationRegistry.start("job-build-batch", async (signal) => await resourceLocks.run(
+      const operation = operationRegistry.start("job-build-batch", async (signal, operationId) => await resourceLocks.run(
         jobs.map((job) => `job:${job}`),
         signal,
         async () => {
           const bridge = await loadBridge();
-          const started = await bridge.jobBuildBatchStart({ jobs, parallelism: parallelism ?? 4 });
+          const started = await bridge.jobBuildBatchStart({
+            jobs,
+            parallelism: parallelism ?? 4,
+            operationId,
+          });
           const startData = asRecord(started.data?.result);
           const remoteOperationId = typeof startData?.operationId === "string" ? startData.operationId : undefined;
-          if (!started.ok || !remoteOperationId) {
+          if (!started.ok || !remoteOperationId || remoteOperationId !== operationId) {
             throw new Error("El bridge no devolvió un operationId para iniciar el build batch.");
           }
 
@@ -81,6 +85,13 @@ export const jobBuildBatchTools = [
               const status = await bridge.jobBuildBatchStatus(remoteOperationId);
               const snapshot = asRecord(status.data?.result);
               if (!status.ok || !snapshot || snapshot.found === false) throw new Error("No se pudo consultar el estado del build batch remoto.");
+              if (typeof snapshot.completed === "number" && typeof snapshot.total === "number") {
+                operationRegistry.updateProgress(operationId, {
+                  completed: snapshot.completed,
+                  total: snapshot.total,
+                  ...(typeof snapshot.currentJob === "string" && snapshot.currentJob ? { currentJob: snapshot.currentJob } : {}),
+                });
+              }
               const state = snapshot.state;
               if (state === "succeeded" || state === "failed" || state === "cancelled") {
                 const result = snapshot.result;
