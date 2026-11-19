@@ -14,7 +14,7 @@ jobs:
     # Para activarlo: runner self-hosted con Talend Studio instalado y
     # variables.STUDIO_ENABLED=true + secret STUDIO_TOKEN si aplica.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v1
       - run: bun install
       - name: Instalar bridge
