@@ -1,5 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 
 /** Autoconfiguracion de clientes MCP: escribe (o quita) la entrada `talend-mcp` sin tocar el resto. */
 
@@ -22,7 +22,8 @@ export const defaultStateHome = (home: string): string => slash(join(home, ".tal
 export function launcherFor(opts: { execPath: string; repoRoot: string; home: string; project?: string; filter?: string }): Launcher {
   const env: Record<string, string> = { TALEND_MCP_MODE: "stdio", TALEND_MCP_FILTER: opts.filter ?? "agent" };
   if (opts.project) env.TALEND_PROJECT = slash(opts.project);
-  const compiled = !/^bun(\.exe)?$/i.test(basename(opts.execPath));
+  // No se usa path.basename: en POSIX no separa las rutas con barra invertida.
+  const compiled = !/^bun(\.exe)?$/i.test(opts.execPath.split(/[\\/]/).pop() ?? "");
   if (compiled) {
     env.TALEND_MCP_HOME = defaultStateHome(opts.home);
     return { command: slash(opts.execPath), args: ["serve"], env };
