@@ -125,7 +125,10 @@ export async function loadComponentCatalog(): Promise<ComponentCatalogMetadata |
   const catalogPath = join(process.cwd(), CATALOG_DIR, CATALOG_FILE);
 
   if (!existsSync(catalogPath)) {
-    return null;
+    // Primer uso (instalacion nueva u otro directorio de estado): sin catalogo todo daba
+    // "componente no encontrado". Se construye una vez desde Studio; sin Studio sigue siendo null.
+    await saveComponentCatalog();
+    if (!existsSync(catalogPath)) return null;
   }
 
   try {

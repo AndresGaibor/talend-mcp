@@ -192,6 +192,11 @@ function deriveRisk(safety: ToolSafetyAnnotation): "read" | "write" | "execute" 
 }
 
 const CANONICAL_RISKS: Record<string, "read" | "write" | "execute" | "destructive"> = {
+  // Sin esta entrada caian en "write": con TALEND_MCP_ALLOW_WRITE=0 se bloqueaba hasta la guia.
+  talend_guide: "read",
+  talend_diagnose_environment: "read",
+  talend_job_quality_report: "read",
+  talend_snapshots_list: "read",
   talend_job_inspect: "read",
   talend_component_describe: "read",
   talend_job_plan: "read",

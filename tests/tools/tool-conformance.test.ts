@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { getAllRuntimeTools } from "../../src/server/registered-tools";
+import { PRESET_AGENT } from "../../src/server/registered-tools/preset-sets";
+import { getToolRisk } from "../../src/presentation/server/tool-safety";
 import { createDeleteJobTool } from "../../src/presentation/tools/jobs/delete-job.tool";
 import { createDuplicateJobTool } from "../../src/presentation/tools/jobs/duplicate-job.tool";
 import { createUpsertRepositoryContextParameterTool } from "../../src/presentation/tools/contexts/upsert-repository-context-parameter.tool";
@@ -59,6 +61,17 @@ describe("Conformidad de tools registradas", () => {
     });
 
     expect(invalidas).toEqual([]);
+  });
+
+  // Solo el preset agent (lo que ven los clientes por defecto): en `all` hay tools legacy
+  // que la heuristica publica como lectura y la tabla de riesgo aun trata como write.
+  test("en el preset agent, el riesgo de lectura y readOnlyHint publicado coinciden", () => {
+    const incoherentes = tools.filter((tool) => PRESET_AGENT.has(tool.name)).flatMap((tool) => {
+      const readOnly = tool.annotations?.readOnlyHint === true;
+      return (getToolRisk(tool.name) === "read") === readOnly ? [] : [`${tool.name}: riesgo ${getToolRisk(tool.name)}, readOnlyHint ${readOnly}`];
+    });
+    expect(incoherentes).toEqual([]);
+    expect(getToolRisk("talend_guide")).toBe("read");
   });
 
   test("los contratos esenciales siguen registrados", () => {

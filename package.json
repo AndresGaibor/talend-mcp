@@ -1,5 +1,12 @@
 {
   "name": "talend-mcp",
+  "version": "0.1.0",
+  "description": "Servidor MCP local para crear, editar, compilar y ejecutar jobs de Qlik Talend Studio.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndresGaibor/talend-mcp.git"
+  },
   "module": "index.ts",
   "type": "module",
   "private": true,
@@ -34,6 +41,7 @@
     "contexts": "bun run scripts/contexts.ts",
     "cli": "bun run src/cli/main.ts",
     "cli:build": "bun build --compile src/cli/main.ts --outfile dist/talend",
+    "release:build": "bun run scripts/build-release.ts",
     "docs:tools": "bun run scripts/generate-tool-catalog.ts",
     "docs:componentes": "bun run scripts/catalogo-componentes.ts",
     "panels:build": "bun run scripts/component-panels.ts",

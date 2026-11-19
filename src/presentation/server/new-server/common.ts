@@ -1,3 +1,4 @@
+import { VERSION } from "../../../version";
 import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import { getRuntimeTools } from "../../../server/registered-tools";
 import { GENERIC_TOOL_OUTPUT_SCHEMA } from "../tool-registry";
@@ -15,7 +16,7 @@ function toStandardSchema(schema: unknown) {
 
 export function createNewMcpServer() {
   const server = new McpServer(
-    { name: "talend-mcp", version: "1.0.0" },
+    { name: "talend-mcp", version: VERSION },
     { instructions: buildServerInstructions() },
   );
   const allTools = getRuntimeTools();

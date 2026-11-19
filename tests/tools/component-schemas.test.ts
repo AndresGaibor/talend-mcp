@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { DefinitionIndexRepository } from "../../src/modules/component-definitions/infrastructure/definition-index.repository";
 import { GetComponentDefinitionsUseCase } from "../../src/modules/component-definitions/application/get-component-definitions.use-case";
+import { resolveTalendPluginsDir } from "../../src/talend/components/talend-paths";
 import { validateComponentParams } from "../../src/modules/jobs/tools/job-plan-edit.tool";
 
-describe("extracción de schemas de los 50 componentes en código", () => {
+// Las definiciones salen de los plugins de una instalacion real de Studio: sin ella (CI) no hay que comparar.
+const conStudio = resolveTalendPluginsDir() !== null;
+
+describe.skipIf(!conStudio)("extracción de schemas de los 50 componentes en código", () => {
   test("tFileInputDelimited: parámetros, tipos y valores válidos desde el XML", async () => {
     const useCase = new GetComponentDefinitionsUseCase(new DefinitionIndexRepository());
     const view = await useCase.get("tFileInputDelimited");

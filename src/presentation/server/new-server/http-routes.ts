@@ -1,3 +1,4 @@
+import { VERSION } from "../../../version";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 
@@ -5,7 +6,7 @@ export function createHealthPayload(toolCount: number) {
   return {
     ok: true,
     service: "talend-mcp",
-    version: "1.0.0",
+    version: VERSION,
     toolCount,
   };
 }
@@ -27,7 +28,7 @@ export function createMetricsPayload(ctx: {
   return {
     ok: true,
     service: "talend-mcp",
-    version: "1.0.0",
+    version: VERSION,
     pid: process.pid,
     node: process.version,
     uptimeSeconds: Math.round((Date.now() - ctx.startedAt) / 1000),

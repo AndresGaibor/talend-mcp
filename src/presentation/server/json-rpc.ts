@@ -1,3 +1,4 @@
+import { VERSION } from "../../version";
 import type { ServerResponse } from "node:http";
 
 import { buildServerInstructions } from "../../modules/guide/domain/server-instructions";
@@ -73,7 +74,7 @@ export function handleMcpRequest(
   if (method === "initialize") {
     sendJson(res, origin, jsonRpcOk(id, {
       protocolVersion: "2024-11-05",
-      serverInfo: { name: "talend-mcp", version: "1.0.0" },
+      serverInfo: { name: "talend-mcp", version: VERSION },
       capabilities: buildServerCapabilities(),
       instructions: buildServerInstructions(),
     }));

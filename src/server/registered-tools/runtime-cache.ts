@@ -1,6 +1,7 @@
 import { getRegisteredServerTools, GENERIC_TOOL_OUTPUT_SCHEMA, getRegisteredServerToolAnnotations } from "../../presentation/server/tool-registry";
 import type { McpToolDefinition } from "../adapt-tool";
 import { adaptToolToMcp } from "../adapt-tool";
+import { getToolRisk } from "../../presentation/server/tool-safety";
 import { getModuleTools } from "./module-tools";
 import { applyFilter } from "./presets";
 import type { RuntimeTool } from "./types";
@@ -43,6 +44,19 @@ export function buildRuntimeToolCache(): void {
       throw new Error(`Tool duplicada detectada: "${tool.definition.name}". Una herramienta de modulo sobrescribe una legacy: declara el alias explicito o renombra.`);
     }
     cache.set(tool.definition.name, tool);
+  }
+
+  // La tabla de riesgo manda sobre la heuristica por verbos: una tool de lectura publicada como
+  // readOnly=false hace que Copilot y Claude Desktop pidan confirmacion en cada llamada.
+  for (const { definition } of cache.values()) {
+    if (getToolRisk(definition.name) !== "read") continue;
+    definition.annotations = {
+      ...definition.annotations,
+      readOnlyHint: true,
+      idempotentHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    };
   }
 
   toolCache = cache;

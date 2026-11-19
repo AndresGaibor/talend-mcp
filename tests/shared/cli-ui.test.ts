@@ -11,6 +11,7 @@ function capture(options: Parameters<typeof createUi>[0] = {}) {
   const lines: string[] = [];
   const ui = createUi({
     color: false,
+    level: "normal",
     stream: { write: (chunk: string) => lines.push(chunk) },
     ...options,
   });
