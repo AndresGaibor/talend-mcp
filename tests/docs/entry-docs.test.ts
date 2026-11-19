@@ -76,7 +76,7 @@ describe("documentacion de entrada", () => {
     const missing: string[] = [];
     for (const file of ALL_DOCS) {
       const text = readFileSync(file, "utf8");
-      for (const match of text.matchAll(/bun run ([a-zA-Z0-9:_./-]+)/g)) {
+      for (const match of text.matchAll(/bun run (?!-)([a-zA-Z0-9:_./-]+)/g)) {
         const command = match[1]!.replace(/[.,;:]$/, "");
         if (command.includes("/")) {
           if (!existsSync(join(ROOT, command))) missing.push(`${file.replace(ROOT, "")} -> ${command}`);

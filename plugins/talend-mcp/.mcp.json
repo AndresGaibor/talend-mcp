@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "talend-mcp": {
+      "command": "talend-mcp",
+      "args": ["serve"],
+      "env": {
+        "TALEND_MCP_MODE": "stdio",
+        "TALEND_MCP_FILTER": "agent"
+      }
+    }
+  }
+}

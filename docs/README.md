@@ -19,6 +19,7 @@
 | **Ver el rumbo del proyecto** | [ROADMAP-DOMINIO-TALEND.md](ROADMAP-DOMINIO-TALEND.md) | [REFACTOR-PENDIENTE.md](REFACTOR-PENDIENTE.md) |
 | **Priorizar mejoras del servidor MCP** | [ROADMAP-MEJORAS-MCP.md](ROADMAP-MEJORAS-MCP.md) | `bun run verify` |
 | **Studio no abre, vuelve al login o el bridge no responde** | [SOLUCION-DE-PROBLEMAS.md](SOLUCION-DE-PROBLEMAS.md) | `talend_diagnose_environment` |
+| **Conectar el MCP a Claude, Copilot, Cursor, Codex o Gemini** | [INSTALACION-CLIENTES.md](INSTALACION-CLIENTES.md) | [GUIA-AGENTE.md](GUIA-AGENTE.md) |
 | **Instalar en Windows o WSL** | [windows-wsl.md](windows-wsl.md) | [README.md](../README.md) |
 
 ## Estado de cada documento

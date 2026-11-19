@@ -1,3 +1,4 @@
+import "./src/config/state-home";
 import { runNewHttpServer, runNewStdioServer } from "./src/presentation/server/new-server";
 import { detectProjectFromBridge } from "./src/talend/workspace";
 

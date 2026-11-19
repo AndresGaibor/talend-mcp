@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
+import "../config/state-home";
 /** CLI MVP conectado al registro local existente, sin requerir servidor HTTP. */
 import { existsSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { VERSION } from "../version";
+import { runSetupCommand } from "./setup-command";
 import { CliOperationError, describeOperation, executeOperation, listOperations } from "../application/operations/command-dispatcher";
 
 const HELP = `Talend CLI (MVP)
@@ -16,7 +19,11 @@ Comandos:
   tools list                  Listar herramientas del registro
   tools describe <nombre>     Mostrar contrato completo
   tools call <nombre>         Ejecutar una operacion clasificada
-  mcp serve                   Iniciar el servidor MCP existente
+  mcp serve                   Iniciar el servidor MCP HTTP existente
+  serve                       Servidor MCP por stdio (lo que lanzan los clientes)
+  setup                       Configurar los clientes MCP detectados
+  remove                      Quitar talend-mcp de los clientes
+  version                     Mostrar la version
 
 Opciones comunes:
   --project <ruta>            Ruta a un proyecto con talend.project
@@ -29,6 +36,8 @@ Opciones comunes:
   --yes                       Autorizar escritura interactiva/preaprobada
   --idempotency-key <clave>   Evitar repetir una escritura reenviada desde CLI
   --port <n>                  Puerto para mcp serve
+  --client <lista>            setup/remove: claude-code,claude-desktop,vscode,cursor,gemini,codex
+  --dry-run                   setup/remove: mostrar sin escribir
   --help                      Mostrar esta ayuda
 `;
 
@@ -40,6 +49,7 @@ const { values, positionals } = parseArgs({
     limit: { type: "string" }, offset: { type: "string" },
     folder: { type: "string" }, yes: { type: "boolean" },
     "idempotency-key": { type: "string" },
+    client: { type: "string" }, "dry-run": { type: "boolean" },
     port: { type: "string" }, help: { type: "boolean", short: "h" },
   },
   strict: true,
@@ -132,6 +142,16 @@ async function main(): Promise<void> {
       fail(`No es un proyecto Talend valido (falta talend.project): ${project}`, "INVALID_PROJECT");
     }
     process.env.TALEND_PROJECT = project;
+  }
+  if (group === "version") { console.log(VERSION); return; }
+  if (group === "serve") {
+    process.env.TALEND_MCP_MODE ??= "stdio";
+    await import("../../index");
+    return;
+  }
+  if (group === "setup" || group === "remove") {
+    process.exitCode = runSetupCommand({ remove: group === "remove", client: values.client, project: values.project && resolve(values.project), filter: values.filter, dryRun: values["dry-run"] === true });
+    return;
   }
   // El preset de CLI no hereda silenciosamente 'agent' de un proceso MCP.
   process.env.TALEND_MCP_FILTER = values.filter ?? process.env.TALEND_CLI_FILTER ?? "canonical";

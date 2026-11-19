@@ -1,0 +1,38 @@
+name: Error
+description: Algo no funciona como debería
+labels: [bug]
+body:
+  - type: textarea
+    id: que
+    attributes:
+      label: Qué pasó y qué esperabas
+    validations: { required: true }
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducirlo
+      description: La llamada a la tool (`talend_...`) con su entrada, si la hay.
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: Versión (`talend-mcp version`)
+    validations: { required: true }
+  - type: dropdown
+    id: cliente
+    attributes:
+      label: Cliente MCP
+      options: [Claude Code, Claude Desktop, GitHub Copilot (VS Code), Cursor, Codex CLI, Gemini CLI, Otro]
+    validations: { required: true }
+  - type: input
+    id: entorno
+    attributes:
+      label: Sistema operativo y versión de Talend Studio
+      placeholder: Windows 11, Talend Studio 8.0.1
+    validations: { required: true }
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Salida de `talend-mcp doctor`
+      description: Ya oculta secretos, pero revisa que no incluya rutas o nombres que no quieras compartir.
+      render: json

@@ -43,6 +43,31 @@ proyectos no salen de él.
 
 ## Empezar
 
+### Instalar (sin clonar)
+
+Cada [release](https://github.com/AndresGaibor/talend-mcp/releases) publica un binario único. El
+instalador lo descarga, comprueba su checksum y **configura tus clientes MCP** (Claude Code, Claude
+Desktop, GitHub Copilot en VS Code, Cursor, Gemini CLI, Codex CLI):
+
+```powershell
+# Windows
+irm https://github.com/AndresGaibor/talend-mcp/releases/latest/download/install.ps1 | iex
+```
+
+```bash
+# Linux y macOS
+curl -fsSL https://github.com/AndresGaibor/talend-mcp/releases/latest/download/install.sh | sh
+```
+
+Para actualizar, vuelve a ejecutarlo. Con Claude Code también puedes instalar el plugin (skill y
+servidor): `/plugin install talend-mcp --marketplace AndresGaibor/talend-mcp`. Comprueba la
+instalación pidiendo al asistente que ejecute `talend_guide` con `mode: overview`. Configuración
+manual, permisos y solución de problemas: [Instalación por cliente](docs/INSTALACION-CLIENTES.md).
+
+### Desde el código
+
+Para desarrollar o probar cambios.
+
 ### Requisitos
 
 - [Bun](https://bun.sh/) para instalar y ejecutar el servidor.
@@ -120,22 +145,10 @@ Con **Claude Code** no hace falta configurar nada a mano: el repositorio trae
 [.claude/skills/talend-mcp/SKILL.md](.claude/skills/talend-mcp/SKILL.md) con el flujo de uso.
 Acepta el servidor del proyecto con `/mcp` la primera vez.
 
-Si tu cliente usa `stdio`:
-
-```json
-{
-  "mcpServers": {
-    "talend-mcp": {
-      "command": "bun",
-      "args": ["run", "index.ts"],
-      "env": {
-        "TALEND_PROJECT": "<ruta-a-tu-proyecto>",
-        "TALEND_MCP_FILTER": "agent"
-      }
-    }
-  }
-}
-```
+Para **Claude Desktop, GitHub Copilot (VS Code), Cursor, Codex CLI y Gemini CLI**, con la
+configuración exacta de cada uno, permisos y solución de problemas, sigue la
+[guía de instalación por cliente](docs/INSTALACION-CLIENTES.md). Cualquier cliente `stdio` sirve con
+`bun run --cwd <ruta-al-repo> index.ts` y `TALEND_MCP_MODE=stdio`.
 
 ## Cómo funciona
 
@@ -147,9 +160,10 @@ flowchart LR
     D --> E[API interna<br/>de Talend Studio]
 ```
 
-El servidor expone **240 herramientas**, con nombres `talend_<área>_<verbo>`. No hace falta cargarlas
-todas: `TALEND_MCP_FILTER` elige un preset, y `agent` (55 herramientas) es el recomendado para empezar.
-`bun run mapa` muestra el recuento por preset.
+El servidor expone más de doscientas herramientas, con nombres `talend_<área>_<verbo>`. No hace falta
+cargarlas todas: `TALEND_MCP_FILTER` elige un preset, y `agent` (una treintena, las del ciclo
+habitual de un job) es el recomendado para empezar. `bun run mapa` muestra el recuento exacto por
+preset.
 
 El trabajo se reparte en dos caminos, según el caso:
 
@@ -184,6 +198,7 @@ bases de datos y servicios cloud, y validar una migración de SAS a Talend compa
 
 | Quieres... | Lee |
 |---|---|
+| Conectar el MCP a Claude, Copilot, Cursor... | [Instalación por cliente](docs/INSTALACION-CLIENTES.md) |
 | Usar el MCP con un asistente | [Guía para asistentes](docs/GUIA-AGENTE.md) |
 | Migrar o editar muchos jobs sin Studio | [Modo offline](docs/MODO-OFFLINE.md) |
 | Ver qué herramientas hay | [Catálogo de herramientas](docs/CATALOGO-DE-TOOLS.md) |

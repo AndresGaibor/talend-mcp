@@ -1,0 +1,13 @@
+name: Propuesta
+description: Una mejora o una capacidad nueva
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué intentas hacer y qué te lo impide hoy
+    validations: { required: true }
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Cómo imaginas que funcionaría

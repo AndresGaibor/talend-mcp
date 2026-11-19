@@ -1,0 +1,90 @@
+name: Release
+
+# Se publica al empujar un tag vX.Y.Z. El tag debe coincidir con la version de package.json.
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    name: Binarios y checksums
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - name: El tag coincide con la version
+        run: |
+          VERSION="$(bun -e 'console.log(require("./package.json").version)')"
+          test "v$VERSION" = "${GITHUB_REF_NAME}" || { echo "El tag ${GITHUB_REF_NAME} no coincide con package.json ($VERSION)"; exit 1; }
+
+      - run: bun run typecheck
+      - run: bun test
+
+      - name: Compilar las cuatro plataformas
+        run: bun run release:build
+
+      - name: Anadir los instaladores
+        run: cp scripts/install/install.ps1 scripts/install/install.sh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: dist/*
+          if-no-files-found: error
+
+  plugin:
+    name: Plugin Java (update site p2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: stCarolas/setup-maven@v4
+        with:
+          maven-version: 3.9.9
+      - name: Build plugin
+        run: mvn -B clean verify -DskipTests
+        working-directory: talend-studio-bridge
+      - name: Empaquetar el update site
+        run: |
+          mkdir -p dist
+          cp talend-studio-bridge/com.andres.talend.bridge.repository/target/com.andres.talend.bridge.repository-*.zip dist/talend-bridge-p2.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin
+          path: dist/talend-bridge-p2.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publicar el release
+    needs: [binaries, plugin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksum del plugin
+        working-directory: dist
+        run: sha256sum talend-bridge-p2.zip >> checksums.txt
+
+      - name: Notas desde CHANGELOG.md
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v h="## [$VERSION]" 'index($0, h) == 1 {f=1; next} index($0, "## [") == 1 {f=0} f' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "CHANGELOG.md no tiene una seccion para $VERSION"; exit 1; }
+
+      - name: Crear el release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --notes-file notes.md

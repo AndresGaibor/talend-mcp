@@ -5,9 +5,9 @@ description: Usa el servidor MCP talend-mcp para inspeccionar, crear, editar, co
 
 # Usar talend-mcp
 
-El repositorio ejecuta un servidor MCP local (`bun run index.ts`) que lee y escribe proyectos de
-Qlik Talend Studio sobre `process/*.item` y, con Studio abierto, a través del plugin Java del
-bridge. Este repo ya trae el servidor registrado en `.mcp.json` con el preset `agent` por stdio.
+talend-mcp es un servidor MCP local (`talend-mcp serve`, o `bun run index.ts` desde el repositorio)
+que lee y escribe proyectos de Qlik Talend Studio sobre `process/*.item` y, con Studio abierto, a
+través del plugin Java del bridge. Se expone por stdio con el preset `agent`.
 
 Usa esta skill para **operar** sobre un proyecto Talend. Para **cambiar el código del servidor**,
 la fuente de verdad es `AGENTS.md` del repositorio, no este archivo.
@@ -33,8 +33,8 @@ la CLI sigue disponible para lectura (ver más abajo).
 4. `talend_diagnose_environment {}` y `talend_bridge_ping {}` antes de tocar Studio.
 
 Si `talend_diagnose_environment` dice que no hay proyecto, abre el proyecto en Studio o pide al
-usuario la ruta y define `TALEND_PROJECT` (la carpeta que contiene `talend.project`) en `.env.local`,
-que Bun carga solo. No inventes rutas.
+usuario la ruta y define `TALEND_PROJECT` (la carpeta que contiene `talend.project`) en el bloque `env` del cliente
+MCP (`talend-mcp setup --project <ruta>` lo hace) o, desde el repositorio, en `.env.local`. No inventes rutas.
 
 ## Estrategia mixta (la decisión que más importa)
 
@@ -87,8 +87,8 @@ código de salida sea 0**. Devuelve `verdict`: `ok`, `ok_con_avisos` o `error`, 
 5. **Los `CHECK` van como cadena con comillas:** `"true"` / `"false"`, no `true`.
 6. **Confirma antes de ejecutar o borrar.** `talend_job_run` exige `confirm: true`; las tools
    destructivas pueden ser irreversibles.
-7. **`bun run bridge:install` recarga el plugin en el Studio abierto**: no lo lances con jobs o
-   diálogos en curso.
+7. **Instalar o actualizar el plugin del bridge recarga Studio** (`bun run bridge:install` desde el
+   repositorio): no lo lances con jobs o diálogos en curso.
 8. **Prefiere `dryRun`** en cualquier edición que no hayas hecho antes; el diff dice qué cambiará.
 
 ## Si falta una tool
@@ -103,16 +103,17 @@ El preset `agent` expone solo una parte del catálogo. Si no ves la que necesita
 ## CLI, cuando el MCP no está disponible
 
 La CLI usa el mismo registro de tools, sin servidor HTTP. Es de solo lectura salvo `jobs create`
-y `tools call` con permiso explícito:
+y `tools call` con permiso explícito. Con el binario instalado es `talend-mcp <comando>`; desde el
+repositorio, `bun run cli <comando>`:
 
 ```bash
-bun run cli help
-bun run cli doctor
-bun run cli jobs list --project <ruta> --json
-bun run cli jobs show <NOMBRE_EP>
-bun run cli tools list --json
-bun run cli tools describe talend_job_verify
-bun run cli tools call talend_job_verify --input '{"job":"MI_JOB"}'
+talend-mcp help
+talend-mcp doctor
+talend-mcp jobs list --project <ruta> --json
+talend-mcp jobs show <NOMBRE_EP>
+talend-mcp tools list --json
+talend-mcp tools describe talend_job_verify
+talend-mcp tools call talend_job_verify --input '{"job":"MI_JOB"}'
 ```
 
 La escritura requiere `--yes` después de revisar la operación. La CLI no sustituye al MCP para
@@ -122,7 +123,7 @@ crear o editar jobs en lote.
 
 | Síntoma | Qué mirar |
 |---|---|
-| No hay proyecto | `TALEND_PROJECT` en `.env.local`, o el proyecto abierto en Studio |
+| No hay proyecto | `TALEND_PROJECT` en la configuración del cliente (o `.env.local`), o el proyecto abierto en Studio |
 | El bridge no responde | `talend_bridge_ping`, `bun run doctor`, Studio abierto con el plugin cargado |
 | No compila | `error.message` de `talend_job_verify`; el detalle suele ser el parámetro exacto que falta |
 | Terminó con código 0 y avisos | `verdict: ok_con_avisos`; lee `findings.warnings` y `talend_tail_run_output` |
@@ -130,6 +131,8 @@ crear o editar jobs en lote.
 | Studio tiene un diálogo abierto | `talend_studio_ui_dialogs`; `talend_job_verify` se niega a seguir con diálogos bloqueantes |
 
 ## Dónde leer más
+
+En https://github.com/AndresGaibor/talend-mcp/tree/main/docs (o en `docs/` del repositorio):
 
 - `docs/AGENTE-EXTERNO.md`: configurar un componente en ocho llamadas, con ejemplo copiable.
 - `docs/GUIA-AGENTE.md`: flujo completo, reglas de configuración, errores.
