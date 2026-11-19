@@ -4,13 +4,16 @@ import { dirname, join } from "node:path";
 /** Autoconfiguracion de clientes MCP: escribe (o quita) la entrada `talend-mcp` sin tocar el resto. */
 
 export const SERVER_NAME = "talend-mcp";
-export const CLIENT_IDS = ["claude-code", "claude-desktop", "vscode", "cursor", "gemini", "codex"] as const;
+export const CLIENT_IDS = ["claude-code", "claude-desktop", "vscode", "copilot", "cursor", "gemini", "codex"] as const;
 export type ClientId = (typeof CLIENT_IDS)[number];
 
 export type Launcher = { command: string; args: string[]; env: Record<string, string> };
-export type Dirs = { home: string; appData?: string; platform: NodeJS.Platform };
+export type Dirs = { home: string; appData?: string; copilotHome?: string; platform: NodeJS.Platform };
 
 const slash = (path: string): string => path.replaceAll("\\", "/");
+
+/** Binario compilado (talend-mcp) frente al runtime de bun. No usa path.basename: en POSIX no separa rutas con barra invertida. */
+export const isCompiledBinary = (execPath: string): boolean => !/^bun(\.exe)?$/i.test(execPath.split(/[\\/]/).pop() ?? "");
 
 /** Estado del servidor instalado por binario: catalogo, auditoria y ejecuciones. */
 export const defaultStateHome = (home: string): string => slash(join(home, ".talend-mcp", "state"));
@@ -22,16 +25,15 @@ export const defaultStateHome = (home: string): string => slash(join(home, ".tal
 export function launcherFor(opts: { execPath: string; repoRoot: string; home: string; project?: string; filter?: string }): Launcher {
   const env: Record<string, string> = { TALEND_MCP_MODE: "stdio", TALEND_MCP_FILTER: opts.filter ?? "agent" };
   if (opts.project) env.TALEND_PROJECT = slash(opts.project);
-  // No se usa path.basename: en POSIX no separa las rutas con barra invertida.
-  const compiled = !/^bun(\.exe)?$/i.test(opts.execPath.split(/[\\/]/).pop() ?? "");
-  if (compiled) {
+  if (isCompiledBinary(opts.execPath)) {
     env.TALEND_MCP_HOME = defaultStateHome(opts.home);
     return { command: slash(opts.execPath), args: ["serve"], env };
   }
   return { command: slash(opts.execPath), args: ["run", "--cwd", slash(opts.repoRoot), "index.ts"], env };
 }
 
-type JsonTarget = { kind: "json"; path: string; rootKey: "mcpServers" | "servers"; withType: boolean };
+/** `extra` son las claves que un cliente exige en la entrada ademas de command, args y env. */
+type JsonTarget = { kind: "json"; path: string; rootKey: "mcpServers" | "servers"; extra?: Record<string, unknown> };
 type TomlTarget = { kind: "toml"; path: string };
 export type Target = JsonTarget | TomlTarget | { kind: "claude-code" };
 
@@ -41,10 +43,12 @@ export function targetFor(id: ClientId, d: Dirs): Target {
   const support = d.platform === "win32" ? appData : d.platform === "darwin" ? join(d.home, "Library", "Application Support") : join(d.home, ".config");
   switch (id) {
     case "claude-code": return { kind: "claude-code" };
-    case "claude-desktop": return { kind: "json", path: join(support, "Claude", "claude_desktop_config.json"), rootKey: "mcpServers", withType: false };
-    case "vscode": return { kind: "json", path: join(support, "Code", "User", "mcp.json"), rootKey: "servers", withType: true };
-    case "cursor": return { kind: "json", path: join(d.home, ".cursor", "mcp.json"), rootKey: "mcpServers", withType: false };
-    case "gemini": return { kind: "json", path: join(d.home, ".gemini", "settings.json"), rootKey: "mcpServers", withType: false };
+    case "claude-desktop": return { kind: "json", path: join(support, "Claude", "claude_desktop_config.json"), rootKey: "mcpServers" };
+    case "vscode": return { kind: "json", path: join(support, "Code", "User", "mcp.json"), rootKey: "servers", extra: { type: "stdio" } };
+    // Formato nativo de Copilot (CLI y VS Code): COPILOT_HOME o ~/.copilot. type "local" y tools "*" son los de su documentacion.
+    case "copilot": return { kind: "json", path: join(d.copilotHome || join(d.home, ".copilot"), "mcp-config.json"), rootKey: "mcpServers", extra: { type: "local", tools: ["*"] } };
+    case "cursor": return { kind: "json", path: join(d.home, ".cursor", "mcp.json"), rootKey: "mcpServers" };
+    case "gemini": return { kind: "json", path: join(d.home, ".gemini", "settings.json"), rootKey: "mcpServers" };
     case "codex": return { kind: "toml", path: join(d.home, ".codex", "config.toml") };
   }
 }
@@ -121,7 +125,7 @@ export function configureClient(id: ClientId, launcher: Launcher | null, deps: S
     const before = existsSync(target.path) ? readFileSync(target.path, "utf8") : undefined;
     const next = target.kind === "toml"
       ? applyToml(before, launcher)
-      : applyJson(before, target.rootKey, launcher ? { ...(target.withType ? { type: "stdio" } : {}), command: launcher.command, args: launcher.args, env: launcher.env } : null);
+      : applyJson(before, target.rootKey, launcher ? { ...target.extra, command: launcher.command, args: launcher.args, env: launcher.env } : null);
     if (before === undefined && !launcher) return { client: id, status: "skipped", detail: "no hay configuracion" };
     if (dryRun) return { client: id, status: "dry-run", detail: target.path };
     mkdirSync(dirname(target.path), { recursive: true });

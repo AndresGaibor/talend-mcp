@@ -10,7 +10,7 @@ const MARK: Record<Outcome["status"], string> = { applied: "✓", "dry-run": "·
 export function runSetupCommand(opts: { remove: boolean; client?: string; project?: string; filter?: string; dryRun: boolean }): number {
   const home = homedir();
   const deps: SetupDeps = {
-    dirs: { home, appData: process.env.APPDATA, platform: process.platform },
+    dirs: { home, appData: process.env.APPDATA, copilotHome: process.env.COPILOT_HOME, platform: process.platform },
     which: (cmd) => Bun.which(cmd),
     run: (cmd) => {
       const r = Bun.spawnSync(cmd, { stdout: "pipe", stderr: "pipe" });
@@ -46,6 +46,6 @@ export function runSetupCommand(opts: { remove: boolean; client?: string; projec
   const outcomes = ids.map((id) => configureClient(id, launcher, deps, opts.dryRun));
   for (const o of outcomes) console.log(`${MARK[o.status]} ${o.client}: ${o.detail}`);
   if (opts.dryRun) console.log("Simulacion: no se escribio nada.");
-  else if (outcomes.some((o) => o.status === "applied")) console.log("Reinicia el cliente para que cargue el servidor.");
+  else if (!opts.remove && outcomes.some((o) => o.status === "applied")) console.log("Reinicia el cliente para que cargue el servidor.");
   return outcomes.some((o) => o.status === "error") ? 1 : 0;
 }

@@ -57,14 +57,15 @@ Si responde con el mapa de tareas, está listo. Para **actualizar**, vuelve a ej
 
 <br>
 
-| Cliente | `--client` |
-|---|---|
-| Claude Code | `claude-code` |
-| Claude Desktop | `claude-desktop` |
-| GitHub Copilot (VS Code) | `vscode` |
-| Cursor | `cursor` |
-| Gemini CLI | `gemini` |
-| Codex CLI | `codex` |
+| Cliente | `--client` | Verificación |
+|---|---|---|
+| Claude Code | `claude-code` | Probado con el cliente real |
+| Claude Desktop | `claude-desktop` | Formato según su documentación |
+| GitHub Copilot en VS Code | `vscode` | Formato según su documentación |
+| GitHub Copilot CLI | `copilot` | Formato según su documentación |
+| Cursor | `cursor` | Formato según su documentación |
+| Codex CLI | `codex` | Formato según su documentación |
+| Gemini CLI | `gemini` | Formato según su documentación |
 
 ```bash
 talend-mcp setup --dry-run                      # ver qué haría, sin escribir nada
@@ -75,7 +76,8 @@ talend-mcp remove                               # desinstalar de los clientes
 
 `setup` solo añade la entrada `talend-mcp`: no toca tus otros servidores, guarda una copia
 `<archivo>.bak-talend-mcp` y deja intacto cualquier archivo que no sea JSON válido. Para configurarlo a
-mano, o si algo falla, mira [Instalación por cliente](docs/INSTALACION-CLIENTES.md).
+mano, o si algo falla, mira [Instalación por cliente](docs/INSTALACION-CLIENTES.md), que detalla qué se
+ha probado y las particularidades de cada cliente.
 
 </details>
 
@@ -98,9 +100,16 @@ el servidor:
 
 <br>
 
-Para crear y editar jobs **abiertos** en Studio hace falta el plugin del bridge. Cada release incluye su
-update site, `talend-bridge-p2.zip`: en Studio, **Help › Install New Software › Add › Archive**, elige el
-zip e instala. Sin el plugin sigue funcionando el [modo offline](docs/MODO-OFFLINE.md) (lotes,
+Para crear y editar jobs **abiertos** en Studio hace falta el plugin del bridge. Un comando lo instala
+desde el release de tu misma versión, con checksum:
+
+```bash
+talend-mcp bridge install --dry-run   # comprueba todo y explica qué haría, sin tocar Studio
+talend-mcp bridge install
+```
+
+Con Studio **cerrado** instala el plugin; con Studio **abierto y el plugin ya cargado** lo actualiza en
+caliente, sin reiniciar. Sin el plugin sigue funcionando el [modo offline](docs/MODO-OFFLINE.md) (lotes,
 migraciones y jobs cerrados).
 
 Si Studio no se detecta, define `TALEND_STUDIO_HOME` con la carpeta que contiene `plugins/` y

@@ -31,8 +31,8 @@ talend-mcp setup --project "C:/ruta/al/proyecto"   # fijar el proyecto (TALEND_P
 talend-mcp remove                           # quitar talend-mcp de los clientes
 ```
 
-Clientes soportados: `claude-code`, `claude-desktop`, `vscode` (GitHub Copilot), `cursor`,
-`gemini`, `codex`. `setup` no toca otros servidores que ya tengas: solo escribe la entrada
+Clientes soportados: `claude-code`, `claude-desktop`, `vscode`, `copilot` (GitHub Copilot CLI y formato
+nativo de Copilot), `cursor`, `gemini`, `codex`. `setup` no toca otros servidores que ya tengas: solo escribe la entrada
 `talend-mcp`, guarda una copia `<archivo>.bak-talend-mcp` la primera vez, y si un archivo no es
 JSON válido (por ejemplo, con comentarios) lo deja intacto y te lo dice. Reinicia el cliente después.
 
@@ -53,10 +53,25 @@ Con el binario ya instalado, el plugin añade la skill que enseña a usar el MCP
 
 ### Plugin de Studio (trabajo en vivo)
 
-Para crear y editar jobs abiertos en Studio hace falta el plugin Java. Cada release incluye su update
-site, `talend-bridge-p2.zip`. Con Studio abierto: **Help, Install New Software, Add, Archive**,
-elige el zip e instala. También se instala desde un clon con `bun run bridge:install`. Sin el plugin
-sigue funcionando el modo offline (lotes, migraciones, jobs cerrados): ver [MODO-OFFLINE.md](MODO-OFFLINE.md).
+Para crear y editar jobs abiertos en Studio hace falta el plugin Java. Un comando lo instala desde el
+release de tu misma versión (descarga `talend-bridge-p2.zip`, comprueba su SHA-256 y usa el director de p2
+de tu Studio):
+
+```bash
+talend-mcp bridge install --dry-run   # comprueba todo y explica qué haría, sin tocar Studio
+talend-mcp bridge install
+```
+
+| Situación de Studio | Qué hace |
+|---|---|
+| **Cerrado** | Instala (o actualiza) el plugin con p2. Es la primera instalación. |
+| **Abierto con el plugin cargado** | Actualiza en caliente, sin reiniciar Studio. |
+| **Abierto sin el plugin** | Se niega y te pide cerrarlo: p2 no puede instalar con Studio corriendo. |
+
+Si Studio no se detecta, define `TALEND_STUDIO_HOME` (la carpeta con `plugins/` y `features/`). Sin red,
+descarga el zip del release y usa `talend-mcp bridge install --from <zip|carpeta>`. La instalación manual
+sigue disponible: en Studio, **Help, Install New Software, Add, Archive**. Sin el plugin funciona el modo
+offline (lotes, migraciones, jobs cerrados): ver [MODO-OFFLINE.md](MODO-OFFLINE.md).
 
 ## 2. Instalación desde el código
 
@@ -200,6 +215,23 @@ En `~/.gemini/settings.json`, mismo bloque `mcpServers` que Claude Desktop.
 2. Pide *"ejecuta `talend_bridge_ping`"* si Studio está abierto: confirma el plugin.
 3. Pide *"ejecuta `talend_diagnose_environment`"*: resume proyecto, Studio, bridge y permisos.
 4. Desde la terminal, sin cliente: `bun run doctor`.
+
+### Qué está verificado y cómo
+
+| Cliente | Verificación |
+|---|---|
+| Claude Code | **Probado con el cliente real**: `setup` registra el servidor, `claude mcp list` lo conecta (✔ Connected), repetirlo no duplica y `remove` lo quita. El plugin se instaló desde el marketplace de GitHub y su servidor también conectó. |
+| Claude Desktop, VS Code, Cursor, Gemini CLI, Codex CLI, Copilot | Formato y ruta **contrastados con la documentación oficial** de cada cliente (19/11/2026), no probados con el cliente real. Si uno falla, usa `--dry-run` para ver qué se escribiría y abre un issue con la versión del cliente. |
+
+Notas de la documentación de cada cliente:
+
+- **VS Code** documenta el formato `servers` de `mcp.json` como "harness local", que anuncia que se retirará en
+  febrero de 2027, y propone el formato nativo de Copilot (`~/.copilot/mcp-config.json`, clave
+  `mcpServers`). Por eso `setup` ofrece los dos: `vscode` y `copilot`.
+- **Gemini CLI** indica en su documentación que fue sustituido por Antigravity CLI el 18/06/2026. `setup`
+  sigue escribiendo su `~/.gemini/settings.json`; Antigravity no está soportado todavía.
+- **Codex CLI** no documenta qué variables de entorno hereda un servidor MCP. `talend-mcp` solo necesita las que
+  `setup` escribe en el bloque `env`.
 
 ## 5. Permisos y modo solo lectura
 

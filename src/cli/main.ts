@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
-import "../config/state-home";
+import { anchorStateHome } from "../config/state-home";
 /** CLI MVP conectado al registro local existente, sin requerir servidor HTTP. */
 import { existsSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { homedir } from "node:os";
 import { VERSION } from "../version";
+import { defaultStateHome, isCompiledBinary } from "./client-setup";
+import { runBridgeCommand } from "./bridge-command";
 import { runSetupCommand } from "./setup-command";
 import { CliOperationError, describeOperation, executeOperation, listOperations } from "../application/operations/command-dispatcher";
 
@@ -23,6 +26,7 @@ Comandos:
   serve                       Servidor MCP por stdio (lo que lanzan los clientes)
   setup                       Configurar los clientes MCP detectados
   remove                      Quitar talend-mcp de los clientes
+  bridge install              Instalar el plugin de Talend Studio (Studio cerrado, o abierto para actualizar)
   version                     Mostrar la version
 
 Opciones comunes:
@@ -37,7 +41,8 @@ Opciones comunes:
   --idempotency-key <clave>   Evitar repetir una escritura reenviada desde CLI
   --port <n>                  Puerto para mcp serve
   --client <lista>            setup/remove: claude-code,claude-desktop,vscode,cursor,gemini,codex
-  --dry-run                   setup/remove: mostrar sin escribir
+  --dry-run                   setup/remove/bridge install: mostrar sin escribir
+  --from <zip|carpeta>        bridge install: update site local en lugar de descargarlo
   --help                      Mostrar esta ayuda
 `;
 
@@ -49,7 +54,7 @@ const { values, positionals } = parseArgs({
     limit: { type: "string" }, offset: { type: "string" },
     folder: { type: "string" }, yes: { type: "boolean" },
     "idempotency-key": { type: "string" },
-    client: { type: "string" }, "dry-run": { type: "boolean" },
+    client: { type: "string" }, from: { type: "string" }, "dry-run": { type: "boolean" },
     port: { type: "string" }, help: { type: "boolean", short: "h" },
   },
   strict: true,
@@ -146,7 +151,16 @@ async function main(): Promise<void> {
   if (group === "version") { console.log(VERSION); return; }
   if (group === "serve") {
     process.env.TALEND_MCP_MODE ??= "stdio";
+    // Lanzado sin configuracion (p. ej. por el plugin de Claude Code) el estado no debe caer en la carpeta del proyecto.
+    if (!process.env.TALEND_MCP_HOME && isCompiledBinary(process.execPath)) {
+      process.env.TALEND_MCP_HOME = defaultStateHome(homedir());
+      anchorStateHome();
+    }
     await import("../../index");
+    return;
+  }
+  if (group === "bridge") {
+    process.exitCode = await runBridgeCommand({ action, from: values.from, dryRun: values["dry-run"] === true });
     return;
   }
   if (group === "setup" || group === "remove") {

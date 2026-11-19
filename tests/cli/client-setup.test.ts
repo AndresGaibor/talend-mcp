@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  applyJson, applyToml, configureClient, launcherFor, targetFor, type Launcher, type SetupDeps,
+  applyJson, applyToml, configureClient, isCompiledBinary, launcherFor, targetFor, type Launcher, type SetupDeps,
 } from "../../src/cli/client-setup";
 
 const launcher: Launcher = { command: "C:/x/talend-mcp.exe", args: ["serve"], env: { TALEND_MCP_MODE: "stdio" } };
@@ -29,6 +29,15 @@ describe("launcherFor", () => {
     const l = launcherFor({ execPath: "C:\\bun\\bun.exe", repoRoot: "C:\\repo", home: "C:\\Users\\a" });
     expect(l.args).toEqual(["run", "--cwd", "C:/repo", "index.ts"]);
     expect(l.env.TALEND_MCP_HOME).toBeUndefined();
+  });
+});
+
+describe("isCompiledBinary", () => {
+  test("distingue bun de un binario compilado con rutas de cualquier plataforma", () => {
+    expect(isCompiledBinary(String.raw`C:\bun\bun.exe`)).toBe(false);
+    expect(isCompiledBinary("/usr/local/bin/bun")).toBe(false);
+    expect(isCompiledBinary(String.raw`C:\Users\a\.talend-mcp\bin\talend-mcp.exe`)).toBe(true);
+    expect(isCompiledBinary("/home/a/.talend-mcp/bin/talend-mcp")).toBe(true);
   });
 });
 
@@ -73,7 +82,7 @@ describe("targetFor", () => {
   test("rutas por plataforma", () => {
     const win = { home: "C:/u", appData: "C:/u/AppData/Roaming", platform: "win32" as const };
     expect(targetFor("claude-desktop", win)).toMatchObject({ path: join("C:/u/AppData/Roaming", "Claude", "claude_desktop_config.json"), rootKey: "mcpServers" });
-    expect(targetFor("vscode", win)).toMatchObject({ rootKey: "servers", withType: true });
+    expect(targetFor("vscode", win)).toMatchObject({ rootKey: "servers", extra: { type: "stdio" } });
     expect(targetFor("claude-desktop", { home: "/h", platform: "darwin" })).toMatchObject({ path: join("/h", "Library", "Application Support", "Claude", "claude_desktop_config.json") });
     expect(targetFor("claude-desktop", { home: "/h", platform: "linux" })).toMatchObject({ path: join("/h", ".config", "Claude", "claude_desktop_config.json") });
   });
@@ -93,6 +102,16 @@ describe("configureClient", () => {
     expect(Object.keys(doc.mcpServers).sort()).toEqual(["otro", "talend-mcp"]);
     expect(doc.mcpServers["talend-mcp"].args).toEqual(["serve", "v2"]);
     expect(JSON.parse(readFileSync(`${path}.bak-talend-mcp`, "utf8")).mcpServers.otro).toBeDefined();
+  });
+
+  test("copilot usa mcpServers con type local y tools, y respeta COPILOT_HOME", () => {
+    const home = sandbox();
+    const copilotHome = join(home, "otra");
+    const d = deps(home);
+    expect(configureClient("copilot", launcher, { ...d, dirs: { ...d.dirs, copilotHome } }, false).status).toBe("applied");
+    const entry = JSON.parse(readFileSync(join(copilotHome, "mcp-config.json"), "utf8")).mcpServers["talend-mcp"];
+    expect(entry).toMatchObject({ type: "local", tools: ["*"], command: launcher.command, args: ["serve"] });
+    expect(existsSync(join(home, ".copilot"))).toBe(false);
   });
 
   test("--dry-run no escribe nada", () => {

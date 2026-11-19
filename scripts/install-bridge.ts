@@ -3,7 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "url";
 
 import { createStyler, createUi, shouldUseColor, type UiTone } from "../src/shared/cli/ui";
-import { detectStudio, runJavaVersion, studioHomeCandidates } from "./lib/studio-detect";
+import { detectStudio, runJavaVersion, safeReaddir, studioHomeCandidates, type StudioInstall } from "./lib/studio-detect";
 import { compileFast, compileWithMaven, type Compiled } from "./lib/bridge-compile";
 import {
   isStudioRunning,
@@ -60,6 +60,13 @@ export type InstallBridgeOptions = {
    * hay nada que hacer, no imprime nada.
    */
   auto?: boolean;
+  /**
+   * Update site ya construido (el del release, descomprimido): instala ese plugin en lugar de
+   * compilarlo. Es la via de `talend-mcp bridge install`, que no necesita Maven ni el repositorio.
+   */
+  repoDir?: string;
+  /** Con `repoDir`: comprueba y explica lo que haria, sin modificar Studio. */
+  dryRun?: boolean;
 };
 
 export async function installBridge(options: InstallBridgeOptions = {}): Promise<void> {
@@ -71,7 +78,7 @@ export async function installBridge(options: InstallBridgeOptions = {}): Promise
 
   if (!auto) {
     banner("Talend Studio Bridge", [
-      `  ${c("Compila el plugin y lo instala (o actualiza) en Talend Studio.", "dim")}`,
+      `  ${c(options.repoDir ? "Instala (o actualiza) el plugin en Talend Studio." : "Compila el plugin y lo instala (o actualiza) en Talend Studio.", "dim")}`,
     ]);
     step("Detectando Talend Studio...");
   }
@@ -114,6 +121,12 @@ export async function installBridge(options: InstallBridgeOptions = {}): Promise
     }
     separador();
   }
+
+  if (options.repoDir) {
+    await installPrebuilt(studio, studioRunning, options.repoDir, options.dryRun === true);
+    return;
+  }
+
   // Con Studio abierto solo hace falta el jar: se compila con javac. Maven
   // queda para el update site de p2 (Studio cerrado) y como respaldo.
   let compiled: Compiled | null;
@@ -183,6 +196,11 @@ export async function installBridge(options: InstallBridgeOptions = {}): Promise
     return;
   }
 
+  runP2Install(studio, repoDir);
+}
+
+/** Instala (o actualiza) el plugin con el director de p2. Studio debe estar cerrado. */
+function runP2Install(studio: StudioInstall, repoDir: string): void {
   separador();
   step("Actualizando el plugin en Talend Studio...");
 
@@ -219,4 +237,58 @@ export async function installBridge(options: InstallBridgeOptions = {}): Promise
     `  ${c("El bridge queda escuchando en http://127.0.0.1:3930", "dim")}`,
     `  ${c("El token esta en ~/.talend-bridge/token", "dim")}`,
   ].filter(Boolean), "success");
+}
+
+/** `com.andres.talend.bridge_0.1.0.202611191543.jar` -> `0.1.0.202611191543` */
+export function bridgeJarVersion(jarPath: string): string | null {
+  return basename(jarPath).match(/^com\.andres\.talend\.bridge_(.+)\.jar$/)?.[1] ?? null;
+}
+
+/**
+ * Instala el plugin desde un update site ya construido (el del release).
+ * - Studio abierto y bridge respondiendo: recarga en caliente con el jar del update site.
+ * - Studio abierto sin plugin: no se puede instalar con Studio corriendo; se pide cerrarlo.
+ * - Studio cerrado: instala con p2, igual que `--install-bridge`.
+ */
+async function installPrebuilt(studio: StudioInstall, studioRunning: boolean, repoDir: string, dryRun: boolean): Promise<void> {
+  const jar = safeReaddir(join(repoDir, "plugins")).map((name) => join(repoDir, "plugins", name)).find((path) => bridgeJarVersion(path) !== null);
+  const version = jar ? bridgeJarVersion(jar) : null;
+  if (!jar || !version) {
+    fail(`El update site no contiene el plugin com.andres.talend.bridge (${repoDir}).`);
+    process.exitCode = 1;
+    return;
+  }
+  const previous = installedFeatureVersion(studio);
+  ok(`Plugin a instalar: ${c(version, "cyan")}`);
+  info(previous ? `Version instalada actualmente: ${c(previous, "yellow")}` : "El plugin no esta instalado en este Studio.");
+
+  if (studioRunning) {
+    const running = await runningBridgeVersion();
+    if (running === null) {
+      fail("Talend Studio esta abierto y el plugin no esta cargado: no se puede instalar con Studio corriendo.");
+      info("Cierra Talend Studio y vuelve a ejecutar `talend-mcp bridge install`.");
+      process.exitCode = 1;
+      return;
+    }
+    if (running === version) {
+      ok("El bridge ya esta en esta version: no hay nada que hacer.");
+      return;
+    }
+    if (dryRun) {
+      info(`Simulacion: se recargaria en caliente el bridge ${c(running, "yellow")} con ${c(version, "cyan")}.`);
+      return;
+    }
+    step("Publicando el bundle para carga en caliente...");
+    publishHotJar(jar);
+    const reloaded = await waitForHotReload(version, 30_000);
+    if (reloaded) ok("Bridge actualizado en caliente, sin reiniciar Studio.");
+    else warn("Plugin publicado; el bridge lo recargara en los proximos segundos.");
+    return;
+  }
+
+  if (dryRun) {
+    info(`Simulacion: con Studio cerrado se instalaria ${c(version, "cyan")} con el director de p2 en ${studio.studioDir}.`);
+    return;
+  }
+  runP2Install(studio, repoDir);
 }

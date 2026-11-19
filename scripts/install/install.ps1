@@ -33,4 +33,5 @@ if (-not $env:TALEND_MCP_NO_PATH) {
   }
 }
 if (-not $env:TALEND_MCP_NO_SETUP) { & $exe setup }
-Write-Host "Listo. Siguiente paso: pide al asistente 'ejecuta talend_guide con mode overview'."
+Write-Host "Listo. Pide al asistente: ejecuta talend_guide con mode overview."
+Write-Host "Para trabajar en vivo con Studio, cierralo y ejecuta: talend-mcp bridge install"

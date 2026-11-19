@@ -29,4 +29,5 @@ mv -f "$TMP" "$DIR/talend-mcp"
 echo "Instalado: $DIR/talend-mcp ($("$DIR/talend-mcp" version))"
 case ":$PATH:" in *":$DIR:"*) ;; *) echo "Anade $DIR al PATH:  export PATH=\"$DIR:\$PATH\"" ;; esac
 [ -n "${TALEND_MCP_NO_SETUP:-}" ] || "$DIR/talend-mcp" setup
-echo "Listo. Siguiente paso: pide al asistente 'ejecuta talend_guide con mode overview'."
+echo "Listo. Pide al asistente: ejecuta talend_guide con mode overview."
+echo "Para trabajar en vivo con Studio, cierralo y ejecuta: talend-mcp bridge install"

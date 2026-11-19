@@ -4,7 +4,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 [SemVer](https://semver.org/lang/es/). El workflow de release usa la sección de la versión como
 notas del release: una versión sin sección no se publica.
 
-## [Unreleased]
+## [0.1.1] - 2026-11-19
+
+### Añadido
+
+- `talend-mcp bridge install`: instala o actualiza el plugin Java de Studio desde el release de la misma
+  versión (descarga con checksum, p2 con Studio cerrado, recarga en caliente con Studio abierto), sin Maven
+  ni clonar el repositorio. Admite `--dry-run` y `--from`.
+- Cliente `copilot` en `setup` (formato nativo de Copilot, `~/.copilot/mcp-config.json`).
+- Tabla de verificación por cliente en `docs/INSTALACION-CLIENTES.md`.
+
+### Corregido
+
+- El servidor compilado lanzado sin configuración (por ejemplo desde el plugin de Claude Code) guardaba su
+  estado en la carpeta del proyecto; ahora usa `~/.talend-mcp/state`.
+- `talend-mcp remove` ya no pide reiniciar el cliente.
 
 ### Cambiado
 
