@@ -20,6 +20,8 @@
 | **Priorizar mejoras del servidor MCP** | [ROADMAP-MEJORAS-MCP.md](ROADMAP-MEJORAS-MCP.md) | `bun run verify` |
 | **Studio no abre, vuelve al login o el bridge no responde** | [SOLUCION-DE-PROBLEMAS.md](SOLUCION-DE-PROBLEMAS.md) | `talend_diagnose_environment` |
 | **Conectar el MCP a Claude, Copilot, Cursor, Codex o Gemini** | [INSTALACION-CLIENTES.md](INSTALACION-CLIENTES.md) | [GUIA-AGENTE.md](GUIA-AGENTE.md) |
+| **Ajustar variables de entorno, reintentos idempotentes o ejecuciones asíncronas** | [CONFIGURACION.md](CONFIGURACION.md) | [SOLUCION-DE-PROBLEMAS.md](SOLUCION-DE-PROBLEMAS.md) |
+| **Usar `talend-mcp` desde la línea de comandos** | [CLI.md](CLI.md) | [CONFIGURACION.md](CONFIGURACION.md) |
 | **Instalar en Windows o WSL** | [windows-wsl.md](windows-wsl.md) | [README.md](../README.md) |
 
 ## Estado de cada documento

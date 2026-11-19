@@ -191,7 +191,7 @@ En `~/.gemini/settings.json`, mismo bloque `mcpServers` que Claude Desktop.
 - Si acepta `stdio`: la configuración base de la sección 2.
 - Si solo acepta una URL HTTP: ejecuta `bun run start` y apunta el cliente a
   `http://127.0.0.1:3927/mcp`. Escucha solo en loopback; para abrirlo a otra máquina hace falta
-  `TALEND_MCP_TOKEN` (ver [README](../README.md#configuración)).
+  `TALEND_MCP_TOKEN` (ver [Configuración](CONFIGURACION.md)).
 
 ## 4. Comprobar que funciona
 

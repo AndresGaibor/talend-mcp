@@ -6,15 +6,15 @@
   <img alt="Talend MCP" src="docs/media/logo-light.svg" width="360">
 </picture>
 
-**Servidor MCP local para crear, editar, compilar y ejecutar jobs de Qlik Talend Studio.**
+**Deja que tu asistente de IA cree, edite, compile y verifique jobs de Qlik Talend Studio.**
 
 [![CI](https://github.com/AndresGaibor/talend-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/AndresGaibor/talend-mcp/actions/workflows/ci.yml)
-![Bun](https://img.shields.io/badge/runtime-Bun-black?logo=bun)
-![MCP](https://img.shields.io/badge/protocolo-MCP-4cc38a)
+[![Release](https://img.shields.io/github/v/release/AndresGaibor/talend-mcp?color=4cc38a)](https://github.com/AndresGaibor/talend-mcp/releases/latest)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-green)](LICENSE)
 ![Talend Studio](https://img.shields.io/badge/Talend%20Studio-8.0.1-blue)
-![Licencia MIT](https://img.shields.io/badge/licencia-MIT-green)
+![Windows · Linux · macOS](https://img.shields.io/badge/plataformas-Windows%20·%20Linux%20·%20macOS-lightgrey)
 
-[Empezar](#empezar) · [Qué puedes hacer](#qué-puedes-hacer) · [Cómo funciona](#cómo-funciona) · [Estado](#estado-del-proyecto) · [Documentación](#documentación)
+[Instalar](#instalación) · [Qué puedes pedirle](#qué-puedes-pedirle) · [Cómo funciona](#cómo-funciona) · [Seguridad](#seguridad) · [Documentación](#documentación)
 
 <br>
 
@@ -24,263 +24,198 @@
 
 <br>
 
-Talend MCP conecta un asistente compatible con [MCP](https://modelcontextprotocol.io/) con tus
-proyectos de Talend Studio. El asistente puede leer el proyecto, crear y modificar jobs, compilarlos,
-ejecutarlos y revisar el resultado, con una sola llamada de verificación que detecta avisos aunque el
-job termine con código 0. Todo corre en tu equipo: el servidor escucha solo en `127.0.0.1` y tus
-proyectos no salen de él.
+**Talend MCP** es un servidor [MCP](https://modelcontextprotocol.io/) local que conecta un asistente
+(Claude, GitHub Copilot, Cursor, Codex, Gemini) con tus proyectos de Talend Studio. El asistente lee el
+proyecto, crea y modifica jobs, los compila, los ejecuta y revisa el resultado. Todo corre en tu equipo:
+tus proyectos no salen de él.
 
-## Qué puedes hacer
+## Instalación
 
-- **Explorar** jobs, componentes, contextos y resultados de ejecuciones, sin abrir Studio.
-- **Crear y modificar jobs en vivo** en un Studio abierto: añadir componentes, definir schemas,
-  conectar y configurar parámetros.
-- **Trabajar en lote y sin Studio**: crear cientos de jobs desde una plantilla, editarlos de forma
-  atómica y comprobar que compilan. Pensado para migraciones.
-- **Verificar con `talend_job_verify`**: diseño, compilación, ejecución y búsqueda de `[WARN]`,
-  `[ERROR]`, `[FATAL]` y excepciones en una sola llamada.
-- **Dejar que el asistente te guíe.** No necesitas memorizar las herramientas: `talend_guide` indica
-  la secuencia adecuada para cada tarea.
+Un solo comando descarga el binario, comprueba su checksum y **configura los clientes MCP que tengas
+instalados**. No hace falta clonar el repositorio ni instalar Bun.
 
-## Empezar
-
-### Instalar (sin clonar)
-
-Cada [release](https://github.com/AndresGaibor/talend-mcp/releases) publica un binario único. El
-instalador lo descarga, comprueba su checksum y **configura tus clientes MCP** (Claude Code, Claude
-Desktop, GitHub Copilot en VS Code, Cursor, Gemini CLI, Codex CLI):
+**Windows (PowerShell)**
 
 ```powershell
-# Windows
 irm https://github.com/AndresGaibor/talend-mcp/releases/latest/download/install.ps1 | iex
 ```
 
+**Linux y macOS**
+
 ```bash
-# Linux y macOS
 curl -fsSL https://github.com/AndresGaibor/talend-mcp/releases/latest/download/install.sh | sh
 ```
 
-Para actualizar, vuelve a ejecutarlo. Con Claude Code también puedes instalar el plugin (skill y
-servidor): `/plugin install talend-mcp --marketplace AndresGaibor/talend-mcp`. Comprueba la
-instalación pidiendo al asistente que ejecute `talend_guide` con `mode: overview`. Configuración
-manual, permisos y solución de problemas: [Instalación por cliente](docs/INSTALACION-CLIENTES.md).
+Reinicia tu cliente y pídele:
 
-### Desde el código
+> Ejecuta `talend_guide` con `mode: overview`.
 
-Para desarrollar o probar cambios.
+Si responde con el mapa de tareas, está listo. Para **actualizar**, vuelve a ejecutar el instalador.
 
-### Requisitos
+<details>
+<summary><b>Clientes que configura</b> y cómo controlarlo</summary>
 
-- [Bun](https://bun.sh/) para instalar y ejecutar el servidor.
-- Un proyecto de Talend Studio accesible desde el equipo.
-- Talend Studio abierto, solo si quieres crear, modificar o ejecutar jobs en vivo.
+<br>
 
-### Instalar
-
-```bash
-git clone https://github.com/AndresGaibor/talend-mcp.git
-cd talend-mcp
-bun install
-```
-
-Indica dónde está tu proyecto en un archivo `.env.local`. La ruta debe señalar la carpeta que
-contiene `talend.project`:
-
-```dotenv
-TALEND_PROJECT="C:/ruta/al/workspace/MI_PROYECTO"
-```
-
-### Iniciar
+| Cliente | `--client` |
+|---|---|
+| Claude Code | `claude-code` |
+| Claude Desktop | `claude-desktop` |
+| GitHub Copilot (VS Code) | `vscode` |
+| Cursor | `cursor` |
+| Gemini CLI | `gemini` |
+| Codex CLI | `codex` |
 
 ```bash
-bun run start
+talend-mcp setup --dry-run                      # ver qué haría, sin escribir nada
+talend-mcp setup --client cursor,vscode         # solo algunos clientes
+talend-mcp setup --project "C:/ruta/al/proyecto" # fijar el proyecto de Talend
+talend-mcp remove                               # desinstalar de los clientes
 ```
 
-El servidor queda disponible en `http://127.0.0.1:3927/mcp`. Configura esa dirección en tu cliente MCP
-y pídele al asistente que use **`talend_guide`**.
+`setup` solo añade la entrada `talend-mcp`: no toca tus otros servidores, guarda una copia
+`<archivo>.bak-talend-mcp` y deja intacto cualquier archivo que no sea JSON válido. Para configurarlo a
+mano, o si algo falla, mira [Instalación por cliente](docs/INSTALACION-CLIENTES.md).
 
-`start` actualiza el plugin automáticamente si Studio está abierto y el bridge no responde. Para que no
-lo toque, usa `bun run start --skip-bridge` o `bun run start:server`.
+</details>
 
-### CLI local (MVP)
+<details>
+<summary><b>Plugin de Claude Code</b> (skill + servidor)</summary>
 
-La CLI puede ejecutar un conjunto pequeño de operaciones desde el registro local, sin iniciar el
-servidor MCP:
+<br>
 
-```bash
-bun run cli help
-bun run cli jobs list --project "C:/ruta/al/proyecto" --json
-bun run cli jobs show CARGA_CLIENTES
-bun run cli tools list --json
-bun run cli tools describe talend_jobs_create
-bun run cli tools call talend_guide --input @entrada.json
-bun run cli mcp serve
+Con el binario instalado, el plugin añade la skill que enseña al asistente el flujo correcto y registra
+el servidor:
+
+```
+/plugin install talend-mcp --marketplace AndresGaibor/talend-mcp
 ```
 
-`entrada.json` debe contener `{"mode":"overview"}`. La opción `--input` también acepta JSON directo
-o `-` para leerlo desde stdin.
+</details>
 
-Este MVP clasifica explícitamente solo lectura, listado, inspección y creación básica; las demás
-operaciones se bloquean hasta revisar su riesgo. La creación modifica el proyecto, requiere Studio y
-confirmación explícita (`--yes` en automatizaciones). Este permiso local no cambia la autorización de
-MCP: la unificación de los despachadores CLI, HTTP y stdio queda pendiente. Para consultar el estado
-del entorno, sigue disponible `bun run doctor`.
+<details>
+<summary><b>Trabajo en vivo con Studio</b>: plugin Java</summary>
 
-### Trabajo en vivo con Studio
+<br>
 
-Para operar sobre jobs abiertos hace falta el plugin incluido en este repositorio:
+Para crear y editar jobs **abiertos** en Studio hace falta el plugin del bridge. Cada release incluye su
+update site, `talend-bridge-p2.zip`: en Studio, **Help › Install New Software › Add › Archive**, elige el
+zip e instala. Sin el plugin sigue funcionando el [modo offline](docs/MODO-OFFLINE.md) (lotes,
+migraciones y jobs cerrados).
 
-```bash
-bun run bridge:install
-```
+Si Studio no se detecta, define `TALEND_STUDIO_HOME` con la carpeta que contiene `plugins/` y
+`features/`. `talend-mcp doctor` muestra el estado completo.
 
-El plugin conecta el servidor con Studio y normalmente se recarga sin reiniciarlo. Funciona en modo de
-solo lectura por defecto: las acciones que modifican el proyecto requieren autorización explícita en el
-entorno. Si no detecta Studio, define `TALEND_STUDIO_HOME` con la carpeta que contiene `plugins/` y
-`features/`. Para revisar el estado completo, ejecuta `bun run doctor`.
+</details>
 
-### Otros clientes MCP
+## Qué puedes pedirle
 
-Con **Claude Code** no hace falta configurar nada a mano: el repositorio trae
-[.mcp.json](.mcp.json) (stdio, preset `agent`) y la skill
-[.claude/skills/talend-mcp/SKILL.md](.claude/skills/talend-mcp/SKILL.md) con el flujo de uso.
-Acepta el servidor del proyecto con `/mcp` la primera vez.
+No hace falta memorizar herramientas: `talend_guide` indica al asistente la secuencia adecuada para cada
+tarea. Ejemplos de peticiones:
 
-Para **Claude Desktop, GitHub Copilot (VS Code), Cursor, Codex CLI y Gemini CLI**, con la
-configuración exacta de cada uno, permisos y solución de problemas, sigue la
-[guía de instalación por cliente](docs/INSTALACION-CLIENTES.md). Cualquier cliente `stdio` sirve con
-`bun run --cwd <ruta-al-repo> index.ts` y `TALEND_MCP_MODE=stdio`.
+> *«Lista los jobs del proyecto y dime cuáles usan `tMap`.»*
+>
+> *«Crea un job que lea `clientes.csv`, filtre `monto > 1000` y escriba `salida.csv`. Compílalo y verifícalo.»*
+>
+> *«Pasa estos 40 jobs del contexto PROD a QA, en lote, y comprueba que compilan.»*
+>
+> *«`CARGA_VENTAS` termina con código 0 pero algo falla. Revísalo.»*
+
+| Capacidad | Para qué |
+|---|---|
+| **Explorar** | Leer jobs, componentes, conexiones, contextos y ejecuciones, sin abrir Studio. |
+| **Crear y editar en vivo** | Añadir componentes, definir schemas, conectar y configurar en un Studio abierto. |
+| **Trabajar en lote, sin Studio** | Crear y editar cientos de jobs de forma atómica. Pensado para migraciones. |
+| **Verificar** | `talend_job_verify` encadena diseño, compilación y ejecución, y detecta `[WARN]`, `[ERROR]`, `[FATAL]` y excepciones **aunque el job termine con código 0**. |
 
 ## Cómo funciona
 
 ```mermaid
 flowchart LR
-    A[Cliente MCP<br/>asistente de IA] -->|MCP| B[Servidor<br/>Bun + TypeScript]
-    B -->|lee y escribe| C[(Proyecto Talend<br/>process/*.item)]
-    B -->|HTTP local| D[Plugin Java<br/>dentro de Studio]
-    D --> E[API interna<br/>de Talend Studio]
+    A["Cliente MCP<br/>(tu asistente)"] -- "stdio · MCP" --> B["talend-mcp<br/>servidor local"]
+    B -- "lee y escribe" --> C[("Proyecto Talend<br/>process/*.item")]
+    B -- "HTTP local" --> D["Plugin Java<br/>dentro de Studio"]
+    D --> E["API interna<br/>de Studio"]
 ```
 
-El servidor expone más de doscientas herramientas, con nombres `talend_<área>_<verbo>`. No hace falta
-cargarlas todas: `TALEND_MCP_FILTER` elige un preset, y `agent` (una treintena, las del ciclo
-habitual de un job) es el recomendado para empezar. `bun run mapa` muestra el recuento exacto por
-preset.
-
-El trabajo se reparte en dos caminos, según el caso:
+El trabajo sigue uno de dos caminos, según el caso:
 
 | Trabajo | Camino |
 |---|---|
 | Migraciones, lotes y jobs cerrados | **Offline**: se escribe el job en disco, de forma atómica y sin Studio. |
 | Jobs abiertos en un editor y componentes que Studio configura al conectar, como `tMap` | **En vivo**: a través del plugin de Studio. |
 
-El detalle, con garantías y rendimiento, está en [Modo offline](docs/MODO-OFFLINE.md).
+> [!NOTE]
+> Nunca se edita en disco un job abierto en Studio: lo pisaría al guardar. Las herramientas offline lo
+> detectan y lo rechazan.
+
+El servidor expone más de doscientas herramientas (`talend_<área>_<verbo>`), pero por defecto solo
+publica las del ciclo habitual de un job (preset `agent`). El resto se descubre bajo demanda con
+`talend_search`. Detalle y garantías en [Modo offline](docs/MODO-OFFLINE.md).
+
+## Seguridad
+
+- **Local**: stdio o `127.0.0.1`. Escuchar fuera de loopback exige `TALEND_MCP_TOKEN`.
+- **Cada herramienta tiene un riesgo** y el servidor lo aplica, no el asistente:
+
+| Riesgo | Por defecto | Cómo cambiarlo |
+|---|---|---|
+| Leer | Permitido | — |
+| Escribir | Permitido | `TALEND_MCP_ALLOW_WRITE=0` |
+| Ejecutar jobs | Permitido, con `confirm: true` | `TALEND_MCP_ALLOW_EXECUTE=0` |
+| Destructivo (borrar, restaurar) | **Bloqueado** | `TALEND_MCP_ALLOW_DESTRUCTIVE=1` y `confirm: true` |
+
+- **Auditoría**: cada llamada queda en `.talend-mcp/audit.jsonl` (herramienta, riesgo, resultado y
+  duración; nunca los argumentos).
+- **Binarios verificados**: el instalador no instala si el SHA-256 no coincide con `checksums.txt`. Los
+  binarios no están firmados.
+
+Más en [SECURITY.md](SECURITY.md).
 
 ## Estado del proyecto
 
 El soporte de componentes se mide por niveles, desde crear un nodo hasta ejecutar un job y comparar su
-salida con el resultado esperado. Cifras en **Talend Studio 8.0.1**:
+salida con el resultado esperado. Foto del 22/10/2026 en **Talend Studio 8.0.1**:
 
-| Cobertura | Resultado más reciente | Qué significa |
+| Nivel | Resultado | Qué significa |
 |---|---:|---|
 | Componentes básicos | **877 de 897** | Se pueden crear y configurar. |
-| Componentes que compilan | **418 de 498 probados** | Talend generó y compiló el job de prueba. |
-| Ejecuciones verificadas | **66 componentes, en 63 escenarios** | Se ejecutó el job y se comparó la salida con lo esperado. |
+| Compilan | **418 de 498 probados** | Talend generó y compiló el job de prueba. |
+| Ejecución verificada | **66 componentes, 63 escenarios** | Se ejecutó y se comparó la salida con lo esperado. |
 
-Estas cifras no implican que cada componente esté probado en todos los escenarios. Algunos necesitan
-drivers, servicios externos o módulos que no están disponibles en el entorno de pruebas, y un componente
-sin pruebas no está necesariamente fuera de soporte. Las pruebas con emuladores (S3, SQS) no sustituyen
-una validación en AWS real.
-
-El proyecto está en desarrollo activo. Hoy se trabaja en ampliar las pruebas por familia, resolver
-dependencias que impiden medir algunos componentes (como la lectura de XLSX), probar más conectores de
-bases de datos y servicios cloud, y validar una migración de SAS a Talend comparando resultados.
+Algunos componentes necesitan drivers o servicios externos que el entorno de pruebas no tiene, y uno sin
+pruebas no está necesariamente fuera de soporte. Las pruebas con emuladores (S3, SQS) no sustituyen una
+validación en AWS real. Detalle por familia en [Cobertura](docs/COBERTURA-POR-FAMILIA.md).
 
 ## Documentación
 
 | Quieres... | Lee |
 |---|---|
-| Conectar el MCP a Claude, Copilot, Cursor... | [Instalación por cliente](docs/INSTALACION-CLIENTES.md) |
-| Usar el MCP con un asistente | [Guía para asistentes](docs/GUIA-AGENTE.md) |
+| Conectar un cliente a mano o resolver un fallo de instalación | [Instalación por cliente](docs/INSTALACION-CLIENTES.md) |
+| Saber cómo trabajar con el MCP desde un asistente | [Guía para asistentes](docs/GUIA-AGENTE.md) |
 | Migrar o editar muchos jobs sin Studio | [Modo offline](docs/MODO-OFFLINE.md) |
-| Ver qué herramientas hay | [Catálogo de herramientas](docs/CATALOGO-DE-TOOLS.md) |
-| Saber qué componentes están probados | [Cobertura por familia](docs/COBERTURA-POR-FAMILIA.md) y [plan de pruebas](docs/PLAN-DE-PRUEBAS.md) |
+| Ajustar variables, reintentos idempotentes o ejecuciones asíncronas | [Configuración](docs/CONFIGURACION.md) |
+| Usar la línea de comandos | [CLI](docs/CLI.md) |
+| Ver todas las herramientas | [Catálogo de herramientas](docs/CATALOGO-DE-TOOLS.md) |
+| Saber qué componentes están probados | [Cobertura](docs/COBERTURA-POR-FAMILIA.md) y [plan de pruebas](docs/PLAN-DE-PRUEBAS.md) |
+| Resolver problemas con Studio o el bridge | [Solución de problemas](docs/SOLUCION-DE-PROBLEMAS.md) |
+| Usarlo en Windows con WSL | [Windows y WSL](docs/windows-wsl.md) |
 | Entender cómo está organizado | [Arquitectura](docs/ARQUITECTURA.md) |
 | Conocer el rumbo | [Hoja de ruta](docs/ROADMAP-DOMINIO-TALEND.md) |
-| Instalar en Windows o WSL | [Windows y WSL](docs/windows-wsl.md) |
-| Contribuir | [AGENTS.md](AGENTS.md) y [docs/README.md](docs/README.md) |
 
 ## Desarrollo
 
 ```bash
-bun run verify       # typecheck, tests y validación de fixtures
-bun run doctor       # estado de Studio, bridge, MCP y configuración
-bun run compat:studio # ping, capabilities y pruebas Java; guarda evidencia versionada
-bun run mapa         # carpetas, herramientas por preset y estado del bridge
+git clone https://github.com/AndresGaibor/talend-mcp.git && cd talend-mcp
+bun install
+bun run verify        # typecheck, tests y validación de fixtures: debe quedar en verde
+bun run start         # servidor HTTP en http://127.0.0.1:3927/mcp
+bun run mapa          # estructura del repo, herramientas por preset y estado del bridge
 ```
 
-`bun run verify` debe pasar antes de cada commit. El comando deja el estado en
-`.talend-mcp/validacion/`; el gancho `pre-commit` compara la huella del árbol y rechaza el commit si
-algo cambió después del cierre o si un paso quedó en rojo. Actívalo una vez por copia con
-`bun run ganchos:instalar` y consulta el resultado con
-`bun run scripts/validacion.ts estado` (o `historial`).
+Las reglas del repositorio están en [AGENTS.md](AGENTS.md) y la guía para contribuir en
+[CONTRIBUTING.md](CONTRIBUTING.md). Los cambios por versión, en [CHANGELOG.md](CHANGELOG.md).
 
-## Configuración
+## Licencia
 
-Por defecto el servidor usa HTTP local. Estas variables ajustan el modo, el puerto o las herramientas
-visibles:
-
-| Variable | Uso |
-|---|---|
-| `TALEND_PROJECT` | Carpeta del proyecto (la que contiene `talend.project`). |
-| `TALEND_WORKSPACE` | Ubicación del workspace, si no defines `TALEND_PROJECT`. |
-| `TALEND_MCP_MODE` | `http` o `stdio`. |
-| `TALEND_MCP_PORT` | Puerto HTTP (por defecto `3927`). |
-| `TALEND_MCP_HOST` | Dirección de escucha (por defecto `127.0.0.1`). |
-| `TALEND_MCP_TOKEN` | Token Bearer obligatorio al escuchar fuera de loopback; protege las rutas MCP y `/metrics`. `/healthz` y CORS preflight siguen públicos. |
-| `TALEND_MCP_FILTER` | Herramientas visibles: `agent` (por defecto en `start`), `core`, `canonical` o `all`. |
-| `TALEND_MCP_MAX_BODY_BYTES` | Tope del cuerpo JSON-RPC (por defecto `1048576`). Al superarlo se responde 413. |
-| `TALEND_MCP_MAX_RUNS` | Ejecuciones que se conservan en el historial (por defecto `200`); las mas viejas se borran con sus archivos. |
-| `TALEND_MCP_RUNS_DIR` | Carpeta del historial de ejecuciones (por defecto `.talend-mcp/runs`). |
-| `TALEND_MCP_TOOL_TIMEOUT_MS` | Plazo de una llamada a una tool (por defecto `600000`). Al vencer responde que no termino. |
-| `TALEND_MCP_MAX_CONCURRENT_CALLS` | Llamadas a tools atendidas a la vez (por defecto `4`); el resto recibe servidor ocupado. |
-| `TALEND_MCP_MAX_RESPONSE_BYTES` | Tope de una respuesta de tool (por defecto `67108864`, 64 MiB); por encima responde un error JSON-RPC `RESPONSE_TOO_LARGE` que pide paginar o subir el tope. |
-| `TALEND_MCP_IDEMPOTENCY_DIR` | Carpeta local para el registro de reintentos idempotentes (por defecto `.talend-mcp`). Protege su contenido: puede incluir resultados devueltos por tools. |
-| `TALEND_BRIDGE_MAX_RESPONSE_BYTES` | Tope de una respuesta del bridge (por defecto `67108864`, 64 MiB). Si se supera, la tool devuelve `BRIDGE_RESPONSE_TOO_LARGE` con `endpoint`, `maxBytes` y `recibidos`; valores inválidos caen al default. |
-| `TALEND_MODALS_AUTO` | `0` apaga la recuperación automática de diálogos de Studio: ante un timeout del bridge el cliente no lee ni pulsa modales ni reintenta. Activa por defecto en Windows. |
-| `TALEND_STUDIO_HOME` | Instalación de Studio (carpeta con `plugins/` y `features/`). |
-| `TALEND_BRIDGE_AUTO_INSTALL` | `0` desactiva la actualización automática del plugin al arrancar. |
-| `TALEND_MCP_LOG` | `quiet`, `normal` o `verbose` para los mensajes de los CLI. |
-| `TALEND_LOG_DIR` | Carpeta donde buscar los logs de Studio para `talend_read_run_log`. |
-| `TALEND_DISABLE_AUTODETECT` | `1` impide inferir el proyecto desde el workspace. |
-
-### Reintentos idempotentes por HTTP
-
-Para evitar duplicar una escritura cuando no se recibió su respuesta, un cliente HTTP MCP puede
-enviar `Idempotency-Key: <clave>` en la petición JSON-RPC `tools/call`. La clave debe tener entre
-8 y 200 caracteres. Una repetición con la misma clave y el mismo nombre/argumentos devuelve el
-resultado previo; si cambia la solicitud, se rechaza. Si el proceso interrumpió la operación y no
-pudo confirmar el resultado, esa clave queda bloqueada como incierta para evitar repetir efectos.
-
-El registro guarda hasta 500 entradas durante siete días en `.talend-mcp/idempotency.sqlite`;
-trátalo como dato local sensible y no lo compartas. El archivo JSON previo se importa al abrir la
-base SQLite. La capacidad aplica a HTTP (`Idempotency-Key`), CLI (`tools call ... --idempotency-key
-<clave>`) y metadata MCP (`_meta.idempotencyKey`). SQLite coordina procesos locales que comparten
-el mismo directorio; no coordina servidores en hosts distintos ni debe colocarse en un filesystem
-de red sin garantías de bloqueo SQLite.
-
-### Ejecuciones asíncronas
-
-`talend_runs_start_async` inicia un Job confirmado (`confirm: true`) y devuelve un `operationId`;
-`talend_operations_status` consulta su estado y `talend_operations_cancel` solicita cancelar cuando el backend lo permite.
-Los builds batch asíncronos comparten su `operationId` con el bridge: estado y cancelación se pueden recuperar tras reiniciar el servidor MCP mientras Studio conserve el historial (hasta 24 horas).
-El estado vive en memoria del servidor, con un máximo de cuatro ejecuciones activas. Si el servidor
-se reinicia, los identificadores anteriores dejan de estar disponibles.
-
-## Solución de problemas
-
-| Síntoma | Qué revisar |
-|---|---|
-| El asistente no encuentra el proyecto | La ruta de `TALEND_PROJECT`. |
-| No aparecen jobs abiertos | Abre el job en Talend Studio. |
-| No conecta con Studio | Que el plugin esté instalado y Studio abierto. Ejecuta `bun run doctor`. |
-| No sabes si un componente está probado | La [cobertura por familia](docs/COBERTURA-POR-FAMILIA.md). |
+[MIT](LICENSE) © 2026 Andres Gaibor

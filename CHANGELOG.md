@@ -4,6 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 [SemVer](https://semver.org/lang/es/). El workflow de release usa la sección de la versión como
 notas del release: una versión sin sección no se publica.
 
+## [Unreleased]
+
+### Cambiado
+
+- README reorganizado: instalación primero, ejemplos de uso, modelo de seguridad y desplegables para
+  lo secundario. La referencia de variables, los reintentos idempotentes y las ejecuciones asíncronas
+  pasan a `docs/CONFIGURACION.md`, y la CLI a `docs/CLI.md`.
+
 ## [0.1.0] - 2026-11-19
 
 Primera versión distribuible.
