@@ -11,12 +11,12 @@
 | Log de errores de Eclipse | `C:\Talend\8.0.1\studio\workspace\.metadata\.log` |
 | Jars de plugins | `C:\Talend\8.0.1\studio\plugins` |
 | JDK que trae Studio (21) | `C:\Talend\8.0.1\zulu21.50.19-ca-jdk21.0.11-win_x64\bin` |
-| Proyecto Talend real | `...\workspace\talendbancolombia-963626413\PRJ_BANCOLOMBIA` |
+| Proyecto Talend real | `...\workspace\ejemplo-12345\PRJ_EJEMPLO` |
 | Config del bridge | `%USERPROFILE%\.talend-bridge\config.json` |
 | Token del bridge | `%USERPROFILE%\.talend-bridge\token` |
 | Historial de launches | `%USERPROFILE%\.talend-bridge\launch-runs.txt` |
 
-El label técnico del proyecto es `PRJ_BANCOLOMBIA`. El label visible (`getLabel()`) es
+El label técnico del proyecto es `PRJ_EJEMPLO`. El label visible (`getLabel()`) es
 distinto del técnico (`getTechnicalLabel()`), y Talend usa uno u otro según el atributo de la
 launch config.
 
@@ -88,7 +88,7 @@ Los identificadores que se pueden escribir en un `.item` (`type="id_*"`) son:
 `id_Decimal` **no existe**. El decimal de Talend es `id_BigDecimal`.
 
 Como descubrir la lista sin fuente: contar los `type="id_*"` que ya usan los jobs reales del
-proyecto. En `PRJ_BANCOLOMBIA` la distribucion era `id_String` 813, `id_Integer` 203, `id_Long`
+proyecto. En `PRJ_EJEMPLO` la distribucion era `id_String` 813, `id_Integer` 203, `id_Long`
 93, `id_Date` 88, `id_BigDecimal` 48, `id_Boolean` 15, `id_Password` 14, `id_Dynamic` 3, y un
 `id_Decimal` invalido. Esa muestra es la fuente de verdad de que `id_Decimal` es un error y no
 una variante aceptada.
@@ -143,7 +143,7 @@ Puntos que importan:
 | `tests/` | tests de contexto |
 
 El codigo Java generado queda en
-`poms/jobs/process/mcp_fase0_raiz_0.1/src/main/java/prj_bancolombia/mcp_fase0_raiz_0_1/MCP_Fase0_Raiz.java`.
+`poms/jobs/process/mcp_fase0_raiz_0.1/src/main/java/prj_ejemplo/mcp_fase0_raiz_0_1/MCP_Fase0_Raiz.java`.
 Si ese archivo esta vacio (0 bytes), la generacion fallo antes de escribirlo: esa es una senal
 rapida para detectar un fallo de generacion sin mirar el log.
 
@@ -179,7 +179,7 @@ una launch config de Talend:
 | `TALEND_JOB_NAME` | `property.getLabel()` | label del job, no el nombre tecnico |
 | `TALEND_JOB_ID` | `property.getId()` | id interno, no el label |
 | `TALEND_JOB_VERSION` | `property.getVersion()` | por ejemplo `0.1` |
-| `JOB_PROJECT_TECH_LABEL` | `project.getTechnicalLabel()` | por ejemplo `PRJ_BANCOLOMBIA` |
+| `JOB_PROJECT_TECH_LABEL` | `project.getTechnicalLabel()` | por ejemplo `PRJ_EJEMPLO` |
 | `CURRENT_PROJECT_NAME` | `project.getLabel()` | visible, no tecnico |
 
 `CURRENT_PROJECT_NAME` no lo usa el delegate, pero `JobLaunchShortcut.findLaunchConfiguration` lo

@@ -73,7 +73,7 @@ describe("analyzeStudioLog", () => {
   });
 
   test("marca si el logon llego a completarse", () => {
-    expect(analyzeStudioLog("Nasimba logged on PRJ-BANCOLOMBIA").loggedOn).toBe(true);
+    expect(analyzeStudioLog("Usuario logged on PRJ-EJEMPLO").loggedOn).toBe(true);
     expect(analyzeStudioLog("nada relevante").loggedOn).toBe(false);
   });
 
@@ -89,7 +89,7 @@ describe("analyzeStudioLog", () => {
 
 describe("describeBridgeDown", () => {
   test("con el token roto explica el bucle de login y propone renovar la conexion", () => {
-    const steps = describeBridgeDown(analyzeStudioLog("Nasimba logged on X\nRefresh token failed."));
+    const steps = describeBridgeDown(analyzeStudioLog("Usuario logged on X\nRefresh token failed."));
     expect(steps.join(" ")).toContain("connection_user.properties");
   });
 

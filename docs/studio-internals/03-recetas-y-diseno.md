@@ -257,7 +257,7 @@ carpeta, al recrearlo Talend reutiliza el proyecto viejo, con su `target` y su
 `.project` de antes, y la ejecucion falla con:
 
 ```
-El recurso /PRJ_BANCOLOMBIA_MI_JOB_0.1/src/main/java/prj_bancolombia no existe
+El recurso /PRJ_EJEMPLO_MI_JOB_0.1/src/main/java/prj_ejemplo no existe
 ```
 
 Por eso `talend_job_delete_in_studio` borra tambien esa carpeta.
@@ -306,7 +306,7 @@ referencia en cuatro parametros, y con solo la etiqueta no basta:
 ```xml
 <elementParameter field="PROCESS_TYPE" name="PROCESS" value="&quot;MI_JOB_HIJO&quot;"/>
 <elementParameter field="TECHNICAL" name="PROCESS:PROCESS_TYPE_CONTEXT" value="Default"/>
-<elementParameter field="TECHNICAL" name="PROCESS:PROCESS_TYPE_PROCESS" value="PRJ-BANCOLOMBIA:_5fdc50e8993c"/>
+<elementParameter field="TECHNICAL" name="PROCESS:PROCESS_TYPE_PROCESS" value="PRJ-EJEMPLO:_5fdc50e8993c"/>
 <elementParameter field="TECHNICAL" name="PROCESS:PROCESS_TYPE_VERSION" value="Latest"/>
 ```
 

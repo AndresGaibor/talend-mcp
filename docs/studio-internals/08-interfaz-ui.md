@@ -275,7 +275,7 @@ Lo que se descubrio al quitar el Run de la construccion del harness:
   falla con `El recurso .../pom.xml no existe`. Ahora la limpieza borra solo el job principal; el auxiliar se
   reemplaza en el siguiente montaje (`createJob` con `replace`). El caso de tRunJob pasa en ~30 s (volumen).
 - **Las dependencias de un padre no estan en el campo de classpath.** El jar del hijo viene en el pom del padre
-  (`groupId=org.example.prj_bancolombia.job`). Se resuelve en el `.m2` por coordenada (`dependenciasDelPom`).
+  (`groupId=org.example.prj_ejemplo.job`). Se resuelve en el `.m2` por coordenada (`dependenciasDelPom`).
 - **`tConvertType` (resuelto, seccion 81).** El error `String cannot be converted to int` en el `row1Struct`
   venia de que, al conectar, el esquema del destino se propaga hacia atras al origen. El origen (un
   `tFixedFlowInput` con filas) necesita `schemaDespuesDeConectar`, que vuelve a poner su esquema tras conectar.

@@ -20,6 +20,7 @@ Primera versión distribuible.
 - `TALEND_MCP_HOME`: fija el directorio de estado (catálogo, auditoría, ejecuciones) con
   independencia de dónde lance el cliente el proceso.
 - Guía de instalación por cliente en `docs/INSTALACION-CLIENTES.md`.
+- Licencia MIT.
 
 ### Corregido
 
@@ -32,3 +33,5 @@ Primera versión distribuible.
   encontrado": el catálogo ahora se construye desde Studio en el primer uso.
 - `bun test` escribía en el `.talend-mcp/audit.jsonl` real y falseaba las métricas.
 - `serverInfo.version` y `/healthz` informaban `1.0.0` fijo; ahora salen de `package.json`.
+- Se sustituyeron por datos de ejemplo el nombre de un proyecto de cliente y un correo corporativo
+  que aparecían en documentación, comentarios y fixtures.

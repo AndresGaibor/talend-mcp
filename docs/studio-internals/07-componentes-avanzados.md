@@ -457,7 +457,7 @@ Medido con el `tWarn`:
   configuration` con `Detail Message: WARNING cannot be resolved to a variable` (y no aparece ningun
   `classpath.jar`: el sintoma en el arnes es `El job no esta compilado`).
 - Con `"PRIORITY": "4"` compila y el job escribe en la salida estandar:
-  `[WARN ] 12:06:43 prj_bancolombia.mcp_l5_aviso_0_1.MCP_L5_Aviso- tWarn_2 - Message: cuidado con el dato. Code: W001`
+  `[WARN ] 12:06:43 prj_ejemplo.mcp_l5_aviso_0_1.MCP_L5_Aviso- tWarn_2 - Message: cuidado con el dato. Code: W001`
 
 El `tWarn` se usa como subjob propio (`tFixedFlowInput` -> `tLogRow` y `OnSubjobOk` del arranque hacia el
 `tWarn`): avisa y el job sigue con codigo 0. El mensaje y el codigo salen en la misma linea, con el nivel

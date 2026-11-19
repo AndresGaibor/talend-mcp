@@ -258,7 +258,7 @@ Cuando un job se borra y se vuelve a crear, Studio deja en el workspace **dos** 
 nombre, y entonces **ningun job compila**:
 
 ```
-[ERROR] Project 'org.example.prj_bancolombia.job:MCP_Coverage:0.1.0' is duplicated in the reactor
+[ERROR] Project 'org.example.prj_ejemplo.job:MCP_Coverage:0.1.0' is duplicated in the reactor
 ```
 
 Los dos sitios posibles, bajo `poms/jobs/process` del proyecto de Eclipse:

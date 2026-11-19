@@ -9,7 +9,7 @@ de 2026 (tarea A-6 del Plan A).
    (`createTalendJoblet` de `src/talend/job-crud/joblet.ts`): `JL_prueba_mcp` versión `0.1`, con
    `tJobletInput` y `tJobletOutput` conectados por `row1` y una variable de contexto `prefijo`
    (`id_String`). Los dos archivos quedaron donde los busca Studio:
-   `PRJ_BANCOLOMBIA/joblets/JL_prueba_mcp_0.1.item` y `.properties`. El generador produce los nodos
+   `PRJ_EJEMPLO/joblets/JL_prueba_mcp_0.1.item` y `.properties`. El generador produce los nodos
    `tJobletInput`/`tJobletOutput`, el parámetro de contexto del joblet y la propiedad
    `TalendProperties:JobletProcessItem` con el enlace `jobletProcess`.
 2. Se pidió refrescar el workspace (`/workspace/refresh` del bridge). Studio contestó

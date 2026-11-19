@@ -228,7 +228,7 @@ Informe: `testdata/cobertura-l4-system.csv`.
 ## 5. Fallos que no son del componente
 
 De los 67 fallos, **19 son del arnes**: el agregador Maven de Studio se rompio con
-`Project 'org.example.prj_bancolombia.job:MCP_Coverage:0.1.0' is duplicated in the reactor`
+`Project 'org.example.prj_ejemplo.job:MCP_Coverage:0.1.0' is duplicated in the reactor`
 (INTERNALS 51) y el componente quedo marcado sin haberlo probado de verdad. Son:
 
 `tAddCRCRow`, `tDqReportRun`, `tFindRegexlibExpressions`, `tJapaneseNumberNormalize`,

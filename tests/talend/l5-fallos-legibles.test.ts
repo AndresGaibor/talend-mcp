@@ -19,7 +19,7 @@ describe("causaDeFallo", () => {
     const lineas = [
       "[WARN ] 14:30:28 org.apache.hadoop.util.Shell- Did not find winutils.exe: java.io.FileNotFoundException",
       "[WARN ] 14:30:28 org.apache.hadoop.util.NativeCodeLoader- Unable to load native-hadoop library",
-      "[FATAL] 14:30:28 prj_bancolombia.mcp_l5_hdfsput_0_1.MCP_L5_HdfsPut- tHDFSPut_2 java.io.FileNotFoundException: HADOOP_HOME and hadoop.home.dir are unset.",
+      "[FATAL] 14:30:28 prj_ejemplo.mcp_l5_hdfsput_0_1.MCP_L5_HdfsPut- tHDFSPut_2 java.io.FileNotFoundException: HADOOP_HOME and hadoop.home.dir are unset.",
     ];
 
     expect(causaDeFallo(lineas)).toContain("[FATAL]");

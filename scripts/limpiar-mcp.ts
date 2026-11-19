@@ -64,7 +64,7 @@ if (existsSync(processDir)) {
 // Los proyectos Maven huerfanos de NUESTROS jobs: los `mcp*` que ya no tienen job.
 //
 // Solo se tocan los que empiezan por `mcp`: en `poms/jobs/process` viven tambien
-// carpetas del usuario (`Pruebas`, `PRJ_BANCOLOMBIA`...) que no son nuestras.
+// carpetas del usuario (`Pruebas`, `PRJ_EJEMPLO`...) que no son nuestras.
 // Se compara contra los jobs que QUEDAN (sin los que acabamos de borrar): si no,
 // el proyecto Maven del job recien borrado se quedaria huerfano para siempre.
 const poms = join(proyecto, "poms", "jobs", "process");

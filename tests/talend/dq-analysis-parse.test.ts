@@ -13,7 +13,7 @@ describe("DQ analysis parser", () => {
     expect(analysis).not.toBeNull();
     expect(analysis?.name).toBe("Basic_Column_Analysis_olist_geolocation");
     expect(analysis?.status).toBe("Draft");
-    expect(analysis?.author).toContain("jose.bonillao");
+    expect(analysis?.author).toContain("autor");
     expect(analysis?.defaultContext).toBe("Default");
     expect(analysis?.connectionName).toBe("geolocation_0.1");
     expect(analysis?.lastRunOk).toBe(true);

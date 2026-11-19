@@ -432,7 +432,7 @@ public final class LaunchTrackerService {
    * Procesos del sistema operativo que corresponden a un job.
    *
    * Se buscan por la linea de comandos, que incluye el nombre de la clase
-   * java del job: `prj_bancolombia.mcp_fase0_zero_0_1.MCP_Fase0_Zero`.
+   * java del job: `prj_ejemplo.mcp_fase0_zero_0_1.MCP_Fase0_Zero`.
    */
   private static List<ProcessHandle> processesOfJob(String launchConfigName) {
     List<ProcessHandle> found = new ArrayList<>();

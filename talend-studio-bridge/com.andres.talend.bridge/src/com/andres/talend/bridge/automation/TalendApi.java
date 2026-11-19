@@ -439,7 +439,7 @@ public final class TalendApi {
     return null;
   }
 
-  /** Etiqueta del proyecto de Talend abierto (por ejemplo PRJ_BANCOLOMBIA). */
+  /** Etiqueta del proyecto de Talend abierto (por ejemplo PRJ_EJEMPLO). */
   public static String projectLabel() throws Exception {
     Object project = currentProject();
     if (project == null) {

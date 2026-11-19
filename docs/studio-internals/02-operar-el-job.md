@@ -533,7 +533,7 @@ y **no** al log de la plataforma. El log de la plataforma solo tiene la linea de
 la que se lanzo el job:
 
 ```
-!MESSAGE 2026-10-20 18:47:31,907 INFO  org.talend.designer.core.runprocess.Processor  - Command line: C:/Talend/.../bin/java.exe ... prj_bancolombia.mcp_fase0_zero_0_1.MCP_Fase0_Zero --context=Default --stat_port=3642 %*
+!MESSAGE 2026-10-20 18:47:31,907 INFO  org.talend.designer.core.runprocess.Processor  - Command line: C:/Talend/.../bin/java.exe ... prj_ejemplo.mcp_fase0_zero_0_1.MCP_Fase0_Zero --context=Default --stat_port=3642 %*
 ```
 
 ### 14.1 Trampa: la linea de comandos no llega a `ProcessHandle` en Windows

@@ -66,7 +66,7 @@ antes de ejecutar").
 ```java
 java -Xms256M -Xmx1024M -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 \
   -cp <job>/target/classpath.jar \
-  prj_bancolombia.mi_job_0_1.MI_JOB --context=Default
+  prj_ejemplo.mi_job_0_1.MI_JOB --context=Default
 ```
 
 El `java` es el del propio runtime de Studio (`java.home`).

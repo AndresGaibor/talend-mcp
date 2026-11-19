@@ -5,7 +5,7 @@
     <taggedValue tag="Purpose" value="Analisis de rangos del campo sellers" />
     <taggedValue tag="Description" value="Analisis con indicador de rango sobre la columna sellers" />
     <taggedValue tag="Version" value="0.1" />
-    <taggedValue tag="Author" value="jose.bonillao@bancolombia.com" />
+    <taggedValue tag="Author" value="autor@example.com" />
     <context xsi:type="dataquality.analysis:TDQConnectionContext">
       <connection href="context/ALIWARECALIDAD_0.1#sellers_0.1" />
       <analysedElements href="context/ALIWARECALIDAD_0.1#sellers_0.1#sellers" />

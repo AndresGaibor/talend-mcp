@@ -5,7 +5,7 @@
     <taggedValue tag="Purpose" value="Analisis de completitud y unicidad de la columna geolocation" />
     <taggedValue tag="Description" value="Analisis basico generado sobre la columna geolocation del dataset olist_orders" />
     <taggedValue tag="Version" value="0.1" />
-    <taggedValue tag="Author" value="jose.bonillao@bancolombia.com" />
+    <taggedValue tag="Author" value="autor@example.com" />
     <context xsi:type="dataquality.analysis:TDQConnectionContext">
       <connection href="context/ALIWARECALIDAD_0.1#geolocation_0.1" />
       <analysedElements href="context/ALIWARECALIDAD_0.1#geolocation_0.1#geolocation" />

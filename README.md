@@ -12,6 +12,7 @@
 ![Bun](https://img.shields.io/badge/runtime-Bun-black?logo=bun)
 ![MCP](https://img.shields.io/badge/protocolo-MCP-4cc38a)
 ![Talend Studio](https://img.shields.io/badge/Talend%20Studio-8.0.1-blue)
+![Licencia MIT](https://img.shields.io/badge/licencia-MIT-green)
 
 [Empezar](#empezar) · [Qué puedes hacer](#qué-puedes-hacer) · [Cómo funciona](#cómo-funciona) · [Estado](#estado-del-proyecto) · [Documentación](#documentación)
 
