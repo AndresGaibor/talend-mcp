@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "url";
 
@@ -6,6 +6,7 @@ import { createStyler, createUi, shouldUseColor, type UiTone } from "../src/shar
 import { detectStudio, runJavaVersion, safeReaddir, studioHomeCandidates, type StudioInstall } from "./lib/studio-detect";
 import { compileFast, compileWithMaven, type Compiled } from "./lib/bridge-compile";
 import {
+  hotJarPath,
   isStudioRunning,
   publishHotJar,
   runningBridgeVersion,
@@ -228,6 +229,14 @@ function runP2Install(studio: StudioInstall, repoDir: string): void {
 
   const installed = installedFeatureVersion(studio);
 
+  // El jar de carga en caliente es de un build anterior: si Studio lo encuentra al arrancar puede
+  // recargarlo por encima del plugin que acaba de instalar p2. Solo se quita si p2 dejo el jar del plugin:
+  // si la instalacion quedo incompleta, el jar en caliente puede ser la unica copia que funcione.
+  const pluginJar = safeReaddir(join(studio.studioDir, "plugins")).some(
+    (name) => name.startsWith("com.andres.talend.bridge_") && name.endsWith(".jar"),
+  );
+  if (installed && pluginJar) clearHotJar();
+
   separador();
   banner("Instalacion completada", [
     `  ${c("Plugin:", "dim")} com.andres.talend.bridge`,
@@ -237,6 +246,24 @@ function runP2Install(studio: StudioInstall, repoDir: string): void {
     `  ${c("El bridge queda escuchando en http://127.0.0.1:3930", "dim")}`,
     `  ${c("El token esta en ~/.talend-bridge/token", "dim")}`,
   ].filter(Boolean), "success");
+}
+
+/**
+ * Borra el jar de carga en caliente y su firma.
+ *
+ * La firma se elimina tambien: si el jar queda pero la firma no coincide, el watcher del plugin recargaria
+ * ese build viejo al abrir Studio, por encima de la version que p2 acaba de dejar instalada.
+ */
+function clearHotJar(): void {
+  const hot = hotJarPath();
+  for (const path of [hot, `${hot}.sig`]) {
+    if (!existsSync(path)) continue;
+    try {
+      rmSync(path, { force: true });
+    } catch (error) {
+      warn(`No se pudo borrar ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 
 /** `com.andres.talend.bridge_0.1.0.202611191543.jar` -> `0.1.0.202611191543` */

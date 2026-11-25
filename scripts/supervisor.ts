@@ -13,7 +13,7 @@ import { FAILURES_BEFORE_RESTART, backoffMs, decideMcpAction, type HealthSample 
  * Cada 10 s mide el MCP (`/healthz`) y el bridge de Studio (`/ping`).
  * - MCP caido tres muestras seguidas, o proceso terminado: lo relanza con espera creciente.
  * - Studio y su bridge solo se observan y se anotan en el latido; no se reinicia Studio.
- * - Los dialogos de Studio se leen y contestan solos (ver startModalLoop).
+ * - Los dialogos de Studio solo se contestan si se pide con TALEND_MODALS_AUTO=1 (ver startModalLoop).
  * Si ya hay un MCP sano al arrancar, lo adopta y solo lo vigila.
  */
 
@@ -74,10 +74,14 @@ function writeHeartbeat(data: Record<string, unknown>): void {
 /**
  * Dialogos de Studio: cada 5 s se leen por accesibilidad y se contestan las reglas conocidas.
  * Un dialogo que no tiene regla propia se registra y se deja abierto: puede ser una ventana que abrio una
- * persona. Cada uno queda en logs/modales.jsonl. Se apaga con TALEND_MODALS_AUTO=0.
+ * persona. Cada uno queda en logs/modales.jsonl.
+ *
+ * Esta apagado por defecto: pulsar botones en Studio mientras una persona edita puede guardar o cerrar
+ * ventanas que no eran del bridge. Se activa a proposito con TALEND_MODALS_AUTO=1.
  */
 function startModalLoop(): void {
-  if (process.env.TALEND_MODALS_AUTO === "0") return;
+  const valor = process.env.TALEND_MODALS_AUTO;
+  if (valor !== "1" && valor !== "true") return;
   let busy = false;
   setInterval(async () => {
     if (busy) return;

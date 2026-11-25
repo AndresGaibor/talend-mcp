@@ -24,7 +24,7 @@ visibles:
 | `TALEND_MCP_MAX_RESPONSE_BYTES` | Tope de una respuesta de tool (por defecto `67108864`, 64 MiB); por encima responde un error JSON-RPC `RESPONSE_TOO_LARGE` que pide paginar o subir el tope. |
 | `TALEND_MCP_IDEMPOTENCY_DIR` | Carpeta local para el registro de reintentos idempotentes (por defecto `.talend-mcp`). Protege su contenido: puede incluir resultados devueltos por tools. |
 | `TALEND_BRIDGE_MAX_RESPONSE_BYTES` | Tope de una respuesta del bridge (por defecto `67108864`, 64 MiB). Si se supera, la tool devuelve `BRIDGE_RESPONSE_TOO_LARGE` con `endpoint`, `maxBytes` y `recibidos`; valores inválidos caen al default. |
-| `TALEND_MODALS_AUTO` | `0` apaga la recuperación automática de diálogos de Studio: ante un timeout del bridge el cliente no lee ni pulsa modales ni reintenta. Activa por defecto en Windows. |
+| `TALEND_MODALS_AUTO` | `1` o `true` activa la recuperación automática de diálogos de Studio: ante un timeout del bridge el cliente lee, pulsa solo diálogos conocidos y reintenta una lectura. Está apagada por defecto para no cerrar ventanas que abrió una persona. |
 | `TALEND_STUDIO_HOME` | Instalación de Studio (carpeta con `plugins/` y `features/`). |
 | `TALEND_BRIDGE_AUTO_INSTALL` | `0` desactiva la actualización automática del plugin al arrancar. |
 | `TALEND_MCP_LOG` | `quiet`, `normal` o `verbose` para los mensajes de los CLI. |

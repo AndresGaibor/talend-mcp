@@ -19,11 +19,12 @@ describe("instaladores y desinstaladores", () => {
     }
   });
 
-  test("los instaladores configuran clientes e intentan el Bridge", () => {
+  test("los instaladores configuran clientes y reparan el Bridge", () => {
     for (const path of ["scripts/install/install.ps1", "scripts/install/install.sh"]) {
       const script = read(path);
       expect(script).toContain("setup");
-      expect(script).toContain("bridge install");
+      expect(script).toContain(" repair");
+      expect(script).toContain("talend-mcp repair");
     }
   });
 

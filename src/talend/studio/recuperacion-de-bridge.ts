@@ -24,6 +24,17 @@ import { handleModals, type HandledModal } from "./modals/modal-handler";
 /** Motivos que un dialogo puede explicar. Un bridge caido no se arregla pulsando botones. */
 const MOTIVOS_RECUPERABLES = new Set<BridgeRecoveryMotivo["codigo"]>(["timeout", "conexion-cortada"]);
 
+/**
+ * La pulsacion automatica esta apagada por defecto.
+ *
+ * Un dialogo de Studio puede ser una ventana que abrio una persona; pulsar "Save" o "Yes" sin que lo pida
+ * cierra o guarda cosas que no eran del bridge. Solo se activa con TALEND_MODALS_AUTO=1 (o `true`).
+ */
+export function modalesAutomaticosActivos(): boolean {
+  const valor = process.env.TALEND_MODALS_AUTO;
+  return valor === "1" || valor === "true";
+}
+
 type Opciones = {
   /** Solo para pruebas: fuerza el sistema operativo del que se leen los dialogos. */
   runtime?: RuntimeOS;
@@ -51,8 +62,13 @@ export async function atenderDialogosTrasFallo(
   motivo: BridgeRecoveryMotivo,
   opciones: Opciones = {},
 ): Promise<BridgeRecoveryOutcome> {
-  if (process.env.TALEND_MODALS_AUTO === "0") {
-    return { reintentar: false, detalle: "La recuperacion automatica de dialogos esta apagada (TALEND_MODALS_AUTO=0)." };
+  if (!modalesAutomaticosActivos()) {
+    return {
+      reintentar: false,
+      detalle:
+        "La recuperacion automatica de dialogos esta apagada. Activala con TALEND_MODALS_AUTO=1 " +
+        "solo si aceptas que se pulsen dialogos conocidos de Studio.",
+    };
   }
   if (!MOTIVOS_RECUPERABLES.has(motivo.codigo)) {
     return { reintentar: false, detalle: `Un fallo de tipo ${motivo.codigo} no se resuelve cerrando dialogos.` };
@@ -96,7 +112,7 @@ let registrado = false;
 export function registrarRecuperacionDeModales(): void {
   if (registrado) return;
   registrado = true;
-  if (process.env.TALEND_MODALS_AUTO === "0") return;
+  if (!modalesAutomaticosActivos()) return;
   setBridgeRecoveryHook(atenderDialogosTrasFallo);
 }
 

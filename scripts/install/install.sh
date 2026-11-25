@@ -36,13 +36,13 @@ else
     echo "Cuando tengas el cliente instalado, ejecuta: talend-mcp setup --client <claude-code,claude-desktop,vscode,copilot,cursor,gemini,codex>" >&2
   fi
 fi
-echo "Instalando el Bridge de Talend Studio desde el release verificado..."
-if "$DIR/talend-mcp" bridge install; then
-  echo "Bridge instalado o actualizado."
+echo "Reparando el plugin de Talend Studio y los dialogos automaticos..."
+if "$DIR/talend-mcp" repair; then
+  echo "Bridge y ajustes de Studio al dia."
 else
-  echo "El servidor MCP quedo instalado, pero no se pudo instalar el Bridge." >&2
+  echo "El servidor MCP quedo instalado, pero no se pudo dejar el Bridge al dia." >&2
   echo "Si Studio esta abierto sin Bridge, cierralo y vuelve a ejecutar este instalador. Si no se detecto Studio, configura TALEND_STUDIO_HOME." >&2
-  echo "Tambien puedes reintentarlo con: talend-mcp bridge install" >&2
+  echo "Tambien puedes reintentarlo con: talend-mcp repair" >&2
 fi
 echo "Listo. Pide al asistente: ejecuta talend_guide con mode overview."
 echo "Reinicia el cliente MCP que se configuro. Si no se configuro ninguno, ejecuta talend-mcp setup --client <id>."

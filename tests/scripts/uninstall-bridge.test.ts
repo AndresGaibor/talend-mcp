@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { planBridgeUninstall, uninstallBridge } from "../../scripts/uninstall-bridge";
@@ -14,12 +15,19 @@ import type { StudioInstall } from "../../scripts/lib/studio-detect";
 const ROOT = join(import.meta.dir, "..", "..");
 const read = (path: string): string => readFileSync(join(ROOT, path), "utf8");
 
+// Carpeta temporal: la desinstalacion real limpia jars sueltos. Si el doble usara una ruta real,
+// ejecutar los tests borraria el plugin de la instalacion de Studio de esta maquina.
+const studioDir = mkdtempSync(join(tmpdir(), "talend-uninstall-bridge-"));
 const studio: StudioInstall = {
-  dir: "C:/Talend/8.0.1",
-  exe: "C:/Talend/8.0.1/studio/studio.exe",
-  jdk: "C:/Talend/8.0.1/jdk",
-  studioDir: "C:/Talend/8.0.1/studio",
+  dir: studioDir,
+  exe: join(studioDir, "studio.exe"),
+  jdk: join(studioDir, "jdk"),
+  studioDir,
 };
+
+afterAll(() => {
+  rmSync(studioDir, { recursive: true, force: true });
+});
 
 let exitCodeOriginal: typeof process.exitCode;
 

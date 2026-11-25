@@ -8,6 +8,7 @@ import { homedir } from "node:os";
 import { VERSION } from "../version";
 import { defaultStateHome, isCompiledBinary } from "./client-setup";
 import { runBridgeCommand } from "./bridge-command";
+import { runRepairCommand } from "./repair-command";
 import { runSetupCommand } from "./setup-command";
 import { CliOperationError, describeOperation, executeOperation, listOperations } from "../application/operations/command-dispatcher";
 
@@ -28,6 +29,7 @@ Comandos:
   remove                      Quitar talend-mcp de los clientes
   bridge install              Instalar el plugin de Talend Studio (Studio cerrado, o abierto para actualizar)
   bridge uninstall            Quitar el plugin de Talend Studio (Studio cerrado)
+  repair                      Arreglar Studio: plugin al dia y sin dialogos automaticos
   version                     Mostrar la version
 
 Opciones comunes:
@@ -42,8 +44,9 @@ Opciones comunes:
   --idempotency-key <clave>   Evitar repetir una escritura reenviada desde CLI
   --port <n>                  Puerto para mcp serve
   --client <lista>            setup/remove: claude-code,claude-desktop,vscode,cursor,gemini,codex
-  --dry-run                   setup/remove/bridge install/bridge uninstall: mostrar sin escribir
-  --from <zip|carpeta>        bridge install: update site local en lugar de descargarlo
+  --dry-run                   setup/remove/bridge install/bridge uninstall/repair: mostrar sin escribir
+  --from <zip|carpeta>        bridge install/repair: update site local en lugar de descargarlo
+  --keep-supervisor           repair: conservar la tarea que mantiene vivo el MCP
   --help                      Mostrar esta ayuda
 `;
 
@@ -56,6 +59,7 @@ const { values, positionals } = parseArgs({
     folder: { type: "string" }, yes: { type: "boolean" },
     "idempotency-key": { type: "string" },
     client: { type: "string" }, from: { type: "string" }, "dry-run": { type: "boolean" },
+    "keep-supervisor": { type: "boolean" },
     port: { type: "string" }, help: { type: "boolean", short: "h" },
   },
   strict: true,
@@ -162,6 +166,14 @@ async function main(): Promise<void> {
   }
   if (group === "bridge") {
     process.exitCode = await runBridgeCommand({ action, from: values.from, dryRun: values["dry-run"] === true });
+    return;
+  }
+  if (group === "repair") {
+    process.exitCode = await runRepairCommand({
+      dryRun: values["dry-run"] === true,
+      from: values.from,
+      keepSupervisor: values["keep-supervisor"] === true,
+    });
     return;
   }
   if (group === "setup" || group === "remove") {

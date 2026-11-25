@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { modalesAutomaticosActivos } from "../../src/talend/studio/recuperacion-de-bridge";
+
 /**
  * Las rutas automaticas no pueden cerrar ventanas que abrio una persona: el transporte del bridge no
  * pulsa dialogos mientras escribe, y el vigilante y la recuperacion solo aplican reglas propias.
@@ -23,4 +25,21 @@ test("la recuperacion y el supervisor solo aplican reglas propias", () => {
 
   const supervisor = readFileSync(join(ROOT, "scripts/supervisor.ts"), "utf8");
   expect(supervisor).toContain("handleModals({ onlyKnown: true })");
+});
+
+test("la pulsacion automatica esta apagada salvo que se pida con TALEND_MODALS_AUTO=1", () => {
+  const previo = process.env.TALEND_MODALS_AUTO;
+  try {
+    delete process.env.TALEND_MODALS_AUTO;
+    expect(modalesAutomaticosActivos()).toBe(false);
+    process.env.TALEND_MODALS_AUTO = "0";
+    expect(modalesAutomaticosActivos()).toBe(false);
+    process.env.TALEND_MODALS_AUTO = "1";
+    expect(modalesAutomaticosActivos()).toBe(true);
+    process.env.TALEND_MODALS_AUTO = "true";
+    expect(modalesAutomaticosActivos()).toBe(true);
+  } finally {
+    if (previo === undefined) delete process.env.TALEND_MODALS_AUTO;
+    else process.env.TALEND_MODALS_AUTO = previo;
+  }
 });

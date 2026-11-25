@@ -4,6 +4,25 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 [SemVer](https://semver.org/lang/es/). El workflow de release usa la sección de la versión como
 notas del release: una versión sin sección no se publica.
 
+## [0.1.6] - 2026-11-25
+
+### Añadido
+
+- `talend-mcp repair`: deja Studio en un estado seguro y al día. Apaga `autoDismissModals`, quita la tarea
+  `TalendMcpSupervisor` que pulsaba diálogos cada 5 s, actualiza el plugin por p2 si Studio está cerrado,
+  lo recarga en caliente si está abierto y borra el jar de carga en caliente anterior. Acepta `--dry-run`,
+  `--from` y `--keep-supervisor`.
+- Los instaladores ejecutan `repair` después de configurar los clientes. Un instalador anterior solo
+  actualizaba el plugin en marcha; este deja también la copia instalada en Studio.
+
+### Cambiado
+
+- La pulsación automática de diálogos de Studio está apagada por defecto en el MCP y en el supervisor. Solo
+  se activa con `TALEND_MODALS_AUTO=1`; antes bastaba con no poner `0`. Una ventana que abrió una persona ya
+  no se guarda ni se cierra sola.
+- Al instalar con p2 se borra el jar de carga en caliente anterior para que Studio arranque con la versión
+  instalada y no recargue un build viejo.
+
 ## [0.1.5] - 2026-11-25
 
 ### Añadido

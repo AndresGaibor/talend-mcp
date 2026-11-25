@@ -20,8 +20,9 @@ curl -fsSL https://github.com/AndresGaibor/talend-mcp/releases/latest/download/i
 ```
 
 El instalador descarga el binario a `~/.talend-mcp/bin`, comprueba su SHA-256 contra
-`checksums.txt` del mismo release (si no coincide, no instala), lo añade al PATH y ejecuta
-`talend-mcp setup`, que **detecta tus clientes y los configura**:
+`checksums.txt` del mismo release (si no coincide, no instala), lo añade al PATH, ejecuta
+`talend-mcp setup`, que **detecta tus clientes y los configura**, y después ejecuta
+`talend-mcp repair` para dejar el plugin de Studio al día:
 
 ```bash
 talend-mcp setup --dry-run                  # ver qué haría, sin escribir nada
@@ -64,10 +65,15 @@ release de tu misma versión (descarga `talend-bridge-p2.zip`, comprueba su SHA-
 de tu Studio):
 
 ```bash
-talend-mcp bridge install --dry-run   # comprueba todo y explica qué haría, sin tocar Studio
-talend-mcp bridge install
+talend-mcp repair --dry-run           # explica qué arreglaría, sin tocar Studio
+talend-mcp repair                     # plugin al día y sin cierres automáticos
+talend-mcp bridge install             # solo el plugin
 talend-mcp bridge uninstall           # quita el plugin; Studio cerrado
 ```
+
+`repair` apaga `autoDismissModals`, quita la tarea `TalendMcpSupervisor` que pulsaba diálogos cada 5 s y
+actualiza el plugin. Si Studio está abierto lo recarga en caliente, pero la copia instalada con p2 queda
+pendiente: cierra Studio y repite `talend-mcp repair`.
 
 | Situación de Studio | Qué hace |
 |---|---|

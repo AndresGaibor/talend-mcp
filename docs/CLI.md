@@ -13,6 +13,7 @@ servidor MCP. Desde el repositorio, `bun run cli <comando>` hace lo mismo.
 | `talend-mcp version` | Versión instalada |
 | `talend-mcp bridge install [--from <zip\|carpeta>] [--dry-run]` | Instala o actualiza el plugin Java en Talend Studio desde el release de la misma versión |
 | `talend-mcp bridge uninstall [--dry-run]` | Quita el plugin Java de Talend Studio (Studio cerrado) |
+| `talend-mcp repair [--dry-run] [--from <zip\|carpeta>] [--keep-supervisor]` | Deja el plugin al día y apaga los cierres automáticos de diálogos; con Studio abierto avisa de que p2 queda pendiente |
 
 ## Operaciones sobre el proyecto
 

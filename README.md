@@ -31,8 +31,8 @@ tus proyectos no salen de él.
 
 ## Instalación
 
-Un solo comando descarga el binario, comprueba su checksum, **configura los clientes MCP detectados** e
-intenta instalar el Bridge de Talend Studio desde el release verificado. No hace falta clonar el repositorio
+Un solo comando descarga el binario, comprueba su checksum, **configura los clientes MCP detectados** y
+**deja el Bridge de Talend Studio al día** desde el release verificado. No hace falta clonar el repositorio
 ni instalar Bun.
 
 **Windows (PowerShell)**
@@ -107,19 +107,29 @@ el servidor:
 
 <br>
 
-El Bridge permite trabajar con jobs **abiertos** en Studio y el instalador principal intenta dejarlo
-configurado automáticamente. Con Studio cerrado lo instala; con Studio abierto y el Bridge ya cargado lo
-actualiza en caliente, sin reiniciar. Para reintentar manualmente:
+El Bridge permite trabajar con jobs **abiertos** en Studio y el instalador principal lo deja configurado
+automáticamente. Con Studio cerrado lo instala; con Studio abierto y el Bridge ya cargado lo actualiza en
+caliente, sin reiniciar. Para reintentar manualmente:
 
 ```bash
-talend-mcp bridge install --dry-run   # comprueba todo y explica qué haría, sin tocar Studio
-talend-mcp bridge install
+talend-mcp repair --dry-run           # explica qué arreglaría, sin tocar Studio
+talend-mcp repair                     # plugin al día y sin cierres automáticos de ventanas
+talend-mcp bridge install             # solo el plugin
 talend-mcp bridge uninstall           # quitar el plugin (Studio cerrado)
 ```
 
-Con Studio **cerrado** instala el plugin; con Studio **abierto y el plugin ya cargado** lo actualiza en
-caliente, sin reiniciar. Sin el plugin sigue funcionando el [modo offline](docs/MODO-OFFLINE.md) (lotes,
-migraciones y jobs cerrados).
+`repair` es el comando recomendado si Studio **cierra ventanas solo**, **no deja editar un flujo** o se
+quedó con una versión vieja del plugin. Hace tres cosas: apaga `autoDismissModals`, quita la tarea
+`TalendMcpSupervisor` que pulsaba diálogos cada 5 s y actualiza el plugin. Con Studio cerrado lo deja
+instalado con p2; con Studio abierto lo recarga en caliente y avisa de que, para dejar la copia instalada
+al día, hay que cerrar Studio y repetir el comando.
+
+La pulsación automática de diálogos está **apagada por defecto**. Solo se activa con
+`TALEND_MODALS_AUTO=1`, y aun así se limita a reglas conocidas. El plugin tiene su propio guardián apagado
+(`autoDismissModals: false`) y no cierra ventanas que abrió una persona.
+
+Sin el plugin sigue funcionando el [modo offline](docs/MODO-OFFLINE.md) (lotes, migraciones y jobs
+cerrados).
 
 Si Studio no se detecta, define `TALEND_STUDIO_HOME` con la carpeta que contiene `plugins/` y
 `features/`. `talend-mcp doctor` muestra el estado completo.
@@ -144,8 +154,8 @@ El binario y el historial se conservan: puedes reactivarlo con `talend-mcp setup
 
 Esto **no toca el plugin Bridge de Talend Studio**. El plugin sigue instalado y arranca con Studio,
 escuchando en `127.0.0.1:3930`; sin un cliente MCP que lo llame queda inactivo. Su guardián de diálogos
-está apagado por defecto (`autoDismissModals: false` en `~/.talend-bridge/config.json`) y, si se activa,
-solo pulsa los diálogos conocidos. Dejarlo instalado no cierra ventanas de Studio. Para quitarlo,
+está apagado por defecto (`autoDismissModals: false` en `~/.talend-bridge/config.json`) y la pulsación
+automática del MCP también. Dejarlo instalado no cierra ventanas de Studio. Para quitarlo,
 `talend-mcp bridge uninstall` con Studio cerrado, o a mano desde Studio (ver el final de esta sección).
 
 **Desinstalar por completo** (entradas de los clientes, PATH, binario, historial, configuración, token del

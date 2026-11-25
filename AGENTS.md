@@ -135,8 +135,9 @@ Reglas de Bun (proyecto, no Node):
   normales, y no envuelvas respuestas grandes en otra capa que las materialice enteras.
 - **La recuperacion de modales no reintenta escrituras.** Ante un timeout o corte de conexion, el
   cliente lee los dialogos por UI Automation, pulsa solo los conocidos y reintenta una vez los GET.
-  Un POST que expiro pudo aplicarse: solo se repite con `reintentarTrasModal: true`. Se apaga con
-  `TALEND_MODALS_AUTO=0`. El detalle queda en `result.recovery` y en el mensaje del error.
+  Un POST que expiro pudo aplicarse: solo se repite con `reintentarTrasModal: true`. Esta apagada por
+  defecto y se activa con `TALEND_MODALS_AUTO=1`. El detalle queda en `result.recovery` y en el mensaje
+  del error.
 
 ## 4. Reglas de oro
 

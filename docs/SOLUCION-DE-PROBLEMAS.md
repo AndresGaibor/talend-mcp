@@ -17,16 +17,25 @@ es una tarea del usuario, sin permisos de administrador).
 
 ## Diálogos de Studio que bloquean (lectura y respuesta autónomas)
 
-El supervisor (`bun run supervisor`) revisa cada 5 s los diálogos de Studio con accesibilidad de Windows
-(UI Automation), sin pasar por el bridge: sigue funcionando con el bridge caído o con la interfaz atascada.
-Lee el título, los mensajes (etiquetas y campos de solo lectura) y los botones, decide con
-`src/talend/studio/modals/modal-policy.ts` y pulsa. Cada diálogo queda en `logs/modales.jsonl` con su texto
-completo, la regla y el resultado.
+La pulsación automática está **apagada por defecto**. El plugin tiene su guardián apagado
+(`autoDismissModals: false`) y ni el supervisor ni la recuperación del cliente pulsan botones salvo que se
+active a propósito con `TALEND_MODALS_AUTO=1`. Antes bastaba con no poner `0`, así que una ventana abierta
+por una persona se podía guardar o cerrar sola mientras editaba.
+
+Si se activa, el supervisor (`bun run supervisor`) revisa cada 5 s los diálogos de Studio con accesibilidad
+de Windows (UI Automation), sin pasar por el bridge: sigue funcionando con el bridge caído o con la
+interfaz atascada. Lee el título, los mensajes (etiquetas y campos de solo lectura) y los botones, decide
+con `src/talend/studio/modals/modal-policy.ts` y pulsa. Cada diálogo queda en `logs/modales.jsonl` con su
+texto completo, la regla y el resultado.
+
+Si Studio ya se está cerrando solo, ejecuta `talend-mcp repair`: apaga el guardián, quita la tarea
+`TalendMcpSupervisor`, actualiza el plugin y borra el jar de carga en caliente anterior. Con Studio cerrado
+lo deja todo instalado; con Studio abierto recarga el plugin en marcha y pide cerrarlo para completar p2.
 
 | Tipo | Qué hace |
 |---|---|
 | El Job ya existe, guardar recursos, esquema del componente destino | Respuesta fija de la regla (Yes, Save, No) |
-| Licencias y módulos de terceros | Acepta y descarga (decisión del usuario del 11 de noviembre de 2026; se apaga con `TALEND_MODALS_AUTO=0`) |
+| Licencias y módulos de terceros | Acepta y descarga (solo con `TALEND_MODALS_AUTO=1`) |
 | Error, aviso o información sin regla propia | Registra el mensaje y lo deja abierto: puede ser una ventana que abrió una persona |
 | Pregunta sin regla (Yes/No) | Registra y deja abierta |
 | Contraseña, campos editables, o que habla de borrar o sobrescribir | No toca: lo decide una persona; queda registrado |
@@ -42,7 +51,7 @@ El cliente MCP usa la misma lectura cuando el bridge deja de contestar: ante un 
 conexión, `src/talend/studio/recuperacion-de-bridge.ts` lee los diálogos, pulsa solo los conocidos y
 **reintenta una vez las lecturas (GET)**. No reintenta escrituras (POST), porque una operación que expiró
 pudo aplicarse igual y repetirla duplicaría nodos o contextos; la respuesta lo dice con
-`recovery.reintentado: false` y el detalle en `error.message`. Se apaga con `TALEND_MODALS_AUTO=0`.
+`recovery.reintentado: false` y el detalle en `error.message`. Solo se activa con `TALEND_MODALS_AUTO=1`.
 
 ## La respuesta es demasiado grande
 

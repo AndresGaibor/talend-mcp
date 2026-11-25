@@ -56,7 +56,8 @@ export const TalendMcpEnvSchema = z.object({
   TALEND_MCP_IDEMPOTENCY_DIR: z.string().optional(),
   /**
    * Si el cliente atiende dialogos conocidos de Studio y reintenta una lectura
-   * cuando el bridge no contesta. Se apaga con `0`, igual que el supervisor.
+   * cuando el bridge no contesta. Apagado por defecto; se activa con `1` o
+   * `true`, igual que el supervisor.
    */
   TALEND_MODALS_AUTO: flag,
 

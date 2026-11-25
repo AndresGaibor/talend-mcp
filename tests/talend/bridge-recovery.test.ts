@@ -173,6 +173,17 @@ const modalDeUnaPersona: HandledModal = {
 const motivo = { endpoint: "/workbench/state", codigo: "timeout" as const, detalle: "" };
 
 describe("atenderDialogosTrasFallo", () => {
+  const modalesPrevios = process.env.TALEND_MODALS_AUTO;
+
+  beforeEach(() => {
+    process.env.TALEND_MODALS_AUTO = "1";
+  });
+
+  afterEach(() => {
+    if (modalesPrevios === undefined) delete process.env.TALEND_MODALS_AUTO;
+    else process.env.TALEND_MODALS_AUTO = modalesPrevios;
+  });
+
   test("pulsa dialogos conocidos y pide reintentar", async () => {
     const out = await atenderDialogosTrasFallo(motivo, { runtime: "windows", handle: async () => [modalPulsado] });
 
@@ -208,17 +219,26 @@ describe("atenderDialogosTrasFallo", () => {
     expect(out.detalle).toContain("Windows");
   });
 
-  test("se apaga con TALEND_MODALS_AUTO=0", async () => {
-    const previo = process.env.TALEND_MODALS_AUTO;
+  test("por defecto esta apagada: no lee ni pulsa dialogos", async () => {
+    delete process.env.TALEND_MODALS_AUTO;
+    let lecturas = 0;
+    const out = await atenderDialogosTrasFallo(motivo, {
+      runtime: "windows",
+      handle: async () => {
+        lecturas++;
+        return [modalPulsado];
+      },
+    });
+    expect(out.reintentar).toBe(false);
+    expect(lecturas).toBe(0);
+    expect(out.detalle).toContain("TALEND_MODALS_AUTO=1");
+  });
+
+  test("solo se activa con TALEND_MODALS_AUTO=1", async () => {
     process.env.TALEND_MODALS_AUTO = "0";
-    try {
-      const out = await atenderDialogosTrasFallo(motivo, { runtime: "windows", handle: async () => [modalPulsado] });
-      expect(out.reintentar).toBe(false);
-      expect(out.detalle).toContain("TALEND_MODALS_AUTO");
-    } finally {
-      if (previo === undefined) delete process.env.TALEND_MODALS_AUTO;
-      else process.env.TALEND_MODALS_AUTO = previo;
-    }
+    const out = await atenderDialogosTrasFallo(motivo, { runtime: "windows", handle: async () => [modalPulsado] });
+    expect(out.reintentar).toBe(false);
+    expect(out.detalle).toContain("TALEND_MODALS_AUTO=1");
   });
 
   test("si la lectura falla, el error queda en el detalle", async () => {
