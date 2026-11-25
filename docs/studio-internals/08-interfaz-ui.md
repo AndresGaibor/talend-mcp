@@ -77,27 +77,33 @@ dialogo, pero **no se abrio ninguno**. La columna del bridge dice que puede hace
 
 ## 74. Modales que el guardian cierra solo
 
-`ModalGuard` (`workbench/ModalGuard.java`) revisa los shells visibles cada 1,2 s y pulsa el boton
-de cada dialogo conocido. Los titulos y botones vienen de `KNOWN_DIALOGS`.
+`ModalGuard` (`workbench/ModalGuard.java`) solo actua en dos casos:
 
-| Dialogo (titulo contiene) | Boton que pulsa |
+- con `talend_studio_dismiss_dialogs` (`/workbench/dialogs`), cuando se pide;
+- si `autoDismissModals` esta activo en la configuracion del bridge (**apagado por defecto**), un hilo
+  revisa los shells visibles cada 1,2 s.
+
+En ambos casos toca solo los dialogos conocidos (`KNOWN_DIALOGS` y `KNOWN_TEXT_DIALOGS`):
+
+| Dialogo (titulo o texto contiene) | Boton que pulsa |
 |---|---|
 | `Jobname Error` / `Job Name Error` | **Yes**: reemplaza el job existente |
 | `Invalid Job Name` | OK, Yes |
 | `Save Resource` / `Guardar recursos` | **Yes** / Guardar |
 | `third party modules` / `modulos de terceros` | Cerrar. No instala nada |
-| Progreso (`progress`, `compilando`, `cargando`...) | No lo toca; lo cancela si lleva mas de 30 s abierto |
-| Cualquier otro con un boton seguro | El primero de: Yes, Si, OK, Accept, Continue, Save, Close... |
-| Diálogo nativo de Windows (`MessageBox`) | Enter, tras 3 intentos seguidos con la UI ocupada |
+| `get the schema of the target component` | No |
+| Cualquier otro | No se toca: se reporta en `dialogs` y se deja abierto |
 
-**Riesgos de este comportamiento** (decision del autor del plugin; no se cambio):
+No hay lista de botones "seguros" para dialogos desconocidos, no se cierra el shell a la fuerza y no
+se simulan teclas (ni Enter en un dialogo nativo). Lo que no encaja en una regla se queda esperando a
+una persona: esa guarda evita cerrar ventanas que abrio quien trabaja en Studio, como Preferencias o
+un asistente.
+
+Riesgos que quedan, por decision del autor:
 
 - `Jobname Error` responde **Yes**, asi que reemplaza el job existente sin preguntar.
 - `Save Resource` responde **Yes**: guarda los cambios pendientes de ese dialogo, incluidos los
   de un job que el agente no toco. Con un job sucio abierto, lo guarda.
-- El boton de un dialogo desconocido sale de `SAFE_BUTTONS`, que incluye **OK**. Deducido del
-  codigo, **no probado**: un dialogo de Preferencias, que tiene OK, se cerraria pulsando OK.
-- Enter en un dialogo nativo es a ciegas: no se sabe que boton es el predeterminado.
 
 `talend_studio_dismiss_dialogs` (`/workbench/dialogs`) ejecuta esta misma logica bajo demanda. **No
 es de solo lectura**: su descripcion lo dice ahora.
