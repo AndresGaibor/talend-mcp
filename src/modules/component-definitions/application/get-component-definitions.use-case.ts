@@ -101,6 +101,21 @@ export class GetComponentDefinitionsUseCase {
     return definition ? this.view(definition) : null;
   }
 
+  /**
+   * Busca en el índice actual y lo reconstruye una vez si no encuentra el nombre.
+   * Evita tratar como ausente un componente añadido después de generar la caché.
+   */
+  async getConActualizacionSiFalta(
+    name: string,
+    palette?: ComponentPalette,
+  ): Promise<{ definition: ComponentDefinitionView | null; refreshed: boolean }> {
+    const actual = await this.get(name, palette);
+    if (actual) return { definition: actual, refreshed: false };
+
+    await this.refresh();
+    return { definition: await this.get(name, palette), refreshed: true };
+  }
+
   /** Resumen de los componentes que cuadran con un filtro. */
   async list(
     filter?: string,

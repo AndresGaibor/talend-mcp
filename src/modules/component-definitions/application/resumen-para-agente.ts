@@ -1,4 +1,4 @@
-import type { DefinitionParameter } from "../domain/component-definition.types";
+import type { ComponentPalette, DefinitionParameter } from "../domain/component-definition.types";
 import { evaluateCondition } from "./plan-required-parameters/condition";
 
 /**
@@ -134,15 +134,34 @@ export function textoResumen(
   return partes.join(" ");
 }
 
+export type DiagnosticoIndiceComponentes = {
+  total: number;
+  pluginsDir: string;
+  refreshed: boolean;
+};
+
 /**
- * Mensaje cuando el nombre no existe en la paleta Standard de esta instalacion.
+ * Mensaje cuando no se encuentra una definicion XML.
  *
- * El agente no tiene que adivinar: se le dice que buscar y con que termino.
+ * La ausencia del XML no demuestra que el componente no este instalado: algunas
+ * generaciones de componentes se describen desde la API de Studio.
  */
-export function mensajeNoEncontrado(nombre: string): string {
+export function mensajeNoEncontrado(
+  nombre: string,
+  diagnostico?: DiagnosticoIndiceComponentes,
+  palette: ComponentPalette = "DI",
+): string {
   const termino = nombre.replace(/^t/, "");
+  const paleta = palette === "DI" ? "Standard (DI)" : palette;
+  const estadoIndice = diagnostico
+    ? diagnostico.pluginsDir
+      ? ` Se ${diagnostico.refreshed ? "releyó" : "consultó"} el índice y contiene ${diagnostico.total} definiciones XML en '${diagnostico.pluginsDir}'; esto no demuestra que el componente no esté instalado.`
+      : " No se pudo detectar la carpeta de plugins de Studio, así que no se puede confirmar si el componente está instalado. Configura TALEND_STUDIO_HOME o TALEND_STUDIO_PLUGINS_DIR y vuelve a consultar."
+    : "";
   return (
-    `No hay ningún componente llamado '${nombre}' en la paleta Standard (DI) de esta instalación de Studio. ` +
+    `No se encontró una definición XML para '${nombre}' en la paleta ${paleta} de esta instalación de Studio.` +
+    estadoIndice +
+    " " +
     `Busca el nombre exacto con talend_components_search, por ejemplo {"query":"${termino}"}. ` +
     `Si es un componente de la generación nueva (JDBC, AWS, Snowflake...) puede no tener XML: ` +
     `en ese caso usa talend_studio_component_parameters.`

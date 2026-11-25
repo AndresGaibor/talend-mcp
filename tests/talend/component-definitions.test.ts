@@ -346,9 +346,21 @@ describe("Indice de definiciones de la instalacion de Studio", () => {
       expect(definicion?.requiredParameters.length).toBeGreaterThan(0);
       expect(definicion?.plan.parameters.some((p) => p.name === "FILENAME")).toBe(true);
 
+      const nuevoComponente = join(
+        plugins,
+        "org.talend.designer.components.localprovider_1.0",
+        "components",
+        "tAgregadoDespues",
+      );
+      mkdirSync(nuevoComponente, { recursive: true });
+      writeFileSync(join(nuevoComponente, "tAgregadoDespues_java.xml"), XML_EJEMPLO);
+      const busquedaActualizada = await casoDeUso.getConActualizacionSiFalta("tAgregadoDespues");
+      expect(busquedaActualizada.refreshed).toBe(true);
+      expect(busquedaActualizada.definition?.name).toBe("tAgregadoDespues");
+
       const resumen = await casoDeUso.summary();
-      expect(resumen.total).toBe(1);
-      expect(resumen.byPalette.DI).toBe(1);
+      expect(resumen.total).toBe(2);
+      expect(resumen.byPalette.DI).toBe(2);
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }

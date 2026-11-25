@@ -165,4 +165,32 @@ describe("resumen de configuracion para un agente", () => {
     expect(mensaje).toContain('{"query":"DBInput"}');
     expect(mensaje).toContain("talend_studio_component_parameters");
   });
+
+  test("si no aparece tras releer el indice, aclara que solo se verificaron definiciones XML", () => {
+    const mensaje = mensajeNoEncontrado("tS3Get", {
+      refreshed: true,
+      total: 127,
+      pluginsDir: "studio/plugins",
+    });
+
+    expect(mensaje).toContain("Se releyó el índice");
+    expect(mensaje).toContain("127 definiciones XML");
+    expect(mensaje).toContain("studio/plugins");
+    expect(mensaje).toContain("no demuestra que el componente no esté instalado");
+  });
+
+  test("si no se detecta la carpeta de plugins, no afirma que el componente no está instalado", () => {
+    const mensaje = mensajeNoEncontrado("tS3Get", {
+      refreshed: true,
+      total: 0,
+      pluginsDir: "",
+    });
+
+    expect(mensaje).toContain("No se pudo detectar la carpeta de plugins");
+    expect(mensaje).toContain("TALEND_STUDIO_HOME");
+  });
+
+  test("nombra la paleta consultada cuando no es Standard", () => {
+    expect(mensajeNoEncontrado("tS3Get", undefined, "SPARK")).toContain("paleta SPARK");
+  });
 });

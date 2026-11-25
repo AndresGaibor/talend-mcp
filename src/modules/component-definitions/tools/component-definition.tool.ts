@@ -45,10 +45,21 @@ export function createComponentDefinitionTool() {
         }
 
         if (input.name) {
-          const definition = await useCase.get(input.name, input.palette);
+          const lookup = input.refresh
+            ? { definition: await useCase.get(input.name, input.palette), refreshed: true }
+            : await useCase.getConActualizacionSiFalta(input.name, input.palette);
+          const definition = lookup.definition;
           if (!definition) {
+            const summary = await useCase.summary();
             return {
-              content: [{ type: "text", text: mensajeNoEncontrado(input.name) }],
+              content: [{
+                type: "text",
+                text: mensajeNoEncontrado(input.name, {
+                  total: summary.total,
+                  pluginsDir: summary.pluginsDir,
+                  refreshed: lookup.refreshed,
+                }, input.palette),
+              }],
               isError: true,
             };
           }
