@@ -20,8 +20,15 @@ export async function jobsAbiertosEnStudio(jobs: string[]): Promise<string[]> {
   }
 }
 
-/** Si el titulo de un editor es el de ese job (`Job NOMBRE 0.1`; Studio antepone `*` si hay cambios sin guardar). */
+/**
+ * Si el titulo de un editor corresponde al job.
+ *
+ * Eclipse/Talend puede presentar `Job NOMBRE 0.1`, `*Job NOMBRE 0.1` o solo
+ * `NOMBRE 0.1` segun la vista y la version. Se busca el nombre con limites de
+ * palabra para no confundir, por ejemplo, `MIG_A` con `MIG_AB`.
+ */
 export function esEditorDelJob(titulo: string, job: string): boolean {
   const escapado = job.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^\\*?\\s*(?:Job|Process)\\s+${escapado}(?:\\s|$)`).test(titulo);
+  const limpio = titulo.trim().replace(/^\*+\s*/, "");
+  return new RegExp(`(?:^|[^A-Za-z0-9_])${escapado}(?=$|[^A-Za-z0-9_])`, "i").test(limpio);
 }

@@ -108,7 +108,11 @@ describe("guarda de jobs abiertos", () => {
     const { esEditorDelJob } = await import("../../src/talend/job-batch/open-guard");
     expect(esEditorDelJob("Job MIG_A 0.1", "MIG_A")).toBe(true);
     expect(esEditorDelJob("*Job MIG_A 0.1", "MIG_A")).toBe(true);
+    expect(esEditorDelJob("JOB_S3_IMPALA 0.1", "JOB_S3_IMPALA")).toBe(true);
+    expect(esEditorDelJob("* JOB_S3_IMPALA 0.1", "JOB_S3_IMPALA")).toBe(true);
+    expect(esEditorDelJob("Process/MIG_A 0.1", "MIG_A")).toBe(true);
     expect(esEditorDelJob("Job MIG_AB 0.1", "MIG_A")).toBe(false);
+    expect(esEditorDelJob("JOB_S3_IMPALA_BACKUP 0.1", "JOB_S3_IMPALA")).toBe(false);
     expect(esEditorDelJob("Welcome", "MIG_A")).toBe(false);
   });
 });
