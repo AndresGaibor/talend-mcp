@@ -2,7 +2,7 @@
   "name": "talend-mcp",
   "description": "Servidor MCP local para crear, editar, compilar y ejecutar jobs de Qlik Talend Studio, con la skill que enseña a usarlo.",
   "author": { "name": "AndresGaibor" },
-  "version": "0.1.3",
+  "version": "0.1.4",
   "homepage": "https://github.com/AndresGaibor/talend-mcp",
   "repository": "https://github.com/AndresGaibor/talend-mcp",
   "keywords": ["talend", "qlik", "mcp", "etl", "migration"]

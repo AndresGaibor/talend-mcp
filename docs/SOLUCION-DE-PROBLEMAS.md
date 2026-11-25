@@ -27,12 +27,16 @@ completo, la regla y el resultado.
 |---|---|
 | El Job ya existe, guardar recursos, esquema del componente destino | Respuesta fija de la regla (Yes, Save, No) |
 | Licencias y módulos de terceros | Acepta y descarga (decisión del usuario del 11 de noviembre de 2026; se apaga con `TALEND_MODALS_AUTO=0`) |
-| Error, aviso o información sin regla propia | Registra el mensaje y pulsa Aceptar, OK o Cerrar |
-| Pregunta sin regla (Yes/No) | Contesta la opción que no cambia nada (No, Cancelar) |
+| Error, aviso o información sin regla propia | Registra el mensaje y lo deja abierto: puede ser una ventana que abrió una persona |
+| Pregunta sin regla (Yes/No) | Registra y deja abierta |
 | Contraseña, campos editables, o que habla de borrar o sobrescribir | No toca: lo decide una persona; queda registrado |
 
 A mano: `bun run modales -- --dry-run` (solo lee y dice qué haría) o `bun run modales` (pulsa).
 Reglas nuevas: se añaden a `RULES` en `modal-policy.ts` con su prueba en `tests/talend/modal-policy.test.ts`.
+
+El cliente MCP no cierra ventanas mientras trabaja: durante una escritura solo espera y reintenta si Studio
+responde que la interfaz está ocupada. Tampoco pulsa la clasificación genérica de forma automática; para
+cerrar un diálogo desconocido hay que pedirlo con `talend_studio_handle_modals`.
 
 El cliente MCP usa la misma lectura cuando el bridge deja de contestar: ante un timeout o un corte de
 conexión, `src/talend/studio/recuperacion-de-bridge.ts` lee los diálogos, pulsa solo los conocidos y

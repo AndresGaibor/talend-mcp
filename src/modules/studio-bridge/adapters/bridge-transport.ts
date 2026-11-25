@@ -136,34 +136,6 @@ function conRecuperacion<T>(resultado: BridgeResult<T>, recovery: BridgeRecovery
   };
 }
 
-/** Contesta los dialogos modales cada `PERIODO_VIGILANCIA_MS` mientras dura una escritura. Sin solapes. */
-const PERIODO_VIGILANCIA_MS = 2000;
-function iniciarVigilanciaDeDialogos(): { parar: () => Promise<void> } {
-  let ocupado: Promise<void> | undefined;
-  let activo = true;
-  const tick = async (): Promise<void> => {
-    if (!activo || ocupado) return;
-    ocupado = (async () => {
-      try {
-        const { handleModals } = await import("../../../talend/studio/modals/modal-handler");
-        await handleModals({ dryRun: false });
-      } catch {
-        // Un fallo leyendo dialogos no debe tumbar la escritura: se reintenta en el siguiente tick.
-      } finally {
-        ocupado = undefined;
-      }
-    })();
-  };
-  const timer = setInterval(() => void tick(), PERIODO_VIGILANCIA_MS);
-  return {
-    parar: async () => {
-      activo = false;
-      clearInterval(timer);
-      await ocupado;
-    },
-  };
-}
-
 const REINTENTOS_INTERFAZ_OCUPADA = 4;
 const PAUSA_INTERFAZ_OCUPADA_MS = 5000;
 
@@ -207,28 +179,15 @@ export class BridgeTransportClient {
   }
 
   protected async request<T>(endpoint: string, init: BridgeRequestInit = {}): Promise<BridgeResult<T>> {
-    // Mientras una escritura espera a Studio, un dialogo modal que aparece en medio la bloquea: se vigila y se
-    // contesta con la misma politica de talend_studio_handle_modals, sin esperar a que la llamada falle.
-    const vigilante = (init.method ?? "GET") !== "GET" && init.sinRecuperacion !== true
-      ? iniciarVigilanciaDeDialogos()
-      : undefined;
-    let resultado: BridgeResult<T>;
-    try {
-      resultado = await this.solicitarUnaVez<T>(endpoint, init);
-    } finally {
-      await vigilante?.parar();
-    }
+    let resultado = await this.solicitarUnaVez<T>(endpoint, init);
     // Studio responde «hilo de la interfaz ocupado» antes de aplicar la operacion: es seguro esperar y repetirla,
-    // tambien en escrituras. Se espera de forma creciente y se rinde tras unos intentos.
+    // tambien en escrituras. Se espera de forma creciente y se rinde tras unos intentos. No se pulsan dialogos
+    // aqui: una ventana que abrio una persona no se cierra sola mientras el MCP trabaja.
     for (
       let intento = 1;
       intento <= REINTENTOS_INTERFAZ_OCUPADA && interfazOcupada(resultado) && init.sinRecuperacion !== true;
       intento++
     ) {
-      // Un dialogo modal bloquea el hilo aunque nadie lo mire: se contesta con la misma politica de
-      // talend_studio_handle_modals antes de repetir. Si no hay nada que contestar, no hace nada.
-      const { handleModals } = await import("../../../talend/studio/modals/modal-handler");
-      await handleModals({ dryRun: false }).catch(() => undefined);
       await new Promise<void>((resolve) => setTimeout(resolve, PAUSA_INTERFAZ_OCUPADA_MS * intento));
       resultado = await this.solicitarUnaVez<T>(endpoint, init);
     }

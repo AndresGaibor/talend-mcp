@@ -61,7 +61,16 @@ function summary(snapshot: ModalSnapshot): string {
   return body ? `"${snapshot.title}": ${body}` : `"${snapshot.title}"`;
 }
 
-export function decideModal(snapshot: ModalSnapshot): ModalDecision {
+export type ModalPolicyOptions = {
+  /**
+   * Solo decide con las reglas propias del proyecto. La clasificacion generica (pulsar OK o Cerrar en un
+   * error, No en una pregunta) se convierte en `leave`: una ventana que abrio una persona no se cierra sola.
+   * Lo usan las rutas automaticas (vigilante y recuperacion); la tool explicita mantiene la politica completa.
+   */
+  soloConocidas?: boolean;
+};
+
+export function decideModal(snapshot: ModalSnapshot, opciones: ModalPolicyOptions = {}): ModalDecision {
   const leave = (kind: ModalKind, rule: string, reason: string): ModalDecision => ({ kind, action: "leave", rule, reason });
 
   if (snapshot.passwordFields > 0) {
@@ -104,6 +113,9 @@ export function decideModal(snapshot: ModalSnapshot): ModalDecision {
   const preferred = kind === "question" ? SAFE_ANSWER : DISMISS;
   const button = pick(snapshot.buttons, preferred);
   if (button) {
+    if (opciones.soloConocidas) {
+      return leave(kind, "generico-desconocido", `Dialogo ${kind} sin regla propia: no se pulsa sin una persona. ${summary(snapshot)}`);
+    }
     return { kind, action: "press", button, rule: `${kind}-generico`, reason: `Dialogo ${kind} sin regla propia. ${summary(snapshot)}` };
   }
   return leave(kind, "sin-boton-seguro", `Ningun boton seguro entre ${snapshot.buttons.join(", ") || "(ninguno)"}. ${summary(snapshot)}`);

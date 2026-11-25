@@ -25,6 +25,11 @@ export interface HandledModal {
 export interface HandleOptions {
   /** Solo lee y decide; no pulsa nada. */
   dryRun?: boolean;
+  /**
+   * Solo pulsa dialogos con una regla propia del proyecto. Los que solo encajan en la clasificacion generica
+   * se dejan abiertos: pueden ser ventanas que abrio una persona. Lo usan las rutas automaticas.
+   */
+  onlyKnown?: boolean;
   /** Sustitutos para pruebas. */
   read?: () => Promise<ModalSnapshot[]>;
   press?: (handle: number, button: string) => Promise<PressResult>;
@@ -50,7 +55,7 @@ export async function handleModals(options: HandleOptions = {}): Promise<Handled
 
   const handled: HandledModal[] = [];
   for (const snapshot of await read()) {
-    const decision = decideModal(snapshot);
+    const decision = decideModal(snapshot, { soloConocidas: options.onlyKnown === true });
     const item: HandledModal = { title: snapshot.title, texts: snapshot.texts, buttons: snapshot.buttons, decision };
     if (decision.action === "press" && decision.button && !options.dryRun) {
       item.press = await press(snapshot.handle, decision.button).catch(

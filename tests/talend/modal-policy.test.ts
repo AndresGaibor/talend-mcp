@@ -55,6 +55,30 @@ describe("decideModal: errores y avisos desconocidos", () => {
   });
 });
 
+describe("decideModal: solo reglas propias en las rutas automaticas", () => {
+  test("un error sin regla no se pulsa aunque tenga OK", () => {
+    const d = decideModal(
+      modal({ title: "Error", texts: ["No se pudo cargar el job"], buttons: ["OK"] }),
+      { soloConocidas: true },
+    );
+    expect(d.action).toBe("leave");
+    expect(d.rule).toBe("generico-desconocido");
+    expect(d.reason).toContain("una persona");
+  });
+
+  test("una pregunta y un aviso sin regla tampoco se contestan", () => {
+    expect(decideModal(modal({ title: "Confirm", texts: ["Continue?"], buttons: ["Yes", "No"] }), { soloConocidas: true }).action).toBe("leave");
+    expect(decideModal(modal({ title: "Information", buttons: ["Aceptar"] }), { soloConocidas: true }).action).toBe("leave");
+  });
+
+  test("las reglas propias se siguen aplicando", () => {
+    const job = decideModal(modal({ title: "Jobname Error", texts: ["Etiqueta X is already in use"], buttons: ["Yes", "No"] }), { soloConocidas: true });
+    expect(job).toMatchObject({ action: "press", button: "Yes", rule: "job-ya-existe" });
+    const red = decideModal(modal({ title: "Network Issue", texts: ["Cannot reach the server"], buttons: ["OK"] }), { soloConocidas: true });
+    expect(red).toMatchObject({ action: "press", button: "OK", rule: "network-issue" });
+  });
+});
+
 describe("decideModal: cuando decide una persona", () => {
   test("con un campo de contrasena no se toca", () => {
     const d = decideModal(modal({ title: "Login", buttons: ["OK"], passwordFields: 1, editableFields: 2 }));

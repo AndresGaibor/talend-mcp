@@ -72,8 +72,9 @@ function writeHeartbeat(data: Record<string, unknown>): void {
 }
 
 /**
- * Dialogos de Studio: cada 5 s se leen por accesibilidad y se contestan segun la politica.
- * Cada uno queda en logs/modales.jsonl. Se apaga con TALEND_MODALS_AUTO=0.
+ * Dialogos de Studio: cada 5 s se leen por accesibilidad y se contestan las reglas conocidas.
+ * Un dialogo que no tiene regla propia se registra y se deja abierto: puede ser una ventana que abrio una
+ * persona. Cada uno queda en logs/modales.jsonl. Se apaga con TALEND_MODALS_AUTO=0.
  */
 function startModalLoop(): void {
   if (process.env.TALEND_MODALS_AUTO === "0") return;
@@ -82,7 +83,7 @@ function startModalLoop(): void {
     if (busy) return;
     busy = true;
     try {
-      for (const m of await handleModals()) {
+      for (const m of await handleModals({ onlyKnown: true })) {
         const how = m.press?.ok ? `pulso "${m.decision.button}"` : m.decision.action === "leave" ? "lo dejo para una persona" : `no pudo pulsar (${m.press?.error ?? "?"})`;
         log(`Dialogo "${m.title}" (${m.decision.kind}, regla ${m.decision.rule}): ${how}. ${m.texts.join(" | ").slice(0, 300)}`);
       }

@@ -188,6 +188,19 @@ describe("atenderDialogosTrasFallo", () => {
     expect(out.detalle).toContain("necesita una persona");
   });
 
+  test("lee los dialogos en modo conservador: solo pulsa reglas propias", async () => {
+    let opciones: { dryRun?: boolean; onlyKnown?: boolean } | undefined;
+    await atenderDialogosTrasFallo(motivo, {
+      runtime: "windows",
+      handle: async (opts) => {
+        opciones = opts;
+        return [];
+      },
+    });
+
+    expect(opciones).toMatchObject({ onlyKnown: true });
+  });
+
   test("en sistemas sin UI Automation no intenta leer dialogos", async () => {
     const out = await atenderDialogosTrasFallo(motivo, { runtime: "linux" });
 

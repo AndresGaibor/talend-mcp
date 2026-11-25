@@ -72,6 +72,42 @@ describe("handleModals", () => {
     expect(out[0]?.press).toMatchObject({ ok: false, error: expect.stringContaining("PowerShell") });
   });
 
+  test("con onlyKnown no pulsa un error sin regla propia", async () => {
+    const pressed: Array<[number, string]> = [];
+    const out = await handleModals({
+      onlyKnown: true,
+      read: async () => [errorModal],
+      press: async (handle, button) => {
+        pressed.push([handle, button]);
+        return { ok: true, pressed: button, via: "bm_click", error: null };
+      },
+      audit: () => {},
+    });
+    expect(pressed).toEqual([]);
+    expect(out[0]?.decision).toMatchObject({ action: "leave", rule: "generico-desconocido" });
+  });
+
+  test("con onlyKnown si pulsa un dialogo con regla propia", async () => {
+    const pressed: string[] = [];
+    const jobModal: ModalSnapshot = {
+      ...errorModal,
+      title: "Jobname Error",
+      texts: ["Etiqueta X is already in use, do you want to replace it?"],
+      buttons: ["Yes", "No"],
+    };
+    const out = await handleModals({
+      onlyKnown: true,
+      read: async () => [jobModal],
+      press: async (_handle, button) => {
+        pressed.push(button);
+        return { ok: true, pressed: button, via: "bm_click", error: null };
+      },
+      audit: () => {},
+    });
+    expect(pressed).toEqual(["Yes"]);
+    expect(out[0]?.decision.rule).toBe("job-ya-existe");
+  });
+
   test("sin dialogos no hay nada que hacer", async () => {
     expect(await handleModals({ read: async () => [], audit: () => {} })).toEqual([]);
   });

@@ -28,7 +28,7 @@ type Opciones = {
   /** Solo para pruebas: fuerza el sistema operativo del que se leen los dialogos. */
   runtime?: RuntimeOS;
   /** Solo para pruebas: sustituto de `handleModals`. */
-  handle?: (options: { dryRun?: boolean }) => Promise<HandledModal[]>;
+  handle?: (options: { dryRun?: boolean; onlyKnown?: boolean }) => Promise<HandledModal[]>;
 };
 
 function dialogoParaResultado(modal: HandledModal): BridgeDialogoAtendido {
@@ -66,7 +66,8 @@ export async function atenderDialogosTrasFallo(
   const leer = opciones.handle ?? ((options) => handleModals(options));
   let atendidos: HandledModal[];
   try {
-    atendidos = await leer({});
+    // Solo se pulsan dialogos con regla propia: si la ventana la abrio una persona, se deja como esta.
+    atendidos = await leer({ onlyKnown: true });
   } catch (error) {
     return {
       reintentar: false,

@@ -4,6 +4,20 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 [SemVer](https://semver.org/lang/es/). El workflow de release usa la sección de la versión como
 notas del release: una versión sin sección no se publica.
 
+## [0.1.4] - 2026-11-25
+
+### Corregido
+
+- El MCP ya no pulsa diálogos de Studio mientras escribe: la vigilancia que se añadió en 0.1.3 podía cerrar
+  ventanas que abrió una persona. Ahora solo espera y reintenta cuando Studio responde que la interfaz está
+  ocupada.
+- El vigilante del supervisor y la recuperación tras un tiempo agotado solo aplican reglas propias (job
+  existente, guardado, licencias, esquema del destino). Un diálogo desconocido se registra y se deja abierto.
+
+### Cambiado
+
+- `talend_studio_handle_modals` sigue cerrando diálogos desconocidos cuando se pide de forma explícita.
+
 ## [0.1.3] - 2026-11-25
 
 ### Añadido
