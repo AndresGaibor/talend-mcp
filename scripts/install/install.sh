@@ -28,6 +28,21 @@ chmod +x "$TMP"
 mv -f "$TMP" "$DIR/talend-mcp"
 echo "Instalado: $DIR/talend-mcp ($("$DIR/talend-mcp" version))"
 case ":$PATH:" in *":$DIR:"*) ;; *) echo "Anade $DIR al PATH:  export PATH=\"$DIR:\$PATH\"" ;; esac
-[ -n "${TALEND_MCP_NO_SETUP:-}" ] || "$DIR/talend-mcp" setup
+if [ -n "${TALEND_MCP_NO_SETUP:-}" ]; then
+  echo "Se omitio la configuracion automatica de clientes (TALEND_MCP_NO_SETUP esta definido)."
+else
+  if ! "$DIR/talend-mcp" setup; then
+    echo "El binario quedo instalado, pero no se pudo configurar un cliente automaticamente." >&2
+    echo "Cuando tengas el cliente instalado, ejecuta: talend-mcp setup --client <claude-code,claude-desktop,vscode,copilot,cursor,gemini,codex>" >&2
+  fi
+fi
+echo "Instalando el Bridge de Talend Studio desde el release verificado..."
+if "$DIR/talend-mcp" bridge install; then
+  echo "Bridge instalado o actualizado."
+else
+  echo "El servidor MCP quedo instalado, pero no se pudo instalar el Bridge." >&2
+  echo "Si Studio esta abierto sin Bridge, cierralo y vuelve a ejecutar este instalador. Si no se detecto Studio, configura TALEND_STUDIO_HOME." >&2
+  echo "Tambien puedes reintentarlo con: talend-mcp bridge install" >&2
+fi
 echo "Listo. Pide al asistente: ejecuta talend_guide con mode overview."
-echo "Para trabajar en vivo con Studio, cierralo y ejecuta: talend-mcp bridge install"
+echo "Reinicia el cliente MCP que se configuro. Si no se configuro ninguno, ejecuta talend-mcp setup --client <id>."

@@ -4,6 +4,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 [SemVer](https://semver.org/lang/es/). El workflow de release usa la sección de la versión como
 notas del release: una versión sin sección no se publica.
 
+## [0.1.2] - 2026-11-25
+
+### Añadido
+
+- Instaladores `uninstall.ps1` y `uninstall.sh`: quitan talend-mcp de los clientes MCP, el PATH de usuario
+  y los datos locales (`~/.talend-mcp` y `~/.talend-bridge`). Piden confirmación y admiten
+  `TALEND_MCP_YES=1` y `TALEND_MCP_KEEP_STATE=1`.
+- Sección **Desinstalar o desactivar** en el README, con el comando para desactivar (`talend-mcp remove`)
+  y el de desinstalación completa.
+
+### Cambiado
+
+- Los instaladores intentan instalar o actualizar el plugin Bridge automáticamente y explican qué hacer si
+  Studio está abierto sin el plugin o no se detecta la instalación.
+- Si no se detecta ningún cliente MCP, el instalador deja el binario instalado y muestra cómo registrar uno
+  manualmente, en lugar de terminar sin instrucciones.
+
 ## [0.1.1] - 2026-11-19
 
 ### Añadido

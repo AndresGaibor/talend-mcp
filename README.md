@@ -14,7 +14,7 @@
 ![Talend Studio](https://img.shields.io/badge/Talend%20Studio-8.0.1-blue)
 ![Windows · Linux · macOS](https://img.shields.io/badge/plataformas-Windows%20·%20Linux%20·%20macOS-lightgrey)
 
-[Instalar](#instalación) · [Qué puedes pedirle](#qué-puedes-pedirle) · [Cómo funciona](#cómo-funciona) · [Seguridad](#seguridad) · [Documentación](#documentación)
+[Instalar](#instalación) · [Desinstalar](#desinstalar-o-desactivar) · [Qué puedes pedirle](#qué-puedes-pedirle) · [Cómo funciona](#cómo-funciona) · [Seguridad](#seguridad) · [Documentación](#documentación)
 
 <br>
 
@@ -31,8 +31,9 @@ tus proyectos no salen de él.
 
 ## Instalación
 
-Un solo comando descarga el binario, comprueba su checksum y **configura los clientes MCP que tengas
-instalados**. No hace falta clonar el repositorio ni instalar Bun.
+Un solo comando descarga el binario, comprueba su checksum, **configura los clientes MCP detectados** e
+intenta instalar el Bridge de Talend Studio desde el release verificado. No hace falta clonar el repositorio
+ni instalar Bun.
 
 **Windows (PowerShell)**
 
@@ -51,6 +52,9 @@ Reinicia tu cliente y pídele:
 > Ejecuta `talend_guide` con `mode: overview`.
 
 Si responde con el mapa de tareas, está listo. Para **actualizar**, vuelve a ejecutar el instalador.
+El instalador confirma qué clientes configuró y te recuerda reiniciarlos. Si no detecta ninguno, deja el
+binario instalado y muestra cómo registrar un cliente manualmente. Si Studio está abierto sin el Bridge,
+cierra Studio y vuelve a ejecutar el mismo comando para completar la instalación.
 
 <details>
 <summary><b>Clientes que configura</b> y cómo controlarlo</summary>
@@ -71,13 +75,16 @@ Si responde con el mapa de tareas, está listo. Para **actualizar**, vuelve a ej
 talend-mcp setup --dry-run                      # ver qué haría, sin escribir nada
 talend-mcp setup --client cursor,vscode         # solo algunos clientes
 talend-mcp setup --project "C:/ruta/al/proyecto" # fijar el proyecto de Talend
-talend-mcp remove                               # desinstalar de los clientes
+talend-mcp remove                               # desactivar en los clientes
 ```
 
 `setup` solo añade la entrada `talend-mcp`: no toca tus otros servidores, guarda una copia
 `<archivo>.bak-talend-mcp` y deja intacto cualquier archivo que no sea JSON válido. Para configurarlo a
 mano, o si algo falla, mira [Instalación por cliente](docs/INSTALACION-CLIENTES.md), que detalla qué se
 ha probado y las particularidades de cada cliente.
+
+Para **desactivar** Talend sin borrar nada, usa `talend-mcp remove`; para borrarlo todo, el comando de
+[Desinstalar](#desinstalar-o-desactivar).
 
 </details>
 
@@ -100,8 +107,9 @@ el servidor:
 
 <br>
 
-Para crear y editar jobs **abiertos** en Studio hace falta el plugin del bridge. Un comando lo instala
-desde el release de tu misma versión, con checksum:
+El Bridge permite trabajar con jobs **abiertos** en Studio y el instalador principal intenta dejarlo
+configurado automáticamente. Con Studio cerrado lo instala; con Studio abierto y el Bridge ya cargado lo
+actualiza en caliente, sin reiniciar. Para reintentar manualmente:
 
 ```bash
 talend-mcp bridge install --dry-run   # comprueba todo y explica qué haría, sin tocar Studio
@@ -116,6 +124,37 @@ Si Studio no se detecta, define `TALEND_STUDIO_HOME` con la carpeta que contiene
 `features/`. `talend-mcp doctor` muestra el estado completo.
 
 </details>
+
+## Desinstalar o desactivar
+
+**Desactivar sin borrar nada** (útil para probar, cambiar de cliente o dejar de usarlo un tiempo):
+
+```bash
+talend-mcp remove                  # quita talend-mcp de los clientes MCP detectados
+talend-mcp remove --client cursor  # solo de un cliente
+talend-mcp remove --dry-run        # muestra qué haría, sin escribir nada
+```
+
+El binario y el historial se conservan: puedes reactivarlo con `talend-mcp setup`.
+
+**Desinstalar por completo** (entradas de los clientes, binario, historial, token del Bridge y PATH):
+
+**Windows (PowerShell)**
+
+```powershell
+irm https://github.com/AndresGaibor/talend-mcp/releases/latest/download/uninstall.ps1 | iex
+```
+
+**Linux y macOS**
+
+```bash
+curl -fsSL https://github.com/AndresGaibor/talend-mcp/releases/latest/download/uninstall.sh | sh
+```
+
+Pide confirmación antes de borrar y después indica qué queda pendiente. Para ejecutarlo sin preguntas,
+define `TALEND_MCP_YES=1`; para conservar el historial, `TALEND_MCP_KEEP_STATE=1`. El plugin Bridge dentro
+de Studio se quita aparte, desde **Help > About > Installation Details > Installed Software**
+(`com.andres.talend.bridge`). Reinicia el cliente MCP al terminar.
 
 ## Qué puedes pedirle
 

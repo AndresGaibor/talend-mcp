@@ -8,7 +8,7 @@ servidor MCP. Desde el repositorio, `bun run cli <comando>` hace lo mismo.
 | Comando | Qué hace |
 |---|---|
 | `talend-mcp setup [--client <lista>] [--project <ruta>] [--dry-run]` | Configura los clientes MCP detectados |
-| `talend-mcp remove [--client <lista>]` | Quita `talend-mcp` de los clientes |
+| `talend-mcp remove [--client <lista>]` | Desactiva `talend-mcp` en los clientes (conserva el binario y el historial) |
 | `talend-mcp serve` | Servidor MCP por stdio (lo que lanzan los clientes) |
 | `talend-mcp version` | Versión instalada |
 | `talend-mcp bridge install [--from <zip\|carpeta>] [--dry-run]` | Instala o actualiza el plugin Java en Talend Studio desde el release de la misma versión |

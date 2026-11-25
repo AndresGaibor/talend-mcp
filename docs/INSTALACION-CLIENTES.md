@@ -28,7 +28,7 @@ talend-mcp setup --dry-run                  # ver qué haría, sin escribir nada
 talend-mcp setup                            # configurar todos los clientes detectados
 talend-mcp setup --client cursor,vscode     # solo algunos
 talend-mcp setup --project "C:/ruta/al/proyecto"   # fijar el proyecto (TALEND_PROJECT)
-talend-mcp remove                           # quitar talend-mcp de los clientes
+talend-mcp remove                           # desactivar en los clientes
 ```
 
 Clientes soportados: `claude-code`, `claude-desktop`, `vscode`, `copilot` (GitHub Copilot CLI y formato
@@ -38,6 +38,11 @@ JSON válido (por ejemplo, con comentarios) lo deja intacto y te lo dice. Reinic
 
 **Actualizar:** vuelve a ejecutar el instalador. Cierra antes el cliente que tenga el servidor abierto.
 Para comprobar la versión: `talend-mcp version`.
+
+**Desinstalar:** el release publica `uninstall.ps1` y `uninstall.sh`, que quitan las entradas de los
+clientes, el PATH y los datos locales. También puedes desactivar solo el servidor con
+`talend-mcp remove`. El plugin Bridge se quita aparte desde Studio, en
+**Help > About > Installation Details > Installed Software** (`com.andres.talend.bridge`).
 
 **Variables del instalador:** `TALEND_MCP_NO_SETUP=1` (solo instala el binario),
 `TALEND_MCP_NO_PATH=1` (no toca el PATH), `TALEND_MCP_RELEASE_URL` (otra fuente, por ejemplo un espejo
