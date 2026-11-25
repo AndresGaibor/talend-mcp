@@ -36,6 +36,7 @@ const TOOL_SAFETY: Record<string, ToolSafetyAnnotation> = {
   talend_bridge_save_active_editor: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
 
   talend_jobs_list: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
+  talend_project_profile: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_jobs_read: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_show_flow: { readOnlyHint: true, idempotentHint: true, destructiveHint: false, openWorldHint: false },
   talend_create_job: { readOnlyHint: false, idempotentHint: false, destructiveHint: false, openWorldHint: false },
@@ -198,6 +199,7 @@ const CANONICAL_RISKS: Record<string, "read" | "write" | "execute" | "destructiv
   talend_job_quality_report: "read",
   talend_snapshots_list: "read",
   talend_job_inspect: "read",
+  talend_project_profile: "read",
   talend_component_describe: "read",
   talend_job_plan: "read",
   talend_job_edit: "write",

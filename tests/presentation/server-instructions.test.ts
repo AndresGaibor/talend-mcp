@@ -18,6 +18,12 @@ describe("instrucciones del servidor", () => {
     expect(instructions.length).toBeGreaterThan(0);
   });
 
+  test("indican disenar-job antes de crear o editar", () => {
+    const instructions = buildServerInstructions();
+    expect(instructions).toContain("ANTES DE CREAR");
+    expect(instructions).toContain('task: "disenar-job"');
+  });
+
   test("el handshake de initialize las incluye", async () => {
     // Con el preset corto el servidor registra 46 tools en vez de 230: la
     // prueba comprueba el cableado, no el tamano del catalogo.

@@ -53,6 +53,7 @@ import { createComponentDefinitionTool } from "../../modules/component-definitio
 import { createComponentIconTool } from "../../modules/component-definitions/tools/component-icon.tool";
 import { createAgentGuideTool } from "../../modules/guide/tools/agent-guide.tool";
 import { createJobInspectTool } from "../../modules/jobs/tools/job-inspect.tool";
+import { createProjectProfileTool } from "../../modules/project-profile/tools/project-profile.tool";
 import { createComponentDescribeTool } from "../../modules/component-definitions/tools/component-describe.tool";
 import { createJobPlanTool, createJobEditTool, createAssignRepositorySchemaTool } from "../../modules/jobs/tools/job-plan-edit.tool";
 import { createJobRunTool, createRunStatusTool } from "../../modules/runs/tools/job-run.tool";
@@ -112,6 +113,7 @@ export function getModuleTools(listTools: () => McpToolDefinition[]): RuntimeToo
     createComponentIconTool(),
     createAgentGuideTool({ listTools }),
     createJobInspectTool(),
+    createProjectProfileTool(),
     createComponentDescribeTool(),
     createJobPlanTool(),
     createJobEditTool(),

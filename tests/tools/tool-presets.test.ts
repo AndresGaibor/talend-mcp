@@ -36,6 +36,10 @@ describe("presets de tools", () => {
     expect(agent.every((name) => canonical.has(name))).toBe(true);
   });
 
+  test("agent incluye talend_project_profile, la lectura del proyecto antes de disenar", () => {
+    expect(withFilter("agent")).toContain("talend_project_profile");
+  });
+
   test("canonical oculta el alias legacy y all lo conserva", () => {
     const canonical = withFilter("canonical");
     const all = withFilter("all");

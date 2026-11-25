@@ -1,5 +1,6 @@
 import type { GuideTask } from "../guide.types";
 import { ORIENTATION_TASKS } from "./orientation.tasks";
+import { DESIGN_TASKS } from "./design.tasks";
 import { JOB_LIFECYCLE_TASKS } from "./job-lifecycle.tasks";
 import { JOB_RUNS_TASKS } from "./job-runs.tasks";
 import { CONTEXTS_TASKS } from "./contexts.tasks";
@@ -24,6 +25,7 @@ import { MASTERY_TASKS } from "./mastery.tasks";
  */
 export const GUIDE_TASKS: GuideTask[] = [
   ...ORIENTATION_TASKS,
+  ...DESIGN_TASKS,
   ...JOB_LIFECYCLE_TASKS,
   ...JOB_RUNS_TASKS,
   ...CONTEXTS_TASKS,

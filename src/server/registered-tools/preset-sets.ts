@@ -71,6 +71,7 @@ export const PRESET_AGENT = new Set([
   "talend_describe",
   "talend_execute",
   "talend_jobs_list",
+  "talend_project_profile",
   "talend_job_verify",
   "talend_read_contexts",
   "talend_job_quality_report",

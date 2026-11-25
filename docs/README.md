@@ -24,6 +24,11 @@
 | **Usar `talend-mcp` desde la línea de comandos** | [CLI.md](CLI.md) | [CONFIGURACION.md](CONFIGURACION.md) |
 | **Instalar en Windows o WSL** | [windows-wsl.md](windows-wsl.md) | [README.md](../README.md) |
 
+## Planes
+
+- [Plan de producción (19/11/2026)](superpowers/plans/2026-11-19-produccion.md): brechas entre la versión 0.1.1 y un
+  MCP fiable en producción, en fases con tareas y criterios de salida. **En curso:** ninguna tarea ejecutada.
+
 ## Estado de cada documento
 
 **Vigentes**: el código manda sobre ellos; si encuentras una contradicción, arregla el documento

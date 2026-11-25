@@ -36,6 +36,12 @@ Si `talend_diagnose_environment` dice que no hay proyecto, abre el proyecto en S
 usuario la ruta y define `TALEND_PROJECT` (la carpeta que contiene `talend.project`) en el bloque `env` del cliente
 MCP (`talend-mcp setup --project <ruta>` lo hace) o, desde el repositorio, en `.env.local`. No inventes rutas.
 
+## Antes de crear
+
+El primer paso es `talend_project_profile` (pasa `purpose` para obtener candidatos a reutilizar; cada entrada de `gaps` es una pregunta para el usuario).
+Despues sigue `talend_guide { mode: "task", task: "disenar-job" }`.
+Las reglas estan en `talend_guide { mode: "rules" }`.
+
 ## Estrategia mixta (la decisión que más importa)
 
 | Trabajo | Camino | Tools |
@@ -59,6 +65,7 @@ lo detectan y responden `JOB_OPEN_IN_STUDIO`; en ese caso usa `mode: "studio"` o
 | `talend_run_status` | `{ runId }` | Estado y resultado de una ejecución |
 | `talend_job_verify` | `{ job, run?: false, installMissing?, timeoutMs? }` | Diseño + compilación + ejecución + avisos en una llamada |
 | `talend_jobs_list` | `{ limit?, offset? }` | Jobs del proyecto |
+| `talend_project_profile` | `{ projectPath?, limit?, purpose? }` | Inventario, convenciones y huecos del proyecto, sin Studio; los huecos son las preguntas que debes hacer al usuario |
 | `talend_job_quality_report` | `{ jobId }` | Informe de calidad del job (puntaje y hallazgos) |
 | `talend_search` / `talend_describe` / `talend_execute` | Code Mode | Acceso a las tools que no están en el preset |
 

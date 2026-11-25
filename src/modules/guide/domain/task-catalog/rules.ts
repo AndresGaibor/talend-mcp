@@ -1,5 +1,7 @@
 import type { GuideRule } from "../guide.types";
 
+const CRITERIO_APPLIES_TO = ["disenar-job", "crear-job", "editar-job", "migracion-masiva"];
+
 /**
  * Reglas que evitan fallos silenciosos. Salen de las trampas documentadas en
  * `docs/GUIA-AGENTE.md` y `docs/TALEND-STUDIO-INTERNALS.md`.
@@ -95,7 +97,99 @@ export const GUIDE_RULES: GuideRule[] = [
   },
   {
     id: "contextos-por-entorno",
-    rule: "Cada entorno tiene su propio valor de la misma variable de contexto.",
-    detail: "No dupliques variables con nombres distintos por entorno; usa el mismo nombre y cambia el valor.",
+    rule: "Todos los entornos de un contexto tienen las mismas variables; cambian solo los valores.",
+    detail:
+      "Si Dev define `RUTA_ENTRADA` y Prod define `RUTA_ENTRADA_PROD`, el job no encuentra la variable al cambiar de entorno y falla en ejecucion. Usa el mismo nombre en todos los entornos y cambia solo el valor.",
+  },
+  {
+    id: "inventario-primero",
+    rule: "Antes de crear o editar, mira que hay en el proyecto (`talend_project_profile`, o las tools de lectura si no esta disponible).",
+    detail:
+      "Un job nuevo sin mirar el proyecto suele duplicar un contexto o una conexion que ya existe. Revisa jobs, contextos, conexiones y esquemas antes de escribir nada.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "reutilizar-antes-de-crear",
+    rule: "Si ya existe un job, joblet, contexto, conexion o esquema que sirve, usalo o extiendelo; no lo dupliques.",
+    detail:
+      "Dos jobs con la misma conexion a base de datos y dos contextos con variables casi iguales se desincronizan con el tiempo. Si la conexion del proyecto sirve, referenciala; si falta un campo, extiende el existente.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "contexto-de-proyecto",
+    rule: "Rutas, hosts, usuarios y credenciales van en variables de contexto, nunca como literales en un componente.",
+    detail:
+      "Un `\"C:/datos/entrada.csv\"` escrito en un tFileInputDelimited obliga a editar el job al pasar a produccion. Con una variable de contexto basta con cambiar el valor del entorno.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "conexion-de-repositorio",
+    rule: "Si el repositorio ya tiene la conexion o el esquema, referencialo (`talend_job_assign_repository_schema`) en vez de repetir su configuracion.",
+    detail:
+      "Repetir host, puerto y esquema en cada componente hace que un cambio de servidor deba aplicarse en decenas de sitios. Un componente ligado al repositorio se actualiza en un solo lugar.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "nombres-del-proyecto",
+    rule: "Usa el prefijo, la carpeta y el formato de nombre que ya dominan en el proyecto; no inventes otro.",
+    detail:
+      "Si el proyecto usa `ETL_` y carpetas por area, un job `prueba2` fuera de esa convencion se pierde en el arbol y rompe los filtros del equipo. Antes de nombrar, mira los nombres de los jobs existentes.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "un-job-una-responsabilidad",
+    rule: "Un job hace una cosa; separa extraer, transformar y cargar cuando la logica crece y orquesta con un padre.",
+    detail:
+      "Un job que lee, transforma, valida y carga en un solo lienzo es dificil de depurar y de reutilizar. Separarlo en un job por etapa y un padre que las llame con tRunJob deja cada fallo localizado.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "logica-comun-en-hijo",
+    rule: "Lo que se repite en dos o mas jobs va a un job hijo (`tRunJob`) o a un joblet que ya exista; no fabriques joblets a mano.",
+    detail:
+      "Si dos jobs validan el mismo fichero con los mismos componentes, copiar el bloque obliga a corregir el error dos veces. Un hijo llamado con tRunJob, o un joblet ya existente, guarda la logica en un sitio.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "control-de-errores",
+    rule: "Maneja errores como lo hace el proyecto (triggers `OnSubjobError`/`OnComponentError`, `tDie`, `tLogCatcher`); un job sin ruta de error no esta terminado.",
+    detail:
+      "Un job sin ruta de error falla sin dejar rastro y el padre sigue como si nada. Conecta OnSubjobError u OnComponentError al registro de errores del proyecto, o a un tDie cuando el fallo debe parar la cadena.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "sin-componentes-huerfanos",
+    rule: "Todo componente queda conectado y los `tLogRow` de depuracion no se entregan.",
+    detail:
+      "Un componente sin conexion compila, pero no hace nada y confunde al siguiente que lea el job. Un tLogRow de depuracion dejado en produccion imprime cada fila en el log del servidor.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "esquemas-explicitos",
+    rule: "Define los esquemas con tipos concretos; evita columnas dinamicas salvo necesidad real.",
+    detail:
+      "Un esquema con columnas dinamicas no deja que Studio valide los tipos y los errores aparecen en ejecucion, no al disenar. Declara cada columna con su tipo (id_String, id_Integer...) y usa dinamico solo si el origen cambia de forma.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "preguntar-huecos",
+    rule: "Si falta un dato que cambia el resultado y no hay un valor razonable por defecto, pregunta al usuario, de una en una y con la opcion recomendada primero; no inventes rutas, credenciales ni nombres de base de datos.",
+    detail:
+      "Una ruta o una base de datos inventadas compilan y fallan solo en produccion, donde nadie espera el error. Pregunta el dato que falta, de uno en uno, y propone primero la opcion recomendada para que el usuario decida rapido.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "cambios-minimos-en-existentes",
+    rule: "Al editar un job existente haz `dryRun`, revisa el diff y no renombres ni reordenes lo que no se pidio.",
+    detail:
+      "Renombrar o reordenar componentes de un job en uso cambia el nombre de sus columnas de salida y rompe a quien las lee. El dryRun muestra el diff antes de escribir y deja claro que solo cambio lo pedido.",
+    appliesTo: CRITERIO_APPLIES_TO,
+  },
+  {
+    id: "etiquetas-con-sentido",
+    rule: "Ponle a cada componente una etiqueta que diga que hace (no `tMap_1`) y al job un proposito en su descripcion.",
+    detail:
+      "Un `tMap_1` no le dice nada al siguiente que abra el job, y un job sin descripcion no explica por que existe. Una etiqueta como `Unir clientes con pedidos` y una descripcion de una frase ahorran una lectura completa.",
+    appliesTo: CRITERIO_APPLIES_TO,
   },
 ];

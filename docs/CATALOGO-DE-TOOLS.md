@@ -3,7 +3,7 @@
 > Generado con `bun run docs:tools`. Fuente de verdad: registro de tools y `talend_guide`.
 > En tiempo de ejecucion, llama `talend_guide` para conocer el preset y las capacidades realmente expuestas.
 
-Tools registradas en el preset actual: **263**.
+Tools registradas en el preset actual: **264**.
 
 ## Empezar
 
@@ -33,6 +33,31 @@ Evita:
 - Si el bridge no responde, abre Talend Studio con el proyecto cargado y reinstala el plugin con `bun run scripts/start.ts --install-bridge`.
 
 **Completado cuando:** `talend_diagnose_environment` devuelve el proyecto y `talend_bridge_ping` responde ok.
+
+### Disenar un job antes de crearlo (`disenar-job`)
+
+Saber que se reutiliza, que se crea nuevo y que contexto usa el job, con el usuario confirmado en los huecos.
+
+**Cuando:** Antes de crear un job nuevo en un proyecto existente, para reutilizar jobs, contextos y conexiones ya presentes. Si el job ya existe, usa `editar-job`; si ya sabes el diseno, usa `crear-job`.
+
+1. `talend_project_profile`: Inventario, convenciones, huecos y candidatos de reutilizacion del proyecto, sin Studio.
+   - Ejemplo: `{"limit":25}`
+2. `talend_jobs_list` (opcional): Inventario de jobs, carpetas y prefijos. Solo FALLBACK si `talend_project_profile` no esta disponible.
+   - Ejemplo: `{"limit":50}`
+3. `talend_job_inspect` (opcional): Copiar la estructura de un job parecido: componentes, conexiones y contextos.
+   - Ejemplo: `{"job":"NOMBRE_DE_UN_JOB_PARECIDO"}`
+4. `talend_list_repository_contexts` (opcional): Contextos de proyecto del repositorio. Requiere Studio.
+5. `talend_list_repository_connections` (opcional): Conexiones compartidas que ya existen en el repositorio. Requiere Studio.
+6. `talend_job_plan`: Validar el diseno con `dryRun` antes de escribir nada.
+7. `talend_job_verify`: Cerrar con la verificacion del job creado: diseno, compilacion y avisos.
+   - Ejemplo: `{"job":"NOMBRE_DEL_JOB"}`
+
+Evita:
+- No hagas una bateria de preguntas generica: pregunta solo por huecos del inventario
+- Sin joblets en el proyecto, la logica comun va en un job hijo con tRunJob
+- Las convenciones se deducen de los nombres existentes: si dudas de una, confirmala con el usuario antes de copiarla.
+
+**Completado cuando:** Se sabe que se reutiliza, que se crea y que se le ha preguntado al usuario; `talend_job_verify` no devuelve error.
 
 ### Crear un job y dejarlo ejecutando (`crear-job`)
 
@@ -388,7 +413,7 @@ Saber que hacer, en que orden y con que tool.
 
 Punto de entrada para agentes: mapa de tareas de Talend con la secuencia exacta de tools, busqueda de tools, reglas de configuracion que evitan fallos silenciosos y estado del proyecto y del bridge. Empieza por mode=overview.
 
-**Uso:** riesgo write; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_guide
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_guide
 
 Argumentos principales:
 
@@ -407,7 +432,7 @@ Comprobar proyecto, Studio, bridge y permisos de lectura.
 
 Audita el entorno de Talend Studio.
 
-**Uso:** riesgo read; escribe/ejecuta; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_bridge_audit_environment
+**Uso:** riesgo read; solo lectura; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_bridge_audit_environment
 
 #### `talend_can_read_metadata`
 
@@ -431,7 +456,7 @@ Verifica si se puede leer el proyecto actual.
 
 Diagnostica el entorno de Talend: plataforma, workspace, proyecto, metadata y proceso del Studio.
 
-**Uso:** riesgo write; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_diagnose_environment
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_diagnose_environment
 
 #### `talend_studio_process`
 
@@ -781,7 +806,7 @@ Argumentos principales:
 
 Lista los comandos disponibles en el bridge.
 
-**Uso:** riesgo read; escribe/ejecuta; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_bridge_commands
+**Uso:** riesgo read; solo lectura; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_bridge_commands
 
 #### `talend_bridge_events_clear`
 
@@ -830,7 +855,7 @@ Argumentos principales:
 
 Lista las configuraciones de launch disponibles.
 
-**Uso:** riesgo read; escribe/ejecuta; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_bridge_launch_configs
+**Uso:** riesgo read; solo lectura; requiere Studio + bridge. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_bridge_launch_configs
 
 #### `talend_bridge_launch_runs`
 
@@ -1166,7 +1191,7 @@ Argumentos principales:
 
 Lee las últimas líneas de stdout/stderr de una ejecución.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_tail_run_output
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_tail_run_output
 
 Argumentos principales:
 
@@ -1182,7 +1207,7 @@ Explicar un error, mapearlo a un componente y sugerir el fix.
 
 Asocia un error a un componente del job.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_error_map_to_component
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_error_map_to_component
 
 Argumentos principales:
 
@@ -1467,7 +1492,7 @@ Argumentos principales:
 
 Lista los snapshots disponibles para el proyecto.
 
-**Uso:** riesgo write; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_snapshots_list
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_snapshots_list
 
 Argumentos principales:
 
@@ -1556,7 +1581,7 @@ Aprender y validar componentes contra Studio.
 
 Ejecuta mastery para todos los componentes del catálogo.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_mastery_all_components
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_mastery_all_components
 
 #### `talend_mastery_batch_continue`
 
@@ -1594,7 +1619,7 @@ Argumentos principales:
 
 Ejecuta mastery para un componente específico.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_mastery_component
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_mastery_component
 
 Argumentos principales:
 
@@ -1624,7 +1649,7 @@ Argumentos principales:
 
 Genera un reporte de mastery.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_mastery_report
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_mastery_report
 
 #### `talend_mastery_validate_in_studio`
 
@@ -1709,7 +1734,7 @@ Argumentos principales:
 
 Lista los conectores de un componente.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_components_connectors
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_components_connectors
 
 Argumentos principales:
 
@@ -1775,7 +1800,7 @@ Argumentos principales:
 
 Lista los parámetros de un componente.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_components_parameters
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_components_parameters
 
 Argumentos principales:
 
@@ -1849,7 +1874,7 @@ Argumentos principales:
 
 Busca componentes en el catálogo.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_components_search
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_components_search
 
 Argumentos principales:
 
@@ -1915,7 +1940,7 @@ Argumentos principales:
 
 Detecta los componentes de base de datos disponibles para un tipo de conexión.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_connection_detect_available_db_components
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_connection_detect_available_db_components
 
 Argumentos principales:
 
@@ -2107,7 +2132,7 @@ Analizar requerimientos y armar planes.
 
 Analiza un enunciado de taller y detecta qué responsabilidades son de Talend vs externas, qué patrones se aplican y qué tools usar.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_task_analyze_requirements
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_task_analyze_requirements
 
 Argumentos principales:
 
@@ -2118,7 +2143,7 @@ Argumentos principales:
 
 Dado un enunciado, construye un plan de ejecución con pasos numerados usando las tools disponibles.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_task_build_execution_plan
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_task_build_execution_plan
 
 Argumentos principales:
 
@@ -2128,7 +2153,7 @@ Argumentos principales:
 
 Extrae solo las responsabilidades específicas de Talend del análisis de un requerimiento.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_task_extract_talend_responsibilities
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_task_extract_talend_responsibilities
 
 Argumentos principales:
 
@@ -2172,7 +2197,7 @@ Argumentos principales:
 
 Analiza los componentes tDBOutput (tMysqlOutput, tDBOutput) de un job para mostrar configuración de base de datos.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_analyze_tdboutput
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_analyze_tdboutput
 
 Argumentos principales:
 
@@ -2255,7 +2280,7 @@ Argumentos principales:
 
 Muestra el flujo de datos (conexiones) de un job.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_show_flow
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_show_flow
 
 Argumentos principales:
 
@@ -2607,7 +2632,7 @@ Argumentos principales:
 
 Planifica cambios sobre un job sin aplicarlos: valida las operaciones y devuelve el diff. mode=auto elige offline o Studio.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_job_plan
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_job_plan
 
 Argumentos principales:
 
@@ -2657,7 +2682,7 @@ Argumentos principales:
 
 Genera un reporte de calidad de un job Talend con puntaje, severidad y soluciones sugeridas. Solo lectura.
 
-**Uso:** riesgo write; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_job_quality_report
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_job_quality_report
 
 Argumentos principales:
 
@@ -2996,7 +3021,7 @@ Argumentos principales:
 
 Describe una operación registrada (Code Mode).
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_describe
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_describe
 
 Argumentos principales:
 
@@ -3104,7 +3129,7 @@ Argumentos principales:
 
 Consulta el estado de una operación asíncrona por operationId, incluido su resultado terminal.
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_operations_status
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_operations_status
 
 Argumentos principales:
 
@@ -3128,7 +3153,7 @@ Argumentos principales:
 
 Muestra previsualización de eliminación de un componente Talend.
 
-**Uso:** riesgo read; escribe/ejecuta; requiere confirmacion; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_preview_delete_component
+**Uso:** riesgo read; solo lectura; requiere confirmacion; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_preview_delete_component
 
 Argumentos principales:
 
@@ -3140,7 +3165,7 @@ Argumentos principales:
 
 Muestra previsualización de eliminación de una conexión Talend.
 
-**Uso:** riesgo read; escribe/ejecuta; requiere confirmacion; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_preview_delete_connection
+**Uso:** riesgo read; solo lectura; requiere confirmacion; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_preview_delete_connection
 
 Argumentos principales:
 
@@ -3162,6 +3187,18 @@ Argumentos principales:
 - `schemaName` (string, obligatorio): Nombre del schema
 - `columnName` (string, obligatorio): Nombre de la columna
 - `patch` (object, obligatorio)
+
+#### `talend_project_profile`
+
+Perfil de un proyecto Talend (solo lectura, sin Studio): inventario de jobs, joblets, contextos, rutinas y metadata, convenciones de nombres, huecos y candidatos de reutilizacion para un proposito.
+
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_project_profile
+
+Argumentos principales:
+
+- `projectPath` (string, opcional): Ruta del proyecto Talend. Si se omite, el proyecto abierto o configurado
+- `limit` (integer, opcional): Maximo de items por categoria del inventario (el total es el real)
+- `purpose` (string, opcional): Proposito del job nuevo; busca candidatos de reutilizacion
 
 #### `talend_recipe_generate`
 
@@ -3260,7 +3297,7 @@ Argumentos principales:
 
 Busca operaciones del catálogo por texto (Code Mode).
 
-**Uso:** riesgo read; escribe/ejecuta; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_search
+**Uso:** riesgo read; solo lectura; funciona sin Studio. **Version:** 1.0.0. **Docs:** https://github.com/AndresGaibor/talend-mcp/blob/main/docs/CATALOGO-DE-TOOLS.md#talend_search
 
 Argumentos principales:
 
