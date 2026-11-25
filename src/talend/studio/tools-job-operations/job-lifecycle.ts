@@ -14,6 +14,14 @@ import { jobDiagnosticsTools } from "../tools-job-diagnostics";
 import { componentCatalogTools } from "../tools-component-catalog";
 
 import { nodeConnectionTools } from "../tools-node-connection";
+import { esperarInterfazLibre } from "../interfaz-libre";
+
+const REINTENTOS_INTERFAZ = 3;
+
+function interfazOcupada(error: unknown): boolean {
+  const texto = typeof error === "string" ? error : JSON.stringify(error ?? "");
+  return /ocupad/i.test(texto);
+}
 export const jobLifecycle = [
 {
     name: "talend_job_create_in_studio",
@@ -41,7 +49,15 @@ export const jobLifecycle = [
       framework?: string;
     }) => {
       const bridge = await loadBridge();
-      const result = await bridge.createJob({ name, version, folder, description, replace, jobType, framework });
+      const crear = () => bridge.createJob({ name, version, folder, description, replace, jobType, framework });
+      // Studio puede tener el hilo de interfaz ocupado (un dialogo modal o una compilacion en curso): se espera
+      // a que responda y se reintenta la creacion solo si el fallo es de interfaz ocupada.
+      await esperarInterfazLibre(bridge);
+      let result = await crear();
+      for (let intento = 1; intento <= REINTENTOS_INTERFAZ && !result.ok && interfazOcupada(result.error); intento++) {
+        await esperarInterfazLibre(bridge);
+        result = await crear();
+      }
       return bridgeOk({
         ok: result.ok,
         source: result.source,
