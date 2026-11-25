@@ -127,6 +127,10 @@ Si Studio no se detecta, define `TALEND_STUDIO_HOME` con la carpeta que contiene
 
 ## Desinstalar o desactivar
 
+Hay tres niveles: desactivar el servidor en los clientes, borrar lo local y quitar el plugin de Talend
+Studio. Los dos primeros están automatizados; el plugin se quita aparte, porque vive dentro de Studio y no
+en las carpetas de usuario.
+
 **Desactivar sin borrar nada** (útil para probar, cambiar de cliente o dejar de usarlo un tiempo):
 
 ```bash
@@ -137,7 +141,13 @@ talend-mcp remove --dry-run        # muestra qué haría, sin escribir nada
 
 El binario y el historial se conservan: puedes reactivarlo con `talend-mcp setup`.
 
-**Desinstalar por completo** (entradas de los clientes, binario, historial, token del Bridge y PATH):
+Esto **no toca el plugin Bridge de Talend Studio**. El plugin sigue instalado y arranca con Studio,
+escuchando en `127.0.0.1:3930`; sin un cliente MCP que lo llame queda inactivo. Su guardián de diálogos
+está apagado por defecto (`autoDismissModals: false` en `~/.talend-bridge/config.json`) y, si se activa,
+solo pulsa los diálogos conocidos. Dejarlo instalado no cierra ventanas de Studio.
+
+**Desinstalar lo local** (entradas de los clientes, PATH, binario, historial, configuración y token del
+Bridge):
 
 **Windows (PowerShell)**
 
@@ -152,9 +162,25 @@ curl -fsSL https://github.com/AndresGaibor/talend-mcp/releases/latest/download/u
 ```
 
 Pide confirmación antes de borrar y después indica qué queda pendiente. Para ejecutarlo sin preguntas,
-define `TALEND_MCP_YES=1`; para conservar el historial, `TALEND_MCP_KEEP_STATE=1`. El plugin Bridge dentro
-de Studio se quita aparte, desde **Help > About > Installation Details > Installed Software**
-(`com.andres.talend.bridge`). Reinicia el cliente MCP al terminar.
+define `TALEND_MCP_YES=1`; para conservar el historial, `TALEND_MCP_KEEP_STATE=1`. Borra `~/.talend-mcp`
+y `~/.talend-bridge`, así que el Bridge de Studio se queda sin configuración ni token.
+
+Ese borrado **tampoco quita el plugin**: si sigue instalado, al abrir Studio vuelve a crear
+`~/.talend-bridge` con los valores por defecto (solo lectura) y un token nuevo. No queda desactivado por
+haber borrado la carpeta.
+
+**Quitar el plugin de Studio**, si ya no quieres el trabajo en vivo:
+
+1. Abre Talend Studio.
+2. Ve a **Help > About > Installation Details > Installed Software**.
+3. Selecciona `com.andres.talend.bridge` y pulsa **Uninstall**.
+4. Acepta y reinicia Studio.
+
+El plugin forma parte de este repositorio
+([github.com/AndresGaibor/talend-mcp](https://github.com/AndresGaibor/talend-mcp), código en
+`talend-studio-bridge/`). Sin él, el MCP sigue funcionando en
+[modo offline](docs/MODO-OFFLINE.md) para lotes, migraciones y jobs cerrados. Reinicia el cliente MCP al
+terminar.
 
 ## Qué puedes pedirle
 
