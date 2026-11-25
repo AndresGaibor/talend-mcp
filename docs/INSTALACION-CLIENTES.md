@@ -40,9 +40,10 @@ JSON válido (por ejemplo, con comentarios) lo deja intacto y te lo dice. Reinic
 Para comprobar la versión: `talend-mcp version`.
 
 **Desinstalar:** el release publica `uninstall.ps1` y `uninstall.sh`, que quitan las entradas de los
-clientes, el PATH y los datos locales. También puedes desactivar solo el servidor con
-`talend-mcp remove`. El plugin Bridge se quita aparte desde Studio, en
-**Help > About > Installation Details > Installed Software** (`com.andres.talend.bridge`).
+clientes, el PATH, los datos locales y, antes de borrar el binario, el plugin Bridge con
+`talend-mcp bridge uninstall`. p2 necesita Studio cerrado: si está abierto, el script avisa y deja el plugin
+para que lo quites después, a mano desde **Help > About > Installation Details > Installed Software**
+(`com.andres.talend.bridge`). También puedes desactivar solo el servidor con `talend-mcp remove`.
 
 **Variables del instalador:** `TALEND_MCP_NO_SETUP=1` (solo instala el binario),
 `TALEND_MCP_NO_PATH=1` (no toca el PATH), `TALEND_MCP_RELEASE_URL` (otra fuente, por ejemplo un espejo
@@ -65,6 +66,7 @@ de tu Studio):
 ```bash
 talend-mcp bridge install --dry-run   # comprueba todo y explica qué haría, sin tocar Studio
 talend-mcp bridge install
+talend-mcp bridge uninstall           # quita el plugin; Studio cerrado
 ```
 
 | Situación de Studio | Qué hace |
@@ -72,6 +74,9 @@ talend-mcp bridge install
 | **Cerrado** | Instala (o actualiza) el plugin con p2. Es la primera instalación. |
 | **Abierto con el plugin cargado** | Actualiza en caliente, sin reiniciar Studio. |
 | **Abierto sin el plugin** | Se niega y te pide cerrarlo: p2 no puede instalar con Studio corriendo. |
+
+`bridge uninstall` usa el mismo director de p2 y también exige Studio cerrado. Sin el plugin, el MCP sigue
+funcionando en modo offline.
 
 Si Studio no se detecta, define `TALEND_STUDIO_HOME` (la carpeta con `plugins/` y `features/`). Sin red,
 descarga el zip del release y usa `talend-mcp bridge install --from <zip|carpeta>`. La instalación manual

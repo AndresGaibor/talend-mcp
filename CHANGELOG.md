@@ -4,6 +4,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 [SemVer](https://semver.org/lang/es/). El workflow de release usa la sección de la versión como
 notas del release: una versión sin sección no se publica.
 
+## [0.1.5] - 2026-11-25
+
+### Añadido
+
+- `talend-mcp bridge uninstall`: quita el plugin del bridge de Talend Studio con el director de p2. Acepta
+  `--dry-run`, exige Studio cerrado y no toca nada si el plugin no está instalado.
+- Los desinstaladores ejecutan `bridge uninstall` antes de borrar el binario. Si Studio está abierto, avisan
+  y dejan el plugin; si el binario es anterior a esta versión, dicen cómo actualizarlo.
+- El README y la guía de instalación separan los tres niveles: desactivar en los clientes, borrar lo local y
+  quitar el plugin de Studio.
+
+### Cambiado
+
+- `talend-mcp bridge` acepta `install` y `uninstall`; la ayuda de la CLI lista el comando nuevo.
+
 ## [0.1.4] - 2026-11-25
 
 ### Corregido

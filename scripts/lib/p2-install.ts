@@ -20,5 +20,6 @@ export { prepareWorkspace } from "./p2-install/workspace";
 export {
   installNew,
   installedFeatureVersion,
+  uninstallFeature,
   uninstallPrevious,
 } from "./p2-install/director";

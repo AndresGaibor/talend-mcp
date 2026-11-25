@@ -23,6 +23,18 @@ export function uninstallPrevious(studio: StudioInstall, data: string): void {
   }
 }
 
+/** Quita el plugin instalado. Devuelve `true` si p2 acepto la desinstalacion. */
+export function uninstallFeature(studio: StudioInstall, data: string): boolean {
+  const status = p2Director(studio, [
+    "-application", "org.eclipse.equinox.p2.director",
+    "-uninstallIU", FEATURE_IU,
+    "-destination", studio.studioDir,
+    "-data", data,
+    "-nosplash", "-console",
+  ]);
+  return status === 0;
+}
+
 export function installNew(studio: StudioInstall, repoDir: string, data: string): boolean {
   const normalized = repoDir.replace(/\\/g, "/");
   // En Windows la URI de un drive necesita tres barras: file:///C:/ruta

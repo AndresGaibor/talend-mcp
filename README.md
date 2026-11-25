@@ -114,6 +114,7 @@ actualiza en caliente, sin reiniciar. Para reintentar manualmente:
 ```bash
 talend-mcp bridge install --dry-run   # comprueba todo y explica qué haría, sin tocar Studio
 talend-mcp bridge install
+talend-mcp bridge uninstall           # quitar el plugin (Studio cerrado)
 ```
 
 Con Studio **cerrado** instala el plugin; con Studio **abierto y el plugin ya cargado** lo actualiza en
@@ -144,10 +145,11 @@ El binario y el historial se conservan: puedes reactivarlo con `talend-mcp setup
 Esto **no toca el plugin Bridge de Talend Studio**. El plugin sigue instalado y arranca con Studio,
 escuchando en `127.0.0.1:3930`; sin un cliente MCP que lo llame queda inactivo. Su guardián de diálogos
 está apagado por defecto (`autoDismissModals: false` en `~/.talend-bridge/config.json`) y, si se activa,
-solo pulsa los diálogos conocidos. Dejarlo instalado no cierra ventanas de Studio.
+solo pulsa los diálogos conocidos. Dejarlo instalado no cierra ventanas de Studio. Para quitarlo,
+`talend-mcp bridge uninstall` con Studio cerrado, o a mano desde Studio (ver el final de esta sección).
 
-**Desinstalar lo local** (entradas de los clientes, PATH, binario, historial, configuración y token del
-Bridge):
+**Desinstalar por completo** (entradas de los clientes, PATH, binario, historial, configuración, token del
+Bridge y plugin de Studio):
 
 **Windows (PowerShell)**
 
@@ -162,14 +164,21 @@ curl -fsSL https://github.com/AndresGaibor/talend-mcp/releases/latest/download/u
 ```
 
 Pide confirmación antes de borrar y después indica qué queda pendiente. Para ejecutarlo sin preguntas,
-define `TALEND_MCP_YES=1`; para conservar el historial, `TALEND_MCP_KEEP_STATE=1`. Borra `~/.talend-mcp`
-y `~/.talend-bridge`, así que el Bridge de Studio se queda sin configuración ni token.
+define `TALEND_MCP_YES=1`; para conservar el historial, `TALEND_MCP_KEEP_STATE=1`. Borra `~/.talend-mcp` y
+`~/.talend-bridge` y, antes de borrar el binario, ejecuta `talend-mcp bridge uninstall`.
 
-Ese borrado **tampoco quita el plugin**: si sigue instalado, al abrir Studio vuelve a crear
-`~/.talend-bridge` con los valores por defecto (solo lectura) y un token nuevo. No queda desactivado por
-haber borrado la carpeta.
+p2 no puede modificar Studio mientras está abierto: en ese caso el script avisa, deja el plugin y sigue con
+la limpieza local. Cierra Studio y ejecuta `talend-mcp bridge uninstall` para terminar. Con un binario
+anterior a 0.1.5 el script tampoco sabe quitarlo; actualiza primero con el instalador.
 
-**Quitar el plugin de Studio**, si ya no quieres el trabajo en vivo:
+**Quitar el plugin suelto** (sin desinstalar el MCP):
+
+```bash
+talend-mcp bridge uninstall            # Studio cerrado
+talend-mcp bridge uninstall --dry-run  # ver qué haría, sin tocar Studio
+```
+
+O desde Studio:
 
 1. Abre Talend Studio.
 2. Ve a **Help > About > Installation Details > Installed Software**.

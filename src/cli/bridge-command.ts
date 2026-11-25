@@ -45,10 +45,21 @@ function findRepo(dir: string): string | null {
   return null;
 }
 
-/** `talend-mcp bridge install [--from <zip|carpeta>] [--dry-run]` */
+/** `talend-mcp bridge install [--from <zip|carpeta>] [--dry-run]` o `bridge uninstall [--dry-run]` */
 export async function runBridgeCommand(opts: { action?: string; from?: string; dryRun: boolean }): Promise<number> {
+  if (opts.action === "uninstall") {
+    try {
+      const { uninstallBridge } = await import("../../scripts/uninstall-bridge");
+      process.exitCode = 0;
+      await uninstallBridge({ dryRun: opts.dryRun });
+      return Number(process.exitCode ?? 0);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      return 1;
+    }
+  }
   if (opts.action !== "install") {
-    console.error("Uso: talend-mcp bridge install [--from <zip|carpeta>] [--dry-run]");
+    console.error("Uso: talend-mcp bridge <install|uninstall> [--from <zip|carpeta>] [--dry-run]");
     return 2;
   }
   const work = mkdtempSync(join(tmpdir(), "talend-bridge-"));

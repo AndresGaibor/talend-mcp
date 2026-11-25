@@ -9,7 +9,8 @@ $bridge = Join-Path $HOME '.talend-bridge'
 $staging = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'talend-mcp' } else { $null }
 
 if (-not (Test-Path $root) -and -not (Test-Path $bridge)) {
-  Write-Host "talend-mcp no esta instalado en este equipo."
+  Write-Host "No se encontro la instalacion local de talend-mcp."
+  Write-Host "Si el plugin Bridge sigue en Talend Studio, quitalo desde Help > About > Installation Details > Installed Software (com.andres.talend.bridge)."
   return
 }
 
@@ -28,6 +29,24 @@ if (Test-Path $exe) {
   }
 } else {
   Write-Host "No se encontro el binario; se omite la limpieza de los clientes MCP."
+}
+
+# El plugin vive dentro de Talend Studio: se quita con p2 y necesita Studio cerrado.
+$pluginPendiente = $false
+if (Test-Path $exe) {
+  Write-Host "Quitando el plugin Bridge de Talend Studio..."
+  & $exe bridge uninstall
+  if ($LASTEXITCODE -eq 2) {
+    $pluginPendiente = $true
+    Write-Warning "Esta version del binario no sabe quitar el plugin."
+    Write-Host "Actualiza con install.ps1 y vuelve a ejecutar."
+  } elseif ($LASTEXITCODE -ne 0) {
+    $pluginPendiente = $true
+    Write-Warning "El plugin Bridge sigue instalado (o Talend Studio estaba abierto)."
+    Write-Host "Cierra Talend Studio y ejecuta: talend-mcp bridge uninstall"
+  }
+} else {
+  $pluginPendiente = $true
 }
 
 # El instalador anadio esta carpeta al PATH de usuario: se quita para no dejar una ruta muerta.
@@ -56,4 +75,6 @@ try {
 
 Write-Host "talend-mcp desinstalado."
 Write-Host "Abre una terminal nueva para que el PATH actualizado tenga efecto."
-Write-Host "El plugin Bridge dentro de Talend Studio se quita desde Help > About > Installation Details > Installed Software (com.andres.talend.bridge)."
+if ($pluginPendiente) {
+  Write-Host "El plugin Bridge sigue en Talend Studio: quitalo desde Help > About > Installation Details > Installed Software (com.andres.talend.bridge)."
+}

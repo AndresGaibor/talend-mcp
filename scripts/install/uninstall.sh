@@ -9,7 +9,8 @@ EXE="$BIN/talend-mcp"
 BRIDGE="$HOME/.talend-bridge"
 
 if [ ! -d "$ROOT" ] && [ ! -d "$BRIDGE" ]; then
-  echo "talend-mcp no esta instalado en este equipo."
+  echo "No se encontro la instalacion local de talend-mcp."
+  echo "Si el plugin Bridge sigue en Talend Studio, quitalo desde Help > About > Installation Details > Installed Software (com.andres.talend.bridge)."
   exit 0
 fi
 
@@ -36,6 +37,24 @@ else
   echo "No se encontro el binario; se omite la limpieza de los clientes MCP."
 fi
 
+# El plugin vive dentro de Talend Studio: se quita con p2 y necesita Studio cerrado.
+PLUGIN_PENDIENTE=0
+if [ -x "$EXE" ]; then
+  echo "Quitando el plugin Bridge de Talend Studio..."
+  status=0
+  "$EXE" bridge uninstall || status=$?
+  if [ "$status" -eq 2 ]; then
+    PLUGIN_PENDIENTE=1
+    echo "Esta version del binario no sabe quitar el plugin; actualiza con install.sh y vuelve a ejecutar." >&2
+  elif [ "$status" -ne 0 ]; then
+    PLUGIN_PENDIENTE=1
+    echo "El plugin Bridge sigue instalado (o Talend Studio estaba abierto)." >&2
+    echo "Cierra Talend Studio y ejecuta: talend-mcp bridge uninstall" >&2
+  fi
+else
+  PLUGIN_PENDIENTE=1
+fi
+
 if [ -n "${TALEND_MCP_KEEP_STATE:-}" ]; then
   rm -rf "$BIN"
 else
@@ -45,4 +64,6 @@ rm -rf "$BRIDGE"
 
 echo "talend-mcp desinstalado."
 echo "Quita $BIN del PATH de tu shell si lo anadiste a mano."
-echo "El plugin Bridge dentro de Talend Studio se quita desde Help > About > Installation Details > Installed Software (com.andres.talend.bridge)."
+if [ "$PLUGIN_PENDIENTE" -eq 1 ]; then
+  echo "El plugin Bridge sigue en Talend Studio: quitalo desde Help > About > Installation Details > Installed Software (com.andres.talend.bridge)."
+fi

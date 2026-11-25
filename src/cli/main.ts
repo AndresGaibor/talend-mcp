@@ -27,6 +27,7 @@ Comandos:
   setup                       Configurar los clientes MCP detectados
   remove                      Quitar talend-mcp de los clientes
   bridge install              Instalar el plugin de Talend Studio (Studio cerrado, o abierto para actualizar)
+  bridge uninstall            Quitar el plugin de Talend Studio (Studio cerrado)
   version                     Mostrar la version
 
 Opciones comunes:
@@ -41,7 +42,7 @@ Opciones comunes:
   --idempotency-key <clave>   Evitar repetir una escritura reenviada desde CLI
   --port <n>                  Puerto para mcp serve
   --client <lista>            setup/remove: claude-code,claude-desktop,vscode,cursor,gemini,codex
-  --dry-run                   setup/remove/bridge install: mostrar sin escribir
+  --dry-run                   setup/remove/bridge install/bridge uninstall: mostrar sin escribir
   --from <zip|carpeta>        bridge install: update site local en lugar de descargarlo
   --help                      Mostrar esta ayuda
 `;
