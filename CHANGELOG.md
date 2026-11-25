@@ -4,6 +4,31 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 [SemVer](https://semver.org/lang/es/). El workflow de release usa la sección de la versión como
 notas del release: una versión sin sección no se publica.
 
+## [0.1.3] - 2026-11-25
+
+### Añadido
+
+- `talend_project_profile`: perfil de solo lectura y sin Studio con el inventario del proyecto, las
+  convenciones de nombres, los huecos que hay que preguntar y los candidatos de reutilización para un
+  propósito. Se expone en el preset `agent`.
+- Tarea `disenar-job` en `talend_guide` y 14 reglas de criterio para reutilizar contextos, conexiones y
+  jobs existentes, nombrar según el proyecto y no dejar jobs sin control de errores.
+- Documento de diseño y plan de la línea de criterio profesional en `docs/superpowers/`.
+
+### Corregido
+
+- Las definiciones de componentes refrescan el índice una vez antes de responder que no existe y ya no
+  afirman que un componente no está instalado solo porque falte su XML.
+- La guarda de jobs abiertos reconoce títulos sin el prefijo `Job`/`Process` y no confunde `MIG_A` con
+  `MIG_AB`.
+- Las escrituras al bridge atienden los diálogos modales que aparecen durante la espera y reintentan
+  cuando Studio responde que la interfaz está ocupada.
+
+### Cambiado
+
+- Las instrucciones del servidor y la skill indican diseñar el job (perfil del proyecto, reutilización y
+  preguntas) antes de crearlo o editarlo.
+
 ## [0.1.2] - 2026-11-25
 
 ### Añadido

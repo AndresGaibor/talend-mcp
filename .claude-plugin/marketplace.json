@@ -7,7 +7,7 @@
       "name": "talend-mcp",
       "source": "./plugins/talend-mcp",
       "description": "Servidor MCP y skill para operar jobs de Qlik Talend Studio. Requiere el binario talend-mcp en el PATH (ver el instalador).",
-      "version": "0.1.2"
+      "version": "0.1.3"
     }
   ]
 }
