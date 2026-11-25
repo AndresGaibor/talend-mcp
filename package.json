@@ -51,7 +51,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cfworker/json-schema": "^4.1.1",
+    "@cfworker/json-schema": "^4.1.6",
     "@modelcontextprotocol/node": "^2.0.0-alpha.2",
     "@modelcontextprotocol/server": "^2.0.0-alpha.2",
     "fast-xml-parser": "^5.8.0",
