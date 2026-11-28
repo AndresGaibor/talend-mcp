@@ -321,3 +321,5 @@ Si alguno de los dos falla antes de tu cambio, el problema es preexistente: repo
 Una carpeta nueva que aparezca sola en la raiz, con un nombre raro, es un error de alguna
 ejecucion: busca quien la creo antes de commitearla. Si aparece `@TESTDATA@`, un escenario L5 no
 sustituyo su placeholder (regla 12).
+
+- CodeRabbit revisa los pull requests de este repositorio. Tras abrir o actualizar un PR, comenta `@coderabbitai review` y espera el check `CodeRabbit`; aplica cada hallazgo o responde por qué no aplica.
