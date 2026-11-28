@@ -1,0 +1,48 @@
+# Configuración de CodeRabbit — https://docs.coderabbit.ai/reference/configuration
+language: es
+
+reviews:
+  profile: chill
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - ".*"
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/.next/**"
+    - "!**/coverage/**"
+    - "!**/.venv/**"
+    - "!**/venv/**"
+    - "!**/__pycache__/**"
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!**/bun.lock"
+    - "!**/uv.lock"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
+    - "!**/generated/**"
+    - "!addons/**"
+    - "!testdata/**"
+    - "!.claude-plugin/**"
+  path_instructions:
+    - path: "**/*.ts"
+      instructions: |
+        - No admitas `any` nuevo ni `as` que silencien errores de tipo.
+        - Señala `await` faltante, promesas sin `.catch`/`try` y `async` sin manejo de error.
+    - path: "**/*.tsx"
+      instructions: |
+        - Comprueba estados de carga/error y que no se filtren secretos al cliente.
+    - path: "**/*.test.ts"
+      instructions: |
+        - Exige que la prueba cubra el camino de error, no solo el feliz.
+
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      - "**/AGENTS.md"
+      - "**/CLAUDE.md"
+      - "**/CONTRIBUTING.md"
